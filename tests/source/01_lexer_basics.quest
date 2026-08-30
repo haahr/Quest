@@ -1,0 +1,16 @@
+(* Basic Quest Lexer Test *)
+
+Let T = Tuple
+    x: Int
+    y: Real
+end;
+
+let origin : T = tuple
+    x = 0
+    y = 0.0
+end;
+
+let add(p1: T, p2: T): T = tuple
+    x = p1.x + p2.x
+    y = p1.y + p2.y
+end;

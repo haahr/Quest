@@ -1,0 +1,28 @@
+# Python artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+.pytest_cache/
+.coverage
+htmlcov/
+
+# macOS metadata
+.DS_Store
+
+# Editors / Swap files
+*~
+*.swp
+*.swo
+.vscode/
+.idea/
+
+# C and Native build outputs
+*.o
+*.a
+*.so
+*.dylib
+*.out
+build/
+bin/
+dist/
