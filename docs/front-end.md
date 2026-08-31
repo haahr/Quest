@@ -8,10 +8,12 @@ This document specifies the architecture, data structures, and APIs for the **Qu
 
 The front-end is responsible for converting raw Quest source text (`.quest`) into an immutable, strongly-typed Abstract Syntax Tree (AST). In accordance with the project plan:
 
-- **Mostly-Functional Style:** The Python bootstrap implementation (in `bootstrap/python/quest/`) uses pure functions, immutable data structures (`@dataclass(frozen=True)`), and pattern matching (`match ... case`) to facilitate a direct subsequent port to Quest (in `src/`).
+- **Target Runtime:** Python 3.10+ (using Python 3.11 at `/opt/homebrew/opt/python@3.11/libexec/bin/python`), enabling native pattern matching (`match ... case`) and `dataclasses.KW_ONLY`.
+- **Mostly-Functional Style:** Pure functions, immutable data structures (`@dataclass(frozen=True)`), and algebraic type decompositions to facilitate a direct subsequent port to Quest (in `src/`).
 - **Dedicated AST Namespace:** All AST nodes live in a dedicated module (`quest.ast`) to prevent name collisions with standard Python built-ins or compiler passes.
 - **Zero External Dependencies:** Built entirely with standard library facilities to ensure immediate portability.
 - **Precision Diagnostics:** Retains full source fidelity with character-offset tracking, enabling formatted error messages with line numbers, column numbers, and underlined source context.
+- **Root `offset` via `KW_ONLY`:** The root `ASTNode` declares `offset: int = 0` with `KW_ONLY`, allowing subclasses to define purely positional semantic fields while automatically inheriting optional keyword `offset` tracking and clean `__match_args__`.
 - **Canonical S-Expression Serialization:** Provides an `ast_dump()` utility emitting deterministic, 2-space indented S-expressions for golden test verification (`tests/golden/parse/<name>.out`).
 - **Dual Execution Modes:** Supports batch compilation (strings and files) and incremental streaming for the interactive REPL.
 
@@ -308,16 +310,19 @@ To avoid name collisions with Python built-ins (e.g. `type`, `tuple`, `eval`) or
 
 ### 4.1. Base Node and Parameter Structures
 
+In Python 3.10+, `ASTNode` declares `_: KW_ONLY` and `offset: int = 0`. Subclasses define purely positional semantic fields, while automatically inheriting keyword-only `offset` tracking:
+
 ```python
 from __future__ import annotations
-from dataclasses import dataclass
+from dataclasses import dataclass, KW_ONLY
 from enum import Enum, auto
 from typing import Optional, Union
 
 @dataclass(frozen=True)
 class ASTNode:
     """Base class for all AST nodes."""
-    offset: int
+    _: KW_ONLY
+    offset: int = 0
 
 class ParamMode(Enum):
     VALUE = auto()
@@ -328,23 +333,20 @@ class ParamMode(Enum):
 class FormalParam(ASTNode):
     """Value-level function parameter: [var | out] x : T"""
     name: str
-    type_annot: Optional[Type]
-    mode: ParamMode
-    offset: int
+    type_annot: Optional[Type] = None
+    mode: ParamMode = ParamMode.VALUE
 
 @dataclass(frozen=True)
 class TypeFormal(ASTNode):
     """Type-level parameter: X <: B or X :: K"""
     name: str
     bound: Kind
-    offset: int
 
 @dataclass(frozen=True)
 class Quantifier(ASTNode):
     """Universal/existential quantifier: X <: B or X :: K"""
     name: str
     bound: Kind
-    offset: int
 ```
 
 ---
@@ -360,13 +362,12 @@ class Kind(ASTNode):
 @dataclass(frozen=True)
 class KindType(Kind):
     """TYPE — the base kind of all ground types."""
-    offset: int
+    pass
 
 @dataclass(frozen=True)
 class KindPower(Kind):
     """POWER(T) — the kind of all subtypes of type T."""
     bound: Type
-    offset: int
 
 @dataclass(frozen=True)
 class KindAll(Kind):
@@ -374,20 +375,17 @@ class KindAll(Kind):
     param_name: str
     param_kind: Kind
     body_kind: Kind
-    offset: int
 
 @dataclass(frozen=True)
 class KindId(Kind):
     """User-defined or aliased kind identifier."""
     name: str
-    offset: int
 
 @dataclass(frozen=True)
 class KindManifest(Kind):
     """Interface manifest kind path, e.g. I_K."""
     interface_name: str
     kind_name: str
-    offset: int
 ```
 
 ---
@@ -404,69 +402,59 @@ class Type(ASTNode):
 class TypePath(Type):
     """Named type or dot-projection path: e.g. 'Int', 'Point', 'Mod.T'."""
     path: tuple[str, ...]
-    offset: int
 
 @dataclass(frozen=True)
 class TypeAll(Type):
     """All(X <: B, Y :: K) T — universal type quantifier."""
     quantifiers: tuple[Quantifier, ...]
     result_type: Type
-    offset: int
 
 @dataclass(frozen=True)
 class FieldSig(ASTNode):
     """Field in a tuple or auto signature: [var | out] x : T"""
     name: str
     type_sig: Type
-    mode: ParamMode
-    offset: int
+    mode: ParamMode = ParamMode.VALUE
 
 @dataclass(frozen=True)
 class TypeTuple(Type):
     """Tuple x:Int, y:Real end — ordered dependent tuple signature."""
     fields: tuple[FieldSig, ...]
-    offset: int
 
 @dataclass(frozen=True)
 class RecordFieldSig(ASTNode):
     """Field in a record signature: [var] x : T"""
     name: str
     type_sig: Type
-    is_var: bool
-    offset: int
+    is_var: bool = False
 
 @dataclass(frozen=True)
 class TypeRecord(Type):
     """Record x:Int, y:Real end — unordered record type."""
     fields: tuple[RecordFieldSig, ...]
-    offset: int
 
 @dataclass(frozen=True)
 class OptionFieldSig(ASTNode):
     """Variant in an option signature: tag [with fields...]"""
     tag: str
-    payload_sig: tuple[FieldSig, ...]
-    offset: int
+    payload_sig: tuple[FieldSig, ...] = ()
 
 @dataclass(frozen=True)
 class TypeOption(Type):
     """Option red, green, blue with val:Int end — tagged union / option type."""
     variants: tuple[OptionFieldSig, ...]
-    offset: int
 
 @dataclass(frozen=True)
 class VariantFieldSig(ASTNode):
     """Field in a variant signature: [var] tag : T"""
     tag: str
     type_sig: Type
-    is_var: bool
-    offset: int
+    is_var: bool = False
 
 @dataclass(frozen=True)
 class TypeVariant(Type):
     """Variant ok:Int, err:String end — unordered variant type."""
     fields: tuple[VariantFieldSig, ...]
-    offset: int
 
 @dataclass(frozen=True)
 class TypeAuto(Type):
@@ -474,7 +462,6 @@ class TypeAuto(Type):
     type_param: Optional[str]
     kind_bound: Kind
     signature: tuple[FieldSig, ...]
-    offset: int
 
 @dataclass(frozen=True)
 class TypeFun(Type):
@@ -482,7 +469,6 @@ class TypeFun(Type):
     params: tuple[TypeFormal, ...]
     result_kind: Optional[Kind]
     body: Type
-    offset: int
 
 @dataclass(frozen=True)
 class TypeRec(Type):
@@ -490,14 +476,12 @@ class TypeRec(Type):
     var_name: str
     bound: Kind
     body: Type
-    offset: int
 
 @dataclass(frozen=True)
 class TypeApp(Type):
     """T(A, B) — type operator application."""
     constructor: Type
     arguments: tuple[Type, ...]
-    offset: int
 
 @dataclass(frozen=True)
 class TypeInfix(Type):
@@ -505,32 +489,27 @@ class TypeInfix(Type):
     left: Type
     op: str
     right: Type
-    offset: int
 
 @dataclass(frozen=True)
 class TypeArray(Type):
     """Array(T) — built-in array type."""
     element_type: Type
-    offset: int
 
 @dataclass(frozen=True)
 class TypeVar(Type):
     """Var(T) — mutable reference cell type."""
     element_type: Type
-    offset: int
 
 @dataclass(frozen=True)
 class TypeOut(Type):
     """Out(T) — contravariant output parameter mode."""
     element_type: Type
-    offset: int
 
 @dataclass(frozen=True)
 class TypeManifest(Type):
     """M_T — manifest type extraction across interfaces."""
     module_name: str
     type_name: str
-    offset: int
 ```
 
 ---
@@ -548,70 +527,60 @@ class Expr(ASTNode):
 class ExprInt(Expr):
     value: int
     lexeme: str
-    offset: int
 
 @dataclass(frozen=True)
 class ExprReal(Expr):
     value: float
     lexeme: str
-    offset: int
 
 @dataclass(frozen=True)
 class ExprChar(Expr):
     value: str
     lexeme: str
-    offset: int
 
 @dataclass(frozen=True)
 class ExprString(Expr):
     value: str
     lexeme: str
-    offset: int
 
 @dataclass(frozen=True)
 class ExprBool(Expr):
     value: bool
-    offset: int
 
 @dataclass(frozen=True)
 class ExprOk(Expr):
-    offset: int
+    pass
 
 @dataclass(frozen=True)
 class ExprId(Expr):
     name: str
-    offset: int
 
 # --- Blocks & Control Flow ---
 @dataclass(frozen=True)
 class ExprBlock(Expr):
     """begin ... end — sequence of bindings and statements."""
     bindings: tuple[BindingNode, ...]
-    offset: int
 
 @dataclass(frozen=True)
 class ExprIf(Expr):
     """if cond then e1 elsif cond2 then e2 else e3 end"""
     cond: Expr
     then_branch: Expr
-    elsifs: tuple[tuple[Expr, Expr], ...]   # tuple of (cond, body)
-    else_branch: Optional[Expr]
-    offset: int
+    elsifs: tuple[tuple[Expr, Expr], ...] = ()   # tuple of (cond, body)
+    else_branch: Optional[Expr] = None
 
 @dataclass(frozen=True)
 class ExprWhile(Expr):
     cond: Expr
     body: Expr
-    offset: int
 
 @dataclass(frozen=True)
 class ExprLoop(Expr):
     body: Expr
-    offset: int
 
 @dataclass(frozen=True)
 class ExprExit(Expr):
-    offset: int
+    pass
 
 @dataclass(frozen=True)
 class ExprFor(Expr):
@@ -620,7 +589,6 @@ class ExprFor(Expr):
     is_downto: bool
     stop: Expr
     body: Expr
-    offset: int
 
 # --- Functions & Applications ---
 @dataclass(frozen=True)
@@ -629,14 +597,12 @@ class ExprFun(Expr):
     params: tuple[FormalParam, ...]
     return_type: Optional[Type]
     body: Expr
-    offset: int
 
 @dataclass(frozen=True)
 class ExprApp(Expr):
     """f(a, b)"""
     func: Expr
     args: tuple[Expr, ...]
-    offset: int
 
 @dataclass(frozen=True)
 class ExprInfix(Expr):
@@ -644,159 +610,135 @@ class ExprInfix(Expr):
     left: Expr
     op: str
     right: Expr
-    offset: int
 
 # --- Aggregates & Constructors ---
 @dataclass(frozen=True)
 class TupleBinding(ASTNode):
     name: Optional[str]
     value: Expr
-    offset: int
 
 @dataclass(frozen=True)
 class ExprTuple(Expr):
     fields: tuple[TupleBinding, ...]
-    offset: int
 
 @dataclass(frozen=True)
 class RecordBinding(ASTNode):
     name: str
     value: Expr
-    is_var: bool
-    offset: int
+    is_var: bool = False
 
 @dataclass(frozen=True)
 class ExprRecord(Expr):
     fields: tuple[RecordBinding, ...]
-    offset: int
 
 @dataclass(frozen=True)
 class ExprOption(Expr):
     tag: str
     option_type: Type
-    payload: Optional[Expr]
-    offset: int
+    payload: Optional[Expr] = None
 
 @dataclass(frozen=True)
 class ExprVariant(Expr):
     tag: str
     variant_type: Type
-    is_var: bool
-    payload: Optional[Expr]
-    offset: int
+    is_var: bool = False
+    payload: Optional[Expr] = None
 
 @dataclass(frozen=True)
 class ExprArray(Expr):
     elements: tuple[Expr, ...]
-    offset: int
 
 @dataclass(frozen=True)
 class ExprArrayRep(Expr):
     count: Expr
     init_val: Expr
-    offset: int
 
 @dataclass(frozen=True)
 class ExprAuto(Expr):
     witness: Optional[tuple[str, Optional[Kind], Expr]]
     target_type: Type
     payload: Expr
-    offset: int
 
 # --- Selection, Indexing, and References ---
 @dataclass(frozen=True)
 class ExprSelect(Expr):
     target: Expr
     field: str
-    offset: int
 
 @dataclass(frozen=True)
 class ExprIndex(Expr):
     target: Expr
     index: Expr
-    offset: int
 
 @dataclass(frozen=True)
 class ExprIndexAssign(Expr):
     target: Expr
     index: Expr
     value: Expr
-    offset: int
 
 @dataclass(frozen=True)
 class ExprVarCell(Expr):
     value: Expr
-    offset: int
 
 @dataclass(frozen=True)
 class ExprDerefCell(Expr):
     target: Expr
-    offset: int
 
 @dataclass(frozen=True)
 class ExprVariantCheck(Expr):
     target: Expr
     tag: str
-    offset: int
 
 @dataclass(frozen=True)
 class ExprVariantAssert(Expr):
     target: Expr
     tag: str
-    offset: int
 
 # --- Pattern Matching & Discrimination ---
 @dataclass(frozen=True)
 class CaseBranch(ASTNode):
     tags: tuple[str, ...]
-    binder: Optional[str]
-    binder_type: Optional[Type]
-    body: Expr
-    offset: int
+    binder: Optional[str] = None
+    binder_type: Optional[Type] = None
+    body: Expr = None
 
 @dataclass(frozen=True)
 class ExprCase(Expr):
     target: Expr
     branches: tuple[CaseBranch, ...]
-    else_branch: Optional[Expr]
-    offset: int
+    else_branch: Optional[Expr] = None
 
 @dataclass(frozen=True)
 class InspectBranch(ASTNode):
     match_type: Type
     binders: tuple[tuple[str, Optional[Type]], ...]
     body: Expr
-    offset: int
 
 @dataclass(frozen=True)
 class ExprInspect(Expr):
     target: Expr
     branches: tuple[InspectBranch, ...]
-    else_branch: Optional[Expr]
-    offset: int
+    else_branch: Optional[Expr] = None
 
 # --- Exceptions ---
 @dataclass(frozen=True)
 class ExprRaise(Expr):
     exc: Expr
-    payload: Optional[Expr]
-    as_type: Optional[Type]
-    offset: int
+    payload: Optional[Expr] = None
+    as_type: Optional[Type] = None
 
 @dataclass(frozen=True)
 class TryBranch(ASTNode):
     exc_pattern: Expr
-    binder: Optional[str]
-    binder_type: Optional[Type]
-    body: Expr
-    offset: int
+    binder: Optional[str] = None
+    binder_type: Optional[Type] = None
+    body: Expr = None
 
 @dataclass(frozen=True)
 class ExprTry(Expr):
     body: Expr
     branches: tuple[TryBranch, ...]
-    else_branch: Optional[Expr]
-    offset: int
+    else_branch: Optional[Expr] = None
 ```
 
 ---
@@ -812,75 +754,66 @@ class BindingNode(ASTNode):
 @dataclass(frozen=True)
 class LetValueBinding(BindingNode):
     """let [rec] [var] x (params...) : T = expr and y = ..."""
-    is_rec: bool
-    is_var: bool
     name: str
-    params: tuple[FormalParam, ...]
-    type_annot: Optional[Type]
     value: Expr
-    offset: int
+    params: tuple[FormalParam, ...] = ()
+    type_annot: Optional[Type] = None
+    is_rec: bool = False
+    is_var: bool = False
 
 @dataclass(frozen=True)
 class LetTypeBinding(BindingNode):
     """Let [Rec] T(X::K)::K' = Type and U = ..."""
-    is_rec: bool
     name: str
-    params: tuple[TypeFormal, ...]
-    bound: Optional[Kind]
     type_val: Type
-    offset: int
+    params: tuple[TypeFormal, ...] = ()
+    bound: Optional[Kind] = None
+    is_rec: bool = False
 
 @dataclass(frozen=True)
 class DefTypeBinding(BindingNode):
     """Def [Rec] T = Type (in interface signature)"""
-    is_rec: bool
     name: str
-    params: tuple[TypeFormal, ...]
-    bound: Optional[Kind]
     type_val: Type
-    offset: int
+    params: tuple[TypeFormal, ...] = ()
+    bound: Optional[Kind] = None
+    is_rec: bool = False
 
 @dataclass(frozen=True)
 class DefKindBinding(BindingNode):
     """DEF K = Kind"""
     name: str
     kind_val: Kind
-    offset: int
 
 @dataclass(frozen=True)
 class ExprStmt(BindingNode):
     """Standalone expression statement."""
     expr: Expr
-    offset: int
 
 @dataclass(frozen=True)
 class ImportItem(ASTNode):
     names: tuple[str, ...]
     interface_name: str
-    offset: int
 
 @dataclass(frozen=True)
 class InterfaceDecl(ASTNode):
     name: str
-    is_unsound: bool
-    imports: tuple[ImportItem, ...]
     signatures: tuple[BindingNode, ...]
-    offset: int
+    imports: tuple[ImportItem, ...] = ()
+    is_unsound: bool = False
 
 @dataclass(frozen=True)
 class ModuleDecl(ASTNode):
     name: str
     interface_name: str
-    is_unsound: bool
-    imports: tuple[ImportItem, ...]
     bindings: tuple[BindingNode, ...]
-    offset: int
+    imports: tuple[ImportItem, ...] = ()
+    is_unsound: bool = False
 
 @dataclass(frozen=True)
 class Program(ASTNode):
     """A complete .quest compilation unit: top-level declarations, expressions, interfaces, modules."""
     phrases: tuple[ASTNode, ...]
-    offset: int
 ```
 
 ---
@@ -890,7 +823,7 @@ class Program(ASTNode):
 To verify parser correctness with the golden test framework (`tests/golden/parse/<name>.out`), `ast_dump()` serializes ASTs to S-expressions using **two-space indentation per nesting level**:
 
 ```python
-def ast_dump(node: ASTNode, indent: int = 0) -> str:
+def ast_dump(node: ASTNode, indent: int = 0, show_offsets: bool = False) -> str:
     """Recursively formats an AST node into a canonical 2-space indented S-expression string."""
     pad = "  " * indent
     # Example format:

@@ -15,6 +15,7 @@ from quest.tokenizer import (
     TokenizerError,
     IncompleteInputError,
 )
+import quest.ast as ast
 
 __all__ = [
     "SourceLocation",
@@ -28,4 +29,5 @@ __all__ = [
     "InteractiveTokenizer",
     "TokenizerError",
     "IncompleteInputError",
+    "ast",
 ]
