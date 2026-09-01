@@ -1075,3 +1075,94 @@ As the bootstrap compiler progresses into type checking and intermediate code ge
 1. **Structured Diagnostics:** Transitioning from unstructured error strings to structured diagnostic objects carrying severity (error/warning), error codes, primary and secondary labels, and compiler hints.
 2. **Error Recovery & Cascading Suppression:** Implementing parser and typechecker synchronization strategies to report multiple non-cascading errors per compilation run.
 3. **Explicit Negative Test Suites:** Organizing negative tests under dedicated subdirectories (e.g. `tests/source/errors/`) to systematically verify diagnostic reporting.
+
+---
+
+## 6. Semantic Type Representation and Symbol Table Architecture
+
+### 6.1. Module Organization
+The semantic analysis and type system is factored into two modular components:
+- **`bootstrap/python/quest/types.py`**: Semantic kind and type hierarchies (`QKind`, `QType`), lazy type evaluation, substitution, and equi-recursive subtyping algorithms.
+- **`bootstrap/python/quest/env.py`**: Lexical scoping, ordered environments, and symbol table structures (`Scope`, `Environment`, `Symbol`).
+
+### 6.2. Naming Conventions
+- **Quest Language Semantic Entities:** Distinguish language levels and prevent collisions with Python host primitives using the `Q` prefix and `Type`/`Kind` suffix:
+  - *Kinds:* `QKind`, `QTypeKind`, `QPowerKind`, `QAllKind`, `QKindVar`
+  - *Primitive Types:* `QIntType`, `QRealType`, `QBoolType`, `QCharType`, `QStringType`, `QOkType`, `QDynamicType`, `QExceptionType`
+  - *Composite & Reference Types:* `QTupleType`, `QRecordType`, `QVariantType`, `QOptionType`, `QFunType`, `QVarType`, `QArrayType`, `QOutType`
+  - *Polymorphic & Higher-Order Types:* `QAllType`, `QAutoType`, `QTypeFun`, `QTypeApp`, `QRecType`, `QRecGroupType`, `QTypeVar`, `QAbstractType`
+  - *Inference Metavariables:* `QTypeMeta`
+- **Compiler Infrastructure Entities:** Mechanisms that manage scoping and compiler state use standard names without a `Q` prefix:
+  - *Symbols:* `Symbol`, `ValueSymbol`, `TypeSymbol`, `KindSymbol`
+  - *Scoping & State:* `Scope`, `Environment`, `TypeChecker`
+
+### 6.3. Core Architectural Decisions
+
+#### 1. Equi-Recursive Subtyping & Mutual Recursion
+- **Lazy Evaluation:** Recursive types are evaluated lazily on demand.
+- **Mutual Recursion Node (`QRecGroupType`):** Mutually recursive definitions (`Let Rec A = ... and B = ...`) are stored as `QRecGroupType(bindings: dict[str, QType])`, preserving source structure and avoiding complex unrolling transformations.
+- **Coinductive Assumption Trail:** The subtyping engine tracks a set of evaluated symbol ID pairs $\Sigma \vdash (S, T)$ to guarantee termination on cyclic and mutually recursive type graphs.
+
+#### 2. Named Type Variables with Unique Symbol IDs
+- `QTypeVar(name: str, symbol_id: int)` retains source identifier names for diagnostic error formatting while using unique integer symbol IDs for identity comparison and capture-avoiding substitution during lazy evaluation.
+
+#### 3. Early Type Path Resolution
+- Syntactic `ast.TypePath` and module-qualified names (`M_T`, `M.T`) are resolved immediately during type elaboration against the `Environment`. There is no `QTypePath` in the semantic type system.
+
+#### 4. Local Bidirectional Inference (No Global Constraint Solver)
+- Matching *Typeful Programming*, the type system uses local bidirectional synthesis ($\Gamma \vdash e \Rightarrow T$) and checking ($\Gamma \vdash e \Leftarrow T$). Local unification variables (`QTypeMeta`) solve omitted polymorphic type arguments at call sites and infer control-flow return types without a global multi-pass constraint solver.
+
+#### 5. Ordered Scopes for Dependent Signatures
+- `Scope` maintains an ordered sequence of declarations to support left-to-right elaboration of dependent signatures (e.g. `Tuple A::TYPE a:A f(x:A):Int end`).
+
+#### 6. Stateless Representation of Manifest vs. Abstract Types
+- Type visibility is represented structurally via `TypeSymbol(name, symbol_id, kind, definition)`:
+  - Inside an implementing module, `definition` points to the concrete `QType` (transparent).
+  - Outside in client scopes, `definition` is `None` (abstract, bounded by `kind`), ensuring the typechecker remains functional and stateless.
+
+#### 7. Full Subkinding on Kinds
+- Implements full subkinding ($K_1 \le K_2$) across all kind forms:
+  - *Reflexivity:* $K \le K$.
+  - *Power to Type:* $\text{POWER}(T) \le \text{TYPE}$ for any valid proper type $T$.
+  - *Power to Power:* $\text{POWER}(S) \le \text{POWER}(T) \iff S \le T$ (delegates to `is_subtype`).
+  - *Higher-Order Operator Kinds (`QAllKind`):* $\text{ALL}(X::K_1) K_2 \le \text{ALL}(Y::K_1') K_2' \iff K_1' \le K_1 \land K_2 \le K_2'[Y \mapsto X]$ (contravariant in parameter kind, covariant in result kind with $\alpha$-renaming).
+  - *Kind Aliases:* `DEF K = Kind` definitions resolve lazily via the `Environment`.
+
+#### 8. Kind Synthesis & Well-Kindedness Verification
+- `synth_kind(type_val, env) -> QKind`: Computes the most specific minimal kind $K$ ($\Gamma \vdash T :: K$).
+- `check_kind(type_val, expected_kind, env)`: Verifies that $\text{is\_subkind}(\text{synth\_kind}(T), \text{expected\_kind})$, raising `KindError` on failures.
+- `check_kind_well_formed(kind, env)`: Validates that kinds are structurally sound ($\text{POWER}(T) \implies T :: \text{TYPE}$).
+- *Non-Unfolding Recursion:* $\text{Rec}(X::K) T$ verifies that under context $\Gamma, X::K$, body $T$ conforms to $K$ without expanding recursive cycles.
+
+---
+
+### 6.4. Key Theoretical and Algorithmic Complexities
+
+The four most intricate areas of the Quest semantic type system and their architectural solutions are:
+
+#### 1. Coinductive Equi-Recursive Subtyping ($F_{<:}^\omega$ + $\mu$-Types)
+- **The Infinite Loop Trap:** When testing $S \le T$ between two recursive types, unfolding definitions naively will loop forever. The engine evaluates types **lazily**, stores evaluated symbol pairs $(S, T)$ in an active assumption trail $\Sigma$, and treats encounters of previously visited pairs as coinductively valid.
+- **Interaction with Contravariance:** In function subtyping ($S_1 \to S_2 \le T_1 \to T_2 \iff T_1 \le S_1 \land S_2 \le T_2$), the subtyping direction flips for argument positions. The assumption trail must correctly track polarity flips without introducing false positives or cycle leaks.
+- **Mutual Recursion (`QRecGroupType`):** When two recursive systems (e.g. `Tree` and `NodeList`) mutually refer to each other, lazy unfolding steps across group boundaries, requiring the cycle-detection trail to canonicalize group member identities.
+
+#### 2. Dependent Tuple Signatures & Incremental Telescopes
+- **Sequential Context Extension:** In `Tuple X::TYPE init: X step(cur: X): X done(cur: X): Bool end`, the type of `init` ($X$) depends on the preceding type parameter $X$. The typechecker cannot check fields independently in parallel; it must check them in strict left-to-right order, incrementally extending the typing environment $\Gamma$ with each preceding component.
+- **Signature Subtyping & Matching:** When comparing two dependent signatures $S \le T$, type variables declared in $T$ must be substituted with the corresponding concrete component types from $S$ before checking subsequent fields.
+
+#### 3. Compile-Time Type-Level $\lambda$-Calculus & Lazy $\beta$-Reduction
+- **Type Equivalence via Lazy Evaluation:** Checking whether two types are equal requires lazily reducing type applications ($\beta$-reduction) and expanding transparent type aliases on demand (e.g. `Pair(Int Int)` $\equiv$ `Tuple first: Int second: Int end`).
+- **Capture-Avoiding Substitution:** When substituting type arguments into type operator bodies (`QTypeFun`), free type variables must not be accidentally captured by inner quantifiers ($\forall$) or recursive binders ($\text{Rec}$). Using unique `symbol_id`s on `QTypeVar` ensures capture-avoiding substitution and exact identity comparisons.
+
+#### 4. Manifest vs. Abstract Types in First-Class Modules
+- **Dual Transparency:** Inside a module implementation `module m: M ...`, a manifest type `M_T` is transparent (equal to its concrete definition in the module's local scope). Outside to clients of interface `M`, `M_T` is an abstract type variable bounded by its kind.
+- **Diamond Import Equivalence:** If modules `B` and `C` both import interface `A`, the typechecker must recognize that manifest types `B_A_T` and `C_A_T` originate from the exact same interface definition `A_T` and are therefore interchangeable.
+
+#### Summary Complexity Matrix
+
+| Complexity Area | Key Difficulty | Architectural Solution |
+| :--- | :--- | :--- |
+| **Recursive Subtyping** | Infinite expansion loops & polarity flips | Lazy evaluation + coinductive symbol-pair trail $\Sigma$ |
+| **Dependent Signatures** | Fields depend on earlier type parameters | Ordered `Scope` with left-to-right incremental elaboration |
+| **Type-Level $\lambda$-Calculus** | $\beta$-reduction & variable capture | Lazy evaluation + `QTypeVar` with unique `symbol_id` |
+| **Module Manifest Types** | Inside is concrete, outside is abstract | Structural `TypeSymbol(kind, definition)` (no ambient flags) |
+| **Diamond Imports** | Disparate import paths for same interface | Canonical interface symbol interning in `Environment` |

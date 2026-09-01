@@ -173,8 +173,8 @@ Our design differs from Cardelli's original proposal in several crucial ways:
 #### Theoretical Complications: Adapting Bidirectional Typing to $F_{<:}^\omega$ and Dependent Signatures
 Standard bidirectional typing was formalized for **System $F$ with subtyping ($F_{<:}$)**, where types are purely static syntactic terms. In Quest ($F_{<:}^\omega$), applying bidirectional typing requires overcoming several complications:
 
-1. **Interleaving Type Normalization (WHNF) with Bidirectional Checking:**  
-   In Quest, types can contain reducible operator applications (e.g., `Cond(True Int Bool)` or `List(Int)`). Before checking whether an expression $e$ matches an expected type $T$, $T$ must be evaluated on-the-fly to **Weak Head Normal Form (WHNF)** using the compile-time type-level $\lambda$-evaluator, taking into account bounded type variables (`X <: B`) in the environment.
+1. **Interleaving Lazy Type Evaluation with Bidirectional Checking:**  
+   In Quest, types can contain reducible operator applications (e.g., `Cond(True Int Bool)` or `List(Int)`). Before checking whether an expression $e$ matches an expected type $T$, $T$ must be evaluated lazily using the compile-time type-level $\lambda$-evaluator, taking into account bounded type variables (`X <: B`) in the environment.
 2. **Dependent Component Types in Signatures:**  
    In tuple signatures (such as `Tuple A::TYPE a:A f(x:A):Int end`), subsequent component types depend on earlier type/value components. Bidirectional checking of tuple and module bindings must proceed strictly left-to-right, incrementally elaborating and extending the typing environment.
 3. **Manifest Type Paths Across Modules (`A_X`, `X_U`):**  
@@ -292,6 +292,63 @@ To keep token and AST representations lightweight and easily portable to Quest:
 
 ---
 
+### 3.10. Type Representation, Recursive Subtyping, and Scoping Infrastructure
+
+To support type checking, local bidirectional type inference, and compile-time type-level $\lambda$-evaluation, the compiler's semantic type system is organized into modular subsystems:
+
+#### Modular Separation (`types.py` & `env.py`)
+- **`bootstrap/python/quest/types.py`**: Houses the semantic kind and type hierarchies (`QKind`, `QType`), lazy type evaluation, substitution, and equi-recursive subtyping algorithms.
+- **`bootstrap/python/quest/env.py`**: Houses the lexical symbol table infrastructure (`Scope`, `Environment`, and `Symbol` definitions).
+
+#### Naming Conventions
+- **Quest Language Semantic Entities:** Follow the `Q` prefix and `Type`/`Kind` suffix convention to avoid collisions with host language primitives and clearly demarcate language levels:
+  - *Kinds:* `QKind`, `QTypeKind`, `QPowerKind`, `QAllKind`, `QKindVar`.
+  - *Types:* `QType`, `QIntType`, `QRealType`, `QBoolType`, `QCharType`, `QStringType`, `QOkType`, `QDynamicType`, `QExceptionType`, `QTupleType`, `QRecordType`, `QVariantType`, `QOptionType`, `QFunType`, `QVarType`, `QArrayType`, `QOutType`, `QAllType`, `QAutoType`, `QTypeFun`, `QTypeApp`, `QRecType`, `QRecGroupType`, `QTypeVar`, `QAbstractType`.
+  - *Inference Metavariables:* `QTypeMeta` (prunable unification variables for local inference).
+- **Compiler Infrastructure Classes:** Entities that manage scoping and analysis are compiler-internal mechanisms rather than Quest language constructs, and therefore do not use a `Q` prefix:
+  - *Symbols:* `Symbol`, `ValueSymbol`, `TypeSymbol`, `KindSymbol`.
+  - *Scoping & Analysis:* `Scope`, `Environment`, `TypeChecker`.
+
+#### Key Design Elements
+1. **Equi-Recursive Subtyping & Mutual Recursion:**  
+   Matching *Typeful Programming*, recursive types use equi-recursive subtyping ($\text{Rec}(X::K) T \equiv T[\text{Rec}(X::K) T / X]$) without requiring explicit user fold/unfold annotations. Mutually recursive definitions (`Let Rec A = ... and B = ...`) are represented as a dedicated `QRecGroupType(bindings: dict[str, QType])` node that unfolds lazily on demand. The subtyping engine employs a coinductive assumption trail of evaluated symbol pairs $\Sigma \vdash S \le T$ to prevent infinite loops on cyclic types.
+2. **Named Type Parameters with Symbol Identity:**  
+   Bound type parameters ($\forall X <: T$) are represented as `QTypeVar(name: str, symbol_id: int)` referencing unique symbol identities. This preserves human-readable identifier names for compiler error diagnostics while ensuring capture-avoiding substitution and exact identity comparisons during lazy evaluation.
+3. **Early Type Path Resolution (No `QTypePath`):**  
+   Because Quest has no dependent types (runtime values cannot project static types), all syntactic type paths (`ast.TypePath`) and module-qualified names (`M_T`, `M.T`) are resolved immediately during type elaboration against the `Environment`, ensuring that `QType` contains only canonical semantic types.
+4. **Local Bidirectional Type Inference (No Global Constraint Solver):**  
+   Matching *Typeful Programming*, the compiler deliberately avoids complex ML-style global constraint solving. Full type annotations are required on top-level definitions and function parameters; type arguments in polymorphic applications and composite expression types are synthesized or checked locally using `QTypeMeta` unification metavariables.
+5. **Ordered Scopes for Dependent Signatures:**  
+   `Scope` maintains an ordered sequence of declarations so that dependent components (e.g. in `Tuple A::TYPE a:A f(x:A):Int end` or interface exports) are evaluated lazily and added to the typing context in strict left-to-right order.
+6. **Stateless Representation of Manifest vs. Abstract Types:**  
+   Rather than using ambient mode flags in the typechecker, type transparency is controlled structurally via `TypeSymbol(name, symbol_id, kind, definition)`:
+   - Inside an implementing module, `definition` points to the concrete `QType` (transparent).
+   - Outside in client scopes, `definition` is `None` (abstract, bounded by `kind`), causing lazy evaluation to treat it as a rigid type constant.
+7. **Full Subkinding on Kinds:**  
+   Implements full subkinding ($K_1 \le K_2$) across all kind forms:
+   - *Reflexivity:* $K \le K$.
+   - *Power to Type:* $\text{POWER}(T) \le \text{TYPE}$ for any valid type $T$.
+   - *Power to Power:* $\text{POWER}(S) \le \text{POWER}(T) \iff S \le T$ (delegating to equi-recursive `is_subtype`).
+   - *Higher-Order Operator Kinds (`QAllKind`):* $\text{ALL}(X::K_1) K_2 \le \text{ALL}(Y::K_1') K_2' \iff K_1' \le K_1 \land K_2 \le K_2'[Y \mapsto X]$ (contravariant in parameter kind, covariant in result kind with $\alpha$-renaming).
+   - *Kind Aliases:* `DEF K = Kind` definitions resolve lazily via the `Environment`.
+8. **Kind Synthesis & Well-Kindedness Verification:**  
+   - `synth_kind(type_val, env) -> QKind`: Computes the most specific minimal kind (e.g. `TYPE` for proper types, $\text{POWER}(B)$ for bounded variables, $\text{ALL}(X::K_1) K_2$ for type functions).
+   - `check_kind(type_val, expected_kind, env)`: Validates that synthesized kind is a subkind of `expected_kind`, raising `KindError` on mismatches.
+   - `check_kind_well_formed(kind, env)`: Enforces the proper type invariant ($\text{POWER}(T) \implies T :: \text{TYPE}$) and validates operator kind parameter/result bounds.
+   - *Non-Unfolding Recursive Types:* $\text{Rec}(X::K) T$ verifies that under context $\Gamma, X::K$, body $T$ conforms to $K$ without expanding recursive cycles.
+
+#### Summary Complexity Matrix
+
+| Complexity Area | Key Difficulty | Architectural Solution |
+| :--- | :--- | :--- |
+| **Recursive Subtyping** | Infinite expansion loops & polarity flips | Lazy evaluation + coinductive symbol-pair trail $\Sigma$ |
+| **Dependent Signatures** | Fields depend on earlier type parameters | Ordered `Scope` with left-to-right incremental elaboration |
+| **Type-Level $\lambda$-Calculus** | $\beta$-reduction & variable capture | Lazy evaluation + `QTypeVar` with unique `symbol_id` |
+| **Module Manifest Types** | Inside is concrete, outside is abstract | Structural `TypeSymbol(kind, definition)` (no ambient flags) |
+| **Diamond Imports** | Disparate import paths for same interface | Canonical interface symbol interning in `Environment` |
+
+---
+
 ## 4. Comprehensive Test-Driven Verification Strategy
 
 The examples in *Typeful Programming* provide essential starting points, but are insufficient on their own to fully exercise the language. A cornerstone of the implementation strategy is the construction of a **large, self-contained suite of Quest test programs (`.quest`)** built from day one, covering all features and complex feature interactions, and continually expanded to prevent regressions.
@@ -302,8 +359,8 @@ All test source files live in a single directory to minimize structural overhead
 - **`tests/source/<name>.quest`**: Self-contained Quest source files.
 
 Verification of both intermediate compiler passes and end-to-end execution is driven by a **golden file testing system**:
-- **`tests/golden/<compiler-phase>/<name>.out`**: Expected standard output produced by `<compiler-phase>` when processing `tests/source/<name>.quest`. If this file exists, the phase's output must match it exactly.
-- **`tests/golden/<compiler-phase>/<name>.err`**: Expected error output (e.g., syntax errors, typechecking errors) produced by `<compiler-phase>` when processing `tests/source/<name>.quest`. If this file exists, the phase must fail and match the diagnostic output.
+- **`tests/golden/<compiler-phase>/<name>.out`**: Expected standard output produced by `<compiler-phase>` when processing `tests/source/<name>.quest` (exit code 0). If this file exists, the phase's standard output must match it exactly.
+- **`tests/golden/<compiler-phase>/<name>.error`**: Expected diagnostic error output produced by `<compiler-phase>` when processing `tests/source/<name>.quest` (exit code $\ne 0$). If this file exists, the phase must fail and match the diagnostic output.
 
 ### 4.2. Custom Test Runner Tooling
 
@@ -314,16 +371,18 @@ Testing will be driven by a **self-contained, custom test runner CLI** (`run_tes
   - Run specific compiler phases: `python3 run_tests.py --phase <P>`
   - Run specific test cases: `python3 run_tests.py --test <name>`
   - Run all phases end-to-end: `python3 run_tests.py --all`
-  - Update golden expectation files: `python3 run_tests.py --phase <P> --update-golden`
-- **Granular Pass/Fail Reporting:** Displays clear diffs when phase output diverges from `tests/golden/<phase>/<name>.out` or `tests/golden/<phase>/<name>.err`.
+  - Update golden expectation files: `python3 run_tests.py --update-golden`
+- **Granular Pass/Fail Reporting:** Displays clear diffs when phase output diverges from `tests/golden/<phase>/<name>.out` or `tests/golden/<phase>/<name>.error`.
 
 ### 4.3. Compiler Phases Tested
 
-The compiler will be structured as a sequence of small, verifiable phases (following the *Essentials of Compilation* approach). As each phase is designed and implemented, corresponding golden subdirectories under `tests/golden/<phase>/` will be populated to verify that phase independently (e.g., lexer tokens, parsed ASTs, typechecker output/errors, intermediate representations, and generated code/execution results). The exact phase registry table will be maintained and expanded in this section as implementation proceeds.
+The compiler will be structured as a sequence of small, verifiable phases (following the *Essentials of Compilation* approach). As each phase is designed and implemented, corresponding golden subdirectories under `tests/golden/<phase>/` will be populated to verify that phase independently:
 
 | Phase Name (`P`) | Description / Input $\to$ Output | Golden Output Format (`tests/golden/<P>/<name>.*`) |
 | :--- | :--- | :--- |
-| `tokenize` | Tokenization: `.quest` source $\to$ stream of `<line>:<col>\t<KIND>\t<lexeme>` | `.out` lists tokens with positions; `.err` contains formatted lexical diagnostic messages. |
+| `tokenize` | Tokenization: `.quest` source $\to$ stream of `<line>:<col>\t<KIND>\t<lexeme>` | `.out` lists tokens with positions; `.error` contains lexical diagnostic messages. |
+| `parse` | Parsing: Token stream $\to$ canonical 2-space indented S-expression AST | `.out` contains AST S-expression; `.error` contains syntax error diagnostic messages. |
+
 
 ### 4.4. Feature and Interaction Coverage
 
