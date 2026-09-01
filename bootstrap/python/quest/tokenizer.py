@@ -53,16 +53,16 @@ class Tokenizer:
             return cls(f.read(), path)
 
     def _peek(self, offset: int = 0) -> str:
-        idx = self.cursor + offset
-        if idx < self.length:
-            return self.source_text[idx]
+        index = self.cursor + offset
+        if index < self.length:
+            return self.source_text[index]
         return ""
 
     def _advance(self) -> str:
         if self.cursor < self.length:
-            ch = self.source_text[self.cursor]
+            char = self.source_text[self.cursor]
             self.cursor += 1
-            return ch
+            return char
         return ""
 
     def _match(self, expected: str) -> bool:
@@ -73,15 +73,15 @@ class Tokenizer:
 
     def _skip_whitespace_and_comments(self) -> None:
         while self.cursor < self.length:
-            ch = self.source_text[self.cursor]
+            char = self.source_text[self.cursor]
 
             # Whitespace
-            if ch in " \t\r\n\f\v":
+            if char in " \t\r\n\f\v":
                 self.cursor += 1
                 continue
 
             # Nested Comments (* ... *)
-            if ch == "(" and self._peek(1) == "*":
+            if char == "(" and self._peek(1) == "*":
                 start_offset = self.cursor
                 self.cursor += 2
                 depth = 1
@@ -122,57 +122,57 @@ class Tokenizer:
 
             # Optional exponent: e.g. 2.0e-5, 3.14E+2
             if self.cursor < self.length and self.source_text[self.cursor] in "eE":
-                exp_start = self.cursor
+                exponent_start = self.cursor
                 self.cursor += 1
                 if self.cursor < self.length and self.source_text[self.cursor] in "+-":
                     self.cursor += 1
                 if not (self.cursor < self.length and self.source_text[self.cursor].isdigit()):
                     raise TokenizerError(
                         "Malformed real exponent",
-                        exp_start,
-                        self.cursor - exp_start,
+                        exponent_start,
+                        self.cursor - exponent_start,
                     )
                 while self.cursor < self.length and self.source_text[self.cursor].isdigit():
                     self.cursor += 1
 
             lexeme = self.source_text[start:self.cursor]
             try:
-                val = float(lexeme)
+                number_value = float(lexeme)
             except ValueError:
                 raise TokenizerError(f"Invalid real literal '{lexeme}'", start, len(lexeme))
-            return Token(TokenKind.REAL_LIT, lexeme, val, start)
+            return Token(TokenKind.REAL_LIT, lexeme, number_value, start)
 
         lexeme = self.source_text[start:self.cursor]
         try:
-            val = int(lexeme)
+            number_value = int(lexeme)
         except ValueError:
             raise TokenizerError(f"Invalid integer literal '{lexeme}'", start, len(lexeme))
-        return Token(TokenKind.INT_LIT, lexeme, val, start)
+        return Token(TokenKind.INT_LIT, lexeme, number_value, start)
 
-    def _lex_escape_sequence(self, lit_start: int) -> tuple[str, int]:
+    def _lex_escape_sequence(self, literal_start: int) -> tuple[str, int]:
         """Parses an escape sequence starting after backslash."""
-        esc_start = self.cursor - 1
+        escape_start = self.cursor - 1
         if self.cursor >= self.length:
-            raise TokenizerError("Unterminated escape sequence", esc_start, 1)
+            raise TokenizerError("Unterminated escape sequence", escape_start, 1)
 
-        ch = self._advance()
-        if ch == "n":
-            return "\n", self.cursor - esc_start
-        elif ch == "t":
-            return "\t", self.cursor - esc_start
-        elif ch == "r":
-            return "\r", self.cursor - esc_start
-        elif ch == "b":
-            return "\b", self.cursor - esc_start
-        elif ch == "f":
-            return "\f", self.cursor - esc_start
-        elif ch == "\\":
-            return "\\", self.cursor - esc_start
-        elif ch == "'":
-            return "'", self.cursor - esc_start
-        elif ch == '"':
-            return '"', self.cursor - esc_start
-        elif ch == "x":
+        char = self._advance()
+        if char == "n":
+            return "\n", self.cursor - escape_start
+        elif char == "t":
+            return "\t", self.cursor - escape_start
+        elif char == "r":
+            return "\r", self.cursor - escape_start
+        elif char == "b":
+            return "\b", self.cursor - escape_start
+        elif char == "f":
+            return "\f", self.cursor - escape_start
+        elif char == "\\":
+            return "\\", self.cursor - escape_start
+        elif char == "'":
+            return "'", self.cursor - escape_start
+        elif char == '"':
+            return '"', self.cursor - escape_start
+        elif char == "x":
             # Hexadecimal escape \xhh
             hex_digits = ""
             for _ in range(2):
@@ -181,19 +181,27 @@ class Tokenizer:
                 else:
                     break
             if not hex_digits:
-                raise TokenizerError("Invalid hexadecimal escape sequence", esc_start, self.cursor - esc_start)
-            return chr(int(hex_digits, 16)), self.cursor - esc_start
-        elif ch.isdigit():
+                raise TokenizerError(
+                    "Invalid hexadecimal escape sequence",
+                    escape_start,
+                    self.cursor - escape_start,
+                )
+            return chr(int(hex_digits, 16)), self.cursor - escape_start
+        elif char.isdigit():
             # Decimal character code \ddd (up to 3 decimal digits)
-            digits = ch
+            digits = char
             while len(digits) < 3 and self.cursor < self.length and self.source_text[self.cursor].isdigit():
                 digits += self._advance()
             char_code = int(digits)
             if char_code > 255:
-                raise TokenizerError(f"Character code {char_code} out of byte range", esc_start, self.cursor - esc_start)
-            return chr(char_code), self.cursor - esc_start
+                raise TokenizerError(
+                    f"Character code {char_code} out of byte range",
+                    escape_start,
+                    self.cursor - escape_start,
+                )
+            return chr(char_code), self.cursor - escape_start
         else:
-            raise TokenizerError(f"Unknown escape sequence '\\{ch}'", esc_start, 2)
+            raise TokenizerError(f"Unknown escape sequence '\\{char}'", escape_start, 2)
 
     def _lex_char(self) -> Token:
         start = self.cursor
@@ -203,16 +211,16 @@ class Tokenizer:
 
         if self.source_text[self.cursor] == "\\":
             self.cursor += 1
-            char_val, _ = self._lex_escape_sequence(start)
+            char_value, _ = self._lex_escape_sequence(start)
         else:
-            char_val = self._advance()
+            char_value = self._advance()
 
         if self.cursor >= self.length or self.source_text[self.cursor] != "'":
             raise TokenizerError("Unterminated character literal", start, self.cursor - start)
 
         self.cursor += 1  # Consume closing quote '
         lexeme = self.source_text[start:self.cursor]
-        return Token(TokenKind.CHAR_LIT, lexeme, char_val, start)
+        return Token(TokenKind.CHAR_LIT, lexeme, char_value, start)
 
     def _lex_string(self) -> Token:
         start = self.cursor
@@ -222,8 +230,8 @@ class Tokenizer:
         while self.cursor < self.length and self.source_text[self.cursor] != '"':
             if self.source_text[self.cursor] == "\\":
                 self.cursor += 1
-                esc_char, _ = self._lex_escape_sequence(start)
-                chars.append(esc_char)
+                escaped_char, _ = self._lex_escape_sequence(start)
+                chars.append(escaped_char)
             else:
                 chars.append(self._advance())
 
@@ -236,10 +244,7 @@ class Tokenizer:
 
     def _lex_ident_or_keyword(self) -> Token:
         start = self.cursor
-        while (
-            self.cursor < self.length
-            and (self.source_text[self.cursor].isalnum() or self.source_text[self.cursor] == "_")
-        ):
+        while self.cursor < self.length and self.source_text[self.cursor].isalnum():
             self.cursor += 1
 
         lexeme = self.source_text[start:self.cursor]
@@ -268,61 +273,61 @@ class Tokenizer:
             return Token(TokenKind.EOF, "", None, self.cursor)
 
         start = self.cursor
-        ch = self.source_text[self.cursor]
+        char = self.source_text[self.cursor]
 
         # 1. Delimiters (single characters)
-        if ch in DELIMITERS:
+        if char in DELIMITERS:
             # Special check for comment opener (* which starts with (
-            if ch == "(" and self._peek(1) == "*":
+            if char == "(" and self._peek(1) == "*":
                 self._skip_whitespace_and_comments()
                 return self.next_token()
             self.cursor += 1
-            return Token(DELIMITERS[ch], ch, None, start)
+            return Token(DELIMITERS[char], char, None, start)
 
         # 2. Dot operator
-        if ch == ".":
+        if char == ".":
             self.cursor += 1
             return Token(TokenKind.DOT, ".", None, start)
 
         # 3. Numeric literals (strictly unsigned)
-        if ch.isdigit():
+        if char.isdigit():
             return self._lex_number()
 
         # 4. Character literal
-        if ch == "'":
+        if char == "'":
             return self._lex_char()
 
         # 5. String literal
-        if ch == '"':
+        if char == '"':
             return self._lex_string()
 
         # 6. Alphanumeric identifiers and keywords
-        if ch.isalpha():
+        if char.isalpha():
             return self._lex_ident_or_keyword()
 
         # 7. Symbolic operators and reserved punctuation
-        if ch in SYMBOLIC_CHARS:
+        if char in SYMBOLIC_CHARS:
             return self._lex_symbolic_or_punctuation()
 
         # 8. Unrecognized character
         self.cursor += 1
-        raise TokenizerError(f"Unexpected character {ch!r}", start, 1)
+        raise TokenizerError(f"Unexpected character {char!r}", start, 1)
 
     def tokenize_all(self) -> list[Token]:
         """Eagerly consumes and returns all tokens up to and including EOF."""
         tokens: list[Token] = []
         while True:
-            tok = self.next_token()
-            tokens.append(tok)
-            if tok.kind == TokenKind.EOF:
+            token = self.next_token()
+            tokens.append(token)
+            if token.kind == TokenKind.EOF:
                 break
         return tokens
 
     def __iter__(self) -> Iterator[Token]:
         while True:
-            tok = self.next_token()
-            yield tok
-            if tok.kind == TokenKind.EOF:
+            token = self.next_token()
+            yield token
+            if token.kind == TokenKind.EOF:
                 break
 
 
@@ -354,11 +359,11 @@ class InteractiveTokenizer:
                     self.cursor = tokenizer.cursor
                     break
 
-                tok = tokenizer.next_token()
-                if tok.kind == TokenKind.EOF:
+                token = tokenizer.next_token()
+                if token.kind == TokenKind.EOF:
                     self.cursor = tokenizer.cursor
                     break
-                tokens.append(tok)
+                tokens.append(token)
                 self.cursor = tokenizer.cursor
         except TokenizerError:
             # If error is due to unclosed literal/comment at end of buffer, wait for more input

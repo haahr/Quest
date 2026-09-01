@@ -1,0 +1,17 @@
+(* Higher-Order Types and Quantifiers Test *)
+
+DEF KBase = TYPE;
+
+Let Identity = Fun(X::TYPE) X;
+
+Let IntIdentity = Identity(Int);
+
+Let List = Rec(L::TYPE) Option
+    nil
+    cons with head: Int tail: L end
+end;
+
+Let Pair = Fun(A::TYPE B::TYPE) Tuple
+    first: A
+    second: B
+end;

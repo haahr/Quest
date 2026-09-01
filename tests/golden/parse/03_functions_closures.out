@@ -1,0 +1,96 @@
+(Program
+  :phrases (
+    (LetValueBinding
+      :name 'add1'
+      :value (ExprFun
+        :params (
+          (FormalParam
+            :name 'x'
+            :type_annot (TypePath ('Int'))
+            :mode VALUE
+          )
+        )
+        :return_type (TypePath ('Int'))
+        :body (ExprInfix
+          :left (ExprId 'x')
+          :op '+'
+          :right (ExprInt 1 '1')
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'adder'
+      :value (ExprFun
+        :params (
+          (FormalParam
+            :name 'y'
+            :type_annot (TypePath ('Int'))
+            :mode VALUE
+          )
+        )
+        :return_type (TypePath ('Int'))
+        :body (ExprInfix
+          :left (ExprId 'x')
+          :op '+'
+          :right (ExprId 'y')
+        )
+      )
+      :params (
+        (FormalParam
+          :name 'x'
+          :type_annot (TypePath ('Int'))
+          :mode VALUE
+        )
+      )
+      :type_annot (TypeAll
+        :quantifiers (
+          (Quantifier
+            :name 'y'
+            :bound (KindType)
+          )
+        )
+        :result_type (TypePath ('Int'))
+      )
+    )
+    (LetValueBinding
+      :name 'apply'
+      :value (ExprApp
+        :func (ExprId 'f')
+        :args (
+          (ExprId 'x')
+        )
+      )
+      :params (
+        (FormalParam
+          :name 'f'
+          :type_annot (TypeAll
+            :quantifiers (
+              (Quantifier
+                :name 'x'
+                :bound (KindType)
+              )
+            )
+            :result_type (TypePath ('Int'))
+          )
+          :mode VALUE
+        )
+        (FormalParam
+          :name 'x'
+          :type_annot (TypePath ('Int'))
+          :mode VALUE
+        )
+      )
+      :type_annot (TypePath ('Int'))
+    )
+    (LetValueBinding
+      :name 'res'
+      :value (ExprApp
+        :func (ExprId 'apply')
+        :args (
+          (ExprId 'add1')
+          (ExprInt 41 '41')
+        )
+      )
+    )
+  )
+)

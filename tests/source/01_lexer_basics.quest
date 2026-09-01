@@ -1,4 +1,4 @@
-(* Basic Quest Lexer Test *)
+(* Basic Quest Lexer and Parser Test *)
 
 Let T = Tuple
     x: Int
@@ -6,11 +6,11 @@ Let T = Tuple
 end;
 
 let origin : T = tuple
-    x = 0
-    y = 0.0
+    let x = 0
+    let y = 0.0
 end;
 
-let add(p1: T, p2: T): T = tuple
-    x = p1.x + p2.x
-    y = p1.y + p2.y
+let add(p1: T p2: T): T = tuple
+    let x = p1.x + p2.x
+    let y = p1.y + p2.y
 end;

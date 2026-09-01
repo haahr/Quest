@@ -15,6 +15,25 @@ from quest.tokenizer import (
     TokenizerError,
     IncompleteInputError,
 )
+from quest.parser import (
+    Parser,
+    ParserError,
+    Construct,
+    MatchToken,
+    SyntaxTarget,
+    Optional,
+    Repeated,
+    Sequence,
+    Rule,
+)
+from quest.grammar import (
+    PROGRAM,
+    PHRASE,
+    TYPE,
+    VALUE,
+    build_quest_grammar,
+    parse_quest_program,
+)
 import quest.ast as ast
 
 __all__ = [
@@ -29,5 +48,20 @@ __all__ = [
     "InteractiveTokenizer",
     "TokenizerError",
     "IncompleteInputError",
+    "Parser",
+    "ParserError",
+    "Construct",
+    "MatchToken",
+    "SyntaxTarget",
+    "Optional",
+    "Repeated",
+    "Sequence",
+    "Rule",
+    "PROGRAM",
+    "PHRASE",
+    "TYPE",
+    "VALUE",
+    "build_quest_grammar",
+    "parse_quest_program",
     "ast",
 ]

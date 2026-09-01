@@ -1,0 +1,19 @@
+(* Exceptions, Dynamic Types, and Inspection Test *)
+
+exception DivByZero: Ok end;
+
+let safeDiv(a: Int b: Int): Int =
+    if b is 0 then
+        raise DivByZero end
+    else
+        a / b
+    end;
+
+let compute(a: Int b: Int): Int =
+    try
+        safeDiv(a b)
+    when DivByZero then
+        0
+    else
+        0 - 1
+    end;

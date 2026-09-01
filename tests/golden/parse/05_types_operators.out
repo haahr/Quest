@@ -1,0 +1,85 @@
+(Program
+  :phrases (
+    (DefKindBinding
+      :name 'KBase'
+      :kind_val (KindType)
+    )
+    (LetTypeBinding
+      :name 'Identity'
+      :type_val (TypeFun
+        :params (
+          (TypeFormal
+            :name 'X'
+            :bound (KindType)
+          )
+        )
+        :body (TypePath ('X'))
+      )
+    )
+    (LetTypeBinding
+      :name 'IntIdentity'
+      :type_val (TypeApp
+        :constructor (TypePath ('Identity'))
+        :arguments (
+          (TypePath ('Int'))
+        )
+      )
+    )
+    (LetTypeBinding
+      :name 'List'
+      :type_val (TypeRec
+        :var_name 'L'
+        :bound (KindType)
+        :body (TypeOption
+          :variants (
+            (OptionFieldSig 'nil' ())
+            (OptionFieldSig
+              :tag 'cons'
+              :payload_sig (
+                (FieldSig
+                  :name 'head'
+                  :type_sig (TypePath ('Int'))
+                  :mode VALUE
+                )
+                (FieldSig
+                  :name 'tail'
+                  :type_sig (TypePath ('L'))
+                  :mode VALUE
+                )
+              )
+            )
+          )
+        )
+      )
+    )
+    (LetTypeBinding
+      :name 'Pair'
+      :type_val (TypeFun
+        :params (
+          (TypeFormal
+            :name 'A'
+            :bound (KindType)
+          )
+          (TypeFormal
+            :name 'B'
+            :bound (KindType)
+          )
+        )
+        :body (TypeTuple
+          :fields (
+            (FieldSig
+              :name 'first'
+              :type_sig (TypePath ('A'))
+              :mode VALUE
+            )
+            (FieldSig
+              :name 'second'
+              :type_sig (TypePath ('B'))
+              :mode VALUE
+            )
+          )
+        )
+      )
+    )
+  )
+)

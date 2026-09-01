@@ -1,0 +1,11 @@
+(* Functions and Closures Test *)
+
+let add1 = fun(x: Int): Int x + 1;
+
+let adder(x: Int): All(y: Int) Int =
+    fun(y: Int): Int x + y;
+
+let apply(f: All(x: Int) Int x: Int): Int =
+    f(x);
+
+let res = apply(add1 41);

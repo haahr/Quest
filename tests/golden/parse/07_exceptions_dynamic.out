@@ -1,0 +1,87 @@
+(Program
+  :phrases (
+    (ExprStmt
+      :expr (ExprException
+        :name 'DivByZero'
+        :type_annot (TypePath ('Ok'))
+      )
+    )
+    (LetValueBinding
+      :name 'safeDiv'
+      :value (ExprIf
+        :cond (ExprInfix
+          :left (ExprId 'b')
+          :op 'is'
+          :right (ExprInt 0 '0')
+        )
+        :then_branch (ExprStmt
+          :expr (ExprRaise
+            :exc (ExprId 'DivByZero')
+          )
+        )
+        :else_branch (ExprStmt
+          :expr (ExprInfix
+            :left (ExprId 'a')
+            :op '/'
+            :right (ExprId 'b')
+          )
+        )
+      )
+      :params (
+        (FormalParam
+          :name 'a'
+          :type_annot (TypePath ('Int'))
+          :mode VALUE
+        )
+        (FormalParam
+          :name 'b'
+          :type_annot (TypePath ('Int'))
+          :mode VALUE
+        )
+      )
+      :type_annot (TypePath ('Int'))
+    )
+    (LetValueBinding
+      :name 'compute'
+      :value (ExprTry
+        :body (ExprStmt
+          :expr (ExprApp
+            :func (ExprId 'safeDiv')
+            :args (
+              (ExprId 'a')
+              (ExprId 'b')
+            )
+          )
+        )
+        :branches (
+          (TryBranch
+            :exc_pattern (ExprId 'DivByZero')
+            :body (ExprStmt
+              :expr (ExprInt 0 '0')
+            )
+          )
+        )
+        :else_branch (ExprStmt
+          :expr (ExprInfix
+            :left (ExprInt 0 '0')
+            :op '-'
+            :right (ExprInt 1 '1')
+          )
+        )
+      )
+      :params (
+        (FormalParam
+          :name 'a'
+          :type_annot (TypePath ('Int'))
+          :mode VALUE
+        )
+        (FormalParam
+          :name 'b'
+          :type_annot (TypePath ('Int'))
+          :mode VALUE
+        )
+      )
+      :type_annot (TypePath ('Int'))
+    )
+  )
+)

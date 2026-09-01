@@ -484,6 +484,12 @@ class ExprInspect(Expr):
 # --- Exceptions ---
 
 @dataclass(frozen=True)
+class ExprException(Expr):
+    name: str
+    type_annot: Optional[Type] = None
+
+
+@dataclass(frozen=True)
 class ExprRaise(Expr):
     exc: Expr
     payload: Optional[Expr] = None
@@ -592,34 +598,32 @@ class Program(ASTNode):
 # 6. Canonical S-Expression Pretty-Printer
 # ============================================================================
 
-def _is_simple_leaf(val: Any) -> bool:
-    """Checks if a value can be rendered compactly inline."""
-    if isinstance(val, (int, float, str, bool)) or val is None:
+def _is_simple_leaf(value: Any) -> bool:
+    """Checks if an AST value is a simple leaf that can be printed inline."""
+    if value is None or isinstance(value, (int, float, bool, str, Enum)):
         return True
-    if isinstance(val, Enum):
+    if isinstance(value, tuple) and all(isinstance(item, str) for item in value):
         return True
-    if isinstance(val, tuple) and all(isinstance(x, str) for x in val):
-        return True
-    if isinstance(val, ASTNode) and len(fields(val)) == 0:
+    if isinstance(value, ASTNode) and len(fields(value)) == 0:
         return True
     return False
 
 
 def ast_dump(node: Any, indent: int = 0, show_offsets: bool = False) -> str:
     """Recursively formats an AST node into a canonical 2-space indented S-expression string."""
-    pad = "  " * indent
-    child_pad = "  " * (indent + 1)
+    padding = "  " * indent
+    child_padding = "  " * (indent + 1)
 
     if not isinstance(node, ASTNode):
         if isinstance(node, tuple):
             if not node:
                 return "()"
-            if all(_is_simple_leaf(x) for x in node):
-                return "(" + " ".join(repr(x) if isinstance(x, str) else str(x) for x in node) + ")"
+            if all(_is_simple_leaf(item) for item in node):
+                return "(" + " ".join(repr(item) if isinstance(item, str) else str(item) for item in node) + ")"
             lines = ["("]
-            for elem in node:
-                lines.append(f"{child_pad}{ast_dump(elem, indent + 1, show_offsets)}")
-            lines.append(f"{pad})")
+            for element in node:
+                lines.append(f"{child_padding}{ast_dump(element, indent + 1, show_offsets)}")
+            lines.append(f"{padding})")
             return "\n".join(lines)
         elif isinstance(node, Enum):
             return node.name
@@ -633,7 +637,7 @@ def ast_dump(node: Any, indent: int = 0, show_offsets: bool = False) -> str:
     node_fields = fields(node)
 
     # Filter out offset field unless show_offsets is True
-    active_fields = [f for f in node_fields if show_offsets or f.name != "offset"]
+    active_fields = [field for field in node_fields if show_offsets or field.name != "offset"]
 
     if not active_fields:
         if show_offsets:
@@ -643,50 +647,50 @@ def ast_dump(node: Any, indent: int = 0, show_offsets: bool = False) -> str:
     # Check if all fields are simple leaves
     all_simple = True
     field_values = []
-    for f in active_fields:
-        val = getattr(node, f.name)
-        field_values.append((f.name, val))
-        if not _is_simple_leaf(val):
+    for field in active_fields:
+        field_value = getattr(node, field.name)
+        field_values.append((field.name, field_value))
+        if not _is_simple_leaf(field_value):
             all_simple = False
 
     if all_simple:
         parts = [class_name]
-        for name, val in field_values:
-            if isinstance(val, Enum):
-                parts.append(val.name)
-            elif isinstance(val, str):
-                parts.append(repr(val))
-            elif isinstance(val, tuple):
-                parts.append("(" + " ".join(repr(x) for x in val) + ")")
-            elif val is None:
+        for name, field_value in field_values:
+            if isinstance(field_value, Enum):
+                parts.append(field_value.name)
+            elif isinstance(field_value, str):
+                parts.append(repr(field_value))
+            elif isinstance(field_value, tuple):
+                parts.append("(" + " ".join(repr(item) for item in field_value) + ")")
+            elif field_value is None:
                 continue  # omit None in simple leaf inline
             else:
-                parts.append(str(val))
+                parts.append(str(field_value))
         return f"({ ' '.join(parts) })"
 
     # Multi-line indented S-expression
     lines = [f"({class_name}"]
-    for name, val in field_values:
-        if val is None or val == () or val == False:
+    for name, field_value in field_values:
+        if field_value is None or field_value == () or field_value == False:
             # Skip empty optional values to keep trees compact
             continue
-        if _is_simple_leaf(val):
-            if isinstance(val, Enum):
-                lines.append(f"{child_pad}:{name} {val.name}")
-            elif isinstance(val, str):
-                lines.append(f"{child_pad}:{name} {val!r}")
-            elif isinstance(val, tuple):
-                lines.append(f"{child_pad}:{name} ({ ' '.join(repr(x) for x in val) })")
+        if _is_simple_leaf(field_value):
+            if isinstance(field_value, Enum):
+                lines.append(f"{child_padding}:{name} {field_value.name}")
+            elif isinstance(field_value, str):
+                lines.append(f"{child_padding}:{name} {field_value!r}")
+            elif isinstance(field_value, tuple):
+                lines.append(f"{child_padding}:{name} ({ ' '.join(repr(item) for item in field_value) })")
             else:
-                lines.append(f"{child_pad}:{name} {val}")
+                lines.append(f"{child_padding}:{name} {field_value}")
         else:
-            if isinstance(val, tuple):
-                lines.append(f"{child_pad}:{name} (")
-                for item in val:
-                    lines.append(f"{child_pad}  {ast_dump(item, indent + 2, show_offsets)}")
-                lines.append(f"{child_pad})")
+            if isinstance(field_value, tuple):
+                lines.append(f"{child_padding}:{name} (")
+                for item in field_value:
+                    lines.append(f"{child_padding}  {ast_dump(item, indent + 2, show_offsets)}")
+                lines.append(f"{child_padding})")
             else:
-                lines.append(f"{child_pad}:{name} {ast_dump(val, indent + 1, show_offsets)}")
+                lines.append(f"{child_padding}:{name} {ast_dump(field_value, indent + 1, show_offsets)}")
 
-    lines.append(f"{pad})")
+    lines.append(f"{padding})")
     return "\n".join(lines)

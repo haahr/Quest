@@ -23,6 +23,8 @@ htmlcov/
 *.so
 *.dylib
 *.out
+!tests/golden/**/*.out
+!tests/golden/**/*.error
 build/
 bin/
 dist/

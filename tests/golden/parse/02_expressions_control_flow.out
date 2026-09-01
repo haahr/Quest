@@ -1,0 +1,200 @@
+(Program
+  :phrases (
+    (LetValueBinding
+      :name 'x'
+      :value (ExprInt 10 '10')
+    )
+    (LetValueBinding
+      :name 'y'
+      :value (ExprInt 20 '20')
+    )
+    (LetValueBinding
+      :name 'sum'
+      :value (ExprInfix
+        :left (ExprId 'x')
+        :op '+'
+        :right (ExprInfix
+          :left (ExprId 'y')
+          :op '*'
+          :right (ExprInt 2 '2')
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'boolVal'
+      :value (ExprInfix
+        :left (ExprId 'x')
+        :op '<'
+        :right (ExprInfix
+          :left (ExprId 'y')
+          :op 'andif'
+          :right (ExprInfix
+            :left (ExprId 'x')
+            :op '<>'
+            :right (ExprInfix
+              :left (ExprInt 0 '0')
+              :op 'orif'
+              :right (ExprInfix
+                :left (ExprId 'y')
+                :op 'is'
+                :right (ExprInt 20 '20')
+              )
+            )
+          )
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'testIf'
+      :value (ExprIf
+        :cond (ExprInfix
+          :left (ExprId 'n')
+          :op '<'
+          :right (ExprInt 0 '0')
+        )
+        :then_branch (ExprStmt
+          :expr (ExprInfix
+            :left (ExprInt 0 '0')
+            :op '-'
+            :right (ExprId 'n')
+          )
+        )
+        :elsifs (
+          (
+            (ExprInfix
+              :left (ExprId 'n')
+              :op 'is'
+              :right (ExprInt 0 '0')
+            )
+            (ExprStmt
+              :expr (ExprInt 0 '0')
+            )
+          )
+        )
+        :else_branch (ExprStmt
+          :expr (ExprId 'n')
+        )
+      )
+      :params (
+        (FormalParam
+          :name 'n'
+          :type_annot (TypePath ('Int'))
+          :mode VALUE
+        )
+      )
+      :type_annot (TypePath ('Int'))
+    )
+    (LetValueBinding
+      :name 'testLoop'
+      :value (ExprBlock
+        :bindings (
+          (LetValueBinding
+            :name 'i'
+            :value (ExprInt 0 '0')
+            :is_var True
+          )
+          (ExprStmt
+            :expr (ExprWhile
+              :cond (ExprDerefCell
+                :target (ExprInfix
+                  :left (ExprId 'i')
+                  :op '<'
+                  :right (ExprInt 10 '10')
+                )
+              )
+              :body (ExprStmt
+                :expr (ExprInfix
+                  :left (ExprId 'i')
+                  :op ':='
+                  :right (ExprDerefCell
+                    :target (ExprInfix
+                      :left (ExprId 'i')
+                      :op '+'
+                      :right (ExprInt 1 '1')
+                    )
+                  )
+                )
+              )
+            )
+          )
+          (ExprStmt
+            :expr (ExprLoop
+              :body (ExprStmt
+                :expr (ExprIf
+                  :cond (ExprDerefCell
+                    :target (ExprInfix
+                      :left (ExprId 'i')
+                      :op 'is'
+                      :right (ExprInt 20 '20')
+                    )
+                  )
+                  :then_branch (ExprStmt
+                    :expr (ExprExit)
+                  )
+                  :else_branch (ExprStmt
+                    :expr (ExprInfix
+                      :left (ExprId 'i')
+                      :op ':='
+                      :right (ExprDerefCell
+                        :target (ExprInfix
+                          :left (ExprId 'i')
+                          :op '+'
+                          :right (ExprInt 1 '1')
+                        )
+                      )
+                    )
+                  )
+                )
+              )
+            )
+          )
+          (ExprStmt
+            :expr (ExprFor
+              :var_name 'k'
+              :start (ExprInt 1 '1')
+              :stop (ExprInt 5 '5')
+              :body (ExprStmt
+                :expr (ExprInfix
+                  :left (ExprId 'i')
+                  :op ':='
+                  :right (ExprDerefCell
+                    :target (ExprInfix
+                      :left (ExprId 'i')
+                      :op '+'
+                      :right (ExprId 'k')
+                    )
+                  )
+                )
+              )
+            )
+          )
+          (ExprStmt
+            :expr (ExprFor
+              :var_name 'k'
+              :start (ExprInt 5 '5')
+              :is_downto True
+              :stop (ExprInt 1 '1')
+              :body (ExprStmt
+                :expr (ExprInfix
+                  :left (ExprId 'i')
+                  :op ':='
+                  :right (ExprDerefCell
+                    :target (ExprInfix
+                      :left (ExprId 'i')
+                      :op '-'
+                      :right (ExprId 'k')
+                    )
+                  )
+                )
+              )
+            )
+          )
+          (ExprStmt
+            :expr (ExprOk)
+          )
+        )
+      )
+      :type_annot (TypePath ('Ok'))
+    )
+  )
+)

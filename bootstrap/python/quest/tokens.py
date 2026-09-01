@@ -27,17 +27,17 @@ class SourceMap:
         self.source_text = source_text
         self.file_name = file_name
         self.line_starts: list[int] = [0]
-        for idx, ch in enumerate(source_text):
-            if ch == "\n":
-                self.line_starts.append(idx + 1)
+        for index, char in enumerate(source_text):
+            if char == "\n":
+                self.line_starts.append(index + 1)
 
     def locate(self, offset: int) -> SourceLocation:
         """Maps a 0-indexed character offset to (line, column)."""
         offset = max(0, min(offset, len(self.source_text)))
-        line_idx = bisect.bisect_right(self.line_starts, offset) - 1
-        line = line_idx + 1
-        col = offset - self.line_starts[line_idx] + 1
-        return SourceLocation(self.file_name, offset, line, col)
+        line_index = bisect.bisect_right(self.line_starts, offset) - 1
+        line = line_index + 1
+        column = offset - self.line_starts[line_index] + 1
+        return SourceLocation(self.file_name, offset, line, column)
 
     def format_error(self, offset: int, length: int, message: str) -> str:
         """Renders a diagnostic message with underlined source context."""

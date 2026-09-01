@@ -1,0 +1,327 @@
+# Quest Grammar Specification (BNF) & Recursive-Descent Parser Guide
+# Extracted from "Typeful Programming" by Luca Cardelli (1989 / 1993, Section 11.1)
+
+===============================================================================
+1. FORMAL BNF GRAMMAR
+===============================================================================
+
+Notation:
+  Id ::= A        Non-terminal symbol Id is defined to be A
+  ".."            Terminal symbol ("" is empty)
+  ide             an alphanumeric identifier token ([A-Za-z][A-Za-z0-9]*, cannot contain '_')
+  infix           Symbolic identifier token (!@#$%&*_+=-|\`:<>/?^~)
+  char            Character literal token ('a', with escapes)
+  string          String literal token ("abc", with escapes)
+  integer         Integer literal token (42)
+  real            Real literal token (3.14, 2.0e-5)
+
+  A B             A followed by B (binds strongest)
+  A | B           A or B
+  [A]             Optional: ("" | A)
+  {A}             Repetition: zero or more times ("" | A {A})
+  (A)             Grouping
+
+-------------------------------------------------------------------------------
+Top-Level Program & Compilation Units
+-------------------------------------------------------------------------------
+
+Program ::=
+    {[Interface | Module | Linkage | Binding] ";"}
+
+Interface ::=
+    ["unsound"] "interface" ide ["import" Import] "export" Signature "end"
+
+Module ::=
+    ["unsound"] "module" ide ":" ide ["import" Import] "export" Binding "end"
+
+Linkage ::=
+    "import" Import
+
+Import ::=
+    {[IdeList] ":" ide}
+
+-------------------------------------------------------------------------------
+Level 2: Kinds
+-------------------------------------------------------------------------------
+
+Kind ::=
+    ide |
+    "TYPE" |
+    "POWER" "(" Type ")" |
+    "ALL" "(" TypeSignature ")" Kind |
+    ide "_" ide |
+    "{" Kind "}"
+
+-------------------------------------------------------------------------------
+Level 1: Types & Type Operators
+-------------------------------------------------------------------------------
+
+Type ::=
+    ide {"." ide} |
+    "Ok" | "Bool" | "Char" | "String" | "Int" | "Real" |
+    "Array" "(" Type ")" | "Exception" |
+    "All" "(" Signature ")" Type |
+    "Tuple" Signature "end" |
+    "Option" OptionSignature "end" |
+    "Auto" [ide] HasKind "with" Signature "end" |
+    "Record" ValueSignature "end" |
+    "Variant" ValueSignature "end" |
+    "Fun" "(" TypeSignature ")" [HasKind] Type |
+    "Rec" "(" ide HasKind ")" Type |
+    Type "(" TypeBinding ")" |
+    Type infix Type |
+    Type "_" ide |
+    "{" Type "}"
+
+-------------------------------------------------------------------------------
+Level 0: Values and Expressions
+-------------------------------------------------------------------------------
+
+Value ::=
+    ide |
+    "ok" | "true" | "false" | char | string | integer | real |
+    "if" Binding ["then" Binding] {"elsif" Binding ["then" Binding]} ["else" Binding] "end" |
+    "begin" Binding "end" |
+    "loop" Binding "end" | "exit" |
+    "while" Binding "do" Binding "end" |
+    "for" ide "=" Binding ( "upto" | "downto" ) Binding "do" Binding "end" |
+    "fun" "(" Signature ")" [":" Type] Value |
+    Value "(" Binding ")" |
+    Value (infix | "is" | "isnot" | "andif" | "orif" | ":=") Value |
+    "tuple" Binding "end" |
+    "auto" (["let" ide [HasKind] "=" ] ":") Type "with" Binding "end" |
+    "option" (ide | "ordinal" "(" Value ")") "of" Type ["with" Binding] "end" |
+    "record" ValueBinding "end" |
+    "variant" ["var"] ide "of" Type ["with" Value] "end" |
+    Value ("." | "?" | "!") ide |
+    "case" Binding CaseBranches "end" |
+    ("array" | Value) "of" (Binding "end" | "(" Binding ")") |
+    Value "[" Value "]" [ ":=" Value ] |
+    "inspect" Binding InspectBranches "end" |
+    "exception" ide [":" Type] "end" |
+    "raise" Value ["with" Value] ["as" Type] "end" |
+    "try" Binding TryBranches "end" |
+    "{" Value "}"
+
+-------------------------------------------------------------------------------
+Signatures and Bindings
+-------------------------------------------------------------------------------
+
+Signature ::=
+    { TypeSignature |
+      ["var" | "out"] IdeList (HasType | ValueFormals) | HasMutType }
+
+TypeSignature ::=
+    { "DEF" KindDecl |
+      "Def" ["Rec"] TypeDecl |
+      [IdeList] HasKind }
+
+ValueSignature ::=
+    { ["var"] IdeList HasType }
+
+OptionSignature ::=
+    ["with" Signature "end"] { IdeList ["with" Signature "end"] }
+
+Binding ::=
+    { "DEF" KindDecl |
+      "Def" ["Rec"] TypeDecl |
+      "Let" ["Rec"] TypeDecl |
+      "let" ["rec"] ValueDecl |
+      "::" Kind |
+      ":" Type |
+      "var" "(" Value ")" |
+      "@" Value |
+      Value }
+
+TypeBinding ::=
+    { Type }
+
+ValueBinding ::=
+    { ["var"] ide "=" Value }
+
+-------------------------------------------------------------------------------
+Declarations and Formal Parameters
+-------------------------------------------------------------------------------
+
+KindDecl ::=
+    ide "=" Kind |
+    KindDecl "and" KindDecl
+
+TypeDecl ::=
+    ide [HasKind | TypeFormals] "=" Type |
+    TypeDecl "and" TypeDecl
+
+ValueDecl ::=
+    ["var"] ide [HasType | ValueFormals] "=" Value |
+    ValueDecl "and" ValueDecl
+
+TypeFormals ::=
+    {"(" TypeSignature ")"} HasKind
+
+ValueFormals ::=
+    {"(" Signature ")"} ":" Type
+
+-------------------------------------------------------------------------------
+Branches and Matchers
+-------------------------------------------------------------------------------
+
+CaseBranches ::=
+    {"when" IdeList ["with" ide [":" Type]] "then" Binding}
+    ["else" Binding]
+
+InspectBranches ::=
+    {"when" Type ["with" {IdeList [":" Type]}] "then" Binding}
+    ["else" Binding]
+
+TryBranches ::=
+    {"when" Binding ["with" ide [":" Type]] "then" Binding}
+    ["else" Binding]
+
+-------------------------------------------------------------------------------
+Type Annotations and Kinds
+-------------------------------------------------------------------------------
+
+HasType ::=
+    ":" Type
+
+HasMutType ::=
+    ":" Type | ":" "Var" "(" Type ")"
+
+HasKind ::=
+    "<:" Type | "::" Kind
+
+IdeList ::=
+    ide | ide "," IdeList
+
+
+===============================================================================
+2. RECURSIVE-DESCENT PARSER IMPLEMENTATION CHALLENGES & WORKAROUNDS
+===============================================================================
+
+Implementing the Quest grammar with a hand-written Recursive-Descent / Pratt
+parser involves several specific syntactic challenges:
+
+-------------------------------------------------------------------------------
+Challenge 1: Left-Recursion in Expressions and Types
+-------------------------------------------------------------------------------
+The BNF defines `Value` and `Type` with direct left-recursive productions:
+  Value ::= Value "(" Binding ")"             -- Function application
+          | Value ("." | "?" | "!") ide       -- Field / Variant projection
+          | Value "[" Value "]" [ ":=" Value] -- Array index / indexed assignment
+          | Value infix Value                 -- Binary infix operations
+
+Workaround:
+Split expression parsing into layered precedence levels:
+1. `parse_primary()`:
+   Parses atoms: literals (`42`, `3.14`, `'a'`, `"str"`), identifiers (`x`),
+   keywords starting blocks (`if`, `begin`, `loop`, `while`, `for`, `fun`,
+   `tuple`, `record`, `option`, `variant`, `array`, `case`, `inspect`,
+   `try`, `raise`, `exception`), and grouped expressions ` "{" Value "}" `.
+2. `parse_postfix()`:
+   Iteratively consumes postfix operators in a loop over the primary node:
+   - `.` `ide`        -> `ExprSelect`
+   - `?` `ide`        -> `ExprVariantCheck`
+   - `!` `ide`        -> `ExprVariantAssert`
+   - `(` `args...` `)`-> `ExprApp`
+   - `[` `idx` `]`    -> `ExprIndex` (or `ExprIndexAssign` if followed by `:=`)
+   - `_` `ide`        -> Manifest extraction
+3. `parse_infix()`:
+   Handles binary infix operators.
+
+-------------------------------------------------------------------------------
+Challenge 2: Uniform Precedence and Strict Right-Associativity
+-------------------------------------------------------------------------------
+Unlike C or Python, in Quest:
+- ALL binary operators (`+`, `-`, `*`, `/`, `is`, `isnot`, `andif`, `orif`,
+  `:=`, custom symbolic operators `<>`, `++`, `/\`, etc.) have IDENTICAL precedence.
+- ALL binary operators are strictly RIGHT-ASSOCIATIVE.
+  Example: `2 * x + y` parses as `2 * (x + y)`.
+  Grouping otherwise requires explicit braces: `{ 2 * x } + y`.
+
+Workaround:
+In the recursive-descent parser, `parse_infix()` is purely right-recursive:
+```python
+def parse_infix(self) -> Expr:
+    left = self.parse_postfix()
+    if self._is_infix_op(self.peek()):
+        op_token = self.advance()
+        right = self.parse_infix()  # Right-recursive call handles right-associativity
+        return ExprInfix(left, op_token.lexeme, right, offset=left.offset)
+    return left
+```
+
+-------------------------------------------------------------------------------
+Challenge 3: Multi-Element Bindings and Semicolon Separation
+-------------------------------------------------------------------------------
+In Quest, a `Binding` (e.g. inside `begin ... end`, `tuple ... end`, or top-level)
+is a sequence of declarations (`Let`, `let`, `Def`, `DEF`) and expressions
+(`Value`). Semicolons `;` are optional separators between bindings.
+
+Workaround:
+`parse_binding_sequence(stop_tokens)` repeatedly parses bindings until hitting
+a closing keyword (`end`, `else`, `elsif`, `when`, `then`, `do`, `export`, etc.):
+- If token is `Let` / `Def` / `DEF` / `let` -> parse declaration.
+- Otherwise -> parse `Value` expression.
+- Consume optional semicolons `;` after each element.
+
+-------------------------------------------------------------------------------
+Challenge 4: Listfix Syntax (`of ... end` vs `of(...)`)
+-------------------------------------------------------------------------------
+Quest supports two distinct forms of listfix expressions:
+1. `array of 1 2 3 end` (literal list of elements)
+2. `array of(5 false)` (count + default element repetition)
+3. `option tag of Type with ... end`
+4. `variant tag of Type with ... end`
+
+Workaround:
+After consuming keyword `of`:
+- If `peek() == LPAREN` `(`:
+  Consume `(`, parse count and initial value `count, init_val`, consume `)`.
+- Otherwise:
+  Parse expressions / bindings until the matching `end` keyword.
+
+-------------------------------------------------------------------------------
+Challenge 5: Disambiguating Parameter Lists vs Grouped Braces
+-------------------------------------------------------------------------------
+- `(` `)` is used strictly for parameter lists, argument applications, and
+  signatures.
+- `{` `}` is used strictly for expression and type precedence grouping.
+This makes grammar disambiguation clean: `(` never means expression grouping,
+and `{` never means parameter lists.
+
+-------------------------------------------------------------------------------
+Challenge 6: `and` Conjunction in Declarations
+-------------------------------------------------------------------------------
+In Quest, simultaneous/mutually recursive declarations use the `and` keyword:
+  `let x = 1 and y = 2`
+  `Let T = Int and U = Bool`
+  `DEF K = TYPE and L = TYPE`
+
+Workaround:
+When parsing a `let` / `Let` / `Def` / `DEF` declaration, loop while `match(KW_AND)`
+to collect all conjoined bindings into a single mutually-bound AST node.
+
+
+===============================================================================
+3. COMPLEXITIES & SUBTLETIES TO PRESERVE SPECIFICATION FIDELITY
+===============================================================================
+
+1. Manifest Types & Kind Identifiers (`ide "_" ide`):
+   Manifest paths across interfaces (e.g. `A_X`, `X_U`) use underscore syntax.
+   Because alphanumeric identifiers (`ide`) in Quest cannot contain underscores
+   (`_`), there is no ambiguity: `A_X` is always tokenized as `IDENT("A")`,
+   `UNDERSCORE`, `IDENT("X")` and parsed cleanly as `TypeManifest` / `KindManifest`.
+
+2. Anonymous vs Named Components in Signatures:
+   In `Tuple`, signatures can mix named fields (`x: Int`) with anonymous
+   types (`: Int` or `Int`).
+
+3. Function Formals Shorthand:
+   `let f(x: Int): Int = x + 1` is syntactic sugar for
+   `let f : All(x: Int) Int = fun(x: Int): Int x + 1`.
+   The parser should construct `FormalParam` nodes directly so the typechecker
+   can elaborate either desugared or explicit forms uniformly.
+
+4. Bounded Quantifiers (`<:` and `::`):
+   - `HasKind ::= "<:" Type | "::" Kind`
+   - `A <: B` is syntactic shorthand for `A :: POWER(B)`.

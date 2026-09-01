@@ -19,31 +19,31 @@ def tokenize_stream(source_text: str, file_name: str = "<stdin>", show_value: bo
     try:
         for token in tokenizer:
             loc = source_map.locate(token.offset)
+            line_column = f"{loc.line}:{loc.column}"
             if token.kind == TokenKind.EOF:
-                # Still output EOF token or terminate
-                line_col = f"{loc.line}:{loc.column}"
-                print(f"{line_col}\t{token.kind.name}")
+                print(f"{line_column}\t{token.kind.name}")
                 break
 
-            line_col = f"{loc.line}:{loc.column}"
             if show_value and token.value is not None:
-                print(f"{line_col}\t{token.kind.name}\t{token.lexeme}\t(value={token.value!r})")
+                print(f"{line_column}\t{token.kind.name}\t{token.lexeme}\t(value={token.value!r})")
             else:
-                print(f"{line_col}\t{token.kind.name}\t{token.lexeme}")
+                print(f"{line_column}\t{token.kind.name}\t{token.lexeme}")
         return 0
 
-    except TokenizerError as err:
-        sys.stderr.write(err.format_with_source(source_map) + "\n")
+    except TokenizerError as error:
+        sys.stderr.write(error.format_with_source(source_map) + "\n")
         return 1
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Tokenize Quest source code.")
-    parser.add_argument("file", nargs="?", default=None, help="Path to Quest source file (.quest), or '-' for stdin.")
-    parser.add_argument("-c", "--code", help="Inline Quest code string to tokenize.")
-    parser.add_argument("--show-value", action="store_true", help="Include parsed literal values in output.")
+    arg_parser = argparse.ArgumentParser(description="Tokenize Quest source code.")
+    arg_parser.add_argument(
+        "file", nargs="?", default=None, help="Path to Quest source file (.quest), or '-' for stdin."
+    )
+    arg_parser.add_argument("-c", "--code", help="Inline Quest code string to tokenize.")
+    arg_parser.add_argument("--show-value", action="store_true", help="Include parsed literal values in output.")
 
-    args = parser.parse_args()
+    args = arg_parser.parse_args()
 
     if args.code is not None:
         return tokenize_stream(args.code, "<string>", args.show_value)
@@ -53,11 +53,11 @@ def main() -> int:
         return tokenize_stream(source_text, "<stdin>", args.show_value)
 
     try:
-        with open(args.file, "r", encoding="utf-8") as f:
-            source_text = f.read()
+        with open(args.file, "r", encoding="utf-8") as file:
+            source_text = file.read()
         return tokenize_stream(source_text, args.file, args.show_value)
-    except OSError as e:
-        sys.stderr.write(f"Error opening file '{args.file}': {e}\n")
+    except OSError as error:
+        sys.stderr.write(f"Error opening file '{args.file}': {error}\n")
         return 1
 
 

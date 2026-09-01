@@ -1,6 +1,6 @@
 # Quest Front-End Design Document
 
-This document specifies the architecture, data structures, and APIs for the **Quest Front-End** (Step 1 of the Quest implementation plan), encompassing the Tokenizer, Source Position Mapping, Diagnostic Formatting, Parser, and Abstract Syntax Tree (AST).
+This document specifies the architecture, data structures, and APIs for the **Quest Front-End** (Step 1 of the Quest implementation plan), encompassing the Tokenizer, Source Position Mapping, Diagnostic Formatting, Data-Driven PEG Parser, and Abstract Syntax Tree (AST).
 
 ---
 
@@ -9,6 +9,7 @@ This document specifies the architecture, data structures, and APIs for the **Qu
 The front-end is responsible for converting raw Quest source text (`.quest`) into an immutable, strongly-typed Abstract Syntax Tree (AST). In accordance with the project plan:
 
 - **Target Runtime:** Python 3.10+ (using Python 3.11 at `/opt/homebrew/opt/python@3.11/libexec/bin/python`), enabling native pattern matching (`match ... case`) and `dataclasses.KW_ONLY`.
+- **Data-Driven PEG / Packrat Architecture:** The grammar is declaratively defined as a set of rules for non-terminal `SyntaxTarget`s composed of algebraic `Construct` elements (`MatchToken`, `MatchTarget`, `Optional`, `Repeated`, `Sequence`).
 - **Mostly-Functional Style:** Pure functions, immutable data structures (`@dataclass(frozen=True)`), and algebraic type decompositions to facilitate a direct subsequent port to Quest (in `src/`).
 - **Dedicated AST Namespace:** All AST nodes live in a dedicated module (`quest.ast`) to prevent name collisions with standard Python built-ins or compiler passes.
 - **Zero External Dependencies:** Built entirely with standard library facilities to ensure immediate portability.
@@ -89,7 +90,7 @@ class TokenKind(Enum):
     STRING_LIT = auto()     # e.g. "hello world", "escaped \" quotes"
     
     # --- Identifiers and Symbolic Operators ---
-    IDENT = auto()          # Alphanumeric: [A-Za-z][A-Za-z0-9_]*
+    IDENT = auto()          # Alphanumeric: [A-Za-z][A-Za-z0-9]* (no underscores)
     SYMBOLIC_INFIX = auto() # Custom symbolic operator: ++, --, **, <>, +, -, *, /, etc.
     
     # --- Delimiters & Punctuation ---
@@ -246,7 +247,7 @@ class Token:
    - If an expression contains `(*)`, the tokenizer interprets `(*` as the start of a comment. To parenthesize a lone `*` operator, whitespace or braces must be used: `( * )` or `{ * }`.
 
 5. **Case-Sensitive Keyword Resolution:**  
-   Alphanumeric identifiers are scanned with `[A-Za-z][A-Za-z0-9_]*`. The resulting string is looked up in a case-sensitive keyword dictionary. If found, the corresponding `KW_*` token is emitted; otherwise, `IDENT` is emitted.
+   Alphanumeric identifiers are scanned with `[A-Za-z][A-Za-z0-9]*` (underscores are not part of identifiers). The resulting string is looked up in a case-sensitive keyword dictionary. If found, the corresponding `KW_*` token is emitted; otherwise, `IDENT` is emitted.
 
 6. **Escape Sequences:**  
    Both character literals (`'...'`) and string literals (`"..."`) support:
@@ -298,9 +299,221 @@ class Tokenizer:
 
 ---
 
-## 3. Parser Architecture (Planned)
+## 3. Data-Driven PEG / Packrat Parser Architecture
 
-*(To be specified: recursive descent / Pratt parser handling Quest's uniform right-associative infix precedence, listfix syntax, and top-level phrase sequencing).*
+The front-end separates parsing into two decoupled modules:
+1. **`quest.parser` (`bootstrap/python/quest/parser.py`):** A domain-agnostic, reusable PEG/Packrat engine implementing algebraic grammar constructs, packrat memoization, `_IN_PROGRESS` cycle detection, loop progress assertions, and farthest-failure diagnostics.
+2. **`quest.grammar` (`bootstrap/python/quest/grammar.py`):** The Quest language grammar specification, mapping `SyntaxTarget` non-terminals to production `Rule`s paired with typed AST builder callables.
+
+### 3.1. Syntax Targets and Grammar Constructs
+
+Non-terminals are first-class `SyntaxTarget` instances that inherit directly from `Construct`. Each syntax target encapsulates its human-readable capitalized name, its list of production `Rule`s, and an `add_rule` registration method.
+
+```python
+class Construct:
+    """Base class for all grammar constructs."""
+    can_match_empty: bool = False
+
+    def evaluate(self, parser: Parser, pos: int) -> tuple[Optional[Any], int]:
+        """Evaluates this construct against the parser at token position pos."""
+        raise NotImplementedError
+
+@dataclass(frozen=True)
+class MatchToken(Construct):
+    """Matches a specific terminal TokenKind."""
+    kind: TokenKind
+    can_match_empty: bool = False
+
+    def evaluate(self, parser: Parser, pos: int) -> tuple[Optional[Any], int]: ...
+
+class SyntaxTarget(Construct):
+    """A grammar non-terminal syntax target owning its production rules."""
+    can_match_empty: bool = False
+
+    def __init__(self, name: str):
+        self.name = name
+        self.rules: list[Rule] = []
+
+    def add_rule(self, constructs: tuple[Construct, ...], action: Callable[..., Any]) -> Rule:
+        rule = Rule(constructs, action)
+        self.rules.append(rule)
+        return rule
+
+    def evaluate(self, parser: Parser, pos: int) -> tuple[Optional[Any], int]: ...
+
+class Optional(Construct):
+    """Matches inner construct(s) 0 or 1 times: [...] in EBNF."""
+    can_match_empty: bool = True
+
+    def __init__(self, *items: Construct):
+        self.inner = items[0] if len(items) == 1 else Sequence(items)
+
+    def evaluate(self, parser: Parser, pos: int) -> tuple[Optional[Any], int]: ...
+
+class Repeated(Construct):
+    """Matches inner construct(s) 0 or more times: {...} in EBNF."""
+    can_match_empty: bool = True
+
+    def __init__(self, *items: Construct):
+        self.inner = items[0] if len(items) == 1 else Sequence(items)
+
+    def evaluate(self, parser: Parser, pos: int) -> tuple[Optional[Any], int]: ...
+
+@dataclass(frozen=True)
+class Sequence(Construct):
+    """Matches a sequence of constructs in order."""
+    items: tuple[Construct, ...]
+    can_match_empty: bool = False
+
+    def evaluate(self, parser: Parser, pos: int) -> tuple[Optional[Any], int]: ...
+
+@dataclass(frozen=True)
+class Rule:
+    """An alternative production rule with a callable semantic action builder."""
+    constructs: tuple[Construct, ...]
+    action: Callable[..., Any]
+```
+
+#### Top-Level Non-Terminals
+Top-level non-terminals are defined as global constants in `bootstrap/python/quest/grammar.py` with capitalized string names:
+
+```python
+PROGRAM = SyntaxTarget("Program")
+PHRASE = SyntaxTarget("Phrase")
+INTERFACE = SyntaxTarget("Interface")
+MODULE = SyntaxTarget("Module")
+IMPORT = SyntaxTarget("Import")
+IDE_LIST = SyntaxTarget("IdeList")
+
+KIND = SyntaxTarget("Kind")
+PRIMARY_KIND = SyntaxTarget("PrimaryKind")
+
+TYPE = SyntaxTarget("Type")
+POSTFIX_TYPE = SyntaxTarget("PostfixType")
+PRIMARY_TYPE = SyntaxTarget("PrimaryType")
+SIGNATURE = SyntaxTarget("Signature")
+
+VALUE = SyntaxTarget("Value")
+POSTFIX_VALUE = SyntaxTarget("PostfixValue")
+PRIMARY_VALUE = SyntaxTarget("PrimaryValue")
+BINDING = SyntaxTarget("Binding")
+```
+
+#### Architectural Alternative: `QuestGrammar` Class Encapsulation
+An alternative design considered was encapsulating all `SyntaxTarget` non-terminals as fields of a `QuestGrammar` class, with rules built in its constructor (`self._build_rules()`):
+
+```python
+class QuestGrammar:
+    def __init__(self):
+        self.PROGRAM = SyntaxTarget("Program")
+        self.VALUE = SyntaxTarget("Value")
+        ...
+        self._build_rules()
+```
+
+- **Advantages:** Eliminates all module-level global variables and allows instantiating multiple isolated grammar instances (useful for testing dialect extensions).
+- **Trade-offs / Why Deferred:** Adds `self.` / unpacking preamble boilerplate across ~80 production rules, and is redundant with Quest's native `interface` / `module` system where a grammar module is already a first-class record/namespace when self-hosting.
+
+---
+
+### 3.2. Left-Recursion Elimination via Factored EBNF
+
+In standard PEG, left-recursive productions like `Value ::= Value infix Value` or `Value ::= Value "(" Binding ")"` cause infinite recursion. We factor these into non-left-recursive EBNF rules:
+
+#### A. Factored Expressions (`Value` & `Infix`)
+Quest's uniform right-associativity (`2 * x + y` $\to$ `2 * (x + y)`) is parsed cleanly by right-recursive infix chaining:
+
+```bnf
+Value         ::= PostfixValue [ InfixTail ]
+PostfixValue  ::= PrimaryValue { PostfixOp }
+PostfixOp     ::= ("." ide | "?" ide | "!" ide | "(" [Binding] ")" | "[" Value "]" | "_" ide)
+```
+
+In rule definitions:
+```python
+T = MatchToken
+TK = TokenKind
+Opt = Optional
+Rep = Repeated
+
+# Value ::= PostfixValue [ InfixTail ]
+VALUE.add_rule(
+    (POSTFIX_VALUE, Opt(T(TK.SYMBOLIC_INFIX), VALUE)),
+    lambda left, tail: ExprInfix(left=left, op=tail[0].lexeme, right=tail[1], offset=left.offset) if tail else left,
+)
+```
+
+#### B. Factored Types (`Type`)
+```bnf
+Type          ::= PostfixType [ InfixTypeTail ]
+PostfixType   ::= PrimaryType { PostfixTypeOp }
+PostfixTypeOp ::= ("." ide | "(" [TypeBinding] ")" | "_" ide)
+```
+
+---
+
+### 3.3. Packrat Memoization Table & Zero-Width Loop Prevention
+
+1. **Table Structure:**  
+   The parser memoizes results strictly at the `SyntaxTarget` level:
+   $$\text{cache}[(target, token\_pos)] \to (result\_node, next\_token\_pos) \text{ or } \text{None}$$
+   Internal construct evaluations (`MatchToken`, `Optional`, `Repeated`) execute directly in a fast loop without cache allocation overhead.
+
+2. **Zero-Width Loop Prevention in `Repeated`:**  
+   On every iteration of `Repeated(construct)`, the parser asserts progress:
+   $$\text{new\_pos} > \text{old\_pos}$$
+   If a construct matches the empty stream without advancing the token index, the loop terminates immediately, preventing infinite loops.
+
+3. **Direct & Mutual Left-Recursion Cycle Detection (`IN_PROGRESS` Sentinel):**  
+   If an accidental left-recursion or mutual cycle ($A \to B \to A$ at the same token index) is entered, `cache[(target, token_pos)]` is marked with an `IN_PROGRESS` sentinel upon entry. If a recursive call hits an `IN_PROGRESS` entry before completion, the parser immediately detects the cycle and fails that branch (`return None, pos`), guaranteeing that mutual left-recursions never trigger stack overflows.
+
+4. **Interactive REPL Caching Policy:**  
+   To prevent stale failure results recorded at EOF boundaries from poisoning future input, the cache is cleared at the start of each top-level interactive phrase parse attempt.
+
+---
+
+### 3.4. Diagnostic Error Reporting via Farthest-Failure Tracking
+
+Backtracking PEG parsers can fail deep inside an invalid expression and backtrack out. The parser tracks:
+- `farthest_pos: int`: The maximum token index reached across all evaluated branches.
+- `expected_constructs: set[TokenKind | SyntaxTarget]`: The set of constructs expected at `farthest_pos`.
+
+When the top-level parse fails, the parser reports the exact token at `farthest_pos` and formats a diagnostic message with line, column, and source underline via `SourceMap`.
+
+---
+
+### 3.5. Parser API
+
+```python
+class ParserError(Exception):
+    """Raised when parsing fails, carrying location and message."""
+    def __init__(self, message: str, offset: int, length: int = 1):
+        super().__init__(message)
+        self.message = message
+        self.offset = offset
+        self.length = length
+
+    def format_with_source(self, source_map: SourceMap) -> str:
+        return source_map.format_error(self.offset, self.length, self.message)
+
+class Parser:
+    """Data-driven PEG / Packrat parser for Quest."""
+    
+    def __init__(self, tokens: list[Token], source_map: SourceMap):
+        self.tokens = tokens
+        self.source_map = source_map
+        self.cache: dict[tuple[SyntaxTarget, int], Optional[tuple[Any, int]]] = {}
+        self.farthest_pos = 0
+        self.expected_at_farthest: set[str] = set()
+
+    def parse_program(self) -> ast.Program:
+        """Parses the entire token stream as a complete Quest Program."""
+        ...
+
+    def parse_target(self, target: SyntaxTarget, pos: int) -> tuple[Optional[Any], int]:
+        """Evaluates a SyntaxTarget at the given token position, with packrat memoization."""
+        ...
+```
 
 ---
 
@@ -841,3 +1054,24 @@ def ast_dump(node: ASTNode, indent: int = 0, show_offsets: bool = False) -> str:
 2. **Atomic Leaves:** Inline representations for simple leaves: `(ExprInt 42)`, `(ExprId x)`, `(KindType)`.
 3. **Complex Children:** Indented on subsequent lines with 2 additional spaces.
 4. **Lists / Tuples:** Formatted with child nodes indented beneath their parent clause.
+
+---
+
+## 5. Output Streams, Golden Testing, and Error Handling Discipline
+
+### 5.1. Standard Compiler Output Streams
+The compiler strictly distinguishes standard output and diagnostic error output:
+- **Standard Output (`stdout`, exit code 0):** Used exclusively for valid compiler output (e.g. token streams from `quest_tokenize.py`, S-expression ASTs from `quest_parse.py`, and compiled code in later phases).
+- **Standard Error (`stderr`, exit code 1):** Used exclusively for diagnostic messages, syntax errors, and compiler errors formatted with source location context.
+
+### 5.2. Golden Test Framework Conventions (`.out` vs. `.error`)
+The test runner (`run_tests.py`) enforces strict separation between positive success tests and negative error tests:
+- **Positive Tests (`<test>.out`):** Valid Quest source files must succeed with exit code 0. Their `stdout` is captured and verified against `tests/golden/<phase>/<test>.out`.
+- **Negative Tests (`<test>.error`):** Invalid Quest source files must fail with exit code $\ne 0$. Their `stderr` diagnostic is captured and verified against `tests/golden/<phase>/<test>.error`.
+- `.out` files must never contain compiler error messages.
+
+### 5.3. Future Error Handling Discipline
+As the bootstrap compiler progresses into type checking and intermediate code generation, more formal discipline will be imposed on error handling:
+1. **Structured Diagnostics:** Transitioning from unstructured error strings to structured diagnostic objects carrying severity (error/warning), error codes, primary and secondary labels, and compiler hints.
+2. **Error Recovery & Cascading Suppression:** Implementing parser and typechecker synchronization strategies to report multiple non-cascading errors per compilation run.
+3. **Explicit Negative Test Suites:** Organizing negative tests under dedicated subdirectories (e.g. `tests/source/errors/`) to systematically verify diagnostic reporting.

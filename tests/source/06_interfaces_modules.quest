@@ -1,0 +1,25 @@
+(* Interfaces and Modules Test *)
+
+interface IntStack
+export
+    Stack::TYPE
+    empty: Stack
+    push(s: Stack x: Int): Stack
+    pop(s: Stack): Int
+end;
+
+module intStack : IntStack
+export
+    Let Stack = Tuple
+        items: Array(Int)
+        top: Int
+    end;
+
+    let empty = tuple
+        let items = array of(10 0)
+        let top = 0
+    end;
+
+    let push(s: Stack x: Int): Stack = s;
+    let pop(s: Stack): Int = 0;
+end;

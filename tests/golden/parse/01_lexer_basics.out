@@ -1,0 +1,85 @@
+(Program
+  :phrases (
+    (LetTypeBinding
+      :name 'T'
+      :type_val (TypeTuple
+        :fields (
+          (FieldSig
+            :name 'x'
+            :type_sig (TypePath ('Int'))
+            :mode VALUE
+          )
+          (FieldSig
+            :name 'y'
+            :type_sig (TypePath ('Real'))
+            :mode VALUE
+          )
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'origin'
+      :value (ExprTuple
+        :fields (
+          (TupleBinding
+            :name 'x'
+            :value (ExprInt 0 '0')
+          )
+          (TupleBinding
+            :name 'y'
+            :value (ExprReal 0.0 '0.0')
+          )
+        )
+      )
+      :type_annot (TypePath ('T'))
+    )
+    (LetValueBinding
+      :name 'add'
+      :value (ExprTuple
+        :fields (
+          (TupleBinding
+            :name 'x'
+            :value (ExprInfix
+              :left (ExprSelect
+                :target (ExprId 'p1')
+                :field 'x'
+              )
+              :op '+'
+              :right (ExprSelect
+                :target (ExprId 'p2')
+                :field 'x'
+              )
+            )
+          )
+          (TupleBinding
+            :name 'y'
+            :value (ExprInfix
+              :left (ExprSelect
+                :target (ExprId 'p1')
+                :field 'y'
+              )
+              :op '+'
+              :right (ExprSelect
+                :target (ExprId 'p2')
+                :field 'y'
+              )
+            )
+          )
+        )
+      )
+      :params (
+        (FormalParam
+          :name 'p1'
+          :type_annot (TypePath ('T'))
+          :mode VALUE
+        )
+        (FormalParam
+          :name 'p2'
+          :type_annot (TypePath ('T'))
+          :mode VALUE
+        )
+      )
+      :type_annot (TypePath ('T'))
+    )
+  )
+)

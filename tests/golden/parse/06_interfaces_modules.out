@@ -1,0 +1,120 @@
+(Program
+  :phrases (
+    (InterfaceDecl
+      :name 'IntStack'
+      :signatures (
+        (TypeFormal
+          :name 'Stack'
+          :bound (KindType)
+        )
+        (FieldSig
+          :name 'empty'
+          :type_sig (TypePath ('Stack'))
+          :mode VALUE
+        )
+        (FieldSig
+          :name 'push'
+          :type_sig (TypeAll
+            :quantifiers (
+              (Quantifier
+                :name 's'
+                :bound (KindType)
+              )
+              (Quantifier
+                :name 'x'
+                :bound (KindType)
+              )
+            )
+            :result_type (TypePath ('Stack'))
+          )
+          :mode VALUE
+        )
+        (FieldSig
+          :name 'pop'
+          :type_sig (TypeAll
+            :quantifiers (
+              (Quantifier
+                :name 's'
+                :bound (KindType)
+              )
+            )
+            :result_type (TypePath ('Int'))
+          )
+          :mode VALUE
+        )
+      )
+    )
+    (ModuleDecl
+      :name 'intStack'
+      :interface_name 'IntStack'
+      :bindings (
+        (LetTypeBinding
+          :name 'Stack'
+          :type_val (TypeTuple
+            :fields (
+              (FieldSig
+                :name 'items'
+                :type_sig (TypeArray
+                  :element_type (TypePath ('Int'))
+                )
+                :mode VALUE
+              )
+              (FieldSig
+                :name 'top'
+                :type_sig (TypePath ('Int'))
+                :mode VALUE
+              )
+            )
+          )
+        )
+        (LetValueBinding
+          :name 'empty'
+          :value (ExprTuple
+            :fields (
+              (TupleBinding
+                :name 'items'
+                :value (ExprArrayRep
+                  :count (ExprInt 10 '10')
+                  :init_val (ExprInt 0 '0')
+                )
+              )
+              (TupleBinding
+                :name 'top'
+                :value (ExprInt 0 '0')
+              )
+            )
+          )
+        )
+        (LetValueBinding
+          :name 'push'
+          :value (ExprId 's')
+          :params (
+            (FormalParam
+              :name 's'
+              :type_annot (TypePath ('Stack'))
+              :mode VALUE
+            )
+            (FormalParam
+              :name 'x'
+              :type_annot (TypePath ('Int'))
+              :mode VALUE
+            )
+          )
+          :type_annot (TypePath ('Stack'))
+        )
+        (LetValueBinding
+          :name 'pop'
+          :value (ExprInt 0 '0')
+          :params (
+            (FormalParam
+              :name 's'
+              :type_annot (TypePath ('Stack'))
+              :mode VALUE
+            )
+          )
+          :type_annot (TypePath ('Int'))
+        )
+      )
+    )
+  )
+)
