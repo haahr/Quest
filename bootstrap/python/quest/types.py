@@ -719,15 +719,19 @@ def is_subtype(
     if sub_lazy == sup_lazy:
         return True
 
-    # 3. Metavariable resolution
+    # 3. Metavariable resolution & unification
     if isinstance(sub_lazy, QTypeMeta):
         pruned = sub_lazy.prune()
         if pruned is not sub_lazy:
             return is_subtype(pruned, sup_lazy, env, trail)
+        sub_lazy.instance = sup_lazy
+        return True
     if isinstance(sup_lazy, QTypeMeta):
         pruned = sup_lazy.prune()
         if pruned is not sup_lazy:
             return is_subtype(sub_lazy, pruned, env, trail)
+        sup_lazy.instance = sub_lazy
+        return True
 
     # 4. Top types: in Quest, any proper type is a subtype of itself or upper bounds
     # 5. Coinductive trail check
@@ -811,16 +815,20 @@ def is_subtype(
     if isinstance(sub_lazy, QFunType) and isinstance(sup_lazy, QFunType):
         if len(sub_lazy.params) != len(sup_lazy.params):
             return False
-        for s_param, t_param in zip(sub_lazy.params, sup_lazy.params):
             if s_param.is_var or t_param.is_var:
+                if s_param.is_var != t_param.is_var:
+                    return False
                 if not (is_subtype(t_param.type_val, s_param.type_val, env, trail)
                         and is_subtype(s_param.type_val, t_param.type_val, env, trail)):
                     return False
             elif s_param.is_out or t_param.is_out:
+                if s_param.is_out != t_param.is_out:
+                    return False
+                # Covariant in output parameters: sub_param <: sup_param
                 if not is_subtype(s_param.type_val, t_param.type_val, env, trail):
                     return False
             else:
-                # Contravariant in value parameters
+                # Contravariant in value parameters: sup_param <: sub_param
                 if not is_subtype(t_param.type_val, s_param.type_val, env, trail):
                     return False
         # Covariant in result type

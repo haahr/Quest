@@ -46,7 +46,9 @@
         :quantifiers (
           (Quantifier
             :name 'y'
-            :bound (KindType)
+            :bound (KindPower
+              :bound (TypePath ('Int'))
+            )
           )
         )
         :result_type (TypePath ('Int'))
@@ -67,7 +69,9 @@
             :quantifiers (
               (Quantifier
                 :name 'x'
-                :bound (KindType)
+                :bound (KindPower
+                  :bound (TypePath ('Int'))
+                )
               )
             )
             :result_type (TypePath ('Int'))

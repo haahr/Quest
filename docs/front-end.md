@@ -1191,3 +1191,42 @@ The semantic pipeline bridges syntactic AST nodes (`ast.Kind`, `ast.Type`, `ast.
 ### 7.2. Typed Representation (Option A)
 
 Term typechecking emits dedicated `TypedExpr` nodes that preserve source provenance while decorating expressions with their synthesized semantic `QType` and resolved `ValueSymbol` bindings. This creates a clean boundary between the front-end checker and backend code generators or interpreters.
+
+---
+
+## 8. Term Typing Semantics and Parameter Modes
+
+### 8.1. Implicit Dereferencing of Mutable (`var`) Variables
+In Quest, mutable variables are declared via `let var x := e` and assigned the semantic type `Var(T)` in the symbol table.
+- **Value Positions:** Whenever a mutable variable is referenced in an expression (e.g. `x + 1`), the typechecker automatically wraps the reference in `TypedDerefCell(target=TypedVar(x), type_val=T)`. Explicit dereferencing (`@x` or `!x`) is also supported.
+- **Assignment Targets:** In an assignment `x := e`, the target `x` is recognized as an lvalue reference without dereferencing, validating that the variable is mutable and the assigned value satisfies $e \le T$.
+
+### 8.2. Infix Operators & Strict Numeric Typing (No Coercion)
+- **Numeric Non-Coercion:** Quest strictly disallows implicit coercion between `Int` and `Real`. Both operands of arithmetic operators (`+`, `-`, `*`, `/`, `mod`) must be `Int` (yielding `Int`) or both must be `Real` (yielding `Real`). Mixed operations like `3 + 4.0` are rejected with a type error.
+- **Short-Circuit Booleans:** `andif` and `orif` require boolean operands and are lowered directly into conditional control flow (`TypedIf`).
+- **Assignment:** `:=` synthesizes `Ok`.
+
+### 8.3. Conditionals and Omitted Else
+- **Conditionals with Else:** In `if cond then e1 else e2 end`, both branches are evaluated and the expression synthesizes their least common supertype join ($T_1 \le T_2 \implies T_2$; $T_2 \le T_1 \implies T_1$).
+- **Omitted Else:** In `if cond then e end`, the construct is evaluated purely for its side effects. The return value of `e` is discarded (accepting any type $T$), and the overall `if` expression synthesizes `Ok`, desugaring to `if cond then (e; ok) else ok end`.
+
+### 8.4. Function Parameter Modes & Covariant Out Parameters
+Quest supports three distinct evaluation modes for formal parameters:
+1. **Value Parameters (Default):** Standard input parameter. The argument must satisfy $\text{arg} \le T_{\text{param}}$ (contravariant in function subtyping).
+2. **`var` Parameters (`fun(var x: T)`):** In-out parameter. The argument must be a mutable memory location holding type $T$. Because the function both reads and writes the location, subtyping is **invariant** ($T_{\text{arg}} = T_{\text{param}}$).
+3. **`out` Parameters (`fun(out x: T)`):** Pure output channel.
+   - **Call-Site Rule:** The argument must be a mutable location `var y: U`. The function guarantees writing a value of type $T$. For the caller to safely read $y$ as $U$ after the call, the call-site requires $T_{\text{param}} \le U_{\text{arg}}$.
+   - **Function Subtyping:** Covariant in $T$. An output parameter behaves exactly like a component of the function's return type: $(\text{out } T_1 \to R) \le (\text{out } T_2 \to R)$ whenever $T_1 \le T_2$.
+
+### 8.5. Polymorphic Quantifiers (`All`) and Local Inference
+- **Dual Role of `All(...)`:** When `All(formals) Type` specifies type variables ($X :: K$), it elaborates to `QAllType` (universal quantification). When it specifies value parameters ($x : T$), it desugars to `QFunType` (dependent/value function).
+- **Local Polymorphic Inference:** Calls to polymorphic functions `f : All(X::K) T` can omit explicit type arguments. The typechecker instantiates metavariables `QTypeMeta` to solve for $X$ from value arguments and inserts an explicit `TypedTypeApp` into the typed AST.
+
+### 8.6. Function Definition Shorthand and Recursive Bindings
+- **Shorthand Desugaring:** A declaration `let f(params): Ret = body` desugars into `let f: FunType = fun(params): Ret body`.
+- **Recursive Functions (`let rec`):** In `let rec f(params): Ret = body`, the full function signature is elaborated and pre-bound in the lexical scope before typechecking `body`, permitting direct recursive invocations `f(...)` within the definition.
+
+### 8.7. Return Type Inference
+- **Annotated Return Type:** In `fun(params): Ret body`, the body is checked against `Ret` using $\Gamma \vdash \text{body} \Leftarrow \text{Ret}$.
+- **Omitted Return Type:** In `fun(params) body`, the body type is synthesized using $\Gamma \vdash \text{body} \Rightarrow T_{\text{ret}}$, and the function's return type becomes $T_{\text{ret}}$.
+

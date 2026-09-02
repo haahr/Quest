@@ -107,6 +107,13 @@ from quest.elaborate_types import (
     elaborate_type_binding,
     elaborate_mutual_rec_type_group,
 )
+import quest.typed_ast as typed_ast
+from quest.typed_ast import typed_ast_dump
+from quest.typechecker import (
+    TypeError as QuestTypeError,
+    check_expr,
+    synth_expr,
+)
 
 __all__ = [
     "SourceLocation",
@@ -202,4 +209,9 @@ __all__ = [
     "elaborate_kind_binding",
     "elaborate_type_binding",
     "elaborate_mutual_rec_type_group",
+    "typed_ast",
+    "typed_ast_dump",
+    "QuestTypeError",
+    "check_expr",
+    "synth_expr",
 ]

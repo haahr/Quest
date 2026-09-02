@@ -232,15 +232,26 @@ def elaborate_type(ast_type: ast.Type, env: Environment) -> QType:
         env.push_scope("all_type")
         try:
             quants: list[QQuantifier] = []
+            val_params: list[QParam] = []
             for q in ast_type.quantifiers:
                 bound_kind = elaborate_kind(q.bound, env)
-                symbol_id = env.fresh_symbol_id()
-                env.current_scope.declare_type(
-                    TypeSymbol(name=q.name, symbol_id=symbol_id, kind=bound_kind)
-                )
-                quants.append(QQuantifier(name=q.name, symbol_id=symbol_id, bound=bound_kind))
+                if isinstance(bound_kind, QPowerKind):
+                    # Value formal parameter: x : T (represented via Power(T))
+                    val_type = bound_kind.bound
+                    val_params.append(QParam(name=q.name, type_val=val_type))
+                    env.current_scope.declare_value(ValueSymbol(name=q.name, type_val=val_type))
+                else:
+                    symbol_id = env.fresh_symbol_id()
+                    env.current_scope.declare_type(
+                        TypeSymbol(name=q.name, symbol_id=symbol_id, kind=bound_kind)
+                    )
+                    quants.append(QQuantifier(name=q.name, symbol_id=symbol_id, bound=bound_kind))
             body = elaborate_type(ast_type.result_type, env)
-            return QAllType(quantifiers=tuple(quants), body=body)
+
+            fn_body: QType = QFunType(params=tuple(val_params), result_type=body) if val_params else body
+            if quants:
+                return QAllType(quantifiers=tuple(quants), body=fn_body)
+            return fn_body
         finally:
             env.pop_scope()
 
