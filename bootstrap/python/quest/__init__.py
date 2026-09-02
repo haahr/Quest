@@ -100,6 +100,13 @@ from quest.env import (
     Scope,
     Environment,
 )
+from quest.elaborate_types import (
+    elaborate_kind,
+    elaborate_type,
+    elaborate_kind_binding,
+    elaborate_type_binding,
+    elaborate_mutual_rec_type_group,
+)
 
 __all__ = [
     "SourceLocation",
@@ -190,4 +197,9 @@ __all__ = [
     "KindSymbol",
     "Scope",
     "Environment",
+    "elaborate_kind",
+    "elaborate_type",
+    "elaborate_kind_binding",
+    "elaborate_type_binding",
+    "elaborate_mutual_rec_type_group",
 ]

@@ -1166,3 +1166,28 @@ The four most intricate areas of the Quest semantic type system and their archit
 | **Type-Level $\lambda$-Calculus** | $\beta$-reduction & variable capture | Lazy evaluation + `QTypeVar` with unique `symbol_id` |
 | **Module Manifest Types** | Inside is concrete, outside is abstract | Structural `TypeSymbol(kind, definition)` (no ambient flags) |
 | **Diamond Imports** | Disparate import paths for same interface | Canonical interface symbol interning in `Environment` |
+
+---
+
+## 7. AST Elaboration and Term Typechecking Architecture
+
+The semantic pipeline bridges syntactic AST nodes (`ast.Kind`, `ast.Type`, `ast.Expr`) to canonical semantic representations and typed core nodes across two modular passes:
+
+### 7.1. Module Separation
+
+1. **`bootstrap/python/quest/elaborate_types.py` (Type Elaboration):**
+   - Pure, unidirectional lowering pass: `ast.Kind` $\to$ `QKind`, `ast.Type` $\to$ `QType`, and `ast.BindingNode` $\to$ `list[TypeSymbol]`.
+   - Resolves lexical `TypePath`s and interface manifests against the `Environment`.
+   - Desugars syntactic sugar (`T -> U` $\to$ `QFunType`, unannotated `All(X) T` $\to$ `QAllType(X :: TYPE)`).
+   - Allocates fresh positive integer `symbol_id`s for all bound type parameters.
+   - Validates well-kindedness using `check_kind_well_formed` and `synth_kind`.
+
+2. **`bootstrap/python/quest/typechecker.py` (Term Elaboration & Typechecking):**
+   - Bidirectional expression typechecking ($\Gamma \vdash e \Leftarrow T$ and $\Gamma \vdash e \Rightarrow T$).
+   - Desugars complex control flow (`for` $\to$ `while`, `andif`/`orif` $\to$ conditionals, `case`/`inspect` $\to$ tag checks).
+   - Inserts explicit type arguments for polymorphic applications.
+   - Produces explicit, decorated **`TypedExpr`** nodes (Option A) storing synthesized `QType`s for interpretation and code generation.
+
+### 7.2. Typed Representation (Option A)
+
+Term typechecking emits dedicated `TypedExpr` nodes that preserve source provenance while decorating expressions with their synthesized semantic `QType` and resolved `ValueSymbol` bindings. This creates a clean boundary between the front-end checker and backend code generators or interpreters.
