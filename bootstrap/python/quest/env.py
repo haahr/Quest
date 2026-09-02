@@ -12,8 +12,13 @@ from quest.types import (
     EXCEPTION_TYPE,
     INT_TYPE,
     OK_TYPE,
+    QAllType,
+    QFunType,
     QKind,
+    QParam,
+    QQuantifier,
     QType,
+    QTypeVar,
     REAL_TYPE,
     STRING_TYPE,
     TYPE_KIND,
@@ -92,6 +97,18 @@ class Scope:
     def declarations(self) -> list[Symbol]:
         """Returns all symbols declared in this scope in strict declaration order."""
         return list(self._declarations)
+
+    @property
+    def values(self) -> dict[str, ValueSymbol]:
+        return dict(self._values)
+
+    @property
+    def types(self) -> dict[str, TypeSymbol]:
+        return dict(self._types)
+
+    @property
+    def kinds(self) -> dict[str, KindSymbol]:
+        return dict(self._kinds)
 
     def declare_value(self, symbol: ValueSymbol) -> ValueSymbol:
         self._declarations.append(symbol)
@@ -256,3 +273,13 @@ class Environment:
         self.global_scope.declare_value(ValueSymbol(name="true", type_val=BOOL_TYPE))
         self.global_scope.declare_value(ValueSymbol(name="false", type_val=BOOL_TYPE))
         self.global_scope.declare_value(ValueSymbol(name="ok", type_val=OK_TYPE))
+
+        # Built-in dynamic constructor: All(X::TYPE) (x: X) -> Dynamic
+        dyn_quant_id = self.fresh_symbol_id()
+        dyn_quant = QQuantifier(name="X", symbol_id=dyn_quant_id, bound=TYPE_KIND)
+        dyn_var = QTypeVar(name="X", symbol_id=dyn_quant_id)
+        dyn_fn_type = QAllType(
+            quantifiers=(dyn_quant,),
+            body=QFunType(params=(QParam(name="x", type_val=dyn_var),), result_type=DYNAMIC_TYPE),
+        )
+        self.global_scope.declare_value(ValueSymbol(name="dynamic", type_val=dyn_fn_type))

@@ -1230,3 +1230,92 @@ Quest supports three distinct evaluation modes for formal parameters:
 - **Annotated Return Type:** In `fun(params): Ret body`, the body is checked against `Ret` using $\Gamma \vdash \text{body} \Leftarrow \text{Ret}$.
 - **Omitted Return Type:** In `fun(params) body`, the body type is synthesized using $\Gamma \vdash \text{body} \Rightarrow T_{\text{ret}}$, and the function's return type becomes $T_{\text{ret}}$.
 
+---
+
+## 9. Structured Data Types, Patterns, and Arrays
+
+### 9.1. Records and Tuples
+- **Record Construction:** `record [var] x = e1 ... end` synthesizes `QRecordType`. In checking mode, width subtyping allows supplying extra fields while verifying that all required fields exist with compatible types.
+- **Mutable Record Fields:** Record fields declared `var` are invariant in their element type and support field update `r.x := val`, which verifies that `x` is mutable and $val \le T_x$.
+- **Tuples:** `tuple [x =] e1 ... end` constructs `QTupleType`. Tuples support named field selection (`t.intensity`). Positional access is not supported.
+
+### 9.2. Options and Variants
+- **Construction (`option` / `variant`):** `option tag [with payload] of OptionType end` validates that `tag` is a declared variant of `OptionType` and checks that the payload matches the tag's declared payload type (or absence thereof).
+
+### 9.3. Pattern Matching (`case`) and Exhaustiveness
+- **Discrimination:** `case target when tag1 [with b] then e1 ... [else default] end` discriminates over `Option` or `Variant` values.
+- **Payload Binders:** When a branch specifies `with b`, the binder is scoped to the branch body and bound to the variant's payload type.
+- **Strict Exhaustiveness:** When an `else` branch is omitted, the typechecker enforces that every tag of the target type is covered by at least one `when` branch. Missing tags produce a compile-time `TypeError`.
+- **Branch Joining:** In synthesis mode, the result type is the least common supertype join of all branch expressions (and the `else` expression if present). In checking mode, every branch is checked against the expected type.
+
+### 9.4. Arrays
+- **Array Literals:** `array of e1 e2 ... end` synthesizes `QArrayType(T)` where $T$ is the least common supertype join of the elements.
+- **Empty Arrays:** `array of end` cannot infer an element type in synthesis mode and strictly requires checking mode / an explicit type annotation (e.g. `let a: Array(Int) = array of end`).
+- **Array Repetition:** `array of (count init)` checks that `count` is an `Int` and synthesizes `QArrayType(T)`.
+- **Indexing & Mutation:** `arr[i]` requires `i: Int` and yields element type $T$. `arr[i] := val` verifies $val \le T$ and evaluates to `Ok`.
+
+---
+
+## 10. Exceptions, Dynamic Types, and Type Inspection
+
+### 10.1. Internal Bottom Type and Control Divergence (`raise`)
+- **Internal `Bottom` Type:** Quest incorporates an internal `Bottom` type ($\bot$) that is a subtype of every type ($\forall T. \bot \le T$). `Bottom` is not exposed directly in user source syntax.
+- **Checking Mode Divergence:** A `raise exc [with payload] end` construct diverts control flow unconditionally. In checking mode ($\Gamma \vdash \text{raise} \Leftarrow T$), it checks successfully against **any** expected type $T$.
+- **Synthesis Mode:** A standalone `raise exc end` with no `as Type` annotation synthesizes `Ok`. If an explicit `as T` clause is given (`raise exc as T end`), it synthesizes $T$.
+
+### 10.2. Exception Declarations and Handling (`try...when`)
+- **Exception Declarations:** `exception Name [: PayloadType] end;` introduces a first-class exception value bound in the lexical scope with type `Exception(PayloadType)` (defaulting to `Exception(Ok)` when omitted).
+- **Payload Checking:** When raising an exception with a payload (`raise Exc with payload end`), the payload expression is checked against the exception's declared payload type.
+- **Handling (`try...when`):**
+  - `try body when Exc1 [with b1] then h1 ... [else default] end`.
+  - When a handler specifies `with b`, binder `b` is scoped to `h` and bound to the exception's payload type.
+  - In checking mode, `body`, all handlers, and `else` (if present) are checked against the expected type. In synthesis mode, the result type is the least common supertype join.
+
+### 10.3. Dynamic Values and Inspection (`inspect`)
+- **Built-in `dynamic` Function:** The global environment pre-declares `dynamic: All(X::TYPE) X -> Dynamic`. Value applications like `dynamic(42)` package a value together with its type tag into the type `Dynamic`.
+- **Dynamic Type Inspection (`inspect`):**
+  - `inspect target when Type1 [with b1] then body1 ... [else default] end` checks that `target` has type `Dynamic`.
+  - Each `when Type with b` branch elaborates `Type` and binds `b` to `Type` in the branch body.
+  - The `else` clause is optional; if omitted and no branch matches at runtime, an inspection exception is raised.
+
+---
+
+## 11. Modules, Interfaces & Whole-Program Elaboration
+
+### 11.1. Interface Declarations & Specifications
+- **Syntax:** `interface InterfaceName [import ...] export Signatures end;`
+- **Specification Scope:** An interface declaration creates an isolated specification scope
+  (`interface_scope`) registering:
+  - Abstract type formals: `T::K` (represented as uninterpreted types with kind bound $K$ and `definition=None`).
+  - Manifest type definitions: `Def T = TypeExpr` (represented with concrete `definition`).
+  - Value signatures: `x: T` or `f(p1: T1 ...): Ret` (represented as `ValueSymbol` with function or value types).
+  - Kind definitions: `DEF K = ...`.
+- **Interface Imports:** Interfaces may import signatures from other interfaces using:
+  `import x, y : OtherInterface;`.
+
+### 11.2. Module Implementation & Conformance Checking
+- **Syntax:** `module ModuleName : InterfaceName [import ...] export Bindings end;`
+- **Internal Checking:** Module bindings are checked in an internal scope that has visibility into
+  concrete type representations.
+- **Conformance Verification:**
+  - Every abstract type in the interface must be implemented in the module, satisfying the kind bound.
+  - Every manifest type in the interface must be equivalent to the module's definition.
+  - Every value in the interface must be provided by the module with a subtype of the expected interface
+    type (with abstract types substituted by the concrete implementation types).
+
+### 11.3. Information Hiding & Qualified Dot Access
+- **Abstract Type Opacity:** Outside the module, types specified as abstract (`Stack::TYPE`) in the interface
+  are exported as opaque type variables (`ModuleName.Stack`). Client code cannot inspect internal fields
+  (e.g. `s.items` is a compile-time `TypeError`).
+- **Manifest Type Transparency:** Manifest types in interfaces (`Def Number = Int`) remain transparent
+  outside the module (`m.Number` equals `Int`).
+- **Qualified Dot Access:** Both values (`ModuleName.valueName`) and types (`ModuleName.TypeName`) are accessed
+  using standard dot notation `.`. Module value namespaces are treated as typed records of their exported
+  signatures.
+
+### 11.4. Whole-Program Elaboration
+- **Top-Level Elaboration:** `elaborate_program(program, env)` processes top-level phrases sequentially:
+  - Interface declarations (`InterfaceDecl`) -> `TypedInterface`
+  - Module implementations (`ModuleDecl`) -> `TypedModule`
+  - Bindings & statements -> `TypedBinding` / `TypedExpr`
+- Returns a complete `TypedProgram` AST.

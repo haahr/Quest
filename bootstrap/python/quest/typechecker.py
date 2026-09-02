@@ -1,4 +1,4 @@
-"""Quest Term Elaboration and Bidirectional Typechecker (Phases 2 & 3)."""
+"""Quest Term Elaboration and Bidirectional Typechecker (Phases 2, 3, 4 & 5)."""
 
 from __future__ import annotations
 
@@ -7,6 +7,7 @@ from typing import Any, Optional, Union
 import quest.ast as ast
 from quest.types import (
     BOOL_TYPE,
+    BOTTOM_TYPE,
     CHAR_TYPE,
     DYNAMIC_TYPE,
     EXCEPTION_TYPE,
@@ -14,6 +15,8 @@ from quest.types import (
     OK_TYPE,
     QAllType,
     QArrayType,
+    QBottomType,
+    QExceptionType,
     QFunType,
     QKind,
     QOptionField,
@@ -22,15 +25,18 @@ from quest.types import (
     QQuantifier,
     QRecordField,
     QRecordType,
+    QTupleField,
     QTupleType,
     QType,
     QTypeMeta,
+    QTypeVar,
     QVarType,
     QVariantField,
     QVariantType,
     REAL_TYPE,
     STRING_TYPE,
     TYPE_KIND,
+    is_subkind,
     is_subtype,
     is_type_equal,
 )
@@ -50,31 +56,52 @@ from quest.elaborate_types import (
 )
 from quest.typed_ast import (
     TypedApp,
+    TypedArray,
+    TypedArrayRep,
     TypedAssign,
     TypedBinding,
     TypedBlock,
     TypedBool,
+    TypedCase,
+    TypedCaseBranch,
     TypedChar,
     TypedDefKind,
     TypedDerefCell,
+    TypedException,
     TypedExit,
     TypedExpr,
     TypedExprStmt,
     TypedFor,
     TypedFun,
     TypedIf,
+    TypedIndex,
+    TypedIndexAssign,
     TypedInfix,
+    TypedInspect,
+    TypedInspectBranch,
+    TypedInterface,
     TypedInt,
     TypedLetType,
     TypedLetValue,
     TypedLoop,
+    TypedModule,
     TypedOk,
+    TypedOption,
     TypedParam,
+    TypedProgram,
+    TypedRaise,
     TypedReal,
+    TypedRecord,
+    TypedRecordField,
+    TypedSelect,
     TypedString,
+    TypedTry,
+    TypedTryBranch,
+    TypedTuple,
     TypedTypeApp,
     TypedVar,
     TypedVarCell,
+    TypedVariant,
     TypedWhile,
 )
 
@@ -114,7 +141,38 @@ def check_expr(
     if isinstance(expr, ast.ExprFun):
         return _check_fun_expr(expr, expected_type, env, loop_depth)
 
-    # 4. Subsumption: synthesize minimal type and check subtyping (S <= T)
+    # 4. Record expression: check fields against expected record type
+    if isinstance(expr, ast.ExprRecord):
+        return _check_record_expr(expr, expected_type, env, loop_depth)
+
+    # 5. Tuple expression: check elements against expected tuple type
+    if isinstance(expr, ast.ExprTuple):
+        return _check_tuple_expr(expr, expected_type, env, loop_depth)
+
+    # 6. Case expression: check all branches against expected_type
+    if isinstance(expr, ast.ExprCase):
+        return _check_case_expr(expr, expected_type, env, loop_depth)
+
+    # 7. Array expressions: check elements against expected array element type
+    if isinstance(expr, ast.ExprArray):
+        return _check_array_expr(expr, expected_type, env, loop_depth)
+
+    if isinstance(expr, ast.ExprArrayRep):
+        return _check_array_rep_expr(expr, expected_type, env, loop_depth)
+
+    # 8. Phase 5: Raise expression (divergent control flow checks against any expected type)
+    if isinstance(expr, ast.ExprRaise):
+        return _check_raise_expr(expr, expected_type, env, loop_depth)
+
+    # 9. Phase 5: Try expression
+    if isinstance(expr, ast.ExprTry):
+        return _check_try_expr(expr, expected_type, env, loop_depth)
+
+    # 10. Phase 5: Inspect expression
+    if isinstance(expr, ast.ExprInspect):
+        return _check_inspect_expr(expr, expected_type, env, loop_depth)
+
+    # 11. Subsumption: synthesize minimal type and check subtyping (S <= T)
     typed = synth_expr(expr, env, loop_depth)
     if not is_subtype(typed.type_val, expected_type, env):
         raise TypeError(
@@ -250,6 +308,50 @@ def synth_expr(
     if isinstance(expr, ast.ExprApp):
         return _synth_app_expr(expr, env, loop_depth)
 
+    # --- Aggregates (Records, Tuples, Options, Variants, Arrays) ---
+    if isinstance(expr, ast.ExprRecord):
+        return _synth_record_expr(expr, env, loop_depth)
+
+    if isinstance(expr, ast.ExprTuple):
+        return _synth_tuple_expr(expr, env, loop_depth)
+
+    if isinstance(expr, ast.ExprSelect):
+        return _synth_select_expr(expr, env, loop_depth)
+
+    if isinstance(expr, ast.ExprOption):
+        return _synth_option_expr(expr, env, loop_depth)
+
+    if isinstance(expr, ast.ExprVariant):
+        return _synth_variant_expr(expr, env, loop_depth)
+
+    if isinstance(expr, ast.ExprCase):
+        return _synth_case_expr(expr, env, loop_depth)
+
+    if isinstance(expr, ast.ExprArray):
+        return _synth_array_expr(expr, env, loop_depth)
+
+    if isinstance(expr, ast.ExprArrayRep):
+        return _synth_array_rep_expr(expr, env, loop_depth)
+
+    if isinstance(expr, ast.ExprIndex):
+        return _synth_index_expr(expr, env, loop_depth)
+
+    if isinstance(expr, ast.ExprIndexAssign):
+        return _synth_index_assign_expr(expr, env, loop_depth)
+
+    # --- Exceptions & Dynamic (Phase 5) ---
+    if isinstance(expr, ast.ExprException):
+        return _synth_exception_expr(expr, env, loop_depth)
+
+    if isinstance(expr, ast.ExprRaise):
+        return _synth_raise_expr(expr, env, loop_depth)
+
+    if isinstance(expr, ast.ExprTry):
+        return _synth_try_expr(expr, env, loop_depth)
+
+    if isinstance(expr, ast.ExprInspect):
+        return _synth_inspect_expr(expr, env, loop_depth)
+
     raise TypeError(f"Unsupported AST expression '{expr}'", offset=getattr(expr, "offset", 0))
 
 
@@ -315,7 +417,6 @@ def _check_fun_expr(
     """Checks a function abstraction against an expected function type."""
     expected_lazy = expected_type.evaluate_lazily(env)
     if not isinstance(expected_lazy, QFunType):
-        # Fall back to synthesis and subsumption
         typed_fun = _synth_fun_expr(expr, env, loop_depth)
         if not is_subtype(typed_fun.type_val, expected_type, env):
             raise TypeError(
@@ -440,7 +541,6 @@ def _check_lvalue_arg(
             )
 
         if is_out:
-            # Covariance: param_type <= sym.type_val
             if not is_subtype(param_type, sym.type_val, env):
                 raise TypeError(
                     f"Type mismatch on out parameter: parameter type '{param_type}' is not a subtype "
@@ -448,7 +548,6 @@ def _check_lvalue_arg(
                     offset=arg.offset,
                 )
         else:
-            # Invariance: param_type == sym.type_val
             if not (
                 is_subtype(param_type, sym.type_val, env)
                 and is_subtype(sym.type_val, param_type, env)
@@ -494,16 +593,13 @@ def _synth_polymorphic_app(
             offset=expr.offset,
         )
 
-    # 1. Create fresh QTypeMeta metavariables for each quantifier
     meta_map: dict[int, QTypeMeta] = {}
     for q in all_type.quantifiers:
         meta_map[q.symbol_id] = QTypeMeta(name=f"?{q.name}")
 
-    # 2. Substitute metavariables into the function signature
     instantiated_fn = fn_body.substitute(meta_map)
     assert isinstance(instantiated_fn, QFunType)
 
-    # 3. Check arguments against instantiated parameter types
     typed_args: list[TypedExpr] = []
     for arg, param in zip(expr.args, instantiated_fn.params):
         if param.is_var or param.is_out:
@@ -512,7 +608,6 @@ def _synth_polymorphic_app(
             typed_arg = check_expr(arg, param.type_val, env, loop_depth)
         typed_args.append(typed_arg)
 
-    # 4. Extract solved type arguments
     resolved_targs: list[QType] = []
     for q in all_type.quantifiers:
         meta = meta_map[q.symbol_id]
@@ -521,12 +616,10 @@ def _synth_polymorphic_app(
             solved = INT_TYPE
         resolved_targs.append(solved)
 
-    # 5. Substitute solved types into instantiated function
     final_subst = {q.symbol_id: resolved_targs[i] for i, q in enumerate(all_type.quantifiers)}
     final_fn = instantiated_fn.substitute(final_subst)
     assert isinstance(final_fn, QFunType)
 
-    # 6. Wrap func in TypedTypeApp
     typed_type_app = TypedTypeApp(
         func=func_typed,
         type_args=tuple(resolved_targs),
@@ -540,6 +633,1126 @@ def _synth_polymorphic_app(
         type_val=final_fn.result_type,
         offset=expr.offset,
     )
+
+
+# ============================================================================
+# Phase 4 & 5 Helpers: Aggregates, Options, Variants, Arrays, Exceptions & Dynamic
+# ============================================================================
+
+def _synth_record_expr(expr: ast.ExprRecord, env: Environment, loop_depth: int) -> TypedRecord:
+    """Synthesizes a record constructor: record [var] x = e1 ... end."""
+    field_typeds: list[TypedRecordField] = []
+    q_fields: list[QRecordField] = []
+
+    for b in expr.fields:
+        val_typed = synth_expr(b.value, env, loop_depth)
+        field_typeds.append(
+            TypedRecordField(name=b.name, value=val_typed, is_var=b.is_var, offset=b.offset)
+        )
+        q_fields.append(QRecordField(name=b.name, type_val=val_typed.type_val, is_var=b.is_var))
+
+    rec_type = QRecordType(fields=tuple(q_fields))
+    return TypedRecord(fields=tuple(field_typeds), type_val=rec_type, offset=expr.offset)
+
+
+def _check_record_expr(
+    expr: ast.ExprRecord,
+    expected_type: QType,
+    env: Environment,
+    loop_depth: int,
+) -> TypedRecord:
+    """Checks a record constructor against an expected record type."""
+    expected_lazy = expected_type.evaluate_lazily(env)
+    if not isinstance(expected_lazy, QRecordType):
+        typed_rec = _synth_record_expr(expr, env, loop_depth)
+        if not is_subtype(typed_rec.type_val, expected_type, env):
+            raise TypeError(
+                f"Record type '{typed_rec.type_val}' is not a subtype of expected '{expected_type}'",
+                offset=expr.offset,
+            )
+        return typed_rec
+
+    field_map = {b.name: b for b in expr.fields}
+    field_typeds: list[TypedRecordField] = []
+
+    for exp_f in expected_lazy.fields:
+        if exp_f.name not in field_map:
+            raise TypeError(
+                f"Record constructor missing required field '{exp_f.name}' of type '{exp_f.type_val}'",
+                offset=expr.offset,
+            )
+        b = field_map[exp_f.name]
+        if exp_f.is_var:
+            if not b.is_var:
+                raise TypeError(
+                    f"Field '{exp_f.name}' in record must be declared mutable (var)",
+                    offset=b.offset,
+                )
+            val_typed = check_expr(b.value, exp_f.type_val, env, loop_depth)
+            if not is_type_equal(val_typed.type_val, exp_f.type_val, env):
+                raise TypeError(
+                    f"Mutable record field '{exp_f.name}' is invariant; expected '{exp_f.type_val}', "
+                    f"got '{val_typed.type_val}'",
+                    offset=b.offset,
+                )
+        else:
+            val_typed = check_expr(b.value, exp_f.type_val, env, loop_depth)
+
+        field_typeds.append(
+            TypedRecordField(name=b.name, value=val_typed, is_var=b.is_var, offset=b.offset)
+        )
+
+    for b in expr.fields:
+        if expected_lazy.get_field(b.name) is None:
+            extra_val = synth_expr(b.value, env, loop_depth)
+            field_typeds.append(
+                TypedRecordField(name=b.name, value=extra_val, is_var=b.is_var, offset=b.offset)
+            )
+
+    return TypedRecord(fields=tuple(field_typeds), type_val=expected_lazy, offset=expr.offset)
+
+
+def _synth_tuple_expr(expr: ast.ExprTuple, env: Environment, loop_depth: int) -> TypedTuple:
+    """Synthesizes a tuple constructor: tuple [name =] e1 ... end."""
+    elem_typeds: list[TypedExpr] = []
+    q_fields: list[QTupleField] = []
+
+    for b in expr.fields:
+        val_typed = synth_expr(b.value, env, loop_depth)
+        elem_typeds.append(val_typed)
+        q_fields.append(QTupleField(name=b.name, type_val=val_typed.type_val))
+
+    tuple_type = QTupleType(tuple(q_fields))
+    return TypedTuple(elements=tuple(elem_typeds), type_val=tuple_type, offset=expr.offset)
+
+
+def _check_tuple_expr(
+    expr: ast.ExprTuple,
+    expected_type: QType,
+    env: Environment,
+    loop_depth: int,
+) -> TypedTuple:
+    """Checks a tuple constructor against an expected tuple type."""
+    expected_lazy = expected_type.evaluate_lazily(env)
+    if not isinstance(expected_lazy, QTupleType):
+        typed_tup = _synth_tuple_expr(expr, env, loop_depth)
+        if not is_subtype(typed_tup.type_val, expected_type, env):
+            raise TypeError(
+                f"Tuple type '{typed_tup.type_val}' is not a subtype of expected '{expected_type}'",
+                offset=expr.offset,
+            )
+        return typed_tup
+
+    if len(expr.fields) != len(expected_lazy.fields):
+        raise TypeError(
+            f"Tuple arity mismatch: expected {len(expected_lazy.fields)} components, got {len(expr.fields)}",
+            offset=expr.offset,
+        )
+
+    elem_typeds: list[TypedExpr] = []
+    for b, exp_f in zip(expr.fields, expected_lazy.fields):
+        if exp_f.name is not None and b.name is not None and b.name != exp_f.name:
+            raise TypeError(
+                f"Tuple field name mismatch: expected '{exp_f.name}', got '{b.name}'",
+                offset=b.offset,
+            )
+        val_typed = check_expr(b.value, exp_f.type_val, env, loop_depth)
+        elem_typeds.append(val_typed)
+
+    return TypedTuple(elements=tuple(elem_typeds), type_val=expected_lazy, offset=expr.offset)
+
+
+def _synth_select_expr(expr: ast.ExprSelect, env: Environment, loop_depth: int) -> TypedSelect:
+    """Synthesizes a field selection on a record, tuple, or module: target.field."""
+    if isinstance(expr.target, ast.ExprId):
+        module_scope = env.lookup_module(expr.target.name)
+        if module_scope is not None:
+            val_sym = module_scope.lookup_value_local(expr.field)
+            if val_sym is None:
+                raise TypeError(
+                    f"Module '{expr.target.name}' has no exported member '{expr.field}'",
+                    offset=expr.offset,
+                )
+            target_typed = TypedVar(
+                name=expr.target.name,
+                symbol=env.lookup_value(expr.target.name) or ValueSymbol(name=expr.target.name, type_val=OK_TYPE),
+                type_val=OK_TYPE,
+                offset=expr.target.offset,
+            )
+            return TypedSelect(
+                target=target_typed,
+                field=expr.field,
+                type_val=val_sym.type_val,
+                offset=expr.offset,
+            )
+
+    target_typed = synth_expr(expr.target, env, loop_depth)
+    target_type = target_typed.type_val.evaluate_lazily(env)
+
+    if isinstance(target_type, QRecordType):
+        rec_f = target_type.get_field(expr.field)
+        if rec_f is None:
+            raise TypeError(
+                f"Record type '{target_type}' has no field named '{expr.field}'",
+                offset=expr.offset,
+            )
+        return TypedSelect(target=target_typed, field=expr.field, type_val=rec_f.type_val, offset=expr.offset)
+
+    if isinstance(target_type, QTupleType):
+        tup_f = target_type.get_field(expr.field)
+        if tup_f is None:
+            raise TypeError(
+                f"Tuple type '{target_type}' has no field named '{expr.field}'",
+                offset=expr.offset,
+            )
+        return TypedSelect(target=target_typed, field=expr.field, type_val=tup_f.type_val, offset=expr.offset)
+
+    raise TypeError(
+        f"Cannot select field '{expr.field}' from non-record/tuple type '{target_type}'",
+        offset=expr.offset,
+    )
+
+
+def _synth_option_expr(expr: ast.ExprOption, env: Environment, loop_depth: int) -> TypedOption:
+    """Synthesizes an option injection: option tag [with payload] of OptionType end."""
+    opt_type = elaborate_type(expr.option_type, env)
+    opt_lazy = opt_type.evaluate_lazily(env)
+    if not isinstance(opt_lazy, QOptionType):
+        raise TypeError(f"Expected option type in 'of' clause, got '{opt_type}'", offset=expr.offset)
+
+    opt_field = opt_lazy.get_option(expr.tag)
+    if opt_field is None:
+        raise TypeError(
+            f"Option type '{opt_type}' has no variant tag '{expr.tag}'",
+            offset=expr.offset,
+        )
+
+    if opt_field.payload_type is not None:
+        if expr.payload is None:
+            raise TypeError(
+                f"Option variant '{expr.tag}' requires a payload of type '{opt_field.payload_type}'",
+                offset=expr.offset,
+            )
+        payload_typed = check_expr(expr.payload, opt_field.payload_type, env, loop_depth)
+    else:
+        if expr.payload is not None:
+            raise TypeError(f"Option variant '{expr.tag}' does not accept a payload", offset=expr.offset)
+        payload_typed = None
+
+    return TypedOption(tag=expr.tag, type_val=opt_type, payload=payload_typed, offset=expr.offset)
+
+
+def _synth_variant_expr(expr: ast.ExprVariant, env: Environment, loop_depth: int) -> TypedVariant:
+    """Synthesizes a variant injection: variant tag [with payload] of VariantType end."""
+    var_type = elaborate_type(expr.variant_type, env)
+    var_lazy = var_type.evaluate_lazily(env)
+    if not isinstance(var_lazy, QVariantType):
+        raise TypeError(f"Expected variant type in 'of' clause, got '{var_type}'", offset=expr.offset)
+
+    var_field = var_lazy.get_variant(expr.tag)
+    if var_field is None:
+        raise TypeError(
+            f"Variant type '{var_type}' has no tag '{expr.tag}'",
+            offset=expr.offset,
+        )
+
+    if var_field.type_val is not None:
+        if expr.payload is None:
+            raise TypeError(
+                f"Variant tag '{expr.tag}' requires a payload of type '{var_field.type_val}'",
+                offset=expr.offset,
+            )
+        payload_typed = check_expr(expr.payload, var_field.type_val, env, loop_depth)
+    else:
+        if expr.payload is not None:
+            raise TypeError(f"Variant tag '{expr.tag}' does not accept a payload", offset=expr.offset)
+        payload_typed = None
+
+    return TypedVariant(tag=expr.tag, type_val=var_type, payload=payload_typed, offset=expr.offset)
+
+
+def _synth_case_expr(expr: ast.ExprCase, env: Environment, loop_depth: int) -> TypedCase:
+    """Synthesizes a case expression over an option or variant target."""
+    target_typed = synth_expr(expr.target, env, loop_depth)
+    target_type = target_typed.type_val.evaluate_lazily(env)
+
+    available_tags, typed_branches = _elaborate_case_branches(
+        expr, target_type, expected_type=None, env=env, loop_depth=loop_depth
+    )
+
+    if expr.else_branch is not None:
+        else_typed: Optional[TypedExpr] = synth_expr(expr.else_branch, env, loop_depth)
+    else:
+        else_typed = None
+
+    branch_types = [b.body.type_val for b in typed_branches]
+    if else_typed is not None:
+        branch_types.append(else_typed.type_val)
+
+    if not branch_types:
+        return TypedCase(
+            target=target_typed,
+            branches=tuple(typed_branches),
+            else_branch=else_typed,
+            type_val=OK_TYPE,
+            offset=expr.offset,
+        )
+
+    join_type = branch_types[0]
+    for bt in branch_types[1:]:
+        if is_subtype(join_type, bt, env):
+            join_type = bt
+        elif is_subtype(bt, join_type, env):
+            pass
+        else:
+            raise TypeError(
+                f"Cannot find common supertype join for case branch types '{join_type}' and '{bt}'",
+                offset=expr.offset,
+            )
+
+    return TypedCase(
+        target=target_typed,
+        branches=tuple(typed_branches),
+        else_branch=else_typed,
+        type_val=join_type,
+        offset=expr.offset,
+    )
+
+
+def _check_case_expr(
+    expr: ast.ExprCase,
+    expected_type: QType,
+    env: Environment,
+    loop_depth: int,
+) -> TypedCase:
+    """Checks a case expression against an expected QType."""
+    target_typed = synth_expr(expr.target, env, loop_depth)
+    target_type = target_typed.type_val.evaluate_lazily(env)
+
+    available_tags, typed_branches = _elaborate_case_branches(
+        expr, target_type, expected_type=expected_type, env=env, loop_depth=loop_depth
+    )
+
+    if expr.else_branch is not None:
+        else_typed: Optional[TypedExpr] = check_expr(expr.else_branch, expected_type, env, loop_depth)
+    else:
+        else_typed = None
+
+    return TypedCase(
+        target=target_typed,
+        branches=tuple(typed_branches),
+        else_branch=else_typed,
+        type_val=expected_type,
+        offset=expr.offset,
+    )
+
+
+def _elaborate_case_branches(
+    expr: ast.ExprCase,
+    target_type: QType,
+    expected_type: Optional[QType],
+    env: Environment,
+    loop_depth: int,
+) -> tuple[dict[str, Optional[QType]], list[TypedCaseBranch]]:
+    """Validates tags, binders, exhaustiveness, and elaborates typed case branches."""
+    if isinstance(target_type, QOptionType):
+        available_tags = {opt.name: opt.payload_type for opt in target_type.options}
+    elif isinstance(target_type, QVariantType):
+        available_tags = {var.name: var.type_val for var in target_type.variants}
+    else:
+        raise TypeError(
+            f"Case target must have Option or Variant type, got '{target_type}'",
+            offset=expr.target.offset,
+        )
+
+    covered_tags: set[str] = set()
+    typed_branches: list[TypedCaseBranch] = []
+
+    for branch in expr.branches:
+        for tag in branch.tags:
+            if tag not in available_tags:
+                raise TypeError(
+                    f"Tag '{tag}' is not a valid variant of type '{target_type}'",
+                    offset=branch.offset,
+                )
+            covered_tags.add(tag)
+
+        if branch.binder is not None:
+            first_payload = available_tags[branch.tags[0]]
+            if first_payload is None:
+                raise TypeError(
+                    f"Tag '{branch.tags[0]}' has no payload to bind to '{branch.binder}'",
+                    offset=branch.offset,
+                )
+
+            if branch.binder_type is not None:
+                binder_t = elaborate_type(branch.binder_type, env)
+                if not is_subtype(first_payload, binder_t, env):
+                    raise TypeError(
+                        f"Binder '{branch.binder}' type '{binder_t}' is not compatible with payload '{first_payload}'",
+                        offset=branch.offset,
+                    )
+            else:
+                binder_t = first_payload
+
+            env.push_scope(f"case_{branch.binder}")
+            try:
+                binder_sym = ValueSymbol(name=branch.binder, type_val=binder_t, is_var=False)
+                env.current_scope.declare_value(binder_sym)
+                if expected_type is not None:
+                    body_typed = check_expr(branch.body, expected_type, env, loop_depth)
+                else:
+                    body_typed = synth_expr(branch.body, env, loop_depth)
+            finally:
+                env.pop_scope()
+        else:
+            binder_sym = None
+            if expected_type is not None:
+                body_typed = check_expr(branch.body, expected_type, env, loop_depth)
+            else:
+                body_typed = synth_expr(branch.body, env, loop_depth)
+
+        typed_branches.append(
+            TypedCaseBranch(
+                tags=branch.tags,
+                body=body_typed,
+                binder=binder_sym,
+                offset=branch.offset,
+            )
+        )
+
+    if expr.else_branch is None:
+        missing = set(available_tags.keys()) - covered_tags
+        if missing:
+            missing_str = ", ".join(sorted(missing))
+            raise TypeError(
+                f"Non-exhaustive case expression missing tags: {missing_str}",
+                offset=expr.offset,
+            )
+
+    return available_tags, typed_branches
+
+
+def _synth_array_expr(expr: ast.ExprArray, env: Environment, loop_depth: int) -> TypedArray:
+    """Synthesizes an explicit array literal: array of e1 e2 ... end."""
+    if not expr.elements:
+        raise TypeError(
+            "Cannot infer element type of empty array; type annotation required",
+            offset=expr.offset,
+        )
+
+    elem_typeds = [synth_expr(e, env, loop_depth) for e in expr.elements]
+    join_type = elem_typeds[0].type_val
+    for et in elem_typeds[1:]:
+        if is_subtype(join_type, et.type_val, env):
+            join_type = et.type_val
+        elif is_subtype(et.type_val, join_type, env):
+            pass
+        else:
+            raise TypeError(
+                f"Incompatible array element types '{join_type}' and '{et.type_val}'",
+                offset=expr.offset,
+            )
+
+    return TypedArray(
+        elements=tuple(elem_typeds),
+        type_val=QArrayType(element_type=join_type),
+        offset=expr.offset,
+    )
+
+
+def _check_array_expr(
+    expr: ast.ExprArray,
+    expected_type: QType,
+    env: Environment,
+    loop_depth: int,
+) -> TypedArray:
+    """Checks an array literal against an expected array type."""
+    expected_lazy = expected_type.evaluate_lazily(env)
+    if not isinstance(expected_lazy, QArrayType):
+        typed_arr = _synth_array_expr(expr, env, loop_depth)
+        if not is_subtype(typed_arr.type_val, expected_type, env):
+            raise TypeError(
+                f"Array type '{typed_arr.type_val}' is not a subtype of expected '{expected_type}'",
+                offset=expr.offset,
+            )
+        return typed_arr
+
+    elem_typeds = [
+        check_expr(e, expected_lazy.element_type, env, loop_depth) for e in expr.elements
+    ]
+    return TypedArray(elements=tuple(elem_typeds), type_val=expected_lazy, offset=expr.offset)
+
+
+def _synth_array_rep_expr(expr: ast.ExprArrayRep, env: Environment, loop_depth: int) -> TypedArrayRep:
+    """Synthesizes an array repetition: array of (count init) end."""
+    count_typed = check_expr(expr.count, INT_TYPE, env, loop_depth)
+    init_typed = synth_expr(expr.init_val, env, loop_depth)
+    return TypedArrayRep(
+        count=count_typed,
+        init_val=init_typed,
+        type_val=QArrayType(element_type=init_typed.type_val),
+        offset=expr.offset,
+    )
+
+
+def _check_array_rep_expr(
+    expr: ast.ExprArrayRep,
+    expected_type: QType,
+    env: Environment,
+    loop_depth: int,
+) -> TypedArrayRep:
+    """Checks an array repetition against an expected array type."""
+    expected_lazy = expected_type.evaluate_lazily(env)
+    if not isinstance(expected_lazy, QArrayType):
+        typed_rep = _synth_array_rep_expr(expr, env, loop_depth)
+        if not is_subtype(typed_rep.type_val, expected_type, env):
+            raise TypeError(
+                f"Array type '{typed_rep.type_val}' is not a subtype of expected '{expected_type}'",
+                offset=expr.offset,
+            )
+        return typed_rep
+
+    count_typed = check_expr(expr.count, INT_TYPE, env, loop_depth)
+    init_typed = check_expr(expr.init_val, expected_lazy.element_type, env, loop_depth)
+    return TypedArrayRep(
+        count=count_typed,
+        init_val=init_typed,
+        type_val=expected_lazy,
+        offset=expr.offset,
+    )
+
+
+def _synth_index_expr(expr: ast.ExprIndex, env: Environment, loop_depth: int) -> TypedIndex:
+    """Synthesizes an array indexing expression: arr[i]."""
+    target_typed = synth_expr(expr.target, env, loop_depth)
+    target_type = target_typed.type_val.evaluate_lazily(env)
+    if not isinstance(target_type, QArrayType):
+        raise TypeError(f"Cannot index non-array type '{target_type}'", offset=expr.offset)
+
+    idx_typed = check_expr(expr.index, INT_TYPE, env, loop_depth)
+    return TypedIndex(
+        target=target_typed,
+        index=idx_typed,
+        type_val=target_type.element_type,
+        offset=expr.offset,
+    )
+
+
+def _synth_index_assign_expr(
+    expr: ast.ExprIndexAssign,
+    env: Environment,
+    loop_depth: int,
+) -> TypedIndexAssign:
+    """Synthesizes an array element assignment: arr[i] := val."""
+    target_typed = synth_expr(expr.target, env, loop_depth)
+    target_type = target_typed.type_val.evaluate_lazily(env)
+    if not isinstance(target_type, QArrayType):
+        raise TypeError(
+            f"Cannot assign to index of non-array type '{target_type}'",
+            offset=expr.offset,
+        )
+
+    idx_typed = check_expr(expr.index, INT_TYPE, env, loop_depth)
+    val_typed = check_expr(expr.value, target_type.element_type, env, loop_depth)
+    return TypedIndexAssign(
+        target=target_typed,
+        index=idx_typed,
+        value=val_typed,
+        type_val=OK_TYPE,
+        offset=expr.offset,
+    )
+
+
+# ============================================================================
+# Phase 5: Exceptions, Dynamic Types, and Type Inspection Helpers
+# ============================================================================
+
+def _synth_exception_expr(expr: ast.ExprException, env: Environment, loop_depth: int) -> TypedException:
+    """Synthesizes an exception constructor: exception Name [: PayloadType] end."""
+    payload_type = elaborate_type(expr.type_annot, env) if expr.type_annot else OK_TYPE
+    exc_type = QExceptionType(payload_type=payload_type)
+    sym = ValueSymbol(name=expr.name, type_val=exc_type, is_var=False)
+    env.current_scope.declare_value(sym)
+    return TypedException(
+        name=expr.name,
+        payload_type=payload_type,
+        type_val=exc_type,
+        offset=expr.offset,
+    )
+
+
+def _check_raise_expr(
+    expr: ast.ExprRaise,
+    expected_type: QType,
+    env: Environment,
+    loop_depth: int,
+) -> TypedRaise:
+    """Checks a raise expression against any expected type (divergent control flow)."""
+    exc_typed = synth_expr(expr.exc, env, loop_depth)
+    exc_type = exc_typed.type_val.evaluate_lazily(env)
+    if not isinstance(exc_type, QExceptionType):
+        raise TypeError(f"Cannot raise non-exception type '{exc_type}'", offset=expr.exc.offset)
+
+    if expr.payload is not None:
+        payload_typed = check_expr(expr.payload, exc_type.payload_type, env, loop_depth)
+    else:
+        if exc_type.payload_type != OK_TYPE:
+            raise TypeError(
+                f"Exception '{exc_type}' requires a payload of type '{exc_type.payload_type}'",
+                offset=expr.offset,
+            )
+        payload_typed = None
+
+    return TypedRaise(
+        exc=exc_typed,
+        payload=payload_typed,
+        type_val=expected_type,
+        offset=expr.offset,
+    )
+
+
+def _synth_raise_expr(expr: ast.ExprRaise, env: Environment, loop_depth: int) -> TypedRaise:
+    """Synthesizes a raise expression. Defaults to Ok if no declared type is present."""
+    exc_typed = synth_expr(expr.exc, env, loop_depth)
+    exc_type = exc_typed.type_val.evaluate_lazily(env)
+    if not isinstance(exc_type, QExceptionType):
+        raise TypeError(f"Cannot raise non-exception type '{exc_type}'", offset=expr.exc.offset)
+
+    if expr.payload is not None:
+        payload_typed = check_expr(expr.payload, exc_type.payload_type, env, loop_depth)
+    else:
+        if exc_type.payload_type != OK_TYPE:
+            raise TypeError(
+                f"Exception '{exc_type}' requires a payload of type '{exc_type.payload_type}'",
+                offset=expr.offset,
+            )
+        payload_typed = None
+
+    if expr.as_type is not None:
+        res_type = elaborate_type(expr.as_type, env)
+    else:
+        res_type = OK_TYPE
+
+    return TypedRaise(
+        exc=exc_typed,
+        payload=payload_typed,
+        type_val=res_type,
+        offset=expr.offset,
+    )
+
+
+def _check_try_expr(
+    expr: ast.ExprTry,
+    expected_type: QType,
+    env: Environment,
+    loop_depth: int,
+) -> TypedTry:
+    """Checks a try expression against an expected QType."""
+    body_typed = check_expr(expr.body, expected_type, env, loop_depth)
+    typed_branches: list[TypedTryBranch] = []
+
+    for branch in expr.branches:
+        exc_typed = synth_expr(branch.exc_pattern, env, loop_depth)
+        exc_type = exc_typed.type_val.evaluate_lazily(env)
+        if not isinstance(exc_type, QExceptionType):
+            raise TypeError(
+                f"Pattern in when branch must be an exception, got '{exc_type}'",
+                offset=branch.offset,
+            )
+
+        if branch.binder is not None:
+            env.push_scope(f"try_{branch.binder}")
+            try:
+                binder_sym = ValueSymbol(name=branch.binder, type_val=exc_type.payload_type, is_var=False)
+                env.current_scope.declare_value(binder_sym)
+                h_body = check_expr(branch.body, expected_type, env, loop_depth)
+            finally:
+                env.pop_scope()
+        else:
+            binder_sym = None
+            h_body = check_expr(branch.body, expected_type, env, loop_depth)
+
+        typed_branches.append(
+            TypedTryBranch(
+                exc_pattern=exc_typed,
+                body=h_body,
+                binder=binder_sym,
+                offset=branch.offset,
+            )
+        )
+
+    if expr.else_branch is not None:
+        else_typed = check_expr(expr.else_branch, expected_type, env, loop_depth)
+    else:
+        else_typed = None
+
+    return TypedTry(
+        body=body_typed,
+        branches=tuple(typed_branches),
+        else_branch=else_typed,
+        type_val=expected_type,
+        offset=expr.offset,
+    )
+
+
+def _synth_try_expr(expr: ast.ExprTry, env: Environment, loop_depth: int) -> TypedTry:
+    """Synthesizes a try expression by joining body and branch result types."""
+    body_typed = synth_expr(expr.body, env, loop_depth)
+    typed_branches: list[TypedTryBranch] = []
+
+    for branch in expr.branches:
+        exc_typed = synth_expr(branch.exc_pattern, env, loop_depth)
+        exc_type = exc_typed.type_val.evaluate_lazily(env)
+        if not isinstance(exc_type, QExceptionType):
+            raise TypeError(
+                f"Pattern in when branch must be an exception, got '{exc_type}'",
+                offset=branch.offset,
+            )
+
+        if branch.binder is not None:
+            env.push_scope(f"try_{branch.binder}")
+            try:
+                binder_sym = ValueSymbol(name=branch.binder, type_val=exc_type.payload_type, is_var=False)
+                env.current_scope.declare_value(binder_sym)
+                h_body = synth_expr(branch.body, env, loop_depth)
+            finally:
+                env.pop_scope()
+        else:
+            binder_sym = None
+            h_body = synth_expr(branch.body, env, loop_depth)
+
+        typed_branches.append(
+            TypedTryBranch(
+                exc_pattern=exc_typed,
+                body=h_body,
+                binder=binder_sym,
+                offset=branch.offset,
+            )
+        )
+
+    if expr.else_branch is not None:
+        else_typed = synth_expr(expr.else_branch, env, loop_depth)
+    else:
+        else_typed = None
+
+    # Collect result types across body, branches, and else
+    all_types = [body_typed.type_val] + [b.body.type_val for b in typed_branches]
+    if else_typed is not None:
+        all_types.append(else_typed.type_val)
+
+    join_type = all_types[0]
+    for bt in all_types[1:]:
+        if is_subtype(join_type, bt, env):
+            join_type = bt
+        elif is_subtype(bt, join_type, env):
+            pass
+        else:
+            raise TypeError(
+                f"Cannot find common supertype join for try expression branch types '{join_type}' and '{bt}'",
+                offset=expr.offset,
+            )
+
+    return TypedTry(
+        body=body_typed,
+        branches=tuple(typed_branches),
+        else_branch=else_typed,
+        type_val=join_type,
+        offset=expr.offset,
+    )
+
+
+def _check_inspect_expr(
+    expr: ast.ExprInspect,
+    expected_type: QType,
+    env: Environment,
+    loop_depth: int,
+) -> TypedInspect:
+    """Checks an inspect expression against an expected QType."""
+    target_typed = synth_expr(expr.target, env, loop_depth)
+    target_type = target_typed.type_val.evaluate_lazily(env)
+    if not is_subtype(target_type, DYNAMIC_TYPE, env):
+        raise TypeError(f"Target of inspect must be Dynamic, got '{target_type}'", offset=expr.target.offset)
+
+    typed_branches: list[TypedInspectBranch] = []
+    for branch in expr.branches:
+        match_t = elaborate_type(branch.match_type, env)
+        if branch.binders:
+            env.push_scope("inspect_branch")
+            try:
+                b_syms: list[ValueSymbol] = []
+                for name, _ in branch.binders:
+                    b_sym = ValueSymbol(name=name, type_val=match_t, is_var=False)
+                    env.current_scope.declare_value(b_sym)
+                    b_syms.append(b_sym)
+                h_body = check_expr(branch.body, expected_type, env, loop_depth)
+            finally:
+                env.pop_scope()
+        else:
+            b_syms = []
+            h_body = check_expr(branch.body, expected_type, env, loop_depth)
+
+        typed_branches.append(
+            TypedInspectBranch(
+                match_type=match_t,
+                binders=tuple(b_syms),
+                body=h_body,
+                offset=branch.offset,
+            )
+        )
+
+    if expr.else_branch is not None:
+        else_typed = check_expr(expr.else_branch, expected_type, env, loop_depth)
+    else:
+        else_typed = None
+
+    return TypedInspect(
+        target=target_typed,
+        branches=tuple(typed_branches),
+        else_branch=else_typed,
+        type_val=expected_type,
+        offset=expr.offset,
+    )
+
+
+def _synth_inspect_expr(expr: ast.ExprInspect, env: Environment, loop_depth: int) -> TypedInspect:
+    """Synthesizes an inspect expression by joining branch result types."""
+    target_typed = synth_expr(expr.target, env, loop_depth)
+    target_type = target_typed.type_val.evaluate_lazily(env)
+    if not is_subtype(target_type, DYNAMIC_TYPE, env):
+        raise TypeError(f"Target of inspect must be Dynamic, got '{target_type}'", offset=expr.target.offset)
+
+    typed_branches: list[TypedInspectBranch] = []
+    for branch in expr.branches:
+        match_t = elaborate_type(branch.match_type, env)
+        if branch.binders:
+            env.push_scope("inspect_branch")
+            try:
+                b_syms: list[ValueSymbol] = []
+                for name, _ in branch.binders:
+                    b_sym = ValueSymbol(name=name, type_val=match_t, is_var=False)
+                    env.current_scope.declare_value(b_sym)
+                    b_syms.append(b_sym)
+                h_body = synth_expr(branch.body, env, loop_depth)
+            finally:
+                env.pop_scope()
+        else:
+            b_syms = []
+            h_body = synth_expr(branch.body, env, loop_depth)
+
+        typed_branches.append(
+            TypedInspectBranch(
+                match_type=match_t,
+                binders=tuple(b_syms),
+                body=h_body,
+                offset=branch.offset,
+            )
+        )
+
+    if expr.else_branch is not None:
+        else_typed = synth_expr(expr.else_branch, env, loop_depth)
+    else:
+        else_typed = None
+
+    branch_types = [b.body.type_val for b in typed_branches]
+    if else_typed is not None:
+        branch_types.append(else_typed.type_val)
+
+    if not branch_types:
+        return TypedInspect(
+            target=target_typed,
+            branches=tuple(typed_branches),
+            else_branch=else_typed,
+            type_val=OK_TYPE,
+            offset=expr.offset,
+        )
+
+    join_type = branch_types[0]
+    for bt in branch_types[1:]:
+        if is_subtype(join_type, bt, env):
+            join_type = bt
+        elif is_subtype(bt, join_type, env):
+            pass
+        else:
+            raise TypeError(
+                f"Cannot find common supertype join for inspect branch types '{join_type}' and '{bt}'",
+                offset=expr.offset,
+            )
+
+    return TypedInspect(
+        target=target_typed,
+        branches=tuple(typed_branches),
+        else_branch=else_typed,
+        type_val=join_type,
+        offset=expr.offset,
+    )
+
+
+# ============================================================================
+# Phase 6: Interfaces, Modules, and Program Elaboration Helpers
+# ============================================================================
+
+def elaborate_interface(decl: ast.InterfaceDecl, env: Environment) -> TypedInterface:
+    """Elaborates an interface declaration into a specification scope and TypedInterface."""
+    interface_scope = Scope(name=f"interface_{decl.name}", parent=env.current_scope)
+
+    # 1. Resolve imports into interface_scope
+    for imp in decl.imports:
+        source_interface_scope = env.lookup_interface(imp.interface_name)
+        if source_interface_scope is None:
+            raise TypeError(
+                f"Undefined interface '{imp.interface_name}' in import of interface '{decl.name}'",
+                offset=decl.offset,
+            )
+        for name in imp.names:
+            type_symbol = source_interface_scope.lookup_type_local(name)
+            if type_symbol is not None:
+                interface_scope.declare_type(type_symbol)
+                continue
+            value_symbol = source_interface_scope.lookup_value_local(name)
+            if value_symbol is not None:
+                interface_scope.declare_value(value_symbol)
+                continue
+            kind_symbol = source_interface_scope.lookup_kind_local(name)
+            if kind_symbol is not None:
+                interface_scope.declare_kind(kind_symbol)
+                continue
+            raise TypeError(
+                f"Symbol '{name}' not found in imported interface '{imp.interface_name}'",
+                offset=decl.offset,
+            )
+
+    # 2. Elaborate signatures in a child scope of the interface
+    saved_scope = env.current_scope
+    env.current_scope = interface_scope
+    try:
+        for sig in decl.signatures:
+            if isinstance(sig, ast.TypeFormal):
+                bound_kind = elaborate_kind(sig.bound, env) if sig.bound else TYPE_KIND
+                symbol_id = env.fresh_symbol_id()
+                type_symbol = TypeSymbol(name=sig.name, symbol_id=symbol_id, kind=bound_kind, definition=None)
+                interface_scope.declare_type(type_symbol)
+
+            elif isinstance(sig, ast.LetTypeBinding):
+                bound_kind = elaborate_kind(sig.bound, env) if sig.bound is not None else None
+                concrete_def = elaborate_type(sig.type_val, env)
+                symbol_id = env.fresh_symbol_id()
+                type_symbol = TypeSymbol(
+                    name=sig.name,
+                    symbol_id=symbol_id,
+                    kind=bound_kind,
+                    definition=concrete_def,
+                )
+                interface_scope.declare_type(type_symbol)
+
+            elif isinstance(sig, ast.FieldSig):
+                val_type = elaborate_type(sig.type_sig, env)
+                val_symbol = ValueSymbol(
+                    name=sig.name,
+                    type_val=val_type,
+                    is_var=(sig.mode == ast.ParamMode.VAR),
+                    is_out=(sig.mode == ast.ParamMode.OUT),
+                )
+                interface_scope.declare_value(val_symbol)
+
+            elif isinstance(sig, ast.DefKindBinding):
+                kind_symbol = elaborate_kind_binding(sig, env)
+                interface_scope.declare_kind(kind_symbol)
+    finally:
+        env.current_scope = saved_scope
+
+    env.register_interface(decl.name, interface_scope)
+    return TypedInterface(name=decl.name, signatures=(), scope=interface_scope, offset=decl.offset)
+
+
+def elaborate_module(decl: ast.ModuleDecl, env: Environment) -> TypedModule:
+    """Elaborates and typechecks a module against its interface, enforcing information hiding."""
+    target_interface_scope = env.lookup_interface(decl.interface_name)
+    if target_interface_scope is None:
+        raise TypeError(
+            f"Undefined interface '{decl.interface_name}' for module '{decl.name}'",
+            offset=decl.offset,
+        )
+
+    module_internal_scope = Scope(name=f"module_internal_{decl.name}", parent=env.current_scope)
+
+    # 1. Resolve imports into module_internal_scope
+    for imp in decl.imports:
+        source_interface_scope = env.lookup_interface(imp.interface_name)
+        if source_interface_scope is None:
+            raise TypeError(
+                f"Undefined interface '{imp.interface_name}' in import of module '{decl.name}'",
+                offset=decl.offset,
+            )
+        for name in imp.names:
+            type_symbol = source_interface_scope.lookup_type_local(name)
+            if type_symbol is not None:
+                module_internal_scope.declare_type(type_symbol)
+                continue
+            value_symbol = source_interface_scope.lookup_value_local(name)
+            if value_symbol is not None:
+                module_internal_scope.declare_value(value_symbol)
+                continue
+            kind_symbol = source_interface_scope.lookup_kind_local(name)
+            if kind_symbol is not None:
+                module_internal_scope.declare_kind(kind_symbol)
+                continue
+            raise TypeError(
+                f"Symbol '{name}' not found in imported interface '{imp.interface_name}'",
+                offset=decl.offset,
+            )
+
+    # 2. Elaborate module internal bindings
+    saved_scope = env.current_scope
+    env.current_scope = module_internal_scope
+    typed_bindings: list[TypedBinding] = []
+    try:
+        for b in decl.bindings:
+            typed_b = _elaborate_binding(b, env, loop_depth=0)
+            typed_bindings.append(typed_b)
+
+        # 3. Conformance checking against interface
+        type_subst: dict[int, QType] = {}
+        for type_name, interface_type_symbol in target_interface_scope.types.items():
+            mod_type_symbol = module_internal_scope.lookup_type_local(type_name)
+            if mod_type_symbol is None:
+                raise TypeError(
+                    f"Module '{decl.name}' does not implement required type '{type_name}' "
+                    f"from interface '{decl.interface_name}'",
+                    offset=decl.offset,
+                )
+            if interface_type_symbol.definition is not None:
+                mod_def = (
+                    mod_type_symbol.definition
+                    if mod_type_symbol.definition is not None
+                    else mod_type_symbol.type_val
+                )
+                if not is_type_equal(mod_def, interface_type_symbol.definition, env):
+                    raise TypeError(
+                        f"Module '{decl.name}' defines manifest type '{type_name}' "
+                        f"incompatibly with interface '{decl.interface_name}'",
+                        offset=decl.offset,
+                    )
+            if interface_type_symbol.kind is not None and mod_type_symbol.kind is not None:
+                if not is_subkind(mod_type_symbol.kind, interface_type_symbol.kind, env):
+                    raise TypeError(
+                        f"Type '{type_name}' in module '{decl.name}' does not satisfy "
+                        f"kind bound from interface '{decl.interface_name}'",
+                        offset=decl.offset,
+                    )
+            if interface_type_symbol.definition is None:
+                concrete_def = (
+                    mod_type_symbol.definition
+                    if mod_type_symbol.definition is not None
+                    else mod_type_symbol.type_val
+                )
+                type_subst[interface_type_symbol.symbol_id] = concrete_def
+
+        for val_name, interface_val_symbol in target_interface_scope.values.items():
+            mod_val_symbol = module_internal_scope.lookup_value_local(val_name)
+            if mod_val_symbol is None:
+                raise TypeError(
+                    f"Module '{decl.name}' does not implement required value '{val_name}' "
+                    f"from interface '{decl.interface_name}'",
+                    offset=decl.offset,
+                )
+            expected_type = interface_val_symbol.type_val.substitute(type_subst)
+            if not is_subtype(mod_val_symbol.type_val, expected_type, env):
+                raise TypeError(
+                    f"Value '{val_name}' in module '{decl.name}' has type '{mod_val_symbol.type_val}', "
+                    f"which is not a subtype of interface signature '{expected_type}'",
+                    offset=decl.offset,
+                )
+    finally:
+        env.current_scope = saved_scope
+
+    # 4. Create exported module scope (strictly opaque for abstract interface types)
+    module_export_scope = Scope(name=f"module_export_{decl.name}")
+    export_type_subst: dict[int, QType] = {}
+
+    for type_name, interface_type_symbol in target_interface_scope.types.items():
+        if interface_type_symbol.definition is None:
+            export_sym_id = env.fresh_symbol_id()
+            opaque_type_symbol = TypeSymbol(
+                name=type_name,
+                symbol_id=export_sym_id,
+                kind=interface_type_symbol.kind,
+                definition=None,
+            )
+            module_export_scope.declare_type(opaque_type_symbol)
+            export_type_subst[interface_type_symbol.symbol_id] = QTypeVar(
+                name=f"{decl.name}.{type_name}",
+                symbol_id=export_sym_id,
+                bound=interface_type_symbol.kind,
+            )
+        else:
+            manifest_type_symbol = TypeSymbol(
+                name=type_name,
+                symbol_id=env.fresh_symbol_id(),
+                kind=interface_type_symbol.kind,
+                definition=interface_type_symbol.definition,
+            )
+            module_export_scope.declare_type(manifest_type_symbol)
+
+    for val_name, interface_val_symbol in target_interface_scope.values.items():
+        exported_val_type = interface_val_symbol.type_val.substitute(export_type_subst)
+        module_export_scope.declare_value(
+            ValueSymbol(
+                name=val_name,
+                type_val=exported_val_type,
+                is_var=interface_val_symbol.is_var,
+                is_out=interface_val_symbol.is_out,
+            )
+        )
+
+    env.register_module(decl.name, module_export_scope)
+
+    rec_fields = tuple(
+        QRecordField(name=v.name, type_val=v.type_val, is_var=v.is_var)
+        for v in module_export_scope.values.values()
+    )
+    env.current_scope.declare_value(
+        ValueSymbol(name=decl.name, type_val=QRecordType(fields=rec_fields))
+    )
+
+    return TypedModule(
+        name=decl.name,
+        interface_name=decl.interface_name,
+        bindings=tuple(typed_bindings),
+        scope=module_export_scope,
+        offset=decl.offset,
+    )
+
+
+def elaborate_program(
+    program: ast.Program,
+    env: Optional[Environment] = None,
+) -> TypedProgram:
+    """Elaborates a top-level Quest program unit (interfaces, modules, declarations, statements)."""
+    if env is None:
+        env = Environment()
+
+    typed_phrases: list[Union[TypedBinding, TypedExpr]] = []
+    for phrase in program.phrases:
+        if isinstance(phrase, ast.InterfaceDecl):
+            typed_interface = elaborate_interface(phrase, env)
+            typed_phrases.append(typed_interface)
+        elif isinstance(phrase, ast.ModuleDecl):
+            typed_module = elaborate_module(phrase, env)
+            typed_phrases.append(typed_module)
+        elif isinstance(phrase, ast.BindingNode):
+            typed_binding = _elaborate_binding(phrase, env, loop_depth=0)
+            typed_phrases.append(typed_binding)
+        elif isinstance(phrase, ast.Expr):
+            typed_expr = synth_expr(phrase, env, loop_depth=0)
+            typed_phrases.append(typed_expr)
+        else:
+            raise TypeError(
+                f"Unsupported top-level phrase '{phrase}'",
+                offset=getattr(phrase, "offset", 0),
+            )
+
+    return TypedProgram(phrases=tuple(typed_phrases), offset=program.offset)
 
 
 # ============================================================================
@@ -662,6 +1875,7 @@ def _synth_infix_expr(expr: ast.ExprInfix, env: Environment, loop_depth: int) ->
 
 def _synth_assignment(expr: ast.ExprInfix, env: Environment, loop_depth: int) -> TypedAssign:
     """Synthesizes an assignment expression: lhs := rhs."""
+    # Target 1: Variable identifier
     if isinstance(expr.left, ast.ExprId):
         sym = env.lookup_value(expr.left.name)
         if sym is None:
@@ -678,6 +1892,35 @@ def _synth_assignment(expr: ast.ExprInfix, env: Environment, loop_depth: int) ->
         rhs_typed = check_expr(expr.right, sym.type_val, env, loop_depth)
         return TypedAssign(target=target_node, value=rhs_typed, offset=expr.offset)
 
+    # Target 2: Record field selection (r.field := rhs)
+    if isinstance(expr.left, ast.ExprSelect):
+        target_typed = synth_expr(expr.left.target, env, loop_depth)
+        target_type = target_typed.type_val.evaluate_lazily(env)
+        if not isinstance(target_type, QRecordType):
+            raise TypeError(
+                f"Cannot mutate field of non-record type '{target_type}'",
+                offset=expr.left.offset,
+            )
+        rec_f = target_type.get_field(expr.left.field)
+        if rec_f is None:
+            raise TypeError(
+                f"Record has no field '{expr.left.field}'",
+                offset=expr.left.offset,
+            )
+        if not rec_f.is_var:
+            raise TypeError(
+                f"Cannot assign to immutable record field '{expr.left.field}'",
+                offset=expr.left.offset,
+            )
+        rhs_typed = check_expr(expr.right, rec_f.type_val, env, loop_depth)
+        target_select = TypedSelect(
+            target=target_typed,
+            field=expr.left.field,
+            type_val=rec_f.type_val,
+            offset=expr.left.offset,
+        )
+        return TypedAssign(target=target_select, value=rhs_typed, offset=expr.offset)
+
     raise TypeError("Assignment target must be a mutable variable or field", offset=expr.left.offset)
 
 
@@ -685,7 +1928,6 @@ def _synth_if_expr(expr: ast.ExprIf, env: Environment, loop_depth: int) -> Typed
     """Synthesizes an if expression."""
     cond_typed = check_expr(expr.cond, BOOL_TYPE, env, loop_depth)
 
-    # If without else branch: ignores return value of then branch and returns Ok
     if expr.else_branch is None and not expr.elsifs:
         then_typed = synth_expr(expr.then_branch, env, loop_depth)
         then_body = TypedBlock(
@@ -702,7 +1944,6 @@ def _synth_if_expr(expr: ast.ExprIf, env: Environment, loop_depth: int) -> Typed
             offset=expr.offset,
         )
 
-    # Desugar elsif branches right-to-left into nested if expressions
     desugared_else: ast.Expr = expr.else_branch if expr.else_branch else ast.ExprOk(offset=expr.offset)
     for elsif_cond, elsif_then in reversed(expr.elsifs):
         desugared_else = ast.ExprIf(
@@ -716,7 +1957,6 @@ def _synth_if_expr(expr: ast.ExprIf, env: Environment, loop_depth: int) -> Typed
     then_typed = synth_expr(expr.then_branch, env, loop_depth)
     else_typed = synth_expr(desugared_else, env, loop_depth)
 
-    # Find common supertype join
     if is_subtype(then_typed.type_val, else_typed.type_val, env):
         join_type = else_typed.type_val
     elif is_subtype(else_typed.type_val, then_typed.type_val, env):
@@ -746,7 +1986,6 @@ def _check_if_expr(
     """Checks an if expression against an expected QType."""
     cond_typed = check_expr(expr.cond, BOOL_TYPE, env, loop_depth)
 
-    # Desugar elsif branches into nested if expressions
     desugared_else: ast.Expr = expr.else_branch if expr.else_branch else ast.ExprOk(offset=expr.offset)
     for elsif_cond, elsif_then in reversed(expr.elsifs):
         desugared_else = ast.ExprIf(
@@ -802,7 +2041,6 @@ def _synth_block_expr(expr: ast.ExprBlock, env: Environment, loop_depth: int) ->
             typed_b = _elaborate_binding(binding, env, loop_depth)
             typed_bindings.append(typed_b)
 
-        # In Quest, if the final statement in a block is an expression statement, its value is the block result
         if typed_bindings and isinstance(typed_bindings[-1], TypedExprStmt):
             last_stmt = typed_bindings.pop()
             assert isinstance(last_stmt, TypedExprStmt)
@@ -869,12 +2107,24 @@ def _check_block_expr(
 
 def _elaborate_binding(binding: ast.BindingNode, env: Environment, loop_depth: int) -> TypedBinding:
     """Elaborates a single binding or statement inside a block or module."""
+    if isinstance(binding, ast.InterfaceDecl):
+        return elaborate_interface(binding, env)
+
+    if isinstance(binding, ast.ModuleDecl):
+        return elaborate_module(binding, env)
+
+    if isinstance(binding, ast.ExprException):
+        typed_exc = _synth_exception_expr(binding, env, loop_depth)
+        return TypedExprStmt(expr=typed_exc, offset=binding.offset)
+
     if isinstance(binding, ast.ExprStmt):
+        if isinstance(binding.expr, ast.ExprException):
+            typed_exc = _synth_exception_expr(binding.expr, env, loop_depth)
+            return TypedExprStmt(expr=typed_exc, offset=binding.offset)
         typed_e = synth_expr(binding.expr, env, loop_depth)
         return TypedExprStmt(expr=typed_e, offset=binding.offset)
 
     if isinstance(binding, ast.LetValueBinding):
-        # Desugar parameter shorthand let f(x: Int): Int = body into ExprFun
         if binding.params:
             fn_expr = ast.ExprFun(
                 params=binding.params,
@@ -883,7 +2133,6 @@ def _elaborate_binding(binding: ast.BindingNode, env: Environment, loop_depth: i
                 offset=binding.offset,
             )
             if binding.is_rec:
-                # Pre-declare recursive function signature in scope
                 param_types = tuple(
                     elaborate_type(p.type_annot, env) if p.type_annot else DYNAMIC_TYPE
                     for p in binding.params
@@ -911,13 +2160,8 @@ def _elaborate_binding(binding: ast.BindingNode, env: Environment, loop_depth: i
                     offset=binding.offset,
                 )
             else:
-                if binding.type_annot is not None:
-                    expected = elaborate_type(binding.type_annot, env)
-                    typed_val = check_expr(fn_expr, expected, env, loop_depth)
-                    val_type = expected
-                else:
-                    typed_val = synth_expr(fn_expr, env, loop_depth)
-                    val_type = typed_val.type_val
+                typed_val = synth_expr(fn_expr, env, loop_depth)
+                val_type = typed_val.type_val
 
                 sym = ValueSymbol(name=binding.name, type_val=val_type, is_var=binding.is_var)
                 env.current_scope.declare_value(sym)

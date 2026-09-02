@@ -14,6 +14,7 @@ from quest.types import (
     QAllKind,
     QKindVar,
     QType,
+    QTupleField,
     QTupleType,
     QRecordField,
     QRecordType,
@@ -88,13 +89,13 @@ def elaborate_kind(ast_kind: ast.Kind, env: Environment) -> QKind:
         return QKindVar(name=sym.name, symbol_id=sym.symbol_id)
 
     if isinstance(ast_kind, ast.KindManifest):
-        iface_scope = env.lookup_interface(ast_kind.interface_name)
-        if iface_scope is None:
+        interface_scope = env.lookup_interface(ast_kind.interface_name)
+        if interface_scope is None:
             raise KindError(
                 f"Undefined interface '{ast_kind.interface_name}' in manifest kind "
                 f"'{ast_kind.interface_name}_{ast_kind.kind_name}' at offset {ast_kind.offset}"
             )
-        sym = iface_scope.lookup_kind(ast_kind.kind_name)
+        sym = interface_scope.lookup_kind(ast_kind.kind_name)
         if sym is None:
             raise KindError(
                 f"Undefined kind '{ast_kind.kind_name}' in interface '{ast_kind.interface_name}' "
@@ -152,13 +153,13 @@ def elaborate_type(ast_type: ast.Type, env: Environment) -> QType:
         raise KindError(f"Unsupported infix type operator '{ast_type.op}' at offset {ast_type.offset}")
 
     if isinstance(ast_type, ast.TypeTuple):
-        elements: list[QType] = []
+        fields: list[QTupleField] = []
         env.push_scope("tuple_sig")
         try:
             for f in ast_type.fields:
                 field_type = elaborate_type(f.type_sig, env)
                 check_kind(field_type, TYPE_KIND, env)
-                elements.append(field_type)
+                fields.append(QTupleField(name=f.name if f.name else None, type_val=field_type))
                 if f.name:
                     env.current_scope.declare_value(
                         ValueSymbol(
@@ -170,7 +171,7 @@ def elaborate_type(ast_type: ast.Type, env: Environment) -> QType:
                     )
         finally:
             env.pop_scope()
-        return QTupleType(tuple(elements))
+        return QTupleType(tuple(fields))
 
     if isinstance(ast_type, ast.TypeRecord):
         fields = tuple(

@@ -18,11 +18,15 @@
             :quantifiers (
               (Quantifier
                 :name 's'
-                :bound (KindType)
+                :bound (KindPower
+                  :bound (TypePath ('Stack'))
+                )
               )
               (Quantifier
                 :name 'x'
-                :bound (KindType)
+                :bound (KindPower
+                  :bound (TypePath ('Int'))
+                )
               )
             )
             :result_type (TypePath ('Stack'))
@@ -35,7 +39,9 @@
             :quantifiers (
               (Quantifier
                 :name 's'
-                :bound (KindType)
+                :bound (KindPower
+                  :bound (TypePath ('Stack'))
+                )
               )
             )
             :result_type (TypePath ('Int'))

@@ -401,7 +401,11 @@ def build_quest_grammar() -> None:
                         quantifiers=tuple(
                             ast.Quantifier(
                                 name=getattr(sig, "name", "_"),
-                                bound=getattr(sig, "bound", ast.KindType(offset=left_paren.offset)),
+                                bound=(
+                                    ast.KindPower(bound=sig.type_sig)
+                                    if hasattr(sig, "type_sig") and sig.type_sig is not None
+                                    else getattr(sig, "bound", ast.KindType(offset=left_paren.offset))
+                                ),
                                 offset=getattr(sig, "offset", left_paren.offset),
                             )
                             for sig in signatures

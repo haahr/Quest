@@ -179,9 +179,27 @@ class QDynamicType(QType):
 
 
 @dataclass(frozen=True)
-class QExceptionType(QType):
+class QBottomType(QType):
+    """Internal bottom type: subtype of all types, used for divergent expressions like raise."""
     def __str__(self) -> str:
-        return "Exception"
+        return "Bottom"
+
+
+@dataclass(frozen=True)
+class QExceptionType(QType):
+    """Exception type, optionally carrying a payload type (defaults to Ok)."""
+    payload_type: QType = field(default_factory=lambda: OK_TYPE)
+
+    def evaluate_lazily(self, env: Optional[Any] = None) -> QType:
+        return self
+
+    def substitute(self, subst: dict[int, QType]) -> QType:
+        return QExceptionType(payload_type=self.payload_type.substitute(subst))
+
+    def __str__(self) -> str:
+        if self.payload_type == OK_TYPE:
+            return "Exception"
+        return f"Exception({self.payload_type})"
 
 
 # Canonical singletons for primitive types
@@ -192,6 +210,7 @@ CHAR_TYPE = QCharType()
 STRING_TYPE = QStringType()
 OK_TYPE = QOkType()
 DYNAMIC_TYPE = QDynamicType()
+BOTTOM_TYPE = QBottomType()
 EXCEPTION_TYPE = QExceptionType()
 
 
@@ -200,18 +219,67 @@ EXCEPTION_TYPE = QExceptionType()
 # ============================================================================
 
 @dataclass(frozen=True)
+class QTupleField:
+    """A single (optionally named) component in an ordered tuple type."""
+    name: Optional[str]
+    type_val: QType
+
+    def substitute(self, subst: dict[int, QType]) -> QTupleField:
+        return QTupleField(name=self.name, type_val=self.type_val.substitute(subst))
+
+    def __str__(self) -> str:
+        if self.name:
+            return f"{self.name}: {self.type_val}"
+        return str(self.type_val)
+
+
+@dataclass(frozen=True)
 class QTupleType(QType):
-    """Ordered tuple type: Tuple T1 ... Tn end."""
-    elements: tuple[QType, ...]
+    """Ordered tuple type: Tuple [x:] T1 ... [y:] Tn end."""
+    fields: tuple[QTupleField, ...]
+
+    def __init__(self, elements: tuple[Union[QType, QTupleField], ...] = ()) -> None:
+        normalized: list[QTupleField] = []
+        for item in elements:
+            if isinstance(item, QTupleField):
+                normalized.append(item)
+            else:
+                normalized.append(QTupleField(name=None, type_val=item))
+        object.__setattr__(self, "fields", tuple(normalized))
+
+    @property
+    def elements(self) -> tuple[QType, ...]:
+        return tuple(f.type_val for f in self.fields)
+
+    def get_field(self, name: str) -> Optional[QTupleField]:
+        for f in self.fields:
+            if f.name == name:
+                return f
+        return None
+
+    def __eq__(self, other: Any) -> bool:
+        if not isinstance(other, QTupleType):
+            return False
+        if len(self.fields) != len(other.fields):
+            return False
+        for f1, f2 in zip(self.fields, other.fields):
+            if f1.name is not None and f2.name is not None and f1.name != f2.name:
+                return False
+            if f1.type_val != f2.type_val:
+                return False
+        return True
+
+    def __hash__(self) -> int:
+        return hash(tuple(f.type_val for f in self.fields))
 
     def evaluate_lazily(self, env: Optional[Any] = None) -> QType:
         return self
 
     def substitute(self, subst: dict[int, QType]) -> QType:
-        return QTupleType(tuple(t.substitute(subst) for t in self.elements))
+        return QTupleType(tuple(f.substitute(subst) for f in self.fields))
 
     def __str__(self) -> str:
-        elems = " ".join(str(t) for t in self.elements)
+        elems = " ".join(str(f) for f in self.fields)
         return f"Tuple {elems} end" if elems else "Tuple end"
 
 
@@ -719,6 +787,10 @@ def is_subtype(
     if sub_lazy == sup_lazy:
         return True
 
+    # 2b. Bottom type: subtype of all types
+    if isinstance(sub_lazy, QBottomType):
+        return True
+
     # 3. Metavariable resolution & unification
     if isinstance(sub_lazy, QTypeMeta):
         pruned = sub_lazy.prune()
@@ -748,14 +820,16 @@ def is_subtype(
             if is_subtype(sub_lazy.bound.bound, sup_lazy, env, trail):
                 return True
 
-    # 7. Tuples: length match, covariant in all fields
+    # 7. Tuples: length match, matching field names (if specified), covariant in elements
     if isinstance(sub_lazy, QTupleType) and isinstance(sup_lazy, QTupleType):
-        if len(sub_lazy.elements) != len(sup_lazy.elements):
+        if len(sub_lazy.fields) != len(sup_lazy.fields):
             return False
-        return all(
-            is_subtype(s_elem, t_elem, env, trail)
-            for s_elem, t_elem in zip(sub_lazy.elements, sup_lazy.elements)
-        )
+        for s_f, t_f in zip(sub_lazy.fields, sup_lazy.fields):
+            if t_f.name is not None and s_f.name != t_f.name:
+                return False
+            if not is_subtype(s_f.type_val, t_f.type_val, env, trail):
+                return False
+        return True
 
     # 8. Records: width, depth, and mutable invariance
     if isinstance(sub_lazy, QRecordType) and isinstance(sup_lazy, QRecordType):
@@ -848,7 +922,12 @@ def is_subtype(
     if isinstance(sub_lazy, QOutType) and isinstance(sup_lazy, QOutType):
         return is_subtype(sup_lazy.element_type, sub_lazy.element_type, env, trail)
 
-    # 15. Universal Quantifiers (Kernel F<:): bounds must match, body covariant
+    # 15. Exceptions: equivalent payload types
+    if isinstance(sub_lazy, QExceptionType) and isinstance(sup_lazy, QExceptionType):
+        return (is_subtype(sub_lazy.payload_type, sup_lazy.payload_type, env, trail)
+                and is_subtype(sup_lazy.payload_type, sub_lazy.payload_type, env, trail))
+
+    # 16. Universal Quantifiers (Kernel F<:): bounds must match, body covariant
     if isinstance(sub_lazy, QAllType) and isinstance(sup_lazy, QAllType):
         if len(sub_lazy.quantifiers) != len(sup_lazy.quantifiers):
             return False
