@@ -203,11 +203,15 @@ def elaborate_type(ast_type: ast.Type, env: Environment) -> QType:
             for opt in opt_variants:
                 if not opt.payload_sig:
                     options.append(QOptionField(name=opt.tag, payload_type=None))
-                elif len(opt.payload_sig) == 1:
-                    payload = elaborate_type(opt.payload_sig[0].type_sig, env)
-                    options.append(QOptionField(name=opt.tag, payload_type=payload))
                 else:
-                    payload = QTupleType(tuple(elaborate_type(f.type_sig, env) for f in opt.payload_sig))
+                    fields = tuple(
+                        QTupleField(
+                            name=f.name if f.name else None,
+                            type_val=elaborate_type(f.type_sig, env),
+                        )
+                        for f in opt.payload_sig
+                    )
+                    payload = QTupleType(fields)
                     options.append(QOptionField(name=opt.tag, payload_type=payload))
             return QOptionType(tuple(options))
 
@@ -354,11 +358,15 @@ def elaborate_type_binding(
 ) -> TypeSymbol:
     """Elaborates a single Let T = Type or Def T = Type declaration."""
     symbol_id = env.fresh_symbol_id()
-    declared_bound = elaborate_kind(binding.bound, env) if binding.bound else TYPE_KIND
-    check_kind_well_formed(declared_bound, env)
+    if binding.bound:
+        declared_bound: Optional[QKind] = elaborate_kind(binding.bound, env)
+        check_kind_well_formed(declared_bound, env)
+    else:
+        declared_bound = None
 
     if binding.params:
         # Desugar parameterized type definition Let T(X::K): ResultKind = Body into TypeFun
+        target_bound = declared_bound if declared_bound is not None else TYPE_KIND
         env.push_scope(f"type_fun_{binding.name}")
         try:
             formals: list[QTypeFormal] = []
@@ -368,13 +376,13 @@ def elaborate_type_binding(
                 env.current_scope.declare_type(TypeSymbol(name=p.name, symbol_id=p_id, kind=p_bound))
                 formals.append(QTypeFormal(name=p.name, symbol_id=p_id, bound=p_bound))
             body_type = elaborate_type(binding.type_val, env)
-            check_kind(body_type, declared_bound, env)
+            check_kind(body_type, target_bound, env)
             qtype_val = QTypeFun(params=tuple(formals), body=body_type)
         finally:
             env.pop_scope()
 
         # Fold parameter kinds into overall operator kind telescope
-        overall_kind: QKind = declared_bound
+        overall_kind: QKind = target_bound
         for formal in reversed(formals):
             overall_kind = QAllKind(
                 param_name=formal.name,
@@ -385,19 +393,23 @@ def elaborate_type_binding(
         bound_kind = overall_kind
     elif binding.is_rec:
         # Single recursive type definition Let Rec T = Body
+        target_bound = declared_bound if declared_bound is not None else TYPE_KIND
         env.push_scope(f"rec_{binding.name}")
         try:
-            env.current_scope.declare_type(TypeSymbol(name=binding.name, symbol_id=symbol_id, kind=declared_bound))
+            env.current_scope.declare_type(TypeSymbol(name=binding.name, symbol_id=symbol_id, kind=target_bound))
             body_type = elaborate_type(binding.type_val, env)
-            check_kind(body_type, declared_bound, env)
-            qtype_val = QRecType(var_name=binding.name, symbol_id=symbol_id, bound=declared_bound, body=body_type)
+            check_kind(body_type, target_bound, env)
+            qtype_val = QRecType(var_name=binding.name, symbol_id=symbol_id, bound=target_bound, body=body_type)
         finally:
             env.pop_scope()
-        bound_kind = declared_bound
+        bound_kind = target_bound
     else:
         qtype_val = elaborate_type(binding.type_val, env)
-        check_kind(qtype_val, declared_bound, env)
-        bound_kind = declared_bound
+        if declared_bound is not None:
+            check_kind(qtype_val, declared_bound, env)
+            bound_kind = declared_bound
+        else:
+            bound_kind = synth_kind(qtype_val, env)
 
     # Validate overall kind conformance
     check_kind(qtype_val, bound_kind, env)

@@ -1,0 +1,28 @@
+(TypedProgram
+  :phrases (
+    (TypedLetValue 'add1' :type Fun(x: Int): Int
+      :value (TypedFun :params (('x' : Int)) :type Fun(x: Int): Int
+        :body (TypedInfix '+' :type Int
+          :left (TypedVar 'x' :type Int)
+          :right (TypedInt 1 :type Int))))
+    (TypedLetValue 'adder' :type Fun(x: Int): Fun(y: Int): Int
+      :value (TypedFun :params (('x' : Int)) :type Fun(x: Int): Fun(y: Int): Int
+        :body (TypedFun :params (('y' : Int)) :type Fun(y: Int): Int
+          :body (TypedInfix '+' :type Int
+            :left (TypedVar 'x' :type Int)
+            :right (TypedVar 'y' :type Int)))))
+    (TypedLetValue 'apply' :type Fun(f: Fun(x: Int): Int x: Int): Int
+      :value (TypedFun :params (('f' : Fun(x: Int): Int) ('x' : Int)) :type Fun(f: Fun(x: Int): Int x: Int): Int
+        :body (TypedApp :type Int
+          :func (TypedVar 'f' :type Fun(x: Int): Int)
+          :args (
+            (TypedVar 'x' :type Int)
+          ))))
+    (TypedLetValue 'res' :type Int
+      :value (TypedApp :type Int
+        :func (TypedVar 'apply' :type Fun(f: Fun(x: Int): Int x: Int): Int)
+        :args (
+          (TypedVar 'add1' :type Fun(x: Int): Int)
+          (TypedInt 41 :type Int)
+        )))
+  ))

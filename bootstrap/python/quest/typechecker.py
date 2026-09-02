@@ -173,7 +173,11 @@ def check_expr(
         case ast.ExprInspect():
             return _check_inspect_expr(expr, expected_type, env, loop_depth)
 
-        # 11. Subsumption: synthesize minimal type and check subtyping (S <= T)
+        # 11. Statement unwrap (for phrase/statement bodies)
+        case ast.ExprStmt(expr=inner):
+            return check_expr(inner, expected_type, env, loop_depth)
+
+        # 12. Subsumption: synthesize minimal type and check subtyping (S <= T)
         case _:
             typed = synth_expr(expr, env, loop_depth)
             if not is_subtype(typed.type_val, expected_type, env):
@@ -354,6 +358,10 @@ def synth_expr(
 
         case ast.ExprInspect():
             return _synth_inspect_expr(expr, env, loop_depth)
+
+        # --- Statement Unwrap ---
+        case ast.ExprStmt(expr=inner):
+            return synth_expr(inner, env, loop_depth)
 
         case _:
             raise TypeError(f"Unsupported AST expression '{expr}'", offset=getattr(expr, "offset", 0))
@@ -1739,23 +1747,20 @@ def elaborate_program(
 
     typed_phrases: list[Union[TypedBinding, TypedExpr]] = []
     for phrase in program.phrases:
-        if isinstance(phrase, ast.InterfaceDecl):
-            typed_interface = elaborate_interface(phrase, env)
-            typed_phrases.append(typed_interface)
-        elif isinstance(phrase, ast.ModuleDecl):
-            typed_module = elaborate_module(phrase, env)
-            typed_phrases.append(typed_module)
-        elif isinstance(phrase, ast.BindingNode):
-            typed_binding = _elaborate_binding(phrase, env, loop_depth=0)
-            typed_phrases.append(typed_binding)
-        elif isinstance(phrase, ast.Expr):
-            typed_expr = synth_expr(phrase, env, loop_depth=0)
-            typed_phrases.append(typed_expr)
-        else:
-            raise TypeError(
-                f"Unsupported top-level phrase '{phrase}'",
-                offset=getattr(phrase, "offset", 0),
-            )
+        match phrase:
+            case ast.InterfaceDecl():
+                typed_phrases.append(elaborate_interface(phrase, env))
+            case ast.ModuleDecl():
+                typed_phrases.append(elaborate_module(phrase, env))
+            case ast.BindingNode():
+                typed_phrases.append(_elaborate_binding(phrase, env, loop_depth=0))
+            case ast.Expr():
+                typed_phrases.append(synth_expr(phrase, env, loop_depth=0))
+            case _:
+                raise TypeError(
+                    f"Unsupported top-level phrase '{phrase}'",
+                    offset=getattr(phrase, "offset", 0),
+                )
 
     return TypedProgram(phrases=tuple(typed_phrases), offset=program.offset)
 

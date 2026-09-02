@@ -1,0 +1,23 @@
+(TypedProgram
+  :phrases (
+    (TypedInterface 'IntStack'
+      :signatures ())
+    (TypedModule 'intStack' implements 'IntStack'
+      :bindings (
+        (TypedLetType 'Stack' :kind TYPE)
+        (TypedLetValue 'empty' :type Tuple items: Array(Int) top: Int end
+          :value (TypedTuple :type Tuple items: Array(Int) top: Int end
+            :elements (
+              (TypedArrayRep :type Array(Int)
+                :count (TypedInt 10 :type Int)
+                :init (TypedInt 0 :type Int))
+              (TypedInt 0 :type Int)
+            )))
+        (TypedLetValue 'push' :type Fun(s: Tuple items: Array(Int) top: Int end x: Int): Tuple items: Array(Int) top: Int end
+          :value (TypedFun :params (('s' : Tuple items: Array(Int) top: Int end) ('x' : Int)) :type Fun(s: Tuple items: Array(Int) top: Int end x: Int): Tuple items: Array(Int) top: Int end
+            :body (TypedVar 's' :type Tuple items: Array(Int) top: Int end)))
+        (TypedLetValue 'pop' :type Fun(s: Tuple items: Array(Int) top: Int end): Int
+          :value (TypedFun :params (('s' : Tuple items: Array(Int) top: Int end)) :type Fun(s: Tuple items: Array(Int) top: Int end): Int
+            :body (TypedInt 0 :type Int)))
+      ))
+  ))

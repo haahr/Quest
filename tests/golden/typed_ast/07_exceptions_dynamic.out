@@ -1,0 +1,33 @@
+(TypedProgram
+  :phrases (
+    (TypedExprStmt
+      :expr (TypedException 'DivByZero' :type Exception))
+    (TypedLetValue 'safeDiv' :type Fun(a: Int b: Int): Int
+      :value (TypedFun :params (('a' : Int) ('b' : Int)) :type Fun(a: Int b: Int): Int
+        :body (TypedIf :type Int
+          :cond (TypedInfix 'is' :type Bool
+            :left (TypedVar 'b' :type Int)
+            :right (TypedInt 0 :type Int))
+          :then (TypedRaise :type Int
+            :exc (TypedVar 'DivByZero' :type Exception))
+          :else (TypedInfix '/' :type Int
+            :left (TypedVar 'a' :type Int)
+            :right (TypedVar 'b' :type Int)))))
+    (TypedLetValue 'compute' :type Fun(a: Int b: Int): Int
+      :value (TypedFun :params (('a' : Int) ('b' : Int)) :type Fun(a: Int b: Int): Int
+        :body (TypedTry :type Int
+          :body (TypedApp :type Int
+            :func (TypedVar 'safeDiv' :type Fun(a: Int b: Int): Int)
+            :args (
+              (TypedVar 'a' :type Int)
+              (TypedVar 'b' :type Int)
+            ))
+          :branches (
+            (TypedTryBranch
+              :exc_pattern (TypedVar 'DivByZero' :type Exception)
+              :body (TypedInt 0 :type Int))
+          )
+          :else (TypedInfix '-' :type Int
+            :left (TypedInt 0 :type Int)
+            :right (TypedInt 1 :type Int)))))
+  ))

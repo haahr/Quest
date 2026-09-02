@@ -1,0 +1,25 @@
+(TypedProgram
+  :phrases (
+    (TypedLetType 'T' :kind TYPE)
+    (TypedLetValue 'origin' :type Tuple x: Int y: Real end
+      :value (TypedTuple :type Tuple x: Int y: Real end
+        :elements (
+          (TypedInt 0 :type Int)
+          (TypedReal 0.0 :type Real)
+        )))
+    (TypedLetValue 'add' :type Fun(p1: Tuple x: Int y: Real end p2: Tuple x: Int y: Real end): Tuple x: Int y: Real end
+      :value (TypedFun :params (('p1' : Tuple x: Int y: Real end) ('p2' : Tuple x: Int y: Real end)) :type Fun(p1: Tuple x: Int y: Real end p2: Tuple x: Int y: Real end): Tuple x: Int y: Real end
+        :body (TypedTuple :type Tuple x: Int y: Real end
+          :elements (
+            (TypedInfix '+' :type Int
+              :left (TypedSelect 'x' :type Int
+                :target (TypedVar 'p1' :type Tuple x: Int y: Real end))
+              :right (TypedSelect 'x' :type Int
+                :target (TypedVar 'p2' :type Tuple x: Int y: Real end)))
+            (TypedInfix '+' :type Real
+              :left (TypedSelect 'y' :type Real
+                :target (TypedVar 'p1' :type Tuple x: Int y: Real end))
+              :right (TypedSelect 'y' :type Real
+                :target (TypedVar 'p2' :type Tuple x: Int y: Real end)))
+          ))))
+  ))

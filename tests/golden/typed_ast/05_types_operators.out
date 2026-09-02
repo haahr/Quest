@@ -1,0 +1,8 @@
+(TypedProgram
+  :phrases (
+    (TypedDefKind 'KBase' :kind TYPE)
+    (TypedLetType 'Identity' :kind ALL(X :: TYPE) TYPE)
+    (TypedLetType 'IntIdentity' :kind TYPE)
+    (TypedLetType 'List' :kind TYPE)
+    (TypedLetType 'Pair' :kind ALL(A :: TYPE) ALL(B :: TYPE) TYPE)
+  ))

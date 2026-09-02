@@ -21,6 +21,10 @@ PHASES = {
         "runner": ROOT_DIR / "bootstrap" / "python" / "quest_parse.py",
         "golden_subdir": "parse",
     },
+    "typed_ast": {
+        "runner": ROOT_DIR / "bootstrap" / "python" / "quest_typed_ast.py",
+        "golden_subdir": "typed_ast",
+    },
 }
 
 

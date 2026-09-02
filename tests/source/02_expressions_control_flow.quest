@@ -4,7 +4,7 @@ let x = 10;
 let y = 20;
 
 let sum = x + y * 2;
-let boolVal = x < y andif x <> 0 orif y is 20;
+let boolVal = {x < y} andif {{x <> 0} orif {y is 20}};
 
 let testIf(n: Int): Int =
     if n < 0 then
@@ -18,24 +18,24 @@ let testIf(n: Int): Int =
 let testLoop(): Ok =
     begin
         let var i = 0;
-        while @i < 10 do
-            i := @i + 1
+        while i < 10 do
+            i := i + 1
         end;
 
         loop
-            if @i is 20 then
+            if i is 20 then
                 exit
             else
-                i := @i + 1
+                i := i + 1
             end
         end;
 
         for k = 1 upto 5 do
-            i := @i + k
+            i := i + k
         end;
 
         for k = 5 downto 1 do
-            i := @i - k
+            i := i - k
         end;
 
         ok

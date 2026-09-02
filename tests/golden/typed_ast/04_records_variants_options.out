@@ -1,0 +1,49 @@
+(TypedProgram
+  :phrases (
+    (TypedLetType 'Color' :kind TYPE)
+    (TypedLetValue 'c' :type Option red green blue with Tuple intensity: Int end end
+      :value (TypedOption 'red' :type Option red green blue with Tuple intensity: Int end end))
+    (TypedLetValue 'colorCode' :type Fun(col: Option red green blue with Tuple intensity: Int end end): Int
+      :value (TypedFun :params (('col' : Option red green blue with Tuple intensity: Int end end)) :type Fun(col: Option red green blue with Tuple intensity: Int end end): Int
+        :body (TypedCase :type Int
+          :target (TypedVar 'col' :type Option red green blue with Tuple intensity: Int end end)
+          :branches (
+            (TypedCaseBranch tags=(red)
+              :body (TypedInt 1 :type Int))
+            (TypedCaseBranch tags=(green)
+              :body (TypedInt 2 :type Int))
+            (TypedCaseBranch tags=(blue) :binder 'b'
+              :body (TypedSelect 'intensity' :type Int
+                :target (TypedVar 'b' :type Tuple intensity: Int end)))
+          )
+          :else (TypedInt 0 :type Int))))
+    (TypedLetType 'PointRec' :kind TYPE)
+    (TypedLetValue 'p' :type Record x: Int y: Int end
+      :value (TypedRecord :type Record x: Int y: Int end
+        :fields (
+          (TypedRecordField 'x'
+            :value (TypedInt 10 :type Int))
+          (TypedRecordField 'y'
+            :value (TypedInt 20 :type Int))
+        )))
+    (TypedLetValue 'px' :type Int
+      :value (TypedSelect 'x' :type Int
+        :target (TypedVar 'p' :type Record x: Int y: Int end)))
+    (TypedLetValue 'arr1' :type Array(Int)
+      :value (TypedArray :type Array(Int)
+        :elements (
+          (TypedInt 1 :type Int)
+          (TypedInt 2 :type Int)
+          (TypedInt 3 :type Int)
+          (TypedInt 4 :type Int)
+          (TypedInt 5 :type Int)
+        )))
+    (TypedLetValue 'arr2' :type Array(Int)
+      :value (TypedArrayRep :type Array(Int)
+        :count (TypedInt 10 :type Int)
+        :init (TypedInt 0 :type Int)))
+    (TypedLetValue 'first' :type Int
+      :value (TypedIndex :type Int
+        :target (TypedVar 'arr1' :type Array(Int))
+        :index (TypedInt 0 :type Int)))
+  ))

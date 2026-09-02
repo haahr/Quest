@@ -23,23 +23,23 @@
     (LetValueBinding
       :name 'boolVal'
       :value (ExprInfix
-        :left (ExprId 'x')
-        :op '<'
+        :left (ExprInfix
+          :left (ExprId 'x')
+          :op '<'
+          :right (ExprId 'y')
+        )
+        :op 'andif'
         :right (ExprInfix
-          :left (ExprId 'y')
-          :op 'andif'
-          :right (ExprInfix
+          :left (ExprInfix
             :left (ExprId 'x')
             :op '<>'
-            :right (ExprInfix
-              :left (ExprInt 0 '0')
-              :op 'orif'
-              :right (ExprInfix
-                :left (ExprId 'y')
-                :op 'is'
-                :right (ExprInt 20 '20')
-              )
-            )
+            :right (ExprInt 0 '0')
+          )
+          :op 'orif'
+          :right (ExprInfix
+            :left (ExprId 'y')
+            :op 'is'
+            :right (ExprInt 20 '20')
           )
         )
       )
@@ -95,23 +95,19 @@
           )
           (ExprStmt
             :expr (ExprWhile
-              :cond (ExprDerefCell
-                :target (ExprInfix
-                  :left (ExprId 'i')
-                  :op '<'
-                  :right (ExprInt 10 '10')
-                )
+              :cond (ExprInfix
+                :left (ExprId 'i')
+                :op '<'
+                :right (ExprInt 10 '10')
               )
               :body (ExprStmt
                 :expr (ExprInfix
                   :left (ExprId 'i')
                   :op ':='
-                  :right (ExprDerefCell
-                    :target (ExprInfix
-                      :left (ExprId 'i')
-                      :op '+'
-                      :right (ExprInt 1 '1')
-                    )
+                  :right (ExprInfix
+                    :left (ExprId 'i')
+                    :op '+'
+                    :right (ExprInt 1 '1')
                   )
                 )
               )
@@ -121,12 +117,10 @@
             :expr (ExprLoop
               :body (ExprStmt
                 :expr (ExprIf
-                  :cond (ExprDerefCell
-                    :target (ExprInfix
-                      :left (ExprId 'i')
-                      :op 'is'
-                      :right (ExprInt 20 '20')
-                    )
+                  :cond (ExprInfix
+                    :left (ExprId 'i')
+                    :op 'is'
+                    :right (ExprInt 20 '20')
                   )
                   :then_branch (ExprStmt
                     :expr (ExprExit)
@@ -135,12 +129,10 @@
                     :expr (ExprInfix
                       :left (ExprId 'i')
                       :op ':='
-                      :right (ExprDerefCell
-                        :target (ExprInfix
-                          :left (ExprId 'i')
-                          :op '+'
-                          :right (ExprInt 1 '1')
-                        )
+                      :right (ExprInfix
+                        :left (ExprId 'i')
+                        :op '+'
+                        :right (ExprInt 1 '1')
                       )
                     )
                   )
@@ -157,12 +149,10 @@
                 :expr (ExprInfix
                   :left (ExprId 'i')
                   :op ':='
-                  :right (ExprDerefCell
-                    :target (ExprInfix
-                      :left (ExprId 'i')
-                      :op '+'
-                      :right (ExprId 'k')
-                    )
+                  :right (ExprInfix
+                    :left (ExprId 'i')
+                    :op '+'
+                    :right (ExprId 'k')
                   )
                 )
               )
@@ -178,12 +168,10 @@
                 :expr (ExprInfix
                   :left (ExprId 'i')
                   :op ':='
-                  :right (ExprDerefCell
-                    :target (ExprInfix
-                      :left (ExprId 'i')
-                      :op '-'
-                      :right (ExprId 'k')
-                    )
+                  :right (ExprInfix
+                    :left (ExprId 'i')
+                    :op '-'
+                    :right (ExprId 'k')
                   )
                 )
               )

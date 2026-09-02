@@ -20,6 +20,7 @@ from quest.types import (
     QAllKind,
     QKindVar,
     QTupleType,
+    QTupleField,
     QRecordType,
     QVariantType,
     QOptionType,
@@ -158,7 +159,10 @@ class TestTypeElaboration(unittest.TestCase):
         self.assertIsInstance(t_opt, QOptionType)
         self.assertEqual(len(t_opt.options), 2)
         self.assertIsNone(t_opt.options[0].payload_type)
-        self.assertEqual(t_opt.options[1].payload_type, INT_TYPE)
+        self.assertEqual(
+            t_opt.options[1].payload_type,
+            QTupleType((QTupleField(name="val", type_val=INT_TYPE),)),
+        )
 
     def test_elaborate_polymorphic_and_operators(self):
         # All(X::TYPE) X -> X
