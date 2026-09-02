@@ -38,12 +38,8 @@ def elaborate_stream(source_text: str, file_name: str = "<stdin>") -> int:
         typed_tree = elaborate_program(tree, env)
         print(typed_tree.dump())
         return 0
-    except QuestTypeError as error:
-        loc = source_map.locate(error.offset)
-        sys.stderr.write(f"{loc.file_name}:{loc.line}:{loc.column}: Type error: {error.message}\n")
-        return 1
-    except KindError as error:
-        sys.stderr.write(f"{file_name}: Kind error: {error}\n")
+    except (QuestTypeError, KindError) as error:
+        sys.stderr.write(error.format_with_source(source_map) + "\n")
         return 1
 
 

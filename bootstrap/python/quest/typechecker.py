@@ -110,9 +110,15 @@ class TypeError(Exception):
     """Raised when a type error occurs during term elaboration and typechecking."""
 
     def __init__(self, message: str, offset: int = 0) -> None:
-        super().__init__(f"{message} at offset {offset}")
+        super().__init__(f"{message} at offset {offset}" if offset else message)
         self.message = message
         self.offset = offset
+
+    def format_with_source(self, source_map: Any, length: int = 1) -> str:
+        """Renders a diagnostic message with underlined source context."""
+        if hasattr(source_map, "format_error"):
+            return source_map.format_error(self.offset, length, self.message)
+        return str(self)
 
 
 # ============================================================================
@@ -802,28 +808,30 @@ def _synth_select_expr(expr: ast.ExprSelect, env: Environment, loop_depth: int) 
     target_typed = synth_expr(expr.target, env, loop_depth)
     target_type = target_typed.type_val.evaluate_lazily(env)
 
-    if isinstance(target_type, QRecordType):
-        rec_f = target_type.get_field(expr.field)
-        if rec_f is None:
+    match target_type:
+        case QRecordType():
+            rec_f = target_type.get_field(expr.field)
+            if rec_f is None:
+                raise TypeError(
+                    f"Record type '{target_type}' has no field named '{expr.field}'",
+                    offset=expr.offset,
+                )
+            return TypedSelect(target=target_typed, field=expr.field, type_val=rec_f.type_val, offset=expr.offset)
+
+        case QTupleType():
+            tup_f = target_type.get_field(expr.field)
+            if tup_f is None:
+                raise TypeError(
+                    f"Tuple type '{target_type}' has no field named '{expr.field}'",
+                    offset=expr.offset,
+                )
+            return TypedSelect(target=target_typed, field=expr.field, type_val=tup_f.type_val, offset=expr.offset)
+
+        case _:
             raise TypeError(
-                f"Record type '{target_type}' has no field named '{expr.field}'",
+                f"Cannot select field '{expr.field}' from non-record/tuple type '{target_type}'",
                 offset=expr.offset,
             )
-        return TypedSelect(target=target_typed, field=expr.field, type_val=rec_f.type_val, offset=expr.offset)
-
-    if isinstance(target_type, QTupleType):
-        tup_f = target_type.get_field(expr.field)
-        if tup_f is None:
-            raise TypeError(
-                f"Tuple type '{target_type}' has no field named '{expr.field}'",
-                offset=expr.offset,
-            )
-        return TypedSelect(target=target_typed, field=expr.field, type_val=tup_f.type_val, offset=expr.offset)
-
-    raise TypeError(
-        f"Cannot select field '{expr.field}' from non-record/tuple type '{target_type}'",
-        offset=expr.offset,
-    )
 
 
 def _synth_option_expr(expr: ast.ExprOption, env: Environment, loop_depth: int) -> TypedOption:
@@ -1885,53 +1893,55 @@ def _synth_infix_expr(expr: ast.ExprInfix, env: Environment, loop_depth: int) ->
 
 def _synth_assignment(expr: ast.ExprInfix, env: Environment, loop_depth: int) -> TypedAssign:
     """Synthesizes an assignment expression: lhs := rhs."""
-    # Target 1: Variable identifier
-    if isinstance(expr.left, ast.ExprId):
-        sym = env.lookup_value(expr.left.name)
-        if sym is None:
-            raise TypeError(f"Undefined variable '{expr.left.name}'", offset=expr.left.offset)
-        if not sym.is_var:
-            raise TypeError(f"Cannot assign to immutable variable '{expr.left.name}'", offset=expr.left.offset)
+    match expr.left:
+        # Target 1: Variable identifier
+        case ast.ExprId(name=name, offset=id_off):
+            sym = env.lookup_value(name)
+            if sym is None:
+                raise TypeError(f"Undefined variable '{name}'", offset=id_off)
+            if not sym.is_var:
+                raise TypeError(f"Cannot assign to immutable variable '{name}'", offset=id_off)
 
-        target_node = TypedVar(
-            name=sym.name,
-            symbol=sym,
-            type_val=QVarType(sym.type_val),
-            offset=expr.left.offset,
-        )
-        rhs_typed = check_expr(expr.right, sym.type_val, env, loop_depth)
-        return TypedAssign(target=target_node, value=rhs_typed, offset=expr.offset)
+            target_node = TypedVar(
+                name=sym.name,
+                symbol=sym,
+                type_val=QVarType(sym.type_val),
+                offset=id_off,
+            )
+            rhs_typed = check_expr(expr.right, sym.type_val, env, loop_depth)
+            return TypedAssign(target=target_node, value=rhs_typed, offset=expr.offset)
 
-    # Target 2: Record field selection (r.field := rhs)
-    if isinstance(expr.left, ast.ExprSelect):
-        target_typed = synth_expr(expr.left.target, env, loop_depth)
-        target_type = target_typed.type_val.evaluate_lazily(env)
-        if not isinstance(target_type, QRecordType):
-            raise TypeError(
-                f"Cannot mutate field of non-record type '{target_type}'",
-                offset=expr.left.offset,
+        # Target 2: Record field selection (r.field := rhs)
+        case ast.ExprSelect(target=target, field=field, offset=sel_off):
+            target_typed = synth_expr(target, env, loop_depth)
+            target_type = target_typed.type_val.evaluate_lazily(env)
+            if not isinstance(target_type, QRecordType):
+                raise TypeError(
+                    f"Cannot mutate field of non-record type '{target_type}'",
+                    offset=sel_off,
+                )
+            rec_f = target_type.get_field(field)
+            if rec_f is None:
+                raise TypeError(
+                    f"Record has no field '{field}'",
+                    offset=sel_off,
+                )
+            if not rec_f.is_var:
+                raise TypeError(
+                    f"Cannot assign to immutable record field '{field}'",
+                    offset=sel_off,
+                )
+            rhs_typed = check_expr(expr.right, rec_f.type_val, env, loop_depth)
+            target_select = TypedSelect(
+                target=target_typed,
+                field=field,
+                type_val=rec_f.type_val,
+                offset=sel_off,
             )
-        rec_f = target_type.get_field(expr.left.field)
-        if rec_f is None:
-            raise TypeError(
-                f"Record has no field '{expr.left.field}'",
-                offset=expr.left.offset,
-            )
-        if not rec_f.is_var:
-            raise TypeError(
-                f"Cannot assign to immutable record field '{expr.left.field}'",
-                offset=expr.left.offset,
-            )
-        rhs_typed = check_expr(expr.right, rec_f.type_val, env, loop_depth)
-        target_select = TypedSelect(
-            target=target_typed,
-            field=expr.left.field,
-            type_val=rec_f.type_val,
-            offset=expr.left.offset,
-        )
-        return TypedAssign(target=target_select, value=rhs_typed, offset=expr.offset)
+            return TypedAssign(target=target_select, value=rhs_typed, offset=expr.offset)
 
-    raise TypeError("Assignment target must be a mutable variable or field", offset=expr.left.offset)
+        case _:
+            raise TypeError("Assignment target must be a mutable variable or field", offset=expr.left.offset)
 
 
 def _synth_if_expr(expr: ast.ExprIf, env: Environment, loop_depth: int) -> TypedIf:

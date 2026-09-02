@@ -8,10 +8,12 @@ import unittest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "bootstrap", "python"))
 
 import quest.ast as ast
+from quest.tokens import SourceMap
 from quest.types import (
     BOOL_TYPE,
     CHAR_TYPE,
     INT_TYPE,
+    KindError,
     OK_TYPE,
     QVarType,
     REAL_TYPE,
@@ -241,6 +243,20 @@ class TestTypecheckerPhase2(unittest.TestCase):
         # Scoped bindings do not leak into outer environment
         self.assertIsNone(self.env.lookup_value("a"))
         self.assertIsNone(self.env.lookup_value("b"))
+
+    def test_error_formatting_with_source(self):
+        source = "let x: Int = true;"
+        sm = SourceMap(source, "test.quest")
+        type_err = QuestTypeError("Type mismatch: expected Int, got Bool", offset=13)
+        formatted = type_err.format_with_source(sm, length=4)
+        self.assertIn("test.quest:1:14: error: Type mismatch", formatted)
+        self.assertIn("let x: Int = true;", formatted)
+        self.assertIn("^^^^", formatted)
+
+        kind_err = KindError("Kind mismatch", offset=4)
+        kind_formatted = kind_err.format_with_source(sm, length=1)
+        self.assertIn("test.quest:1:5: error: Kind mismatch", kind_formatted)
+        self.assertIn("^", kind_formatted)
 
 
 if __name__ == "__main__":

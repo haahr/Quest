@@ -985,48 +985,67 @@ def is_subkind(sub: QKind, sup: QKind, env: Optional[Any] = None) -> bool:
 
 class KindError(Exception):
     """Raised when kind synthesis, kind checking, or well-kindedness verification fails."""
-    pass
+
+    def __init__(self, message: str, offset: int = 0) -> None:
+        super().__init__(f"{message} at offset {offset}" if offset else message)
+        self.message = message
+        self.offset = offset
+
+    def format_with_source(self, source_map: Any, length: int = 1) -> str:
+        """Renders a diagnostic message with underlined source context."""
+        if hasattr(source_map, "format_error"):
+            return source_map.format_error(self.offset, length, self.message)
+        return str(self)
 
 
 def check_kind_well_formed(kind: QKind, env: Optional[Any] = None) -> None:
     """Verifies that a kind is well-formed according to Quest kind formation rules."""
     kind_lazy = kind.evaluate_lazily(env)
-    if isinstance(kind_lazy, QTypeKind):
-        return
+    match kind_lazy:
+        case QTypeKind():
+            return
 
-    if isinstance(kind_lazy, QPowerKind):
-        # Bound of a power kind MUST be a proper type of kind TYPE
-        check_kind(kind_lazy.bound, TYPE_KIND, env)
-        return
+        case QPowerKind(bound=bound):
+            # Bound of a power kind MUST be a proper type of kind TYPE
+            check_kind(bound, TYPE_KIND, env)
+            return
 
-    if isinstance(kind_lazy, QAllKind):
-        check_kind_well_formed(kind_lazy.param_kind, env)
-        if env is not None and hasattr(env, "push_scope"):
-            from quest.env import TypeSymbol
-            env.push_scope(f"kind_param_{kind_lazy.param_name}")
-            try:
-                env.current_scope.declare_type(
-                    TypeSymbol(
-                        name=kind_lazy.param_name,
-                        symbol_id=kind_lazy.param_id,
-                        kind=kind_lazy.param_kind,
+        case QAllKind(
+            param_name=param_name,
+            param_id=param_id,
+            param_kind=param_kind,
+            result_kind=result_kind,
+        ):
+            check_kind_well_formed(param_kind, env)
+            if env is not None and hasattr(env, "push_scope"):
+                from quest.env import TypeSymbol
+                env.push_scope(f"kind_param_{param_name}")
+                try:
+                    env.current_scope.declare_type(
+                        TypeSymbol(
+                            name=param_name,
+                            symbol_id=param_id,
+                            kind=param_kind,
+                        )
                     )
-                )
-                check_kind_well_formed(kind_lazy.result_kind, env)
-            finally:
-                env.pop_scope()
-        else:
-            check_kind_well_formed(kind_lazy.result_kind, env)
-        return
+                    check_kind_well_formed(result_kind, env)
+                finally:
+                    env.pop_scope()
+            else:
+                check_kind_well_formed(result_kind, env)
+            return
 
-    if isinstance(kind_lazy, QKindVar):
-        if env is not None and hasattr(env, "lookup_kind_by_id"):
-            sym = env.lookup_kind_by_id(kind_lazy.symbol_id)
-            if sym is None:
-                sym = env.lookup_kind(kind_lazy.name)
-            if sym is None:
-                raise KindError(f"Unbound kind variable '{kind_lazy.name}' (#{kind_lazy.symbol_id})")
-        return
+        case QKindVar(name=name, symbol_id=symbol_id):
+            if env is not None and hasattr(env, "lookup_kind_by_id"):
+                sym = env.lookup_kind_by_id(symbol_id)
+                if sym is None:
+                    sym = env.lookup_kind(name)
+                if sym is None:
+                    raise KindError(f"Unbound kind variable '{name}' (#{symbol_id})")
+            return
+
+        case _:
+            raise KindError(f"Malformed or unsupported kind '{kind_lazy}'")
 
 
 def check_kind(type_val: QType, expected_kind: QKind, env: Optional[Any] = None) -> None:
