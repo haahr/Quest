@@ -129,58 +129,60 @@ def check_expr(
     if env is None:
         env = Environment()
 
-    # 1. Conditionals with else branch: check both branches against expected_type
-    if isinstance(expr, ast.ExprIf) and expr.else_branch is not None:
-        return _check_if_expr(expr, expected_type, env, loop_depth)
+    match expr:
+        # 1. Conditionals with else branch: check both branches against expected_type
+        case ast.ExprIf(else_branch=else_br) if else_br is not None:
+            return _check_if_expr(expr, expected_type, env, loop_depth)
 
-    # 2. Block expression: check final result against expected_type
-    if isinstance(expr, ast.ExprBlock):
-        return _check_block_expr(expr, expected_type, env, loop_depth)
+        # 2. Block expression: check final result against expected_type
+        case ast.ExprBlock():
+            return _check_block_expr(expr, expected_type, env, loop_depth)
 
-    # 3. Function abstraction: check against expected function type
-    if isinstance(expr, ast.ExprFun):
-        return _check_fun_expr(expr, expected_type, env, loop_depth)
+        # 3. Function abstraction: check against expected function type
+        case ast.ExprFun():
+            return _check_fun_expr(expr, expected_type, env, loop_depth)
 
-    # 4. Record expression: check fields against expected record type
-    if isinstance(expr, ast.ExprRecord):
-        return _check_record_expr(expr, expected_type, env, loop_depth)
+        # 4. Record expression: check fields against expected record type
+        case ast.ExprRecord():
+            return _check_record_expr(expr, expected_type, env, loop_depth)
 
-    # 5. Tuple expression: check elements against expected tuple type
-    if isinstance(expr, ast.ExprTuple):
-        return _check_tuple_expr(expr, expected_type, env, loop_depth)
+        # 5. Tuple expression: check elements against expected tuple type
+        case ast.ExprTuple():
+            return _check_tuple_expr(expr, expected_type, env, loop_depth)
 
-    # 6. Case expression: check all branches against expected_type
-    if isinstance(expr, ast.ExprCase):
-        return _check_case_expr(expr, expected_type, env, loop_depth)
+        # 6. Case expression: check all branches against expected_type
+        case ast.ExprCase():
+            return _check_case_expr(expr, expected_type, env, loop_depth)
 
-    # 7. Array expressions: check elements against expected array element type
-    if isinstance(expr, ast.ExprArray):
-        return _check_array_expr(expr, expected_type, env, loop_depth)
+        # 7. Array expressions: check elements against expected array element type
+        case ast.ExprArray():
+            return _check_array_expr(expr, expected_type, env, loop_depth)
 
-    if isinstance(expr, ast.ExprArrayRep):
-        return _check_array_rep_expr(expr, expected_type, env, loop_depth)
+        case ast.ExprArrayRep():
+            return _check_array_rep_expr(expr, expected_type, env, loop_depth)
 
-    # 8. Phase 5: Raise expression (divergent control flow checks against any expected type)
-    if isinstance(expr, ast.ExprRaise):
-        return _check_raise_expr(expr, expected_type, env, loop_depth)
+        # 8. Phase 5: Raise expression (divergent control flow checks against any expected type)
+        case ast.ExprRaise():
+            return _check_raise_expr(expr, expected_type, env, loop_depth)
 
-    # 9. Phase 5: Try expression
-    if isinstance(expr, ast.ExprTry):
-        return _check_try_expr(expr, expected_type, env, loop_depth)
+        # 9. Phase 5: Try expression
+        case ast.ExprTry():
+            return _check_try_expr(expr, expected_type, env, loop_depth)
 
-    # 10. Phase 5: Inspect expression
-    if isinstance(expr, ast.ExprInspect):
-        return _check_inspect_expr(expr, expected_type, env, loop_depth)
+        # 10. Phase 5: Inspect expression
+        case ast.ExprInspect():
+            return _check_inspect_expr(expr, expected_type, env, loop_depth)
 
-    # 11. Subsumption: synthesize minimal type and check subtyping (S <= T)
-    typed = synth_expr(expr, env, loop_depth)
-    if not is_subtype(typed.type_val, expected_type, env):
-        raise TypeError(
-            f"Type mismatch: synthesized type '{typed.type_val}' is not a subtype "
-            f"of expected type '{expected_type}'",
-            offset=expr.offset,
-        )
-    return typed
+        # 11. Subsumption: synthesize minimal type and check subtyping (S <= T)
+        case _:
+            typed = synth_expr(expr, env, loop_depth)
+            if not is_subtype(typed.type_val, expected_type, env):
+                raise TypeError(
+                    f"Type mismatch: synthesized type '{typed.type_val}' is not a subtype "
+                    f"of expected type '{expected_type}'",
+                    offset=expr.offset,
+                )
+            return typed
 
 
 def synth_expr(
@@ -192,167 +194,170 @@ def synth_expr(
     if env is None:
         env = Environment()
 
-    # --- Literals ---
-    if isinstance(expr, ast.ExprInt):
-        return TypedInt(value=expr.value, offset=expr.offset)
+    match expr:
+        # --- Literals ---
+        case ast.ExprInt(value=val, offset=off):
+            return TypedInt(value=val, offset=off)
 
-    if isinstance(expr, ast.ExprReal):
-        return TypedReal(value=expr.value, offset=expr.offset)
+        case ast.ExprReal(value=val, offset=off):
+            return TypedReal(value=val, offset=off)
 
-    if isinstance(expr, ast.ExprBool):
-        return TypedBool(value=expr.value, offset=expr.offset)
+        case ast.ExprBool(value=val, offset=off):
+            return TypedBool(value=val, offset=off)
 
-    if isinstance(expr, ast.ExprChar):
-        return TypedChar(value=expr.value, offset=expr.offset)
+        case ast.ExprChar(value=val, offset=off):
+            return TypedChar(value=val, offset=off)
 
-    if isinstance(expr, ast.ExprString):
-        return TypedString(value=expr.value, offset=expr.offset)
+        case ast.ExprString(value=val, offset=off):
+            return TypedString(value=val, offset=off)
 
-    if isinstance(expr, ast.ExprOk):
-        return TypedOk(offset=expr.offset)
+        case ast.ExprOk(offset=off):
+            return TypedOk(offset=off)
 
-    if isinstance(expr, ast.ExprExit):
-        if loop_depth <= 0:
-            raise TypeError("Exit statement outside of any loop", offset=expr.offset)
-        return TypedExit(offset=expr.offset)
+        case ast.ExprExit(offset=off):
+            if loop_depth <= 0:
+                raise TypeError("Exit statement outside of any loop", offset=off)
+            return TypedExit(offset=off)
 
-    # --- Variables & Identifiers ---
-    if isinstance(expr, ast.ExprId):
-        sym = env.lookup_value(expr.name)
-        if sym is None:
-            raise TypeError(f"Undefined variable '{expr.name}'", offset=expr.offset)
-
-        # Implicit dereferencing: mutable variables in value positions yield element type
-        if sym.is_var:
-            var_node = TypedVar(
-                name=sym.name,
-                symbol=sym,
-                type_val=QVarType(sym.type_val),
-                offset=expr.offset,
-            )
-            return TypedDerefCell(target=var_node, type_val=sym.type_val, offset=expr.offset)
-
-        return TypedVar(name=sym.name, symbol=sym, type_val=sym.type_val, offset=expr.offset)
-
-    # --- Explicit Dereference (@e or !e) ---
-    if isinstance(expr, ast.ExprDerefCell):
-        if isinstance(expr.target, ast.ExprId):
-            sym = env.lookup_value(expr.target.name)
+        # --- Variables & Identifiers ---
+        case ast.ExprId(name=name, offset=off):
+            sym = env.lookup_value(name)
             if sym is None:
-                raise TypeError(f"Undefined variable '{expr.target.name}'", offset=expr.target.offset)
-            if not sym.is_var and not isinstance(sym.type_val, QVarType):
-                raise TypeError(
-                    f"Cannot dereference non-variable symbol '{expr.target.name}'",
-                    offset=expr.target.offset,
+                raise TypeError(f"Undefined variable '{name}'", offset=off)
+
+            # Implicit dereferencing: mutable variables in value positions yield element type
+            if sym.is_var:
+                var_node = TypedVar(
+                    name=sym.name,
+                    symbol=sym,
+                    type_val=QVarType(sym.type_val),
+                    offset=off,
                 )
-            var_type = QVarType(sym.type_val) if sym.is_var else sym.type_val
-            elem_type = sym.type_val if sym.is_var else sym.type_val.element_type
-            var_node = TypedVar(
-                name=sym.name,
-                symbol=sym,
-                type_val=var_type,
-                offset=expr.target.offset,
+                return TypedDerefCell(target=var_node, type_val=sym.type_val, offset=off)
+
+            return TypedVar(name=sym.name, symbol=sym, type_val=sym.type_val, offset=off)
+
+        # --- Explicit Dereference (@e or !e) ---
+        case ast.ExprDerefCell(target=target, offset=off):
+            if isinstance(target, ast.ExprId):
+                sym = env.lookup_value(target.name)
+                if sym is None:
+                    raise TypeError(f"Undefined variable '{target.name}'", offset=target.offset)
+                if not sym.is_var and not isinstance(sym.type_val, QVarType):
+                    raise TypeError(
+                        f"Cannot dereference non-variable symbol '{target.name}'",
+                        offset=target.offset,
+                    )
+                var_type = QVarType(sym.type_val) if sym.is_var else sym.type_val
+                elem_type = sym.type_val if sym.is_var else sym.type_val.element_type
+                var_node = TypedVar(
+                    name=sym.name,
+                    symbol=sym,
+                    type_val=var_type,
+                    offset=target.offset,
+                )
+                return TypedDerefCell(target=var_node, type_val=elem_type, offset=off)
+
+            target_typed = synth_expr(target, env, loop_depth)
+            if not isinstance(target_typed.type_val, QVarType):
+                raise TypeError(
+                    f"Cannot dereference non-variable type '{target_typed.type_val}'",
+                    offset=off,
+                )
+            return TypedDerefCell(
+                target=target_typed,
+                type_val=target_typed.type_val.element_type,
+                offset=off,
             )
-            return TypedDerefCell(target=var_node, type_val=elem_type, offset=expr.offset)
 
-        target_typed = synth_expr(expr.target, env, loop_depth)
-        if not isinstance(target_typed.type_val, QVarType):
-            raise TypeError(
-                f"Cannot dereference non-variable type '{target_typed.type_val}'",
-                offset=expr.offset,
+        # --- Reference Cell Allocation (var e) ---
+        case ast.ExprVarCell(value=val, offset=off):
+            val_typed = synth_expr(val, env, loop_depth)
+            return TypedVarCell(
+                value=val_typed,
+                type_val=QVarType(val_typed.type_val),
+                offset=off,
             )
-        return TypedDerefCell(
-            target=target_typed,
-            type_val=target_typed.type_val.element_type,
-            offset=expr.offset,
-        )
 
-    # --- Reference Cell Allocation (var e) ---
-    if isinstance(expr, ast.ExprVarCell):
-        val_typed = synth_expr(expr.value, env, loop_depth)
-        return TypedVarCell(
-            value=val_typed,
-            type_val=QVarType(val_typed.type_val),
-            offset=expr.offset,
-        )
+        # --- Infix Operators ---
+        case ast.ExprInfix():
+            return _synth_infix_expr(expr, env, loop_depth)
 
-    # --- Infix Operators ---
-    if isinstance(expr, ast.ExprInfix):
-        return _synth_infix_expr(expr, env, loop_depth)
+        # --- Conditionals ---
+        case ast.ExprIf():
+            return _synth_if_expr(expr, env, loop_depth)
 
-    # --- Conditionals (if cond then e1 [elsif ...] [else e2] end) ---
-    if isinstance(expr, ast.ExprIf):
-        return _synth_if_expr(expr, env, loop_depth)
+        # --- Loops & Control Flow ---
+        case ast.ExprWhile(cond=cond, body=body, offset=off):
+            cond_typed = check_expr(cond, BOOL_TYPE, env, loop_depth)
+            body_typed = synth_expr(body, env, loop_depth + 1)
+            return TypedWhile(cond=cond_typed, body=body_typed, offset=off)
 
-    # --- Loops & Control Flow ---
-    if isinstance(expr, ast.ExprWhile):
-        cond_typed = check_expr(expr.cond, BOOL_TYPE, env, loop_depth)
-        body_typed = synth_expr(expr.body, env, loop_depth + 1)
-        return TypedWhile(cond=cond_typed, body=body_typed, offset=expr.offset)
+        case ast.ExprLoop(body=body, offset=off):
+            body_typed = synth_expr(body, env, loop_depth + 1)
+            return TypedLoop(body=body_typed, offset=off)
 
-    if isinstance(expr, ast.ExprLoop):
-        body_typed = synth_expr(expr.body, env, loop_depth + 1)
-        return TypedLoop(body=body_typed, offset=expr.offset)
+        case ast.ExprFor():
+            return _synth_for_expr(expr, env, loop_depth)
 
-    if isinstance(expr, ast.ExprFor):
-        return _synth_for_expr(expr, env, loop_depth)
+        # --- Block Expressions ---
+        case ast.ExprBlock():
+            return _synth_block_expr(expr, env, loop_depth)
 
-    # --- Block Expressions ---
-    if isinstance(expr, ast.ExprBlock):
-        return _synth_block_expr(expr, env, loop_depth)
+        # --- Functions and Applications ---
+        case ast.ExprFun():
+            return _synth_fun_expr(expr, env, loop_depth)
 
-    # --- Functions and Applications ---
-    if isinstance(expr, ast.ExprFun):
-        return _synth_fun_expr(expr, env, loop_depth)
+        case ast.ExprApp():
+            return _synth_app_expr(expr, env, loop_depth)
 
-    if isinstance(expr, ast.ExprApp):
-        return _synth_app_expr(expr, env, loop_depth)
+        # --- Aggregates (Records, Tuples, Options, Variants, Arrays) ---
+        case ast.ExprRecord():
+            return _synth_record_expr(expr, env, loop_depth)
 
-    # --- Aggregates (Records, Tuples, Options, Variants, Arrays) ---
-    if isinstance(expr, ast.ExprRecord):
-        return _synth_record_expr(expr, env, loop_depth)
+        case ast.ExprTuple():
+            return _synth_tuple_expr(expr, env, loop_depth)
 
-    if isinstance(expr, ast.ExprTuple):
-        return _synth_tuple_expr(expr, env, loop_depth)
+        case ast.ExprSelect():
+            return _synth_select_expr(expr, env, loop_depth)
 
-    if isinstance(expr, ast.ExprSelect):
-        return _synth_select_expr(expr, env, loop_depth)
+        case ast.ExprOption():
+            return _synth_option_expr(expr, env, loop_depth)
 
-    if isinstance(expr, ast.ExprOption):
-        return _synth_option_expr(expr, env, loop_depth)
+        case ast.ExprVariant():
+            return _synth_variant_expr(expr, env, loop_depth)
 
-    if isinstance(expr, ast.ExprVariant):
-        return _synth_variant_expr(expr, env, loop_depth)
+        case ast.ExprCase():
+            return _synth_case_expr(expr, env, loop_depth)
 
-    if isinstance(expr, ast.ExprCase):
-        return _synth_case_expr(expr, env, loop_depth)
+        case ast.ExprArray():
+            return _synth_array_expr(expr, env, loop_depth)
 
-    if isinstance(expr, ast.ExprArray):
-        return _synth_array_expr(expr, env, loop_depth)
+        case ast.ExprArrayRep():
+            return _synth_array_rep_expr(expr, env, loop_depth)
 
-    if isinstance(expr, ast.ExprArrayRep):
-        return _synth_array_rep_expr(expr, env, loop_depth)
+        case ast.ExprIndex():
+            return _synth_index_expr(expr, env, loop_depth)
 
-    if isinstance(expr, ast.ExprIndex):
-        return _synth_index_expr(expr, env, loop_depth)
+        case ast.ExprIndexAssign():
+            return _synth_index_assign_expr(expr, env, loop_depth)
 
-    if isinstance(expr, ast.ExprIndexAssign):
-        return _synth_index_assign_expr(expr, env, loop_depth)
+        # --- Exceptions & Dynamic (Phase 5) ---
+        case ast.ExprException():
+            return _synth_exception_expr(expr, env, loop_depth)
 
-    # --- Exceptions & Dynamic (Phase 5) ---
-    if isinstance(expr, ast.ExprException):
-        return _synth_exception_expr(expr, env, loop_depth)
+        case ast.ExprRaise():
+            return _synth_raise_expr(expr, env, loop_depth)
 
-    if isinstance(expr, ast.ExprRaise):
-        return _synth_raise_expr(expr, env, loop_depth)
+        case ast.ExprTry():
+            return _synth_try_expr(expr, env, loop_depth)
 
-    if isinstance(expr, ast.ExprTry):
-        return _synth_try_expr(expr, env, loop_depth)
+        case ast.ExprInspect():
+            return _synth_inspect_expr(expr, env, loop_depth)
 
-    if isinstance(expr, ast.ExprInspect):
-        return _synth_inspect_expr(expr, env, loop_depth)
+        case _:
+            raise TypeError(f"Unsupported AST expression '{expr}'", offset=getattr(expr, "offset", 0))
 
-    raise TypeError(f"Unsupported AST expression '{expr}'", offset=getattr(expr, "offset", 0))
 
 
 # ============================================================================
@@ -2107,35 +2112,36 @@ def _check_block_expr(
 
 def _elaborate_binding(binding: ast.BindingNode, env: Environment, loop_depth: int) -> TypedBinding:
     """Elaborates a single binding or statement inside a block or module."""
-    if isinstance(binding, ast.InterfaceDecl):
-        return elaborate_interface(binding, env)
+    match binding:
+        case ast.InterfaceDecl():
+            return elaborate_interface(binding, env)
 
-    if isinstance(binding, ast.ModuleDecl):
-        return elaborate_module(binding, env)
+        case ast.ModuleDecl():
+            return elaborate_module(binding, env)
 
-    if isinstance(binding, ast.ExprException):
-        typed_exc = _synth_exception_expr(binding, env, loop_depth)
-        return TypedExprStmt(expr=typed_exc, offset=binding.offset)
-
-    if isinstance(binding, ast.ExprStmt):
-        if isinstance(binding.expr, ast.ExprException):
-            typed_exc = _synth_exception_expr(binding.expr, env, loop_depth)
+        case ast.ExprException():
+            typed_exc = _synth_exception_expr(binding, env, loop_depth)
             return TypedExprStmt(expr=typed_exc, offset=binding.offset)
-        typed_e = synth_expr(binding.expr, env, loop_depth)
-        return TypedExprStmt(expr=typed_e, offset=binding.offset)
 
-    if isinstance(binding, ast.LetValueBinding):
-        if binding.params:
+        case ast.ExprStmt(expr=ast.ExprException() as exc):
+            typed_exc = _synth_exception_expr(exc, env, loop_depth)
+            return TypedExprStmt(expr=typed_exc, offset=binding.offset)
+
+        case ast.ExprStmt(expr=expr):
+            typed_e = synth_expr(expr, env, loop_depth)
+            return TypedExprStmt(expr=typed_e, offset=binding.offset)
+
+        case ast.LetValueBinding(params=params, is_rec=is_rec) if params:
             fn_expr = ast.ExprFun(
-                params=binding.params,
+                params=params,
                 return_type=binding.type_annot,
                 body=binding.value,
                 offset=binding.offset,
             )
-            if binding.is_rec:
+            if is_rec:
                 param_types = tuple(
                     elaborate_type(p.type_annot, env) if p.type_annot else DYNAMIC_TYPE
-                    for p in binding.params
+                    for p in params
                 )
                 ret_type = elaborate_type(binding.type_annot, env) if binding.type_annot else DYNAMIC_TYPE
                 q_params = tuple(
@@ -2145,7 +2151,7 @@ def _elaborate_binding(binding: ast.BindingNode, env: Environment, loop_depth: i
                         is_var=(p.mode == ast.ParamMode.VAR),
                         is_out=(p.mode == ast.ParamMode.OUT),
                     )
-                    for i, p in enumerate(binding.params)
+                    for i, p in enumerate(params)
                 )
                 rec_fn_type = QFunType(params=q_params, result_type=ret_type)
                 rec_sym = ValueSymbol(name=binding.name, type_val=rec_fn_type)
@@ -2173,30 +2179,32 @@ def _elaborate_binding(binding: ast.BindingNode, env: Environment, loop_depth: i
                     offset=binding.offset,
                 )
 
-        if binding.type_annot is not None:
-            expected = elaborate_type(binding.type_annot, env)
-            typed_val = check_expr(binding.value, expected, env, loop_depth)
-            val_type = expected
-        else:
-            typed_val = synth_expr(binding.value, env, loop_depth)
-            val_type = typed_val.type_val
+        case ast.LetValueBinding():
+            if binding.type_annot is not None:
+                expected = elaborate_type(binding.type_annot, env)
+                typed_val = check_expr(binding.value, expected, env, loop_depth)
+                val_type = expected
+            else:
+                typed_val = synth_expr(binding.value, env, loop_depth)
+                val_type = typed_val.type_val
 
-        sym = ValueSymbol(name=binding.name, type_val=val_type, is_var=binding.is_var)
-        env.current_scope.declare_value(sym)
-        return TypedLetValue(
-            name=binding.name,
-            value=typed_val,
-            symbol=sym,
-            is_rec=binding.is_rec,
-            offset=binding.offset,
-        )
+            sym = ValueSymbol(name=binding.name, type_val=val_type, is_var=binding.is_var)
+            env.current_scope.declare_value(sym)
+            return TypedLetValue(
+                name=binding.name,
+                value=typed_val,
+                symbol=sym,
+                is_rec=binding.is_rec,
+                offset=binding.offset,
+            )
 
-    if isinstance(binding, (ast.LetTypeBinding, ast.DefTypeBinding)):
-        sym = elaborate_type_binding(binding, env)
-        return TypedLetType(name=binding.name, symbol=sym, offset=binding.offset)
+        case ast.LetTypeBinding() | ast.DefTypeBinding():
+            sym = elaborate_type_binding(binding, env)
+            return TypedLetType(name=binding.name, symbol=sym, offset=binding.offset)
 
-    if isinstance(binding, ast.DefKindBinding):
-        k_sym = elaborate_kind_binding(binding, env)
-        return TypedDefKind(name=binding.name, symbol=k_sym, offset=binding.offset)
+        case ast.DefKindBinding():
+            k_sym = elaborate_kind_binding(binding, env)
+            return TypedDefKind(name=binding.name, symbol=k_sym, offset=binding.offset)
 
-    raise TypeError(f"Unsupported binding '{binding}'", offset=getattr(binding, "offset", 0))
+        case _:
+            raise TypeError(f"Unsupported binding '{binding}'", offset=getattr(binding, "offset", 0))

@@ -600,13 +600,15 @@ class Program(ASTNode):
 
 def _is_simple_leaf(value: Any) -> bool:
     """Checks if an AST value is a simple leaf that can be printed inline."""
-    if value is None or isinstance(value, (int, float, bool, str, Enum)):
-        return True
-    if isinstance(value, tuple) and all(isinstance(item, str) for item in value):
-        return True
-    if isinstance(value, ASTNode) and len(fields(value)) == 0:
-        return True
-    return False
+    match value:
+        case None | int() | float() | bool() | str() | Enum():
+            return True
+        case tuple() if all(isinstance(item, str) for item in value):
+            return True
+        case ASTNode() if len(fields(value)) == 0:
+            return True
+        case _:
+            return False
 
 
 def ast_dump(node: Any, indent: int = 0, show_offsets: bool = False) -> str:
@@ -615,23 +617,25 @@ def ast_dump(node: Any, indent: int = 0, show_offsets: bool = False) -> str:
     child_padding = "  " * (indent + 1)
 
     if not isinstance(node, ASTNode):
-        if isinstance(node, tuple):
-            if not node:
-                return "()"
-            if all(_is_simple_leaf(item) for item in node):
-                return "(" + " ".join(repr(item) if isinstance(item, str) else str(item) for item in node) + ")"
-            lines = ["("]
-            for element in node:
-                lines.append(f"{child_padding}{ast_dump(element, indent + 1, show_offsets)}")
-            lines.append(f"{padding})")
-            return "\n".join(lines)
-        elif isinstance(node, Enum):
-            return node.name
-        elif isinstance(node, str):
-            return repr(node)
-        elif node is None:
-            return "nil"
-        return str(node)
+        match node:
+            case tuple():
+                if not node:
+                    return "()"
+                if all(_is_simple_leaf(item) for item in node):
+                    return "(" + " ".join(repr(item) if isinstance(item, str) else str(item) for item in node) + ")"
+                lines = ["("]
+                for element in node:
+                    lines.append(f"{child_padding}{ast_dump(element, indent + 1, show_offsets)}")
+                lines.append(f"{padding})")
+                return "\n".join(lines)
+            case Enum(name=enum_name):
+                return enum_name
+            case str():
+                return repr(node)
+            case None:
+                return "nil"
+            case _:
+                return str(node)
 
     class_name = node.__class__.__name__
     node_fields = fields(node)
@@ -656,33 +660,35 @@ def ast_dump(node: Any, indent: int = 0, show_offsets: bool = False) -> str:
     if all_simple:
         parts = [class_name]
         for name, field_value in field_values:
-            if isinstance(field_value, Enum):
-                parts.append(field_value.name)
-            elif isinstance(field_value, str):
-                parts.append(repr(field_value))
-            elif isinstance(field_value, tuple):
-                parts.append("(" + " ".join(repr(item) for item in field_value) + ")")
-            elif field_value is None:
-                continue  # omit None in simple leaf inline
-            else:
-                parts.append(str(field_value))
+            match field_value:
+                case Enum(name=enum_name):
+                    parts.append(enum_name)
+                case str():
+                    parts.append(repr(field_value))
+                case tuple():
+                    parts.append("(" + " ".join(repr(item) for item in field_value) + ")")
+                case None:
+                    continue  # omit None in simple leaf inline
+                case _:
+                    parts.append(str(field_value))
         return f"({ ' '.join(parts) })"
 
     # Multi-line indented S-expression
     lines = [f"({class_name}"]
     for name, field_value in field_values:
-        if field_value is None or field_value == () or field_value == False:
+        if field_value is None or field_value == () or field_value is False:
             # Skip empty optional values to keep trees compact
             continue
         if _is_simple_leaf(field_value):
-            if isinstance(field_value, Enum):
-                lines.append(f"{child_padding}:{name} {field_value.name}")
-            elif isinstance(field_value, str):
-                lines.append(f"{child_padding}:{name} {field_value!r}")
-            elif isinstance(field_value, tuple):
-                lines.append(f"{child_padding}:{name} ({ ' '.join(repr(item) for item in field_value) })")
-            else:
-                lines.append(f"{child_padding}:{name} {field_value}")
+            match field_value:
+                case Enum(name=enum_name):
+                    lines.append(f"{child_padding}:{name} {enum_name}")
+                case str():
+                    lines.append(f"{child_padding}:{name} {field_value!r}")
+                case tuple():
+                    lines.append(f"{child_padding}:{name} ({ ' '.join(repr(item) for item in field_value) })")
+                case _:
+                    lines.append(f"{child_padding}:{name} {field_value}")
         else:
             if isinstance(field_value, tuple):
                 lines.append(f"{child_padding}:{name} (")

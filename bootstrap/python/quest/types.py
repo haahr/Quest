@@ -820,129 +820,123 @@ def is_subtype(
             if is_subtype(sub_lazy.bound.bound, sup_lazy, env, trail):
                 return True
 
-    # 7. Tuples: length match, matching field names (if specified), covariant in elements
-    if isinstance(sub_lazy, QTupleType) and isinstance(sup_lazy, QTupleType):
-        if len(sub_lazy.fields) != len(sup_lazy.fields):
-            return False
-        for s_f, t_f in zip(sub_lazy.fields, sup_lazy.fields):
-            if t_f.name is not None and s_f.name != t_f.name:
+    # 7. Pattern matching across type pairs
+    match (sub_lazy, sup_lazy):
+        # Tuples: length match, matching field names, covariant elements
+        case (QTupleType(fields=sub_fields), QTupleType(fields=sup_fields)):
+            if len(sub_fields) != len(sup_fields):
                 return False
-            if not is_subtype(s_f.type_val, t_f.type_val, env, trail):
-                return False
-        return True
+            for s_f, t_f in zip(sub_fields, sup_fields):
+                if t_f.name is not None and s_f.name != t_f.name:
+                    return False
+                if not is_subtype(s_f.type_val, t_f.type_val, env, trail):
+                    return False
+            return True
 
-    # 8. Records: width, depth, and mutable invariance
-    if isinstance(sub_lazy, QRecordType) and isinstance(sup_lazy, QRecordType):
-        for sup_field in sup_lazy.fields:
-            sub_field = sub_lazy.get_field(sup_field.name)
-            if sub_field is None:
-                return False
-            if sup_field.is_var:
-                # Mutable record fields must be invariant
-                if not sub_field.is_var:
+        # Records: width, depth, and mutable invariance
+        case (QRecordType(), QRecordType()):
+            for sup_field in sup_lazy.fields:
+                sub_field = sub_lazy.get_field(sup_field.name)
+                if sub_field is None:
                     return False
-                if not (is_subtype(sub_field.type_val, sup_field.type_val, env, trail)
-                        and is_subtype(sup_field.type_val, sub_field.type_val, env, trail)):
-                    return False
-            else:
-                # Immutable fields are covariant
-                if not is_subtype(sub_field.type_val, sup_field.type_val, env, trail):
-                    return False
-        return True
-
-    # 9. Variants: sup must contain all tags of sub (width), payload covariance
-    if isinstance(sub_lazy, QVariantType) and isinstance(sup_lazy, QVariantType):
-        for sub_var in sub_lazy.variants:
-            sup_var = sup_lazy.get_variant(sub_var.name)
-            if sup_var is None:
-                return False
-            if sub_var.type_val is not None:
-                if sup_var.type_val is None:
-                    return False
-                if sub_var.is_var or sup_var.is_var:
-                    if not (is_subtype(sub_var.type_val, sup_var.type_val, env, trail)
-                            and is_subtype(sup_var.type_val, sub_var.type_val, env, trail)):
+                if sup_field.is_var:
+                    if not sub_field.is_var:
+                        return False
+                    if not (is_subtype(sub_field.type_val, sup_field.type_val, env, trail)
+                            and is_subtype(sup_field.type_val, sub_field.type_val, env, trail)):
                         return False
                 else:
-                    if not is_subtype(sub_var.type_val, sup_var.type_val, env, trail):
+                    if not is_subtype(sub_field.type_val, sup_field.type_val, env, trail):
                         return False
-            elif sup_var.type_val is not None:
-                return False
-        return True
+            return True
 
-    # 10. Options: sup must contain all tags of sub, payload covariance
-    if isinstance(sub_lazy, QOptionType) and isinstance(sup_lazy, QOptionType):
-        for sub_opt in sub_lazy.options:
-            sup_opt = sup_lazy.get_option(sub_opt.name)
-            if sup_opt is None:
-                return False
-            if sub_opt.payload_type is not None:
-                if sup_opt.payload_type is None:
+        # Variants: width and payload covariance
+        case (QVariantType(), QVariantType()):
+            for sub_var in sub_lazy.variants:
+                sup_var = sup_lazy.get_variant(sub_var.name)
+                if sup_var is None:
                     return False
-                if not is_subtype(sub_opt.payload_type, sup_opt.payload_type, env, trail):
+                if sub_var.type_val is not None:
+                    if sup_var.type_val is None:
+                        return False
+                    if sub_var.is_var or sup_var.is_var:
+                        if not (is_subtype(sub_var.type_val, sup_var.type_val, env, trail)
+                                and is_subtype(sup_var.type_val, sub_var.type_val, env, trail)):
+                            return False
+                    else:
+                        if not is_subtype(sub_var.type_val, sup_var.type_val, env, trail):
+                            return False
+                elif sup_var.type_val is not None:
                     return False
-            elif sup_opt.payload_type is not None:
-                return False
-        return True
+            return True
 
-    # 11. Functions: contravariant params, covariant result
-    if isinstance(sub_lazy, QFunType) and isinstance(sup_lazy, QFunType):
-        if len(sub_lazy.params) != len(sup_lazy.params):
+        # Options: width and payload covariance
+        case (QOptionType(), QOptionType()):
+            for sub_opt in sub_lazy.options:
+                sup_opt = sup_lazy.get_option(sub_opt.name)
+                if sup_opt is None:
+                    return False
+                if sub_opt.payload_type is not None:
+                    if sup_opt.payload_type is None:
+                        return False
+                    if not is_subtype(sub_opt.payload_type, sup_opt.payload_type, env, trail):
+                        return False
+                elif sup_opt.payload_type is not None:
+                    return False
+            return True
+
+        # Functions: contravariant value params, invariant var params, covariant out params and result
+        case (QFunType(), QFunType()):
+            if len(sub_lazy.params) != len(sup_lazy.params):
+                return False
+            for s_param, t_param in zip(sub_lazy.params, sup_lazy.params):
+                if s_param.is_var or t_param.is_var:
+                    if s_param.is_var != t_param.is_var:
+                        return False
+                    if not (is_subtype(t_param.type_val, s_param.type_val, env, trail)
+                            and is_subtype(s_param.type_val, t_param.type_val, env, trail)):
+                        return False
+                elif s_param.is_out or t_param.is_out:
+                    if s_param.is_out != t_param.is_out:
+                        return False
+                    if not is_subtype(s_param.type_val, t_param.type_val, env, trail):
+                        return False
+                else:
+                    if not is_subtype(t_param.type_val, s_param.type_val, env, trail):
+                        return False
+            return is_subtype(sub_lazy.result_type, sup_lazy.result_type, env, trail)
+
+        # References (Var) & Arrays: invariant element type
+        case (QVarType(element_type=s_elem), QVarType(element_type=t_elem)) | \
+             (QArrayType(element_type=s_elem), QArrayType(element_type=t_elem)):
+            return (is_subtype(s_elem, t_elem, env, trail)
+                    and is_subtype(t_elem, s_elem, env, trail))
+
+        # Out parameters: contravariant
+        case (QOutType(element_type=s_elem), QOutType(element_type=t_elem)):
+            return is_subtype(t_elem, s_elem, env, trail)
+
+        # Exceptions: invariant payload type
+        case (QExceptionType(payload_type=s_pay), QExceptionType(payload_type=t_pay)):
+            return (is_subtype(s_pay, t_pay, env, trail)
+                    and is_subtype(t_pay, s_pay, env, trail))
+
+        # Universal Quantifiers (Kernel F<:): bounds match, body covariant
+        case (QAllType(), QAllType()):
+            if len(sub_lazy.quantifiers) != len(sup_lazy.quantifiers):
+                return False
+            subst = {
+                t_quant.symbol_id: QTypeVar(s_quant.name, s_quant.symbol_id, s_quant.bound)
+                for s_quant, t_quant in zip(sub_lazy.quantifiers, sup_lazy.quantifiers)
+            }
+            for s_q, t_q in zip(sub_lazy.quantifiers, sup_lazy.quantifiers):
+                t_bound_renamed = t_q.bound.substitute_types(subst)
+                if not is_kind_equal(s_q.bound, t_bound_renamed, env):
+                    return False
+            return is_subtype(sub_lazy.body, sup_lazy.body.substitute(subst), env, trail)
+
+        case _:
             return False
-            if s_param.is_var or t_param.is_var:
-                if s_param.is_var != t_param.is_var:
-                    return False
-                if not (is_subtype(t_param.type_val, s_param.type_val, env, trail)
-                        and is_subtype(s_param.type_val, t_param.type_val, env, trail)):
-                    return False
-            elif s_param.is_out or t_param.is_out:
-                if s_param.is_out != t_param.is_out:
-                    return False
-                # Covariant in output parameters: sub_param <: sup_param
-                if not is_subtype(s_param.type_val, t_param.type_val, env, trail):
-                    return False
-            else:
-                # Contravariant in value parameters: sup_param <: sub_param
-                if not is_subtype(t_param.type_val, s_param.type_val, env, trail):
-                    return False
-        # Covariant in result type
-        return is_subtype(sub_lazy.result_type, sup_lazy.result_type, env, trail)
-
-    # 12. References (Var): invariant in element type
-    if isinstance(sub_lazy, QVarType) and isinstance(sup_lazy, QVarType):
-        return (is_subtype(sub_lazy.element_type, sup_lazy.element_type, env, trail)
-                and is_subtype(sup_lazy.element_type, sub_lazy.element_type, env, trail))
-
-    # 13. Arrays: invariant in element type
-    if isinstance(sub_lazy, QArrayType) and isinstance(sup_lazy, QArrayType):
-        return (is_subtype(sub_lazy.element_type, sup_lazy.element_type, env, trail)
-                and is_subtype(sup_lazy.element_type, sub_lazy.element_type, env, trail))
-
-    # 14. Out parameters: contravariant
-    if isinstance(sub_lazy, QOutType) and isinstance(sup_lazy, QOutType):
-        return is_subtype(sup_lazy.element_type, sub_lazy.element_type, env, trail)
-
-    # 15. Exceptions: equivalent payload types
-    if isinstance(sub_lazy, QExceptionType) and isinstance(sup_lazy, QExceptionType):
-        return (is_subtype(sub_lazy.payload_type, sup_lazy.payload_type, env, trail)
-                and is_subtype(sup_lazy.payload_type, sub_lazy.payload_type, env, trail))
-
-    # 16. Universal Quantifiers (Kernel F<:): bounds must match, body covariant
-    if isinstance(sub_lazy, QAllType) and isinstance(sup_lazy, QAllType):
-        if len(sub_lazy.quantifiers) != len(sup_lazy.quantifiers):
-            return False
-        # Rename sup quantifiers to match sub quantifiers
-        subst = {
-            t_quant.symbol_id: QTypeVar(s_quant.name, s_quant.symbol_id, s_quant.bound)
-            for s_quant, t_quant in zip(sub_lazy.quantifiers, sup_lazy.quantifiers)
-        }
-        for s_q, t_q in zip(sub_lazy.quantifiers, sup_lazy.quantifiers):
-            t_bound_renamed = t_q.bound.substitute_types(subst)
-            if not is_kind_equal(s_q.bound, t_bound_renamed, env):
-                return False
-        return is_subtype(sub_lazy.body, sup_lazy.body.substitute(subst), env, trail)
-
-    return False
 
 
 def is_kind_equal(k1: QKind, k2: QKind, env: Optional[Any] = None) -> bool:
@@ -959,31 +953,30 @@ def is_subkind(sub: QKind, sup: QKind, env: Optional[Any] = None) -> bool:
     if sub_lazy == sup_lazy:
         return True
 
-    # 2. Power Kind to TYPE: POWER(T) <= TYPE (for any proper type T)
-    if isinstance(sup_lazy, QTypeKind):
-        if isinstance(sub_lazy, QPowerKind):
+    # 2. Binary pattern matching
+    match (sub_lazy, sup_lazy):
+        # Power Kind to TYPE: POWER(T) <= TYPE
+        case (QPowerKind(), QTypeKind()):
             return True
 
-    # 3. Power to Power: POWER(S) <= POWER(T) iff S <: T
-    if isinstance(sub_lazy, QPowerKind) and isinstance(sup_lazy, QPowerKind):
-        return is_subtype(sub_lazy.bound, sup_lazy.bound, env)
+        # Power to Power: POWER(S) <= POWER(T) iff S <: T
+        case (QPowerKind(bound=s_bound), QPowerKind(bound=t_bound)):
+            return is_subtype(s_bound, t_bound, env)
 
-    # 4. Higher-Order Operator Kinds (Full Subkinding on Kinds):
-    # ALL(X :: K1) K2 <= ALL(Y :: K1') K2' iff K1' <= K1 and K2 <= K2'[Y -> X]
-    if isinstance(sub_lazy, QAllKind) and isinstance(sup_lazy, QAllKind):
-        # Contravariant in parameter kind
-        if not is_subkind(sup_lazy.param_kind, sub_lazy.param_kind, env):
+        # Higher-Order Operator Kinds (Full Subkinding on Kinds):
+        # ALL(X :: K1) K2 <= ALL(Y :: K1') K2' iff K1' <= K1 and K2 <= K2'[Y -> X]
+        case (QAllKind(), QAllKind()):
+            if not is_subkind(sup_lazy.param_kind, sub_lazy.param_kind, env):
+                return False
+            renamed_sup_res = sup_lazy.result_kind.substitute_types({
+                sup_lazy.param_id: QTypeVar(sub_lazy.param_name, sup_lazy.param_id)
+            }).substitute_kinds({
+                sup_lazy.param_id: QKindVar(sub_lazy.param_name, sub_lazy.param_id)
+            })
+            return is_subkind(sub_lazy.result_kind, renamed_sup_res, env)
+
+        case _:
             return False
-        # Rename Y to X in sup_lazy.result_kind
-        renamed_sup_res = sup_lazy.result_kind.substitute_types({
-            sup_lazy.param_id: QTypeVar(sub_lazy.param_name, sub_lazy.param_id)
-        }).substitute_kinds({
-            sup_lazy.param_id: QKindVar(sub_lazy.param_name, sub_lazy.param_id)
-        })
-        # Covariant in result kind
-        return is_subkind(sub_lazy.result_kind, renamed_sup_res, env)
-
-    return False
 
 
 # ============================================================================
@@ -1048,201 +1041,178 @@ def check_kind(type_val: QType, expected_kind: QKind, env: Optional[Any] = None)
 
 def synth_kind(type_val: QType, env: Optional[Any] = None) -> QKind:
     """Synthesizes the most specific minimal kind K for type_val in the given environment."""
-    # 1. Primitives
-    if isinstance(type_val, (QIntType, QRealType, QBoolType, QCharType, QStringType,
-                             QOkType, QDynamicType, QExceptionType)):
-        return TYPE_KIND
+    match type_val:
+        case (QIntType() | QRealType() | QBoolType() | QCharType() | QStringType()
+              | QOkType() | QDynamicType() | QExceptionType()):
+            return TYPE_KIND
 
-    # 2. Tuples
-    if isinstance(type_val, QTupleType):
-        for elem in type_val.elements:
-            check_kind(elem, TYPE_KIND, env)
-        return TYPE_KIND
+        case QTupleType(elements=elems):
+            for elem in elems:
+                check_kind(elem, TYPE_KIND, env)
+            return TYPE_KIND
 
-    # 3. Records
-    if isinstance(type_val, QRecordType):
-        for f in type_val.fields:
-            check_kind(f.type_val, TYPE_KIND, env)
-        return TYPE_KIND
-
-    # 4. Variants
-    if isinstance(type_val, QVariantType):
-        for v in type_val.variants:
-            if v.type_val is not None:
-                check_kind(v.type_val, TYPE_KIND, env)
-        return TYPE_KIND
-
-    # 5. Options
-    if isinstance(type_val, QOptionType):
-        for opt in type_val.options:
-            if opt.payload_type is not None:
-                check_kind(opt.payload_type, TYPE_KIND, env)
-        return TYPE_KIND
-
-    # 6. Functions
-    if isinstance(type_val, QFunType):
-        for param in type_val.params:
-            check_kind(param.type_val, TYPE_KIND, env)
-        check_kind(type_val.result_type, TYPE_KIND, env)
-        return TYPE_KIND
-
-    # 7. References, Arrays, Out
-    if isinstance(type_val, (QVarType, QArrayType, QOutType)):
-        check_kind(type_val.element_type, TYPE_KIND, env)
-        return TYPE_KIND
-
-    # 8. Type Variables
-    if isinstance(type_val, QTypeVar):
-        if type_val.bound is not None:
-            return type_val.bound
-        if env is not None and hasattr(env, "lookup_type_by_id"):
-            sym = env.lookup_type_by_id(type_val.symbol_id)
-            if sym is None:
-                sym = env.lookup_type(type_val.name)
-            if sym is not None:
-                return sym.kind
-        raise KindError(f"Unbound type variable '{type_val.name}' (#{type_val.symbol_id})")
-
-    # 9. Abstract Types
-    if isinstance(type_val, QAbstractType):
-        check_kind_well_formed(type_val.bound, env)
-        return type_val.bound
-
-    # 10. Metavariables
-    if isinstance(type_val, QTypeMeta):
-        pruned = type_val.prune()
-        if pruned is not type_val:
-            return synth_kind(pruned, env)
-        return type_val.bound
-
-    # 11. Polymorphic Types (All)
-    if isinstance(type_val, QAllType):
-        if env is not None and hasattr(env, "push_scope"):
-            from quest.env import TypeSymbol
-            env.push_scope("all_type")
-            try:
-                for q in type_val.quantifiers:
-                    check_kind_well_formed(q.bound, env)
-                    env.current_scope.declare_type(
-                        TypeSymbol(name=q.name, symbol_id=q.symbol_id, kind=q.bound)
-                    )
-                check_kind(type_val.body, TYPE_KIND, env)
-            finally:
-                env.pop_scope()
-        else:
-            for q in type_val.quantifiers:
-                check_kind_well_formed(q.bound, env)
-            check_kind(type_val.body, TYPE_KIND, env)
-        return TYPE_KIND
-
-    # 12. Automorphic / Existential Types (Auto)
-    if isinstance(type_val, QAutoType):
-        if env is not None and hasattr(env, "push_scope"):
-            from quest.env import TypeSymbol
-            env.push_scope("auto_type")
-            try:
-                check_kind_well_formed(type_val.kind_bound, env)
-                env.current_scope.declare_type(
-                    TypeSymbol(
-                        name=type_val.type_param,
-                        symbol_id=type_val.symbol_id,
-                        kind=type_val.kind_bound,
-                    )
-                )
-                for f in type_val.signature:
-                    check_kind(f.type_val, TYPE_KIND, env)
-            finally:
-                env.pop_scope()
-        else:
-            check_kind_well_formed(type_val.kind_bound, env)
-            for f in type_val.signature:
+        case QRecordType(fields=fields):
+            for f in fields:
                 check_kind(f.type_val, TYPE_KIND, env)
-        return TYPE_KIND
+            return TYPE_KIND
 
-    # 13. Recursive Types (Rec) - non-unfolding
-    if isinstance(type_val, QRecType):
-        check_kind_well_formed(type_val.bound, env)
-        if env is not None and hasattr(env, "push_scope"):
-            from quest.env import TypeSymbol
-            env.push_scope(f"rec_{type_val.var_name}")
-            try:
-                env.current_scope.declare_type(
-                    TypeSymbol(
-                        name=type_val.var_name,
-                        symbol_id=type_val.symbol_id,
-                        kind=type_val.bound,
-                    )
-                )
-                check_kind(type_val.body, type_val.bound, env)
-            finally:
-                env.pop_scope()
-        else:
-            check_kind(type_val.body, type_val.bound, env)
-        return type_val.bound
+        case QVariantType(variants=variants):
+            for v in variants:
+                if v.type_val is not None:
+                    check_kind(v.type_val, TYPE_KIND, env)
+            return TYPE_KIND
 
-    # 14. Mutually Recursive Type Groups (QRecGroupType)
-    if isinstance(type_val, QRecGroupType):
-        if env is not None and hasattr(env, "push_scope"):
-            from quest.env import TypeSymbol
-            env.push_scope("rec_group")
-            try:
-                for b_name, b_id, b_kind, _ in type_val.bindings:
-                    check_kind_well_formed(b_kind, env)
+        case QOptionType(options=options):
+            for opt in options:
+                if opt.payload_type is not None:
+                    check_kind(opt.payload_type, TYPE_KIND, env)
+            return TYPE_KIND
+
+        case QFunType(params=params, result_type=res_type):
+            for param in params:
+                check_kind(param.type_val, TYPE_KIND, env)
+            check_kind(res_type, TYPE_KIND, env)
+            return TYPE_KIND
+
+        case QVarType(element_type=elem) | QArrayType(element_type=elem) | QOutType(element_type=elem):
+            check_kind(elem, TYPE_KIND, env)
+            return TYPE_KIND
+
+        case QTypeVar(name=name, symbol_id=sym_id, bound=bound):
+            if bound is not None:
+                return bound
+            if env is not None and hasattr(env, "lookup_type_by_id"):
+                sym = env.lookup_type_by_id(sym_id)
+                if sym is None:
+                    sym = env.lookup_type(name)
+                if sym is not None:
+                    return sym.kind
+            raise KindError(f"Unbound type variable '{name}' (#{sym_id})")
+
+        case QAbstractType(bound=bound):
+            check_kind_well_formed(bound, env)
+            return bound
+
+        case QTypeMeta():
+            pruned = type_val.prune()
+            if pruned is not type_val:
+                return synth_kind(pruned, env)
+            return type_val.bound
+
+        case QAllType(quantifiers=quants, body=body):
+            if env is not None and hasattr(env, "push_scope"):
+                from quest.env import TypeSymbol
+                env.push_scope("all_type")
+                try:
+                    for q in quants:
+                        check_kind_well_formed(q.bound, env)
+                        env.current_scope.declare_type(
+                            TypeSymbol(name=q.name, symbol_id=q.symbol_id, kind=q.bound)
+                        )
+                    check_kind(body, TYPE_KIND, env)
+                finally:
+                    env.pop_scope()
+            else:
+                for q in quants:
+                    check_kind_well_formed(q.bound, env)
+                check_kind(body, TYPE_KIND, env)
+            return TYPE_KIND
+
+        case QAutoType(type_param=param_name, symbol_id=sym_id, kind_bound=kbound, signature=sig):
+            if env is not None and hasattr(env, "push_scope"):
+                from quest.env import TypeSymbol
+                env.push_scope("auto_type")
+                try:
+                    check_kind_well_formed(kbound, env)
                     env.current_scope.declare_type(
-                        TypeSymbol(name=b_name, symbol_id=b_id, kind=b_kind)
+                        TypeSymbol(name=param_name, symbol_id=sym_id, kind=kbound)
                     )
-                for _, _, b_kind, b_body in type_val.bindings:
-                    check_kind(b_body, b_kind, env)
-            finally:
-                env.pop_scope()
-        return type_val.bindings[type_val.active_index][2]
+                    for f in sig:
+                        check_kind(f.type_val, TYPE_KIND, env)
+                finally:
+                    env.pop_scope()
+            else:
+                check_kind_well_formed(kbound, env)
+                for f in sig:
+                    check_kind(f.type_val, TYPE_KIND, env)
+            return TYPE_KIND
 
-    # 15. Type Operators (TypeFun)
-    if isinstance(type_val, QTypeFun):
-        if env is not None and hasattr(env, "push_scope"):
-            from quest.env import TypeSymbol
-            env.push_scope("type_fun")
-            try:
-                for formal in type_val.params:
+        case QRecType(var_name=vname, symbol_id=sym_id, bound=bound, body=body):
+            check_kind_well_formed(bound, env)
+            if env is not None and hasattr(env, "push_scope"):
+                from quest.env import TypeSymbol
+                env.push_scope(f"rec_{vname}")
+                try:
+                    env.current_scope.declare_type(
+                        TypeSymbol(name=vname, symbol_id=sym_id, kind=bound)
+                    )
+                    check_kind(body, bound, env)
+                finally:
+                    env.pop_scope()
+            else:
+                check_kind(body, bound, env)
+            return bound
+
+        case QRecGroupType(bindings=bindings, active_index=idx):
+            if env is not None and hasattr(env, "push_scope"):
+                from quest.env import TypeSymbol
+                env.push_scope("rec_group")
+                try:
+                    for b_name, b_id, b_kind, _ in bindings:
+                        check_kind_well_formed(b_kind, env)
+                        env.current_scope.declare_type(
+                            TypeSymbol(name=b_name, symbol_id=b_id, kind=b_kind)
+                        )
+                    for _, _, b_kind, b_body in bindings:
+                        check_kind(b_body, b_kind, env)
+                finally:
+                    env.pop_scope()
+            return bindings[idx][2]
+
+        case QTypeFun(params=formals, body=body):
+            if env is not None and hasattr(env, "push_scope"):
+                from quest.env import TypeSymbol
+                env.push_scope("type_fun")
+                try:
+                    for formal in formals:
+                        check_kind_well_formed(formal.bound, env)
+                        env.current_scope.declare_type(
+                            TypeSymbol(name=formal.name, symbol_id=formal.symbol_id, kind=formal.bound)
+                        )
+                    body_kind = synth_kind(body, env)
+                finally:
+                    env.pop_scope()
+            else:
+                for formal in formals:
                     check_kind_well_formed(formal.bound, env)
-                    env.current_scope.declare_type(
-                        TypeSymbol(name=formal.name, symbol_id=formal.symbol_id, kind=formal.bound)
-                    )
-                body_kind = synth_kind(type_val.body, env)
-            finally:
-                env.pop_scope()
-        else:
-            for formal in type_val.params:
-                check_kind_well_formed(formal.bound, env)
-            body_kind = synth_kind(type_val.body, env)
+                body_kind = synth_kind(body, env)
 
-        result_kind = body_kind
-        for formal in reversed(type_val.params):
-            result_kind = QAllKind(
-                param_name=formal.name,
-                param_id=formal.symbol_id,
-                param_kind=formal.bound,
-                result_kind=result_kind,
-            )
-        return result_kind
-
-    # 16. Type Application (TypeApp)
-    if isinstance(type_val, QTypeApp):
-        ctor_kind = synth_kind(type_val.constructor, env).evaluate_lazily(env)
-        for arg in type_val.arguments:
-            if not isinstance(ctor_kind, QAllKind):
-                raise KindError(
-                    f"Type application error: constructor '{type_val.constructor}' "
-                    f"has non-operator kind '{ctor_kind}'"
+            result_kind = body_kind
+            for formal in reversed(formals):
+                result_kind = QAllKind(
+                    param_name=formal.name,
+                    param_id=formal.symbol_id,
+                    param_kind=formal.bound,
+                    result_kind=result_kind,
                 )
-            check_kind(arg, ctor_kind.param_kind, env)
-            # Substitute argument into remaining kind telescope
-            ctor_kind = ctor_kind.result_kind.substitute_types({
-                ctor_kind.param_id: arg
-            }).evaluate_lazily(env)
-        return ctor_kind
+            return result_kind
 
-    raise KindError(f"Cannot synthesize kind for unknown type node '{type_val}'")
+        case QTypeApp(constructor=ctor, arguments=args):
+            ctor_kind = synth_kind(ctor, env).evaluate_lazily(env)
+            for arg in args:
+                if not isinstance(ctor_kind, QAllKind):
+                    raise KindError(
+                        f"Type application error: constructor '{ctor}' "
+                        f"has non-operator kind '{ctor_kind}'"
+                    )
+                check_kind(arg, ctor_kind.param_kind, env)
+                ctor_kind = ctor_kind.result_kind.substitute_types({
+                    ctor_kind.param_id: arg
+                }).evaluate_lazily(env)
+            return ctor_kind
+
+        case _:
+            raise KindError(f"Cannot synthesize kind for unknown type node '{type_val}'")
 
 
 # ============================================================================
@@ -1252,108 +1222,111 @@ def synth_kind(type_val: QType, env: Optional[Any] = None) -> QKind:
 def qtype_dump(item: Union[QType, QKind], indent: int = 0) -> str:
     """Formats a QType or QKind into a canonical 2-space indented S-expression string."""
     pad = "  " * indent
-    if isinstance(item, (QIntType, QRealType, QBoolType, QCharType, QStringType,
-                         QOkType, QDynamicType, QExceptionType, QTypeKind)):
-        return f"({item.__class__.__name__})"
+    match item:
+        case (QIntType() | QRealType() | QBoolType() | QCharType() | QStringType()
+              | QOkType() | QDynamicType() | QExceptionType() | QTypeKind()):
+            return f"({item.__class__.__name__})"
 
-    if isinstance(item, QPowerKind):
-        return f"({item.__class__.__name__}\n{pad}  :bound {qtype_dump(item.bound, indent + 1)})"
+        case QPowerKind(bound=bound):
+            return f"({item.__class__.__name__}\n{pad}  :bound {qtype_dump(bound, indent + 1)})"
 
-    if isinstance(item, QAllKind):
-        return (
-            f"({item.__class__.__name__}\n"
-            f"{pad}  :param '{item.param_name}'\n"
-            f"{pad}  :param_kind {qtype_dump(item.param_kind, indent + 1)}\n"
-            f"{pad}  :result_kind {qtype_dump(item.result_kind, indent + 1)})"
-        )
+        case QAllKind(param_name=pname, param_kind=pkind, result_kind=rkind):
+            return (
+                f"({item.__class__.__name__}\n"
+                f"{pad}  :param '{pname}'\n"
+                f"{pad}  :param_kind {qtype_dump(pkind, indent + 1)}\n"
+                f"{pad}  :result_kind {qtype_dump(rkind, indent + 1)})"
+            )
 
-    if isinstance(item, (QTypeVar, QAbstractType, QKindVar)):
-        return f"({item.__class__.__name__} '{item.name}' #{item.symbol_id})"
+        case QTypeVar(name=name, symbol_id=sym_id) | QAbstractType(name=name, symbol_id=sym_id) \
+             | QKindVar(name=name, symbol_id=sym_id):
+            return f"({item.__class__.__name__} '{name}' #{sym_id})"
 
-    if isinstance(item, QTupleType):
-        elems = "\n".join(f"{pad}    {qtype_dump(elem, indent + 2)}" for elem in item.elements)
-        return f"(QTupleType\n{pad}  :elements (\n{elems}\n{pad}  ))" if item.elements else "(QTupleType)"
+        case QTupleType(elements=elems):
+            if not elems:
+                return "(QTupleType)"
+            elem_strs = "\n".join(f"{pad}    {qtype_dump(elem, indent + 2)}" for elem in elems)
+            return f"(QTupleType\n{pad}  :elements (\n{elem_strs}\n{pad}  ))"
 
-    if isinstance(item, QRecordType):
-        fields = "\n".join(
-            f"{pad}    (QRecordField '{f.name}'{ ' :var' if f.is_var else '' } {qtype_dump(f.type_val, indent + 2)})"
-            for f in item.fields
-        )
-        return f"(QRecordType\n{pad}  :fields (\n{fields}\n{pad}  ))" if item.fields else "(QRecordType)"
+        case QRecordType(fields=fields):
+            if not fields:
+                return "(QRecordType)"
+            field_strs = "\n".join(
+                f"{pad}    (QRecordField '{f.name}'{ ' :var' if f.is_var else '' } "
+                f"{qtype_dump(f.type_val, indent + 2)})"
+                for f in fields
+            )
+            return f"(QRecordType\n{pad}  :fields (\n{field_strs}\n{pad}  ))"
 
-    if isinstance(item, QVariantType):
-        variants = "\n".join(
-            f"{pad}    (QVariantField '{v.name}'"
-            + (f" {qtype_dump(v.type_val, indent + 2)}" if v.type_val else "")
-            + ")"
-            for v in item.variants
-        )
-        return f"(QVariantType\n{pad}  :variants (\n{variants}\n{pad}  ))" if item.variants else "(QVariantType)"
+        case QVariantType(variants=variants):
+            if not variants:
+                return "(QVariantType)"
+            var_strs = "\n".join(
+                f"{pad}    (QVariantField '{v.name}'"
+                + (f" {qtype_dump(v.type_val, indent + 2)}" if v.type_val else "")
+                + ")"
+                for v in variants
+            )
+            return f"(QVariantType\n{pad}  :variants (\n{var_strs}\n{pad}  ))"
 
-    if isinstance(item, QOptionType):
-        options = "\n".join(
-            f"{pad}    (QOptionField '{o.name}'"
-            + (f" {qtype_dump(o.payload_type, indent + 2)}" if o.payload_type else "")
-            + ")"
-            for o in item.options
-        )
-        return f"(QOptionType\n{pad}  :options (\n{options}\n{pad}  ))" if item.options else "(QOptionType)"
+        case QOptionType(options=options):
+            if not options:
+                return "(QOptionType)"
+            opt_strs = "\n".join(
+                f"{pad}    (QOptionField '{o.name}'"
+                + (f" {qtype_dump(o.payload_type, indent + 2)}" if o.payload_type else "")
+                + ")"
+                for o in options
+            )
+            return f"(QOptionType\n{pad}  :options (\n{opt_strs}\n{pad}  ))"
 
-    if isinstance(item, QFunType):
-        params = "\n".join(
-            f"{pad}    (QParam '{p.name}'{ ' :var' if p.is_var else '' }{ ' :out' if p.is_out else '' } "
-            f"{qtype_dump(p.type_val, indent + 2)})"
-            for p in item.params
-        )
-        return (
-            f"(QFunType\n"
-            f"{pad}  :params (\n{params}\n{pad}  )\n"
-            f"{pad}  :result {qtype_dump(item.result_type, indent + 1)})"
-        )
+        case QFunType(params=params, result_type=res_type):
+            param_strs = "\n".join(
+                f"{pad}    (QParam '{p.name}'{ ' :var' if p.is_var else '' }{ ' :out' if p.is_out else '' } "
+                f"{qtype_dump(p.type_val, indent + 2)})"
+                for p in params
+            )
+            return (
+                f"(QFunType\n"
+                f"{pad}  :params (\n{param_strs}\n{pad}  )\n"
+                f"{pad}  :result {qtype_dump(res_type, indent + 1)})"
+            )
 
-    if isinstance(item, (QVarType, QArrayType, QOutType)):
-        return f"({item.__class__.__name__}\n{pad}  :element {qtype_dump(item.element_type, indent + 1)})"
+        case QVarType(element_type=elem) | QArrayType(element_type=elem) | QOutType(element_type=elem):
+            return f"({item.__class__.__name__}\n{pad}  :element {qtype_dump(elem, indent + 1)})"
 
-    if isinstance(item, QAllType):
-        quants = "\n".join(
-            f"{pad}    (QQuantifier '{q.name}' #{q.symbol_id} {qtype_dump(q.bound, indent + 2)})"
-            for q in item.quantifiers
-        )
-        return (
-            f"(QAllType\n"
-            f"{pad}  :quantifiers (\n{quants}\n{pad}  )\n"
-            f"{pad}  :body {qtype_dump(item.body, indent + 1)})"
-        )
+        case QAllType(quantifiers=quants, body=body):
+            quant_strs = "\n".join(
+                f"{pad}    (QQuantifier '{q.name}' #{q.symbol_id} {qtype_dump(q.bound, indent + 2)})"
+                for q in quants
+            )
+            return (
+                f"(QAllType\n"
+                f"{pad}  :quantifiers (\n{quant_strs}\n{pad}  )\n"
+                f"{pad}  :body {qtype_dump(body, indent + 1)})"
+            )
 
-    if isinstance(item, QTypeApp):
-        args = "\n".join(f"{pad}    {qtype_dump(arg, indent + 2)}" for arg in item.arguments)
-        return (
-            f"(QTypeApp\n"
-            f"{pad}  :constructor {qtype_dump(item.constructor, indent + 1)}\n"
-            f"{pad}  :arguments (\n{args}\n{pad}  ))"
-        )
+        case QTypeApp(constructor=ctor, arguments=args):
+            arg_strs = "\n".join(f"{pad}    {qtype_dump(arg, indent + 2)}" for arg in args)
+            return (
+                f"(QTypeApp\n"
+                f"{pad}  :constructor {qtype_dump(ctor, indent + 1)}\n"
+                f"{pad}  :arguments (\n{arg_strs}\n{pad}  ))"
+            )
 
-    if isinstance(item, QRecType):
-        return (
-            f"(QRecType '{item.var_name}' #{item.symbol_id}\n"
-            f"{pad}  :bound {qtype_dump(item.bound, indent + 1)}\n"
-            f"{pad}  :body {qtype_dump(item.body, indent + 1)})"
-        )
+        case QRecType(var_name=vname, symbol_id=sym_id, bound=bound, body=body):
+            return (
+                f"(QRecType '{vname}' #{sym_id}\n"
+                f"{pad}  :bound {qtype_dump(bound, indent + 1)}\n"
+                f"{pad}  :body {qtype_dump(body, indent + 1)})"
+            )
 
-    if isinstance(item, QRecGroupType):
-        bindings = "\n".join(
-            f"{pad}    (Binding '{b[0]}' #{b[1]} {qtype_dump(b[2], indent + 2)} {qtype_dump(b[3], indent + 2)})"
-            for b in item.bindings
-        )
-        return (
-            f"(QRecGroupType :active '{item.current_name}'\n"
-            f"{pad}  :bindings (\n{bindings}\n{pad}  ))"
-        )
+        case QRecGroupType(bindings=bindings):
+            b_strs = "\n".join(
+                f"{pad}    (Binding '{b[0]}' #{b[1]} {qtype_dump(b[2], indent + 2)} {qtype_dump(b[3], indent + 2)})"
+                for b in bindings
+            )
+            return f"(QRecGroupType\n{pad}  :bindings (\n{b_strs}\n{pad}  ))"
 
-    if isinstance(item, QTypeMeta):
-        pruned = item.prune()
-        if pruned is not item:
-            return f"(QTypeMeta {item.name} => {qtype_dump(pruned, indent)})"
-        return f"(QTypeMeta {item.name})"
-
-    return f"({item.__class__.__name__})"
+        case _:
+            return f"({item.__class__.__name__})"
