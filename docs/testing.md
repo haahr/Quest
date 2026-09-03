@@ -24,7 +24,7 @@ The compiler test suite is organized into three complementary testing tiers:
 
 2. **Golden-File Compiler Tests (`tests/source/` and `tests/golden/`):**
    - End-to-end tests for valid Quest programs.
-   - Executes each compiler phase CLI tool (`quest_tokenize.py`, `quest_parse.py`, `quest_typed_ast.py`) against
+   - Executes the unified compiler driver (`quest_driver.py --stop-after <phase>`) against
      canonical `.quest` source files.
    - Validates stdout against exact expected outputs in `tests/golden/<phase>/<name>.out`.
 
@@ -55,7 +55,7 @@ tests/
       │   └── 01_lexer_basics.out ... 07_exceptions_dynamic.out
       ├── parse/
       │   └── 01_lexer_basics.out ... 07_exceptions_dynamic.out
-      └── typed_ast/
+      └── typecheck/
           └── 01_lexer_basics.out ... 07_exceptions_dynamic.out
 ```
 
@@ -67,10 +67,10 @@ tests/
   - `stderr`: Reserved exclusively for diagnostic error messages and warnings.
 
 ### 2.3. Test Runner (`run_tests.py`)
-The test runner executes each test source file across all active compiler phases:
-- `tokenize`: Runs `bootstrap/python/quest_tokenize.py <source_file>`.
-- `parse`: Runs `bootstrap/python/quest_parse.py <source_file>`.
-- `typed_ast`: Runs `bootstrap/python/quest_typed_ast.py <source_file>`.
+The test runner executes each test source file across all active compiler phases via `quest_driver.py`:
+- `tokenize`: Runs `quest_driver.py --stop-after tokenize <source_file>`.
+- `parse`: Runs `quest_driver.py --stop-after parse <source_file>`.
+- `typecheck`: Runs `quest_driver.py --stop-after typecheck <source_file>`.
 
 **Commands:**
 ```bash
@@ -78,7 +78,7 @@ The test runner executes each test source file across all active compiler phases
 python3 run_tests.py
 
 # Run only a specific phase
-python3 run_tests.py --phase typed_ast
+python3 run_tests.py --phase typecheck
 
 # Run only matching tests
 python3 run_tests.py -k 03_functions
@@ -113,7 +113,7 @@ tests/errors/
   ├── parse/
   │   ├── missing_end.quest
   │   └── invalid_infix.quest
-  └── typed_ast/
+  └── typecheck/
       ├── non_contractive_rec.quest
       ├── record_field_mismatch.quest
       └── unhandled_exception.quest
@@ -133,13 +133,13 @@ the diagnostic is expected:
 
 #### Examples
 ```quest
-(* tests/errors/typed_ast/non_contractive_rec.quest *)
+(* tests/errors/typecheck/non_contractive_rec.quest *)
 Let Rec Bad::TYPE = Bad; (* ERROR: not contractive *)
 
-(* tests/errors/typed_ast/type_mismatch.quest *)
+(* tests/errors/typecheck/type_mismatch.quest *)
 let x: Int = "hello"; (* ERROR: type mismatch.*expected 'Int' *)
 
-(* tests/errors/typed_ast/warnings.quest *)
+(* tests/errors/typecheck/warnings.quest *)
 let unused = 42; (* WARNING: unused variable 'unused' *)
 ```
 
@@ -147,11 +147,11 @@ let unused = 42; (* WARNING: unused variable 'unused' *)
 A test in `tests/errors/<phase>/` must contain errors **only in `<phase>`**.
 
 When running a test for `<phase>`:
-1. The runner executes all precursor phases in order (e.g. for `typed_ast`, it first runs `tokenize` and `parse`).
+1. The runner executes all precursor phases in order (e.g. for `typecheck`, it first runs `tokenize` and `parse`).
 2. If any precursor phase produces an error, the test fails immediately:
    ```
-   [FAIL] typed_ast:tests/errors/typed_ast/bad_syntax.quest
-     Precursor phase 'parse' failed unexpectedly before reaching 'typed_ast':
+   [FAIL] typecheck:tests/errors/typecheck/bad_syntax.quest
+     Precursor phase 'parse' failed unexpectedly before reaching 'typecheck':
      test.quest:2:5: error: syntax error, expected 'end'
    ```
 This enforces independence of concerns and ensures tests do not pass accidentally due to earlier unintended failures.

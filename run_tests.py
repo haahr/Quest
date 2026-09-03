@@ -12,48 +12,33 @@ ROOT_DIR = Path(__file__).parent.resolve()
 sys.path.insert(0, str(ROOT_DIR / "bootstrap" / "python"))
 
 from quest.error_testing import run_error_test
+from quest.pipeline import default_pipeline
 
 TESTS_SOURCE_DIR = ROOT_DIR / "tests" / "source"
 TESTS_GOLDEN_DIR = ROOT_DIR / "tests" / "golden"
 TESTS_ERRORS_DIR = ROOT_DIR / "tests" / "errors"
-
-PHASES = {
-    "tokenize": {
-        "runner": ROOT_DIR / "bootstrap" / "python" / "quest_tokenize.py",
-        "golden_subdir": "tokenize",
-    },
-    "parse": {
-        "runner": ROOT_DIR / "bootstrap" / "python" / "quest_parse.py",
-        "golden_subdir": "parse",
-    },
-    "typed_ast": {
-        "runner": ROOT_DIR / "bootstrap" / "python" / "quest_typed_ast.py",
-        "golden_subdir": "typed_ast",
-    },
-}
-
-PRECURSORS = {
-    "tokenize": [],
-    "parse": ["tokenize"],
-    "typed_ast": ["tokenize", "parse"],
-}
+DRIVER_SCRIPT = ROOT_DIR / "bootstrap" / "python" / "quest_driver.py"
 
 
 def run_single_golden_test(
     source_file: Path,
     phase_name: str,
-    phase_config: dict,
     update_golden: bool = False,
     python_executable: str = sys.executable,
 ) -> bool:
-    runner_script = phase_config["runner"]
-    golden_dir = TESTS_GOLDEN_DIR / phase_config["golden_subdir"]
+    golden_dir = TESTS_GOLDEN_DIR / phase_name
     golden_dir.mkdir(parents=True, exist_ok=True)
     out_file = golden_dir / f"{source_file.stem}.out"
     error_file = golden_dir / f"{source_file.stem}.error"
 
-    # Run the phase tool
-    command = [python_executable, str(runner_script), str(source_file)]
+    # Execute driver with --stop-after <phase_name>
+    command = [
+        python_executable,
+        str(DRIVER_SCRIPT),
+        "--stop-after",
+        phase_name,
+        str(source_file),
+    ]
     environment = os.environ.copy()
     environment["PYTHONPATH"] = str(ROOT_DIR / "bootstrap" / "python")
 
@@ -90,8 +75,8 @@ def run_single_golden_test(
                 diff = difflib.unified_diff(
                     expected_output.splitlines(keepends=True),
                     process.stdout.splitlines(keepends=True),
-                    fromfile=f"golden/{phase_config['golden_subdir']}/{out_file.name}",
-                    tofile=f"actual/{phase_config['golden_subdir']}/{out_file.name}",
+                    fromfile=f"golden/{phase_name}/{out_file.name}",
+                    tofile=f"actual/{phase_name}/{out_file.name}",
                 )
                 print("".join(diff))
                 return False
@@ -119,8 +104,8 @@ def run_single_golden_test(
             diff = difflib.unified_diff(
                 expected_error.splitlines(keepends=True),
                 process.stderr.splitlines(keepends=True),
-                fromfile=f"golden/{phase_config['golden_subdir']}/{error_file.name}",
-                tofile=f"actual/{phase_config['golden_subdir']}/{error_file.name}",
+                fromfile=f"golden/{phase_name}/{error_file.name}",
+                tofile=f"actual/{phase_name}/{error_file.name}",
             )
             print("".join(diff))
             return False
@@ -137,9 +122,12 @@ def run_single_golden_test(
 
 
 def main() -> int:
+    pipeline = default_pipeline()
+    available_phases = pipeline.phase_names()
+
     arg_parser = argparse.ArgumentParser(description="Run Quest compiler tests (golden outputs and error suites).")
     arg_parser.add_argument(
-        "--phase", choices=list(PHASES.keys()) + ["all"], default="all", help="Compiler phase to test."
+        "--phase", choices=available_phases + ["all"], default="all", help="Compiler phase to test."
     )
     arg_parser.add_argument(
         "--suite",
@@ -170,7 +158,7 @@ def main() -> int:
     # Fallback to sys.executable if specified python does not exist
     python_executable = args.python if os.path.exists(args.python) else sys.executable
 
-    phases_to_run = list(PHASES.keys()) if args.phase == "all" else [args.phase]
+    phases_to_run = available_phases if args.phase == "all" else [args.phase]
 
     total_golden = 0
     passed_golden = 0
@@ -192,14 +180,12 @@ def main() -> int:
         if source_files:
             print("=== Golden Tests ===")
             for phase in phases_to_run:
-                config = PHASES[phase]
                 print(f"--- Phase: {phase} ---")
                 for source_file in source_files:
                     total_golden += 1
                     if run_single_golden_test(
                         source_file,
                         phase,
-                        config,
                         update_golden=args.update_golden,
                         python_executable=python_executable,
                     ):
@@ -227,13 +213,12 @@ def main() -> int:
                 error_phases_found = True
 
             print(f"--- Phase: {phase} ---")
-            precursors = PRECURSORS.get(phase, [])
+            precursors = pipeline.precursors_of(phase)
             for error_file in error_files:
                 total_errors += 1
                 passed, report = run_error_test(
                     source_file=error_file,
                     target_phase=phase,
-                    phase_configs=PHASES,
                     precursor_phases=precursors,
                     python_executable=python_executable,
                     root_dir=ROOT_DIR,

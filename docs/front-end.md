@@ -1115,7 +1115,8 @@ error tests) is documented in [docs/testing.md](testing.md).
 ### 5.1. Standard Compiler Output Streams
 The compiler strictly distinguishes standard output and diagnostic error output:
 - **Standard Output (`stdout`, exit code 0):** Used exclusively for valid compiler output (e.g. token streams from
-  `quest_tokenize.py`, S-expression ASTs from `quest_parse.py`, and typed AST dumps from `quest_typed_ast.py`).
+  `quest --stop-after tokenize`, S-expression ASTs from `quest --stop-after parse`, and typed AST dumps from
+  `quest --stop-after typecheck`).
 - **Standard Error (`stderr`, exit code 1):** Used exclusively for diagnostic messages, syntax errors, and compiler
   errors formatted with source location context.
 

@@ -95,13 +95,20 @@ def parse_actual_diagnostics(stderr_text: str) -> list[ActualDiagnostic]:
 
 
 def execute_phase(
-    runner_script: Path,
+    phase_name: str,
     source_file: Path,
     python_executable: str,
     root_dir: Path,
 ) -> tuple[int, str, str]:
-    """Executes a compiler phase CLI tool, returning (returncode, stdout, stderr)."""
-    command = [python_executable, str(runner_script), str(source_file)]
+    """Executes the compiler driver up to the specified phase."""
+    driver_script = root_dir / "bootstrap" / "python" / "quest_driver.py"
+    command = [
+        python_executable,
+        str(driver_script),
+        "--stop-after",
+        phase_name,
+        str(source_file),
+    ]
     env = os.environ.copy()
     env["PYTHONPATH"] = str(root_dir / "bootstrap" / "python")
 
@@ -118,10 +125,10 @@ def execute_phase(
 def run_error_test(
     source_file: Path,
     target_phase: str,
-    phase_configs: dict[str, dict],
     precursor_phases: list[str],
     python_executable: str,
     root_dir: Path,
+    phase_configs: Optional[dict] = None,
 ) -> tuple[bool, str]:
     """Runs an error test with precursor validation and bidirectional 1:1 diagnostic matching."""
     source_text = source_file.read_text(encoding="utf-8")
@@ -132,10 +139,7 @@ def run_error_test(
 
     # Step 1: Precursor Phase Validation
     for pre_phase in precursor_phases:
-        pre_config = phase_configs.get(pre_phase)
-        if not pre_config:
-            continue
-        rc, _, stderr = execute_phase(pre_config["runner"], source_file, python_executable, root_dir)
+        rc, _, stderr = execute_phase(pre_phase, source_file, python_executable, root_dir)
         if rc != 0 or parse_actual_diagnostics(stderr):
             err_msg = stderr.strip() if stderr.strip() else f"exited with code {rc}"
             return False, (
@@ -144,11 +148,7 @@ def run_error_test(
             )
 
     # Step 2: Target Phase Execution
-    target_config = phase_configs.get(target_phase)
-    if not target_config:
-        return False, f"Unknown target phase '{target_phase}'"
-
-    rc, stdout, stderr = execute_phase(target_config["runner"], source_file, python_executable, root_dir)
+    rc, stdout, stderr = execute_phase(target_phase, source_file, python_executable, root_dir)
     actual = parse_actual_diagnostics(stderr)
 
     # Step 3: Bidirectional 1:1 Matching
