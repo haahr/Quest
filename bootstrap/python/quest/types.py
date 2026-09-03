@@ -5,6 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Optional, Union
 
+from quest.diagnostics import Diagnostic, DiagnosticRenderer
+
 
 # ============================================================================
 # 1. Kinds (Level 2)
@@ -986,16 +988,32 @@ def is_subkind(sub: QKind, sup: QKind, env: Optional[Any] = None) -> bool:
 class KindError(Exception):
     """Raised when kind synthesis, kind checking, or well-kindedness verification fails."""
 
-    def __init__(self, message: str, offset: int = 0) -> None:
+    def __init__(
+        self,
+        message: str,
+        offset: int = 0,
+        help_text: Optional[str] = None,
+        notes: Optional[list[str]] = None,
+    ) -> None:
         super().__init__(f"{message} at offset {offset}" if offset else message)
         self.message = message
         self.offset = offset
+        self.help_text = help_text
+        self.notes = notes or []
+
+    def to_diagnostic(self, length: int = 1) -> Diagnostic:
+        """Converts this error into a structured Diagnostic object."""
+        return Diagnostic.make_error(
+            message=self.message,
+            offset=self.offset,
+            length=length,
+            help_text=self.help_text,
+            notes=self.notes,
+        )
 
     def format_with_source(self, source_map: Any, length: int = 1) -> str:
         """Renders a diagnostic message with underlined source context."""
-        if hasattr(source_map, "format_error"):
-            return source_map.format_error(self.offset, length, self.message)
-        return str(self)
+        return DiagnosticRenderer.render_diagnostic(self.to_diagnostic(length), source_map)
 
 
 def check_kind_well_formed(kind: QKind, env: Optional[Any] = None) -> None:

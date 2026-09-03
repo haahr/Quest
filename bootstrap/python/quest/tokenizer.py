@@ -13,6 +13,7 @@ from quest.tokens import (
     Token,
     TokenKind,
 )
+from quest.diagnostics import Diagnostic, DiagnosticRenderer
 
 
 class TokenizerError(Exception):
@@ -24,8 +25,12 @@ class TokenizerError(Exception):
         self.offset = offset
         self.length = length
 
+    def to_diagnostic(self) -> Diagnostic:
+        """Converts this error into a structured Diagnostic object."""
+        return Diagnostic.make_error(message=self.message, offset=self.offset, length=self.length)
+
     def format_with_source(self, source_map: SourceMap) -> str:
-        return source_map.format_error(self.offset, self.length, self.message)
+        return DiagnosticRenderer.render_diagnostic(self.to_diagnostic(), source_map)
 
 
 class IncompleteInputError(TokenizerError):
