@@ -1,40 +1,86 @@
 # Quest Bootstrap Tree-Walking Interpreter & REPL Plan (Step 3)
 
-This document preserves the comprehensive architecture and multi-phase implementation plan for **Step 3: The Bootstrap
-Tree-Walking Interpreter and Interactive REPL** for Quest in `bootstrap/python/quest/`.
+This document preserves the comprehensive architecture, output semantics, standard library modules, and implementation
+plan for **Step 3: The Bootstrap Tree-Walking Interpreter and Interactive REPL** in `bootstrap/python/quest/`.
 
 ---
 
 ## 1. Architectural Overview
 
-The interpreter consumes the typed AST (`TypedProgram`, `TypedBinding`, `TypedExpr`) produced by term elaboration and
-executes it via direct tree-walking evaluation.
+The interpreter consumes the typed AST (`TypedProgram`, `TypedBinding`, `TypedExpr`) produced by the `typecheck` phase
+and executes it via direct tree-walking evaluation.
 
 ```
 +------------------------------------+
 | TypedProgram / TypedExpr           |
-| (from Term Elaboration Phase 2)    |
+| (from Typecheck Phase)             |
 +------------------------------------+
-                 |
-                 v
+                 │
+                 ▼
 +------------------------------------+
 | tree_eval_expr(expr, runtime_env)  |
 | - Runtime Values (QInt, QReal...)  |
-| - Call Frames & Scopes             |
+| - Call Frames & Lexical Scopes     |
 | - Mutable Cell References (QRef)   |
-| - Dynamic Dispatch & Pattern Match |
+| - Cardelli Standard Library Modules|
+| - Direct I/O Side Effects          |
 | - Exception Stack Unwinding        |
 +------------------------------------+
-                 |
-                 v
+                 │
+                 ▼
 +------------------------------------+
-| Execution Result / Output / REPL   |
+| Final Value (QValue) / REPL Echo   |
 +------------------------------------+
 ```
 
 ---
 
-## 2. Multi-Phase Implementation Plan
+## 2. Output Semantics and Execution Modes
+
+The interpreter strictly separates direct I/O side effects from phase return values:
+
+1. **I/O As Side Effects:**
+   - I/O operations (such as `writer.putString`) write directly to standard output/error as runtime side effects.
+   - I/O is **not** captured, buffered, or tracked as `InterpretPhase` data.
+
+2. **Phase Output (`InterpretPhase`):**
+   - The result of `InterpretPhase.run` is the evaluated `QValue` of the program's final phrase.
+   - `InterpretPhase.dump(value)`:
+     - If the value is `ok` (`QOk`), output is **completely silent** (empty string).
+     - If the value is non-ok, renders the canonical formatted value string.
+
+3. **Batch Execution vs. REPL Discipline:**
+   - **Batch Execution (`quest file.quest`):** By default, runs silently (Option A). Emits only explicit I/O
+     side effects. Top-level expressions and bindings execute without echoing their values. If the `--interactive`
+     flag is specified, echoes every top-level binding and expression result.
+   - **Interactive REPL (`quest` without arguments, or REPL session):** Always echoes binding signatures and evaluated
+     results (Option B):
+     ```quest
+     Quest> let x: Int = 40 + 2;
+     val x: Int = 42
+     Quest> x * 2;
+     84 : Int
+     ```
+
+---
+
+## 3. Standard Library Modules (Cardelli Specification)
+
+In accordance with Luca Cardelli's *Typeful Programming* (Section 11.3), standard operations are organized into
+pre-linked modules and interfaces in the root environment:
+
+- **`writer: Writer`:** Character and string output (`writer.output`, `writer.putString`, `writer.putChar`,
+  `writer.flush`).
+- **`reader: Reader`:** Character and string input (`reader.input`, `reader.getString`, `reader.getChar`).
+- **`conv: Conv`:** Value to string conversions (`conv.int`, `conv.real`, `conv.bool`, `conv.okay`).
+- **`ascii: Ascii`:** Ascii character encoding conversions (`ascii.char`, `ascii.val`).
+- **`int: IntOp` & `real: RealOp`:** Numeric operations and functions.
+- **`string: StringOp`:** String manipulation (`string.length`, `string.getSub`, `string.cat`).
+- **`arrayOp: ArrayOp`:** Array operations (`arrayOp.new`, `arrayOp.size`, `arrayOp.get`, `arrayOp.set`).
+
+---
+
+## 4. Multi-Phase Implementation Plan
 
 ### Phase 1: Runtime Values & Memory Model (`quest/runtime.py`)
 - Define runtime value representation hierarchy (`QValue`):
@@ -55,7 +101,7 @@ executes it via direct tree-walking evaluation.
   - **Dynamic & Exceptions:**
     - `QExceptionVal(name: str, payload: Optional[QValue])`
     - `QDynamicVal(value: QValue, type_val: QType)`
-- Canonical value string formatter (`qvalue_to_str(val: QValue) -> str`) and equality predicates.
+- Canonical value string formatter (`qvalue_to_str(val: QValue) -> str`) and structural equality predicates.
 
 ### Phase 2: Runtime Environment & Core Evaluation (`quest/interpreter.py`)
 - `RuntimeEnvironment` with scoped lexical frame chains (`lookup`, `define`, `assign`, `push_scope`, `pop_scope`).
@@ -68,71 +114,42 @@ executes it via direct tree-walking evaluation.
   - Loop termination (`TypedExit` via internal Python control-flow exception `_LoopExit`).
   - Scoped blocks (`TypedBlock`).
 
-### Phase 3: Functions, Closures & Recursion
+### Phase 3: Functions, Compound Structures & Mutation
 - First-class function closure creation (`TypedFun` -> `QClosure`).
-- Application evaluation (`TypedApp`): evaluate callee, evaluate arguments, bind parameters in a fresh activation
-  scope, evaluate body.
+- Application evaluation (`TypedApp`): evaluate callee, evaluate arguments, bind parameters in fresh activation scope,
+  evaluate body.
 - Recursive functions (`let rec f = ...`) with cyclic closure environments.
-- Type applications (`TypedTypeApp`): evaluate inner expression (type erasure at runtime).
+- Record and tuple creation (`TypedRecord`, `TypedTuple`) and member selection.
+- Array creation (`TypedArray`, `TypedArrayRep`), indexing, and element mutation.
+- Record field mutation (`r.field := value`).
+- Option/Variant construction and `case` pattern matching (`TypedCase`).
 
-### Phase 4: Compound Data Structures & Mutation
-- Record creation (`TypedRecord`) and field selection (`TypedSelect`).
-- Tuple creation (`TypedTuple`) and indexing/selection.
-- Array creation (`TypedArray`, `TypedArrayRep`).
-- Array indexing (`TypedIndex`) and element assignment (`TypedIndexAssign`).
-- Record field mutation (`r.field := value` updating the `QRef` cell).
-
-### Phase 5: Variants, Options & Pattern Matching
-- Option creation (`TypedOption`) and Variant creation (`TypedVariant`).
-- Case expression matching (`TypedCase`): match tag against branches, unpack payload binding into branch scope,
-  evaluate matching branch body, fall back to `else_branch`.
-
-### Phase 6: Exceptions & Dynamic Typing
+### Phase 4: Exceptions & Cardelli Standard Library Modules (`quest/builtins.py`)
 - Exception declaration (`TypedExceptionDecl`).
 - Raising exceptions (`TypedRaise` via Python control-flow exception `QuestRuntimeException`).
 - Try-handler evaluation (`TypedTry`): evaluate body; if exception matches handler tag, bind payload and evaluate
   handler body; otherwise propagate or fallback to `else_branch`.
-- Dynamic typing: `TypedDynamic(expr)` packaging value with its type, `TypedInspect` type-case matching.
+- Pre-linked standard library module implementations: `writer: Writer`, `reader: Reader`, `conv: Conv`,
+  `ascii: Ascii`, `string: StringOp`, `int: IntOp`, `real: RealOp`, `arrayOp: ArrayOp`.
 
-### Phase 7: Interfaces, Modules & Standalone CLI (`quest_run.py`)
-- Module evaluation (`TypedModule`): evaluate bindings sequentially, capture exported members into a `QRecord` or
-  `QModuleValue`.
-- Standalone CLI runner: `python3 bootstrap/python/quest_run.py <file.quest>` with error diagnostics and exit codes.
-
-### Phase 8: Interactive REPL (`quest_repl.py`) & End-to-End Suite
-- Multi-line input REPL maintaining persistent `Environment` (types) and `RuntimeEnvironment` (values).
-- Expression evaluation auto-printing (`it = <val> : <Type>`).
-- End-to-end integration tests (`tests/python/test_interpreter.py`).
+### Phase 5: Pipeline Integration, CLI & Interactive REPL (`quest/repl.py`)
+- `InterpretPhase` registered in `PhasePipeline` following `typecheck`:
+  - Output: final phrase `QValue`.
+  - Silent when `QOk`, formatted when non-ok.
+- CLI driver support: default execution runs through `interpret`. Flag `--interactive` enables top-level echo in batch.
+- Interactive multi-line REPL (`quest` without files) maintaining persistent `Environment` and `RuntimeEnvironment`.
+- Integration tests in `tests/python/test_interpreter.py` and compiler golden tests in `tests/golden/interpret/`.
 
 ---
 
-## 3. Native Quest Call Stack Traces & Runtime Error Handling
+## 5. Native Quest Call Stack Traces & Runtime Error Handling
 
 To provide high-fidelity runtime diagnostics (rather than raw Python tracebacks), the interpreter maintains a stack
 of Quest activation frames:
-
-- **Activation Frame Tracking (`RuntimeStackFrame`):**
-  - When evaluating `TypedApp`, push a frame with `function_name`, `file_name`, `call_offset`, and `scope_name`.
-  - Pop the frame upon normal or exceptional return.
-- **Runtime Error & Exception Capture (`QuestRuntimeError`):**
-  - Both uncaught language-level exceptions (`raise E with payload`) and system invariant violations (division by zero,
-    array out of bounds, non-exhaustive match failure) capture the current `list[RuntimeStackFrame]`.
-- **Source-Mapped Traceback Formatting:**
-  - Formatted using `SourceMap` to display file, line, column, function name, and underlined source call-site:
-    ```
-    Unhandled Quest Exception: StackUnderflow (payload: "empty stack")
-      Traceback (most recent call last):
-        File "stack.quest", line 18, in pop
-          raise StackUnderflow with "empty stack"
-          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-        File "main.quest", line 5, in run
-          let item = stack.pop()
-                     ^^^^^^^^^^^
-        File "main.quest", line 12, in <toplevel>
-          run()
-          ^^^^^
-    ```
-- **Reference:** See [`diagnostics.md`](diagnostics.md) for full details.
+- **Activation Frame Tracking (`RuntimeStackFrame`):** Pushes frame with function name, file name, call offset, and
+  scope; pops upon normal or exceptional return.
+- **Source-Mapped Traceback Formatting:** Formats unhandled exceptions or runtime errors using `SourceMap` with exact
+  file, line, column, and caret underlines.
 
 ---
 
@@ -141,3 +158,4 @@ of Quest activation frames:
 - [roadmap.md](roadmap.md): 7-stage implementation roadmap.
 - [pipeline.md](pipeline.md): Compiler pipeline framework and CLI driver.
 - [type-system.md](type-system.md): Semantic types, subtyping, and elaboration.
+- [diagnostics.md](diagnostics.md): Diagnostic reporting architecture.

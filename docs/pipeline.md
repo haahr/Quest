@@ -43,7 +43,9 @@ All compiler phases are named by their **Verb / Action Form**:
 - `tokenize`: Lexical analysis from source text to token stream.
 - `parse`: Syntactic parsing from token stream to untyped AST.
 - `typecheck`: Semantic typing, kind well-formedness, subtyping, and elaboration to typed AST.
-- `interpret`: Evaluation of typed AST via tree-walking interpreter (Step 3).
+- `interpret`: Direct evaluation of typed AST via tree-walking interpreter (Step 3). Returns final phrase
+  `QValue`. Output is silent if `ok` (`QOk`), formatted if non-ok. Runtime I/O operations execute as direct
+  side effects.
 - `codegen`: Code generation to C or native AArch64 machine code.
 
 ### Uniform Enforcement Across Interfaces
@@ -61,6 +63,7 @@ Encapsulates runtime configuration:
 - `stop_after: Optional[str]`: Pipeline milestone to halt after (implicitly dumping output).
 - `dump_after: set[str]`: Intermediate phase outputs to dump to stdout while continuing pipeline execution.
 - `include_paths: list[Path]`: Search directories for imported interfaces and modules (`-I`).
+- `interactive: bool`: When true, echoes top-level binding signatures and evaluated values in batch mode.
 - `show_offsets: bool`: Controls rendering of source offsets in AST dumps.
 - `show_values: bool`: Controls rendering of parsed literal values in token dumps.
 
@@ -118,6 +121,9 @@ quest -c "let x = 1;" --stop-after typecheck
 
 # Add search paths for imports:
 quest -I ./lib -I ./interfaces main.quest
+
+# Echo top-level bindings and expression results in batch execution:
+quest --interactive file.quest
 ```
 
 Accepts both dashed (`--stop-after`) and underscored (`--stop_after`) flag formats.
