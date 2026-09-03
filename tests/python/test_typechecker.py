@@ -259,5 +259,125 @@ class TestTypecheckerPhase2(unittest.TestCase):
         self.assertIn("^", kind_formatted)
 
 
+class TestRecursiveContractiveness(unittest.TestCase):
+    """Tests for recursive type contractiveness verification (C \succ X)."""
+
+    def setUp(self):
+        self.env = Environment()
+
+    def test_valid_contractive_recursive_types(self):
+        from quest.elaborate_types import elaborate_type_binding
+
+        # 1. Recursive Record: Let Rec List = Tuple head: Int tail: List end;
+        list_ast = ast.LetTypeBinding(
+            name="List",
+            bound=None,
+            type_val=ast.TypeTuple(
+                fields=(
+                    ast.FieldSig(name="head", type_sig=ast.TypePath(("Int",))),
+                    ast.FieldSig(name="tail", type_sig=ast.TypePath(("List",))),
+                )
+            ),
+            is_rec=True,
+        )
+        sym = elaborate_type_binding(list_ast, self.env)
+        self.assertEqual(sym.name, "List")
+
+        # 2. Recursive Function: Let Rec FunType = Tuple f: All(:Int) FunType end;
+        fun_ast = ast.LetTypeBinding(
+            name="FunType",
+            bound=None,
+            type_val=ast.TypeTuple(
+                fields=(
+                    ast.FieldSig(
+                        name="f",
+                        type_sig=ast.TypeTuple(
+                            fields=(
+                                ast.FieldSig(name="arg", type_sig=ast.TypePath(("Int",))),
+                                ast.FieldSig(name="res", type_sig=ast.TypePath(("FunType",))),
+                            )
+                        ),
+                    ),
+                )
+            ),
+            is_rec=True,
+        )
+        sym_fun = elaborate_type_binding(fun_ast, self.env)
+        self.assertEqual(sym_fun.name, "FunType")
+
+        # 3. Recursive Option: Let Rec Tree = Option empty, node with t: Tree end;
+        tree_ast = ast.LetTypeBinding(
+            name="Tree",
+            bound=None,
+            type_val=ast.TypeOption(
+                variants=(
+                    ast.OptionFieldSig(tag="empty"),
+                    ast.OptionFieldSig(
+                        tag="node",
+                        payload_sig=(ast.FieldSig(name="t", type_sig=ast.TypePath(("Tree",))),),
+                    ),
+                )
+            ),
+            is_rec=True,
+        )
+        sym_tree = elaborate_type_binding(tree_ast, self.env)
+        self.assertEqual(sym_tree.name, "Tree")
+
+    def test_reject_immediate_bare_recursion(self):
+        from quest.elaborate_types import elaborate_type_binding
+
+        # Let Rec Bad = Bad;
+        bad_ast = ast.LetTypeBinding(
+            name="Bad",
+            bound=None,
+            type_val=ast.TypePath(("Bad",)),
+            is_rec=True,
+            offset=10,
+        )
+        with self.assertRaises(KindError) as ctx:
+            elaborate_type_binding(bad_ast, self.env)
+        self.assertIn("not contractive", str(ctx.exception))
+
+    def test_reject_nested_bare_recursion(self):
+        from quest.elaborate_types import elaborate_type
+
+        # Rec(Bad) Rec(Inner) Bad
+        nested_ast = ast.TypeRec(
+            var_name="Bad",
+            bound=ast.KindType(),
+            body=ast.TypeRec(
+                var_name="Inner",
+                bound=ast.KindType(),
+                body=ast.TypePath(("Bad",), offset=12),
+            ),
+        )
+        with self.assertRaises(KindError) as ctx:
+            elaborate_type(nested_ast, self.env)
+        self.assertIn("not contractive", str(ctx.exception))
+
+    def test_reject_mutual_bare_recursion(self):
+        from quest.elaborate_types import elaborate_mutual_rec_type_group
+
+        # Let Rec A = B and B = A;
+        b1 = ast.LetTypeBinding(name="A", bound=None, type_val=ast.TypePath(("B",)), is_rec=True, offset=5)
+        b2 = ast.LetTypeBinding(name="B", bound=None, type_val=ast.TypePath(("A",)), is_rec=True, offset=15)
+        with self.assertRaises(KindError) as ctx:
+            elaborate_mutual_rec_type_group([b1, b2], self.env)
+        self.assertIn("not contractive", str(ctx.exception))
+
+    def test_reject_inline_bare_rec_type(self):
+        from quest.elaborate_types import elaborate_type
+
+        # Rec(X)X
+        inline_ast = ast.TypeRec(
+            var_name="X",
+            bound=ast.KindType(),
+            body=ast.TypePath(("X",), offset=8),
+        )
+        with self.assertRaises(KindError) as ctx:
+            elaborate_type(inline_ast, self.env)
+        self.assertIn("not contractive", str(ctx.exception))
+
+
 if __name__ == "__main__":
     unittest.main()

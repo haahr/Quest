@@ -39,6 +39,7 @@ from quest.types import (
     QAbstractType,
     check_kind,
     check_kind_well_formed,
+    check_type_contractive,
     synth_kind,
 )
 from quest.env import (
@@ -297,6 +298,13 @@ def elaborate_type(ast_type: ast.Type, env: Environment) -> QType:
                     TypeSymbol(name=vname, symbol_id=symbol_id, kind=bound)
                 )
                 body = elaborate_type(body_ast, env)
+                check_type_contractive(
+                    body,
+                    {symbol_id},
+                    var_name=vname,
+                    offset=getattr(body_ast, "offset", 0),
+                    env=env,
+                )
                 return QRecType(
                     var_name=vname,
                     symbol_id=symbol_id,
@@ -399,6 +407,13 @@ def elaborate_type_binding(
             env.current_scope.declare_type(TypeSymbol(name=binding.name, symbol_id=symbol_id, kind=target_bound))
             body_type = elaborate_type(binding.type_val, env)
             check_kind(body_type, target_bound, env)
+            check_type_contractive(
+                body_type,
+                {symbol_id},
+                var_name=binding.name,
+                offset=binding.offset,
+                env=env,
+            )
             qtype_val = QRecType(var_name=binding.name, symbol_id=symbol_id, bound=target_bound, body=body_type)
         finally:
             env.pop_scope()
@@ -437,10 +452,18 @@ def elaborate_mutual_rec_type_group(
             env.current_scope.declare_type(TypeSymbol(name=name, symbol_id=sym_id, kind=bound))
 
         # 3. Elaborate each body in the mutually recursive scope
+        all_group_ids = {sym_id for _, sym_id, _, _ in pre_symbols}
         group_entries: list[tuple[str, int, QKind, QType]] = []
         for name, sym_id, bound, b in pre_symbols:
             body_type = elaborate_type(b.type_val, env)
             check_kind(body_type, bound, env)
+            check_type_contractive(
+                body_type,
+                all_group_ids,
+                var_name=name,
+                offset=b.offset,
+                env=env,
+            )
             group_entries.append((name, sym_id, bound, body_type))
     finally:
         env.pop_scope()
