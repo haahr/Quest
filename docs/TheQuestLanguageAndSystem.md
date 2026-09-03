@@ -1,10 +1,15 @@
 # The Quest Language and System
 
+> [!NOTE]
+> **Foundational Literature Reference:**  
+> Luca Cardelli. *The Quest Language and System*.  
+> DEC Systems Research Center (SRC), May 12, 1994.  
+> Companion PDF: [TheQuestLanguageAndSystem.pdf](TheQuestLanguageAndSystem.pdf).
+
 **Luca Cardelli**  
 *Digital Equipment Corporation, Systems Research Center*  
 *130 Lytton Avenue, Palo Alto CA 94301*  
 
-*May 12, 1994*  
 *© Digital Equipment Corporation 1989, 1994.*
 
 ---

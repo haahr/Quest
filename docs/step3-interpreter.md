@@ -132,5 +132,12 @@ of Quest activation frames:
           run()
           ^^^^^
     ```
-- **Reference:** See [`diagnostics-design.md`](file:///Users/haahr/Dropbox/Paul/src/quest/docs/diagnostics-design.md)
-  for full details.
+- **Reference:** See [`diagnostics.md`](diagnostics.md) for full details.
+
+---
+
+## See Also
+- [README.md](../README.md): Project overview and quickstart.
+- [roadmap.md](roadmap.md): 7-stage implementation roadmap.
+- [pipeline.md](pipeline.md): Compiler pipeline framework and CLI driver.
+- [type-system.md](type-system.md): Semantic types, subtyping, and elaboration.

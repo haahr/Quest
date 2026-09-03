@@ -1,5 +1,10 @@
 # Typeful Programming
 
+> [!NOTE]
+> **Foundational Literature Reference:**  
+> Luca Cardelli. *Typeful Programming*. DEC Systems Research Center (SRC) Research Report 45, 1989 (revised 1993).  
+> Companion PDF: [TypefulProg.pdf](TypefulProg.pdf).
+
 **Luca Cardelli**  
 *Digital Equipment Corporation, Systems Research Center*  
 *130 Lytton Avenue, Palo Alto, CA 94301*

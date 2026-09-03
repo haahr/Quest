@@ -6,8 +6,13 @@
 **Giuseppe Longo**  
 *LIENS, Ecole Normale Supérieure, Paris*  
 
-*Appears in: Journal of Functional Programming, Vol 1, Part 4, pp.417-458, Cambridge Univ. Press, Oct 1991.*  
-*SRC Research Report 55, February 14, 1990. Revised January 1, 1993.*  
+> [!NOTE]
+> **Foundational Literature Reference:**  
+> Luca Cardelli and Giuseppe Longo. *A Semantic Basis for Quest*.  
+> *Journal of Functional Programming*, 1(4):417–458, Cambridge University Press, October 1991.  
+> DEC Systems Research Center (SRC) Research Report 55, February 1990 (revised 1993).  
+> Companion PDF: [ASemanticBasisForQuest.pdf](ASemanticBasisForQuest.pdf).
+
 *© Digital Equipment Corporation 1990, 1993.*
 
 ---
