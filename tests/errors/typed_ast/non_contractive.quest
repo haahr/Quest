@@ -1,0 +1,1 @@
+Let Rec Bad::TYPE = Bad; (* ERROR: not contractive *)

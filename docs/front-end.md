@@ -1,22 +1,35 @@
 # Quest Front-End Design Document
 
-This document specifies the architecture, data structures, and APIs for the **Quest Front-End** (Step 1 of the Quest implementation plan), encompassing the Tokenizer, Source Position Mapping, Diagnostic Formatting, Data-Driven PEG Parser, and Abstract Syntax Tree (AST).
+This document specifies the architecture, data structures, and APIs for the **Quest Front-End** (Step 1 of the Quest
+implementation plan), encompassing the Tokenizer, Source Position Mapping, Diagnostic Formatting, Data-Driven PEG
+Parser, and Abstract Syntax Tree (AST).
 
 ---
 
 ## 1. Overview and Design Principles
 
-The front-end is responsible for converting raw Quest source text (`.quest`) into an immutable, strongly-typed Abstract Syntax Tree (AST). In accordance with the project plan:
+The front-end is responsible for converting raw Quest source text (`.quest`) into an immutable, strongly-typed Abstract
+Syntax Tree (AST). In accordance with the project plan:
 
-- **Target Runtime:** Python 3.10+ (using Python 3.11 at `/opt/homebrew/opt/python@3.11/libexec/bin/python`), enabling native pattern matching (`match ... case`) and `dataclasses.KW_ONLY`.
-- **Data-Driven PEG / Packrat Architecture:** The grammar is declaratively defined as a set of rules for non-terminal `SyntaxTarget`s composed of algebraic `Construct` elements (`MatchToken`, `MatchTarget`, `Optional`, `Repeated`, `Sequence`).
-- **Mostly-Functional Style:** Pure functions, immutable data structures (`@dataclass(frozen=True)`), and algebraic type decompositions to facilitate a direct subsequent port to Quest (in `src/`).
-- **Dedicated AST Namespace:** All AST nodes live in a dedicated module (`quest.ast`) to prevent name collisions with standard Python built-ins or compiler passes.
+- **Target Runtime:** Python 3.10+ (using Python 3.11 at `/opt/homebrew/opt/python@3.11/libexec/bin/python`), enabling
+  native pattern matching (`match ... case`) and `dataclasses.KW_ONLY`.
+- **Data-Driven PEG / Packrat Architecture:** The grammar is declaratively defined as a set of rules for non-terminal
+  `SyntaxTarget`s composed of algebraic `Construct` elements (`MatchToken`, `MatchTarget`, `Optional`, `Repeated`,
+  `Sequence`).
+- **Mostly-Functional Style:** Pure functions, immutable data structures (`@dataclass(frozen=True)`), and algebraic type
+  decompositions to facilitate a direct subsequent port to Quest (in `src/`).
+- **Dedicated AST Namespace:** All AST nodes live in a dedicated module (`quest.ast`) to prevent name collisions with
+  standard Python built-ins or compiler passes.
 - **Zero External Dependencies:** Built entirely with standard library facilities to ensure immediate portability.
-- **Precision Diagnostics:** Retains full source fidelity with character-offset tracking, enabling formatted error messages with line numbers, column numbers, and underlined source context.
-- **Root `offset` via `KW_ONLY`:** The root `ASTNode` declares `offset: int = 0` with `KW_ONLY`, allowing subclasses to define purely positional semantic fields while automatically inheriting optional keyword `offset` tracking and clean `__match_args__`.
-- **Canonical S-Expression Serialization:** Provides an `ast_dump()` utility emitting deterministic, 2-space indented S-expressions for golden test verification (`tests/golden/parse/<name>.out`).
-- **Dual Execution Modes:** Supports batch compilation (strings and files) and incremental streaming for the interactive REPL.
+- **Precision Diagnostics:** Retains full source fidelity with character-offset tracking, enabling formatted error
+  messages with line numbers, column numbers, and underlined source context.
+- **Root `offset` via `KW_ONLY`:** The root `ASTNode` declares `offset: int = 0` with `KW_ONLY`, allowing subclasses to
+  define purely positional semantic fields while automatically inheriting optional keyword `offset` tracking and clean
+  `__match_args__`.
+- **Canonical S-Expression Serialization:** Provides an `ast_dump()` utility emitting deterministic, 2-space indented
+  S-expressions for golden test verification (`tests/golden/parse/<name>.out`).
+- **Dual Execution Modes:** Supports batch compilation (strings and files) and incremental streaming for the interactive
+  REPL.
 
 ---
 
@@ -26,9 +39,11 @@ The front-end is responsible for converting raw Quest source text (`.quest`) int
 
 To keep token and AST representations lightweight and avoid per-token line-counting overhead:
 
-1. **Offset-Only Tokens:** Each token records only its 0-indexed starting character offset (`offset: int`) from the beginning of the input string.
+1. **Offset-Only Tokens:** Each token records only its 0-indexed starting character offset (`offset: int`) from the
+   beginning of the input string.
 2. **Computed Token Bounds:** The token's end offset is computed on demand as `offset + len(lexeme)`.
-3. **In-Memory Source Text:** The compiler retains the entire input string in memory. A utility function maps any character offset to its 1-indexed `(line, column)` coordinates on demand when formatting diagnostic messages.
+3. **In-Memory Source Text:** The compiler retains the entire input string in memory. A utility function maps any
+   character offset to its 1-indexed `(line, column)` coordinates on demand when formatting diagnostic messages.
 
 #### Diagnostic Formatter / Source Map API
 ```python
@@ -77,7 +92,8 @@ class SourceMap:
 
 ### 2.2. Token Kinds (`TokenKind`)
 
-Quest tokens are classified into literals, identifiers, symbolic operators, punctuation/delimiters, and case-sensitive keywords:
+Quest tokens are classified into literals, identifiers, symbolic operators, punctuation/delimiters, and case-sensitive
+keywords:
 
 ```python
 from enum import Enum, auto
@@ -215,11 +231,16 @@ class Token:
 ### 2.4. Lexical Disambiguation and Tokenization Rules
 
 1. **Unsigned Numeric Literals (No Leading Signs):**  
-   `INT_LIT` and `REAL_LIT` are strictly unsigned sequences of decimal digits (e.g. `0`, `42`, `3.14`). The tokenizer **never** consumes a leading `+` or `-` as part of a numeric literal. Signs (`+`, `-`) are always emitted as `SYMBOLIC_INFIX` tokens, allowing the parser to resolve them as unary negation or binary subtraction without breaking infix expressions like `x-5`.
+   `INT_LIT` and `REAL_LIT` are strictly unsigned sequences of decimal digits (e.g. `0`, `42`, `3.14`). The tokenizer
+**never** consumes a leading `+` or `-` as part of a numeric literal. Signs (`+`, `-`) are always emitted as
+`SYMBOLIC_INFIX` tokens, allowing the parser to resolve them as unary negation or binary subtraction without breaking
+infix expressions like `x-5`.
 
 2. **Real Literal vs. Integer Projection (`.`):**  
-   - If a sequence of digits is followed by `.` **and the character immediately following the `.` is a decimal digit** (`0..9`), it is consumed as a `REAL_LIT` (e.g. `2.0`, `3.14159`, `2.0e10`).
-   - If a sequence of digits is followed by `.` and a **non-digit** character (e.g. `t.1`, `r.x`), the digits are emitted as `INT_LIT` (or `IDENT`), and the `.` is emitted separately as `DOT`.
+   - If a sequence of digits is followed by `.` **and the character immediately following the `.` is a decimal digit**
+     (`0..9`), it is consumed as a `REAL_LIT` (e.g. `2.0`, `3.14159`, `2.0e10`).
+   - If a sequence of digits is followed by `.` and a **non-digit** character (e.g. `t.1`, `r.x`), the digits are
+     emitted as `INT_LIT` (or `IDENT`), and the `.` is emitted separately as `DOT`.
    - Real numbers require at least one digit after the decimal point (`2.0`, not `2.`).
 
 3. **Symbolic Operator Characters vs. String/Char Quotes:**  
@@ -227,10 +248,12 @@ class Token:
    ```
    ! @ # $ % & * + - = | \ ` : < > / ? ^ ~
    ```
-   Single quotes `'` (reserved for `CHAR_LIT`) and double quotes `"` (reserved for `STRING_LIT`) are **strictly excluded** from symbolic operator lexemes.
-   
+   Single quotes `'` (reserved for `CHAR_LIT`) and double quotes `"` (reserved for `STRING_LIT`) are **strictly
+excluded** from symbolic operator lexemes.
+
    **Maximal Munch & Punctuation Lookup:**  
-   The tokenizer greedily accumulates the longest contiguous sequence of symbolic characters. It then checks this sequence against reserved punctuation tokens:
+   The tokenizer greedily accumulates the longest contiguous sequence of symbolic characters. It then checks this
+sequence against reserved punctuation tokens:
    - `:=` $\to$ `ASSIGN`
    - `::` $\to$ `COLON_COLON`
    - `<:` $\to$ `SUBTYPE`
@@ -239,15 +262,21 @@ class Token:
    - `?`  $\to$ `QUESTION`
    - `!`  $\to$ `BANG`
    - `@`  $\to$ `AT`
-   
-   If the sequence matches a reserved punctuation token, that token is emitted. Otherwise, the full sequence is emitted as `SYMBOLIC_INFIX` (e.g. `+`, `-`, `*`, `/`, `<>`, `<=`, `>=`, `++`, `**`, `/\`, `\/`, `<::`).
+
+   If the sequence matches a reserved punctuation token, that token is emitted. Otherwise, the full sequence is emitted
+as `SYMBOLIC_INFIX` (e.g. `+`, `-`, `*`, `/`, `<>`, `<=`, `>=`, `++`, `**`, `/\`, `\/`, `<::`).
 
 4. **Comments vs. Parenthesized Operators (`(*` vs. `(`):**  
-   - When the tokenizer encounters `(`, it performs a 1-character lookahead. If the next character is `*`, it immediately opens a comment (`comment_depth += 1`) and consumes characters until the matching `*)` returns `comment_depth` to 0.
-   - If an expression contains `(*)`, the tokenizer interprets `(*` as the start of a comment. To parenthesize a lone `*` operator, whitespace or braces must be used: `( * )` or `{ * }`.
+   - When the tokenizer encounters `(`, it performs a 1-character lookahead. If the next character is `*`, it
+     immediately opens a comment (`comment_depth += 1`) and consumes characters until the matching `*)` returns
+     `comment_depth` to 0.
+   - If an expression contains `(*)`, the tokenizer interprets `(*` as the start of a comment. To parenthesize a lone
+     `*` operator, whitespace or braces must be used: `( * )` or `{ * }`.
 
 5. **Case-Sensitive Keyword Resolution:**  
-   Alphanumeric identifiers are scanned with `[A-Za-z][A-Za-z0-9]*` (underscores are not part of identifiers). The resulting string is looked up in a case-sensitive keyword dictionary. If found, the corresponding `KW_*` token is emitted; otherwise, `IDENT` is emitted.
+   Alphanumeric identifiers are scanned with `[A-Za-z][A-Za-z0-9]*` (underscores are not part of identifiers). The
+resulting string is looked up in a case-sensitive keyword dictionary. If found, the corresponding `KW_*` token is
+emitted; otherwise, `IDENT` is emitted.
 
 6. **Escape Sequences:**  
    Both character literals (`'...'`) and string literals (`"..."`) support:
@@ -302,12 +331,16 @@ class Tokenizer:
 ## 3. Data-Driven PEG / Packrat Parser Architecture
 
 The front-end separates parsing into two decoupled modules:
-1. **`quest.parser` (`bootstrap/python/quest/parser.py`):** A domain-agnostic, reusable PEG/Packrat engine implementing algebraic grammar constructs, packrat memoization, `_IN_PROGRESS` cycle detection, loop progress assertions, and farthest-failure diagnostics.
-2. **`quest.grammar` (`bootstrap/python/quest/grammar.py`):** The Quest language grammar specification, mapping `SyntaxTarget` non-terminals to production `Rule`s paired with typed AST builder callables.
+1. **`quest.parser` (`bootstrap/python/quest/parser.py`):** A domain-agnostic, reusable PEG/Packrat engine implementing
+   algebraic grammar constructs, packrat memoization, `_IN_PROGRESS` cycle detection, loop progress assertions, and
+   farthest-failure diagnostics.
+2. **`quest.grammar` (`bootstrap/python/quest/grammar.py`):** The Quest language grammar specification, mapping
+   `SyntaxTarget` non-terminals to production `Rule`s paired with typed AST builder callables.
 
 ### 3.1. Syntax Targets and Grammar Constructs
 
-Non-terminals are first-class `SyntaxTarget` instances that inherit directly from `Construct`. Each syntax target encapsulates its human-readable capitalized name, its list of production `Rule`s, and an `add_rule` registration method.
+Non-terminals are first-class `SyntaxTarget` instances that inherit directly from `Construct`. Each syntax target
+encapsulates its human-readable capitalized name, its list of production `Rule`s, and an `add_rule` registration method.
 
 ```python
 class Construct:
@@ -375,7 +408,8 @@ class Rule:
 ```
 
 #### Top-Level Non-Terminals
-Top-level non-terminals are defined as global constants in `bootstrap/python/quest/grammar.py` with capitalized string names:
+Top-level non-terminals are defined as global constants in `bootstrap/python/quest/grammar.py` with capitalized string
+names:
 
 ```python
 PROGRAM = SyntaxTarget("Program")
@@ -400,7 +434,8 @@ BINDING = SyntaxTarget("Binding")
 ```
 
 #### Architectural Alternative: `QuestGrammar` Class Encapsulation
-An alternative design considered was encapsulating all `SyntaxTarget` non-terminals as fields of a `QuestGrammar` class, with rules built in its constructor (`self._build_rules()`):
+An alternative design considered was encapsulating all `SyntaxTarget` non-terminals as fields of a `QuestGrammar` class,
+with rules built in its constructor (`self._build_rules()`):
 
 ```python
 class QuestGrammar:
@@ -411,17 +446,22 @@ class QuestGrammar:
         self._build_rules()
 ```
 
-- **Advantages:** Eliminates all module-level global variables and allows instantiating multiple isolated grammar instances (useful for testing dialect extensions).
-- **Trade-offs / Why Deferred:** Adds `self.` / unpacking preamble boilerplate across ~80 production rules, and is redundant with Quest's native `interface` / `module` system where a grammar module is already a first-class record/namespace when self-hosting.
+- **Advantages:** Eliminates all module-level global variables and allows instantiating multiple isolated grammar
+  instances (useful for testing dialect extensions).
+- **Trade-offs / Why Deferred:** Adds `self.` / unpacking preamble boilerplate across ~80 production rules, and is
+  redundant with Quest's native `interface` / `module` system where a grammar module is already a first-class
+  record/namespace when self-hosting.
 
 ---
 
 ### 3.2. Left-Recursion Elimination via Factored EBNF
 
-In standard PEG, left-recursive productions like `Value ::= Value infix Value` or `Value ::= Value "(" Binding ")"` cause infinite recursion. We factor these into non-left-recursive EBNF rules:
+In standard PEG, left-recursive productions like `Value ::= Value infix Value` or `Value ::= Value "(" Binding ")"`
+cause infinite recursion. We factor these into non-left-recursive EBNF rules:
 
 #### A. Factored Expressions (`Value` & `Infix`)
-Quest's uniform right-associativity (`2 * x + y` $\to$ `2 * (x + y)`) is parsed cleanly by right-recursive infix chaining:
+Quest's uniform right-associativity (`2 * x + y` $\to$ `2 * (x + y)`) is parsed cleanly by right-recursive infix
+chaining:
 
 ```bnf
 Value         ::= PostfixValue [ InfixTail ]
@@ -457,18 +497,24 @@ PostfixTypeOp ::= ("." ide | "(" [TypeBinding] ")" | "_" ide)
 1. **Table Structure:**  
    The parser memoizes results strictly at the `SyntaxTarget` level:
    $$\text{cache}[(target, token\_pos)] \to (result\_node, next\_token\_pos) \text{ or } \text{None}$$
-   Internal construct evaluations (`MatchToken`, `Optional`, `Repeated`) execute directly in a fast loop without cache allocation overhead.
+   Internal construct evaluations (`MatchToken`, `Optional`, `Repeated`) execute directly in a fast loop without cache
+allocation overhead.
 
 2. **Zero-Width Loop Prevention in `Repeated`:**  
    On every iteration of `Repeated(construct)`, the parser asserts progress:
    $$\text{new\_pos} > \text{old\_pos}$$
-   If a construct matches the empty stream without advancing the token index, the loop terminates immediately, preventing infinite loops.
+   If a construct matches the empty stream without advancing the token index, the loop terminates immediately,
+preventing infinite loops.
 
 3. **Direct & Mutual Left-Recursion Cycle Detection (`IN_PROGRESS` Sentinel):**  
-   If an accidental left-recursion or mutual cycle ($A \to B \to A$ at the same token index) is entered, `cache[(target, token_pos)]` is marked with an `IN_PROGRESS` sentinel upon entry. If a recursive call hits an `IN_PROGRESS` entry before completion, the parser immediately detects the cycle and fails that branch (`return None, pos`), guaranteeing that mutual left-recursions never trigger stack overflows.
+   If an accidental left-recursion or mutual cycle ($A \to B \to A$ at the same token index) is entered, `cache[(target,
+token_pos)]` is marked with an `IN_PROGRESS` sentinel upon entry. If a recursive call hits an `IN_PROGRESS` entry before
+completion, the parser immediately detects the cycle and fails that branch (`return None, pos`), guaranteeing that
+mutual left-recursions never trigger stack overflows.
 
 4. **Interactive REPL Caching Policy:**  
-   To prevent stale failure results recorded at EOF boundaries from poisoning future input, the cache is cleared at the start of each top-level interactive phrase parse attempt.
+   To prevent stale failure results recorded at EOF boundaries from poisoning future input, the cache is cleared at the
+start of each top-level interactive phrase parse attempt.
 
 ---
 
@@ -478,7 +524,8 @@ Backtracking PEG parsers can fail deep inside an invalid expression and backtrac
 - `farthest_pos: int`: The maximum token index reached across all evaluated branches.
 - `expected_constructs: set[TokenKind | SyntaxTarget]`: The set of constructs expected at `farthest_pos`.
 
-When the top-level parse fails, the parser reports the exact token at `farthest_pos` and formats a diagnostic message with line, column, and source underline via `SourceMap`.
+When the top-level parse fails, the parser reports the exact token at `farthest_pos` and formats a diagnostic message
+with line, column, and source underline via `SourceMap`.
 
 ---
 
@@ -519,11 +566,13 @@ class Parser:
 
 ## 4. Abstract Syntax Tree (AST) Specification (`quest.ast`)
 
-To avoid name collisions with Python built-ins (e.g. `type`, `tuple`, `eval`) or compiler pass symbols, all AST nodes reside in the dedicated namespace **`quest.ast`** (`bootstrap/python/quest/ast.py`).
+To avoid name collisions with Python built-ins (e.g. `type`, `tuple`, `eval`) or compiler pass symbols, all AST nodes
+reside in the dedicated namespace **`quest.ast`** (`bootstrap/python/quest/ast.py`).
 
 ### 4.1. Base Node and Parameter Structures
 
-In Python 3.10+, `ASTNode` declares `_: KW_ONLY` and `offset: int = 0`. Subclasses define purely positional semantic fields, while automatically inheriting keyword-only `offset` tracking:
+In Python 3.10+, `ASTNode` declares `_: KW_ONLY` and `offset: int = 0`. Subclasses define purely positional semantic
+fields, while automatically inheriting keyword-only `offset` tracking:
 
 ```python
 from __future__ import annotations
@@ -1033,7 +1082,8 @@ class Program(ASTNode):
 
 ### 4.6. Canonical S-Expression Pretty-Printer (`ast_dump`)
 
-To verify parser correctness with the golden test framework (`tests/golden/parse/<name>.out`), `ast_dump()` serializes ASTs to S-expressions using **two-space indentation per nesting level**:
+To verify parser correctness with the golden test framework (`tests/golden/parse/<name>.out`), `ast_dump()` serializes
+ASTs to S-expressions using **two-space indentation per nesting level**:
 
 ```python
 def ast_dump(node: ASTNode, indent: int = 0, show_offsets: bool = False) -> str:
@@ -1059,22 +1109,22 @@ def ast_dump(node: ASTNode, indent: int = 0, show_offsets: bool = False) -> str:
 
 ## 5. Output Streams, Golden Testing, and Error Handling Discipline
 
+The complete specification of compiler test suites (unit tests, golden-file end-to-end tests, and inline diagnostic
+error tests) is documented in [docs/testing.md](testing.md).
+
 ### 5.1. Standard Compiler Output Streams
 The compiler strictly distinguishes standard output and diagnostic error output:
-- **Standard Output (`stdout`, exit code 0):** Used exclusively for valid compiler output (e.g. token streams from `quest_tokenize.py`, S-expression ASTs from `quest_parse.py`, and compiled code in later phases).
-- **Standard Error (`stderr`, exit code 1):** Used exclusively for diagnostic messages, syntax errors, and compiler errors formatted with source location context.
+- **Standard Output (`stdout`, exit code 0):** Used exclusively for valid compiler output (e.g. token streams from
+  `quest_tokenize.py`, S-expression ASTs from `quest_parse.py`, and typed AST dumps from `quest_typed_ast.py`).
+- **Standard Error (`stderr`, exit code 1):** Used exclusively for diagnostic messages, syntax errors, and compiler
+  errors formatted with source location context.
 
-### 5.2. Golden Test Framework Conventions (`.out` vs. `.error`)
-The test runner (`run_tests.py`) enforces strict separation between positive success tests and negative error tests:
-- **Positive Tests (`<test>.out`):** Valid Quest source files must succeed with exit code 0. Their `stdout` is captured and verified against `tests/golden/<phase>/<test>.out`.
-- **Negative Tests (`<test>.error`):** Invalid Quest source files must fail with exit code $\ne 0$. Their `stderr` diagnostic is captured and verified against `tests/golden/<phase>/<test>.error`.
-- `.out` files must never contain compiler error messages.
-
-### 5.3. Future Error Handling Discipline
-As the bootstrap compiler progresses into type checking and intermediate code generation, more formal discipline will be imposed on error handling:
-1. **Structured Diagnostics:** Transitioning from unstructured error strings to structured diagnostic objects carrying severity (error/warning), error codes, primary and secondary labels, and compiler hints.
-2. **Error Recovery & Cascading Suppression:** Implementing parser and typechecker synchronization strategies to report multiple non-cascading errors per compilation run.
-3. **Explicit Negative Test Suites:** Organizing negative tests under dedicated subdirectories (e.g. `tests/source/errors/`) to systematically verify diagnostic reporting.
+### 5.2. Testing Architecture Reference
+- **Golden-File Tests (`tests/source/` & `tests/golden/`):** Positive tests for valid programs verified via
+  `run_tests.py`.
+- **Diagnostic Inline Tests (`tests/errors/`):** Negative tests with inline expectation comments
+  (`(* ERROR: <regexp> *)`) enforcing precursor validation and bidirectional 1:1 matching.
+- See [docs/testing.md](testing.md) for full directory layouts, syntax specifications, and commands.
 
 ---
 
@@ -1082,17 +1132,24 @@ As the bootstrap compiler progresses into type checking and intermediate code ge
 
 ### 6.1. Module Organization
 The semantic analysis and type system is factored into two modular components:
-- **`bootstrap/python/quest/types.py`**: Semantic kind and type hierarchies (`QKind`, `QType`), lazy type evaluation, substitution, and equi-recursive subtyping algorithms.
-- **`bootstrap/python/quest/env.py`**: Lexical scoping, ordered environments, and symbol table structures (`Scope`, `Environment`, `Symbol`).
+- **`bootstrap/python/quest/types.py`**: Semantic kind and type hierarchies (`QKind`, `QType`), lazy type evaluation,
+  substitution, and equi-recursive subtyping algorithms.
+- **`bootstrap/python/quest/env.py`**: Lexical scoping, ordered environments, and symbol table structures (`Scope`,
+  `Environment`, `Symbol`).
 
 ### 6.2. Naming Conventions
-- **Quest Language Semantic Entities:** Distinguish language levels and prevent collisions with Python host primitives using the `Q` prefix and `Type`/`Kind` suffix:
+- **Quest Language Semantic Entities:** Distinguish language levels and prevent collisions with Python host primitives
+  using the `Q` prefix and `Type`/`Kind` suffix:
   - *Kinds:* `QKind`, `QTypeKind`, `QPowerKind`, `QAllKind`, `QKindVar`
-  - *Primitive Types:* `QIntType`, `QRealType`, `QBoolType`, `QCharType`, `QStringType`, `QOkType`, `QDynamicType`, `QExceptionType`
-  - *Composite & Reference Types:* `QTupleType`, `QRecordType`, `QVariantType`, `QOptionType`, `QFunType`, `QVarType`, `QArrayType`, `QOutType`
-  - *Polymorphic & Higher-Order Types:* `QAllType`, `QAutoType`, `QTypeFun`, `QTypeApp`, `QRecType`, `QRecGroupType`, `QTypeVar`, `QAbstractType`
+  - *Primitive Types:* `QIntType`, `QRealType`, `QBoolType`, `QCharType`, `QStringType`, `QOkType`, `QDynamicType`,
+    `QExceptionType`
+  - *Composite & Reference Types:* `QTupleType`, `QRecordType`, `QVariantType`, `QOptionType`, `QFunType`, `QVarType`,
+    `QArrayType`, `QOutType`
+  - *Polymorphic & Higher-Order Types:* `QAllType`, `QAutoType`, `QTypeFun`, `QTypeApp`, `QRecType`, `QRecGroupType`,
+    `QTypeVar`, `QAbstractType`
   - *Inference Metavariables:* `QTypeMeta`
-- **Compiler Infrastructure Entities:** Mechanisms that manage scoping and compiler state use standard names without a `Q` prefix:
+- **Compiler Infrastructure Entities:** Mechanisms that manage scoping and compiler state use standard names without a
+  `Q` prefix:
   - *Symbols:* `Symbol`, `ValueSymbol`, `TypeSymbol`, `KindSymbol`
   - *Scoping & State:* `Scope`, `Environment`, `TypeChecker`
 
@@ -1100,39 +1157,52 @@ The semantic analysis and type system is factored into two modular components:
 
 #### 1. Equi-Recursive Subtyping & Mutual Recursion
 - **Lazy Evaluation:** Recursive types are evaluated lazily on demand.
-- **Mutual Recursion Node (`QRecGroupType`):** Mutually recursive definitions (`Let Rec A = ... and B = ...`) are stored as `QRecGroupType(bindings: dict[str, QType])`, preserving source structure and avoiding complex unrolling transformations.
-- **Coinductive Assumption Trail:** The subtyping engine tracks a set of evaluated symbol ID pairs $\Sigma \vdash (S, T)$ to guarantee termination on cyclic and mutually recursive type graphs.
+- **Mutual Recursion Node (`QRecGroupType`):** Mutually recursive definitions (`Let Rec A = ... and B = ...`) are stored
+  as `QRecGroupType(bindings: dict[str, QType])`, preserving source structure and avoiding complex unrolling
+  transformations.
+- **Coinductive Assumption Trail:** The subtyping engine tracks a set of evaluated symbol ID pairs $\Sigma \vdash (S,
+  T)$ to guarantee termination on cyclic and mutually recursive type graphs.
 
 #### 2. Named Type Variables with Unique Symbol IDs
-- `QTypeVar(name: str, symbol_id: int)` retains source identifier names for diagnostic error formatting while using unique integer symbol IDs for identity comparison and capture-avoiding substitution during lazy evaluation.
+- `QTypeVar(name: str, symbol_id: int)` retains source identifier names for diagnostic error formatting while using
+  unique integer symbol IDs for identity comparison and capture-avoiding substitution during lazy evaluation.
 
 #### 3. Early Type Path Resolution
-- Syntactic `ast.TypePath` and module-qualified names (`M_T`, `M.T`) are resolved immediately during type elaboration against the `Environment`. There is no `QTypePath` in the semantic type system.
+- Syntactic `ast.TypePath` and module-qualified names (`M_T`, `M.T`) are resolved immediately during type elaboration
+  against the `Environment`. There is no `QTypePath` in the semantic type system.
 
 #### 4. Local Bidirectional Inference (No Global Constraint Solver)
-- Matching *Typeful Programming*, the type system uses local bidirectional synthesis ($\Gamma \vdash e \Rightarrow T$) and checking ($\Gamma \vdash e \Leftarrow T$). Local unification variables (`QTypeMeta`) solve omitted polymorphic type arguments at call sites and infer control-flow return types without a global multi-pass constraint solver.
+- Matching *Typeful Programming*, the type system uses local bidirectional synthesis ($\Gamma \vdash e \Rightarrow T$)
+  and checking ($\Gamma \vdash e \Leftarrow T$). Local unification variables (`QTypeMeta`) solve omitted polymorphic
+  type arguments at call sites and infer control-flow return types without a global multi-pass constraint solver.
 
 #### 5. Ordered Scopes for Dependent Signatures
-- `Scope` maintains an ordered sequence of declarations to support left-to-right elaboration of dependent signatures (e.g. `Tuple A::TYPE a:A f(x:A):Int end`).
+- `Scope` maintains an ordered sequence of declarations to support left-to-right elaboration of dependent signatures
+  (e.g. `Tuple A::TYPE a:A f(x:A):Int end`).
 
 #### 6. Stateless Representation of Manifest vs. Abstract Types
 - Type visibility is represented structurally via `TypeSymbol(name, symbol_id, kind, definition)`:
   - Inside an implementing module, `definition` points to the concrete `QType` (transparent).
-  - Outside in client scopes, `definition` is `None` (abstract, bounded by `kind`), ensuring the typechecker remains functional and stateless.
+  - Outside in client scopes, `definition` is `None` (abstract, bounded by `kind`), ensuring the typechecker remains
+    functional and stateless.
 
 #### 7. Full Subkinding on Kinds
 - Implements full subkinding ($K_1 \le K_2$) across all kind forms:
   - *Reflexivity:* $K \le K$.
   - *Power to Type:* $\text{POWER}(T) \le \text{TYPE}$ for any valid proper type $T$.
   - *Power to Power:* $\text{POWER}(S) \le \text{POWER}(T) \iff S \le T$ (delegates to `is_subtype`).
-  - *Higher-Order Operator Kinds (`QAllKind`):* $\text{ALL}(X::K_1) K_2 \le \text{ALL}(Y::K_1') K_2' \iff K_1' \le K_1 \land K_2 \le K_2'[Y \mapsto X]$ (contravariant in parameter kind, covariant in result kind with $\alpha$-renaming).
+  - *Higher-Order Operator Kinds (`QAllKind`):* $\text{ALL}(X::K_1) K_2 \le \text{ALL}(Y::K_1') K_2' \iff K_1' \le K_1
+    \land K_2 \le K_2'[Y \mapsto X]$ (contravariant in parameter kind, covariant in result kind with $\alpha$-renaming).
   - *Kind Aliases:* `DEF K = Kind` definitions resolve lazily via the `Environment`.
 
 #### 8. Kind Synthesis & Well-Kindedness Verification
 - `synth_kind(type_val, env) -> QKind`: Computes the most specific minimal kind $K$ ($\Gamma \vdash T :: K$).
-- `check_kind(type_val, expected_kind, env)`: Verifies that $\text{is\_subkind}(\text{synth\_kind}(T), \text{expected\_kind})$, raising `KindError` on failures.
-- `check_kind_well_formed(kind, env)`: Validates that kinds are structurally sound ($\text{POWER}(T) \implies T :: \text{TYPE}$).
-- *Non-Unfolding Recursion:* $\text{Rec}(X::K) T$ verifies that under context $\Gamma, X::K$, body $T$ conforms to $K$ without expanding recursive cycles.
+- `check_kind(type_val, expected_kind, env)`: Verifies that $\text{is\_subkind}(\text{synth\_kind}(T),
+  \text{expected\_kind})$, raising `KindError` on failures.
+- `check_kind_well_formed(kind, env)`: Validates that kinds are structurally sound ($\text{POWER}(T) \implies T ::
+  \text{TYPE}$).
+- *Non-Unfolding Recursion:* $\text{Rec}(X::K) T$ verifies that under context $\Gamma, X::K$, body $T$ conforms to $K$
+  without expanding recursive cycles.
 
 ---
 
@@ -1141,42 +1211,62 @@ The semantic analysis and type system is factored into two modular components:
 The four most intricate areas of the Quest semantic type system and their architectural solutions are:
 
 #### 1. Coinductive Equi-Recursive Subtyping ($F_{<:}^\omega$ + $\mu$-Types)
-- **The Infinite Loop Trap:** When testing $S \le T$ between two recursive types, unfolding definitions naively will loop forever. The engine evaluates types **lazily**, stores evaluated symbol pairs $(S, T)$ in an active assumption trail $\Sigma$, and treats encounters of previously visited pairs as coinductively valid.
-- **Interaction with Contravariance:** In function subtyping ($S_1 \to S_2 \le T_1 \to T_2 \iff T_1 \le S_1 \land S_2 \le T_2$), the subtyping direction flips for argument positions. The assumption trail must correctly track polarity flips without introducing false positives or cycle leaks.
-- **Mutual Recursion (`QRecGroupType`):** When two recursive systems (e.g. `Tree` and `NodeList`) mutually refer to each other, lazy unfolding steps across group boundaries, requiring the cycle-detection trail to canonicalize group member identities.
+- **The Infinite Loop Trap:** When testing $S \le T$ between two recursive types, unfolding definitions naively will
+  loop forever. The engine evaluates types **lazily**, stores evaluated symbol pairs $(S, T)$ in an active assumption
+  trail $\Sigma$, and treats encounters of previously visited pairs as coinductively valid.
+- **Interaction with Contravariance:** In function subtyping ($S_1 \to S_2 \le T_1 \to T_2 \iff T_1 \le S_1 \land S_2
+  \le T_2$), the subtyping direction flips for argument positions. The assumption trail must correctly track polarity
+  flips without introducing false positives or cycle leaks.
+- **Mutual Recursion (`QRecGroupType`):** When two recursive systems (e.g. `Tree` and `NodeList`) mutually refer to each
+  other, lazy unfolding steps across group boundaries, requiring the cycle-detection trail to canonicalize group member
+  identities.
 
 #### 2. Dependent Tuple Signatures & Incremental Telescopes
-- **Sequential Context Extension:** In `Tuple X::TYPE init: X step(cur: X): X done(cur: X): Bool end`, the type of `init` ($X$) depends on the preceding type parameter $X$. The typechecker cannot check fields independently in parallel; it must check them in strict left-to-right order, incrementally extending the typing environment $\Gamma$ with each preceding component.
-- **Signature Subtyping & Matching:** When comparing two dependent signatures $S \le T$, type variables declared in $T$ must be substituted with the corresponding concrete component types from $S$ before checking subsequent fields.
+- **Sequential Context Extension:** In `Tuple X::TYPE init: X step(cur: X): X done(cur: X): Bool end`, the type of
+  `init` ($X$) depends on the preceding type parameter $X$. The typechecker cannot check fields independently in
+  parallel; it must check them in strict left-to-right order, incrementally extending the typing environment $\Gamma$
+  with each preceding component.
+- **Signature Subtyping & Matching:** When comparing two dependent signatures $S \le T$, type variables declared in $T$
+  must be substituted with the corresponding concrete component types from $S$ before checking subsequent fields.
 
 #### 3. Compile-Time Type-Level $\lambda$-Calculus & Lazy $\beta$-Reduction
-- **Type Equivalence via Lazy Evaluation:** Checking whether two types are equal requires lazily reducing type applications ($\beta$-reduction) and expanding transparent type aliases on demand (e.g. `Pair(Int Int)` $\equiv$ `Tuple first: Int second: Int end`).
-- **Capture-Avoiding Substitution:** When substituting type arguments into type operator bodies (`QTypeFun`), free type variables must not be accidentally captured by inner quantifiers ($\forall$) or recursive binders ($\text{Rec}$). Using unique `symbol_id`s on `QTypeVar` ensures capture-avoiding substitution and exact identity comparisons.
+- **Type Equivalence via Lazy Evaluation:** Checking whether two types are equal requires lazily reducing type
+  applications ($\beta$-reduction) and expanding transparent type aliases on demand (e.g. `Pair(Int Int)` $\equiv$
+  `Tuple first: Int second: Int end`).
+- **Capture-Avoiding Substitution:** When substituting type arguments into type operator bodies (`QTypeFun`), free type
+  variables must not be accidentally captured by inner quantifiers ($\forall$) or recursive binders ($\text{Rec}$).
+  Using unique `symbol_id`s on `QTypeVar` ensures capture-avoiding substitution and exact identity comparisons.
 
 #### 4. Manifest vs. Abstract Types in First-Class Modules
-- **Dual Transparency:** Inside a module implementation `module m: M ...`, a manifest type `M_T` is transparent (equal to its concrete definition in the module's local scope). Outside to clients of interface `M`, `M_T` is an abstract type variable bounded by its kind.
-- **Diamond Import Equivalence:** If modules `B` and `C` both import interface `A`, the typechecker must recognize that manifest types `B_A_T` and `C_A_T` originate from the exact same interface definition `A_T` and are therefore interchangeable.
+- **Dual Transparency:** Inside a module implementation `module m: M ...`, a manifest type `M_T` is transparent (equal
+  to its concrete definition in the module's local scope). Outside to clients of interface `M`, `M_T` is an abstract
+  type variable bounded by its kind.
+- **Diamond Import Equivalence:** If modules `B` and `C` both import interface `A`, the typechecker must recognize that
+  manifest types `B_A_T` and `C_A_T` originate from the exact same interface definition `A_T` and are therefore
+  interchangeable.
 
 #### Summary Complexity Matrix
 
 | Complexity Area | Key Difficulty | Architectural Solution |
 | :--- | :--- | :--- |
-| **Recursive Subtyping** | Infinite expansion loops & polarity flips | Lazy evaluation + coinductive symbol-pair trail $\Sigma$ |
-| **Dependent Signatures** | Fields depend on earlier type parameters | Ordered `Scope` with left-to-right incremental elaboration |
-| **Type-Level $\lambda$-Calculus** | $\beta$-reduction & variable capture | Lazy evaluation + `QTypeVar` with unique `symbol_id` |
-| **Module Manifest Types** | Inside is concrete, outside is abstract | Structural `TypeSymbol(kind, definition)` (no ambient flags) |
-| **Diamond Imports** | Disparate import paths for same interface | Canonical interface symbol interning in `Environment` |
+| **Recursive Subtyping** | Infinite expansion loops & polarity flips | Lazy eval + coinductive trail $\Sigma$ |
+| **Dependent Signatures** | Fields depend on earlier type parameters | Ordered `Scope` incremental elaboration |
+| **Type $\lambda$-Calculus** | $\beta$-reduction & variable capture | Lazy eval + `QTypeVar` symbol IDs |
+| **Module Manifest Types** | Concrete inside, abstract outside | Structural `TypeSymbol(kind, definition)` |
+| **Diamond Imports** | Disparate paths for same interface | Canonical symbol interning in `Environment` |
 
 ---
 
 ## 7. AST Elaboration and Term Typechecking Architecture
 
-The semantic pipeline bridges syntactic AST nodes (`ast.Kind`, `ast.Type`, `ast.Expr`) to canonical semantic representations and typed core nodes across two modular passes:
+The semantic pipeline bridges syntactic AST nodes (`ast.Kind`, `ast.Type`, `ast.Expr`) to canonical semantic
+representations and typed core nodes across two modular passes:
 
 ### 7.1. Module Separation
 
 1. **`bootstrap/python/quest/elaborate_types.py` (Type Elaboration):**
-   - Pure, unidirectional lowering pass: `ast.Kind` $\to$ `QKind`, `ast.Type` $\to$ `QType`, and `ast.BindingNode` $\to$ `list[TypeSymbol]`.
+   - Pure, unidirectional lowering pass: `ast.Kind` $\to$ `QKind`, `ast.Type` $\to$ `QType`, and `ast.BindingNode` $\to$
+     `list[TypeSymbol]`.
    - Resolves lexical `TypePath`s and interface manifests against the `Environment`.
    - Desugars syntactic sugar (`T -> U` $\to$ `QFunType`, unannotated `All(X) T` $\to$ `QAllType(X :: TYPE)`).
    - Allocates fresh positive integer `symbol_id`s for all bound type parameters.
@@ -1184,95 +1274,143 @@ The semantic pipeline bridges syntactic AST nodes (`ast.Kind`, `ast.Type`, `ast.
 
 2. **`bootstrap/python/quest/typechecker.py` (Term Elaboration & Typechecking):**
    - Bidirectional expression typechecking ($\Gamma \vdash e \Leftarrow T$ and $\Gamma \vdash e \Rightarrow T$).
-   - Desugars complex control flow (`for` $\to$ `while`, `andif`/`orif` $\to$ conditionals, `case`/`inspect` $\to$ tag checks).
+   - Desugars complex control flow (`for` $\to$ `while`, `andif`/`orif` $\to$ conditionals, `case`/`inspect` $\to$ tag
+     checks).
    - Inserts explicit type arguments for polymorphic applications.
-   - Produces explicit, decorated **`TypedExpr`** nodes (Option A) storing synthesized `QType`s for interpretation and code generation.
+   - Produces explicit, decorated **`TypedExpr`** nodes (Option A) storing synthesized `QType`s for interpretation and
+     code generation.
 
 ### 7.2. Typed Representation (Option A)
 
-Term typechecking emits dedicated `TypedExpr` nodes that preserve source provenance while decorating expressions with their synthesized semantic `QType` and resolved `ValueSymbol` bindings. This creates a clean boundary between the front-end checker and backend code generators or interpreters.
+Term typechecking emits dedicated `TypedExpr` nodes that preserve source provenance while decorating expressions with
+their synthesized semantic `QType` and resolved `ValueSymbol` bindings. This creates a clean boundary between the
+front-end checker and backend code generators or interpreters.
 
 ---
 
 ## 8. Term Typing Semantics and Parameter Modes
 
 ### 8.1. Implicit Dereferencing of Mutable (`var`) Variables
-In Quest, mutable variables are declared via `let var x := e` and assigned the semantic type `Var(T)` in the symbol table.
-- **Value Positions:** Whenever a mutable variable is referenced in an expression (e.g. `x + 1`), the typechecker automatically wraps the reference in `TypedDerefCell(target=TypedVar(x), type_val=T)`. Explicit dereferencing (`@x` or `!x`) is also supported.
-- **Assignment Targets:** In an assignment `x := e`, the target `x` is recognized as an lvalue reference without dereferencing, validating that the variable is mutable and the assigned value satisfies $e \le T$.
+In Quest, mutable variables are declared via `let var x := e` and assigned the semantic type `Var(T)` in the symbol
+table.
+- **Value Positions:** Whenever a mutable variable is referenced in an expression (e.g. `x + 1`), the typechecker
+  automatically wraps the reference in `TypedDerefCell(target=TypedVar(x), type_val=T)`. Explicit dereferencing (`@x` or
+  `!x`) is also supported.
+- **Assignment Targets:** In an assignment `x := e`, the target `x` is recognized as an lvalue reference without
+  dereferencing, validating that the variable is mutable and the assigned value satisfies $e \le T$.
 
 ### 8.2. Infix Operators & Strict Numeric Typing (No Coercion)
-- **Numeric Non-Coercion:** Quest strictly disallows implicit coercion between `Int` and `Real`. Both operands of arithmetic operators (`+`, `-`, `*`, `/`, `mod`) must be `Int` (yielding `Int`) or both must be `Real` (yielding `Real`). Mixed operations like `3 + 4.0` are rejected with a type error.
-- **Short-Circuit Booleans:** `andif` and `orif` require boolean operands and are lowered directly into conditional control flow (`TypedIf`).
+- **Numeric Non-Coercion:** Quest strictly disallows implicit coercion between `Int` and `Real`. Both operands of
+  arithmetic operators (`+`, `-`, `*`, `/`, `mod`) must be `Int` (yielding `Int`) or both must be `Real` (yielding
+  `Real`). Mixed operations like `3 + 4.0` are rejected with a type error.
+- **Short-Circuit Booleans:** `andif` and `orif` require boolean operands and are lowered directly into conditional
+  control flow (`TypedIf`).
 - **Assignment:** `:=` synthesizes `Ok`.
 
 ### 8.3. Conditionals and Omitted Else
-- **Conditionals with Else:** In `if cond then e1 else e2 end`, both branches are evaluated and the expression synthesizes their least common supertype join ($T_1 \le T_2 \implies T_2$; $T_2 \le T_1 \implies T_1$).
-- **Omitted Else:** In `if cond then e end`, the construct is evaluated purely for its side effects. The return value of `e` is discarded (accepting any type $T$), and the overall `if` expression synthesizes `Ok`, desugaring to `if cond then (e; ok) else ok end`.
+- **Conditionals with Else:** In `if cond then e1 else e2 end`, both branches are evaluated and the expression
+  synthesizes their least common supertype join ($T_1 \le T_2 \implies T_2$; $T_2 \le T_1 \implies T_1$).
+- **Omitted Else:** In `if cond then e end`, the construct is evaluated purely for its side effects. The return value of
+  `e` is discarded (accepting any type $T$), and the overall `if` expression synthesizes `Ok`, desugaring to `if cond
+  then (e; ok) else ok end`.
 
 ### 8.4. Function Parameter Modes & Covariant Out Parameters
 Quest supports three distinct evaluation modes for formal parameters:
-1. **Value Parameters (Default):** Standard input parameter. The argument must satisfy $\text{arg} \le T_{\text{param}}$ (contravariant in function subtyping).
-2. **`var` Parameters (`fun(var x: T)`):** In-out parameter. The argument must be a mutable memory location holding type $T$. Because the function both reads and writes the location, subtyping is **invariant** ($T_{\text{arg}} = T_{\text{param}}$).
+1. **Value Parameters (Default):** Standard input parameter. The argument must satisfy $\text{arg} \le T_{\text{param}}$
+   (contravariant in function subtyping).
+2. **`var` Parameters (`fun(var x: T)`):** In-out parameter. The argument must be a mutable memory location holding type
+   $T$. Because the function both reads and writes the location, subtyping is **invariant** ($T_{\text{arg}} =
+   T_{\text{param}}$).
 3. **`out` Parameters (`fun(out x: T)`):** Pure output channel.
-   - **Call-Site Rule:** The argument must be a mutable location `var y: U`. The function guarantees writing a value of type $T$. For the caller to safely read $y$ as $U$ after the call, the call-site requires $T_{\text{param}} \le U_{\text{arg}}$.
-   - **Function Subtyping:** Covariant in $T$. An output parameter behaves exactly like a component of the function's return type: $(\text{out } T_1 \to R) \le (\text{out } T_2 \to R)$ whenever $T_1 \le T_2$.
+   - **Call-Site Rule:** The argument must be a mutable location `var y: U`. The function guarantees writing a value of
+     type $T$. For the caller to safely read $y$ as $U$ after the call, the call-site requires $T_{\text{param}} \le
+     U_{\text{arg}}$.
+   - **Function Subtyping:** Covariant in $T$. An output parameter behaves exactly like a component of the function's
+     return type: $(\text{out } T_1 \to R) \le (\text{out } T_2 \to R)$ whenever $T_1 \le T_2$.
 
 ### 8.5. Polymorphic Quantifiers (`All`) and Local Inference
-- **Dual Role of `All(...)`:** When `All(formals) Type` specifies type variables ($X :: K$), it elaborates to `QAllType` (universal quantification). When it specifies value parameters ($x : T$), it desugars to `QFunType` (dependent/value function).
-- **Local Polymorphic Inference:** Calls to polymorphic functions `f : All(X::K) T` can omit explicit type arguments. The typechecker instantiates metavariables `QTypeMeta` to solve for $X$ from value arguments and inserts an explicit `TypedTypeApp` into the typed AST.
+- **Dual Role of `All(...)`:** When `All(formals) Type` specifies type variables ($X :: K$), it elaborates to `QAllType`
+  (universal quantification). When it specifies value parameters ($x : T$), it desugars to `QFunType` (dependent/value
+  function).
+- **Local Polymorphic Inference:** Calls to polymorphic functions `f : All(X::K) T` can omit explicit type arguments.
+  The typechecker instantiates metavariables `QTypeMeta` to solve for $X$ from value arguments and inserts an explicit
+  `TypedTypeApp` into the typed AST.
 
 ### 8.6. Function Definition Shorthand and Recursive Bindings
-- **Shorthand Desugaring:** A declaration `let f(params): Ret = body` desugars into `let f: FunType = fun(params): Ret body`.
-- **Recursive Functions (`let rec`):** In `let rec f(params): Ret = body`, the full function signature is elaborated and pre-bound in the lexical scope before typechecking `body`, permitting direct recursive invocations `f(...)` within the definition.
+- **Shorthand Desugaring:** A declaration `let f(params): Ret = body` desugars into `let f: FunType = fun(params): Ret
+  body`.
+- **Recursive Functions (`let rec`):** In `let rec f(params): Ret = body`, the full function signature is elaborated and
+  pre-bound in the lexical scope before typechecking `body`, permitting direct recursive invocations `f(...)` within the
+  definition.
 
 ### 8.7. Return Type Inference
-- **Annotated Return Type:** In `fun(params): Ret body`, the body is checked against `Ret` using $\Gamma \vdash \text{body} \Leftarrow \text{Ret}$.
-- **Omitted Return Type:** In `fun(params) body`, the body type is synthesized using $\Gamma \vdash \text{body} \Rightarrow T_{\text{ret}}$, and the function's return type becomes $T_{\text{ret}}$.
+- **Annotated Return Type:** In `fun(params): Ret body`, the body is checked against `Ret` using $\Gamma \vdash
+  \text{body} \Leftarrow \text{Ret}$.
+- **Omitted Return Type:** In `fun(params) body`, the body type is synthesized using $\Gamma \vdash \text{body}
+  \Rightarrow T_{\text{ret}}$, and the function's return type becomes $T_{\text{ret}}$.
 
 ---
 
 ## 9. Structured Data Types, Patterns, and Arrays
 
 ### 9.1. Records and Tuples
-- **Record Construction:** `record [var] x = e1 ... end` synthesizes `QRecordType`. In checking mode, width subtyping allows supplying extra fields while verifying that all required fields exist with compatible types.
-- **Mutable Record Fields:** Record fields declared `var` are invariant in their element type and support field update `r.x := val`, which verifies that `x` is mutable and $val \le T_x$.
-- **Tuples:** `tuple [x =] e1 ... end` constructs `QTupleType`. Tuples support named field selection (`t.intensity`). Positional access is not supported.
+- **Record Construction:** `record [var] x = e1 ... end` synthesizes `QRecordType`. In checking mode, width subtyping
+  allows supplying extra fields while verifying that all required fields exist with compatible types.
+- **Mutable Record Fields:** Record fields declared `var` are invariant in their element type and support field update
+  `r.x := val`, which verifies that `x` is mutable and $val \le T_x$.
+- **Tuples:** `tuple [x =] e1 ... end` constructs `QTupleType`. Tuples support named field selection (`t.intensity`).
+  Positional access is not supported.
 
 ### 9.2. Options and Variants
-- **Construction (`option` / `variant`):** `option tag [with payload] of OptionType end` validates that `tag` is a declared variant of `OptionType` and checks that the payload matches the tag's declared payload type (or absence thereof).
+- **Construction (`option` / `variant`):** `option tag [with payload] of OptionType end` validates that `tag` is a
+  declared variant of `OptionType` and checks that the payload matches the tag's declared payload type (or absence
+  thereof).
 
 ### 9.3. Pattern Matching (`case`) and Exhaustiveness
-- **Discrimination:** `case target when tag1 [with b] then e1 ... [else default] end` discriminates over `Option` or `Variant` values.
-- **Payload Binders:** When a branch specifies `with b`, the binder is scoped to the branch body and bound to the variant's payload type.
-- **Strict Exhaustiveness:** When an `else` branch is omitted, the typechecker enforces that every tag of the target type is covered by at least one `when` branch. Missing tags produce a compile-time `TypeError`.
-- **Branch Joining:** In synthesis mode, the result type is the least common supertype join of all branch expressions (and the `else` expression if present). In checking mode, every branch is checked against the expected type.
+- **Discrimination:** `case target when tag1 [with b] then e1 ... [else default] end` discriminates over `Option` or
+  `Variant` values.
+- **Payload Binders:** When a branch specifies `with b`, the binder is scoped to the branch body and bound to the
+  variant's payload type.
+- **Strict Exhaustiveness:** When an `else` branch is omitted, the typechecker enforces that every tag of the target
+  type is covered by at least one `when` branch. Missing tags produce a compile-time `TypeError`.
+- **Branch Joining:** In synthesis mode, the result type is the least common supertype join of all branch expressions
+  (and the `else` expression if present). In checking mode, every branch is checked against the expected type.
 
 ### 9.4. Arrays
-- **Array Literals:** `array of e1 e2 ... end` synthesizes `QArrayType(T)` where $T$ is the least common supertype join of the elements.
-- **Empty Arrays:** `array of end` cannot infer an element type in synthesis mode and strictly requires checking mode / an explicit type annotation (e.g. `let a: Array(Int) = array of end`).
+- **Array Literals:** `array of e1 e2 ... end` synthesizes `QArrayType(T)` where $T$ is the least common supertype join
+  of the elements.
+- **Empty Arrays:** `array of end` cannot infer an element type in synthesis mode and strictly requires checking mode /
+  an explicit type annotation (e.g. `let a: Array(Int) = array of end`).
 - **Array Repetition:** `array of (count init)` checks that `count` is an `Int` and synthesizes `QArrayType(T)`.
-- **Indexing & Mutation:** `arr[i]` requires `i: Int` and yields element type $T$. `arr[i] := val` verifies $val \le T$ and evaluates to `Ok`.
+- **Indexing & Mutation:** `arr[i]` requires `i: Int` and yields element type $T$. `arr[i] := val` verifies $val \le T$
+  and evaluates to `Ok`.
 
 ---
 
 ## 10. Exceptions, Dynamic Types, and Type Inspection
 
 ### 10.1. Internal Bottom Type and Control Divergence (`raise`)
-- **Internal `Bottom` Type:** Quest incorporates an internal `Bottom` type ($\bot$) that is a subtype of every type ($\forall T. \bot \le T$). `Bottom` is not exposed directly in user source syntax.
-- **Checking Mode Divergence:** A `raise exc [with payload] end` construct diverts control flow unconditionally. In checking mode ($\Gamma \vdash \text{raise} \Leftarrow T$), it checks successfully against **any** expected type $T$.
-- **Synthesis Mode:** A standalone `raise exc end` with no `as Type` annotation synthesizes `Ok`. If an explicit `as T` clause is given (`raise exc as T end`), it synthesizes $T$.
+- **Internal `Bottom` Type:** Quest incorporates an internal `Bottom` type ($\bot$) that is a subtype of every type
+  ($\forall T. \bot \le T$). `Bottom` is not exposed directly in user source syntax.
+- **Checking Mode Divergence:** A `raise exc [with payload] end` construct diverts control flow unconditionally. In
+  checking mode ($\Gamma \vdash \text{raise} \Leftarrow T$), it checks successfully against **any** expected type $T$.
+- **Synthesis Mode:** A standalone `raise exc end` with no `as Type` annotation synthesizes `Ok`. If an explicit `as T`
+  clause is given (`raise exc as T end`), it synthesizes $T$.
 
 ### 10.2. Exception Declarations and Handling (`try...when`)
-- **Exception Declarations:** `exception Name [: PayloadType] end;` introduces a first-class exception value bound in the lexical scope with type `Exception(PayloadType)` (defaulting to `Exception(Ok)` when omitted).
-- **Payload Checking:** When raising an exception with a payload (`raise Exc with payload end`), the payload expression is checked against the exception's declared payload type.
+- **Exception Declarations:** `exception Name [: PayloadType] end;` introduces a first-class exception value bound in
+  the lexical scope with type `Exception(PayloadType)` (defaulting to `Exception(Ok)` when omitted).
+- **Payload Checking:** When raising an exception with a payload (`raise Exc with payload end`), the payload expression
+  is checked against the exception's declared payload type.
 - **Handling (`try...when`):**
   - `try body when Exc1 [with b1] then h1 ... [else default] end`.
   - When a handler specifies `with b`, binder `b` is scoped to `h` and bound to the exception's payload type.
-  - In checking mode, `body`, all handlers, and `else` (if present) are checked against the expected type. In synthesis mode, the result type is the least common supertype join.
+  - In checking mode, `body`, all handlers, and `else` (if present) are checked against the expected type. In synthesis
+    mode, the result type is the least common supertype join.
 
 ### 10.3. Dynamic Values and Inspection (`inspect`)
-- **Built-in `dynamic` Function:** The global environment pre-declares `dynamic: All(X::TYPE) X -> Dynamic`. Value applications like `dynamic(42)` package a value together with its type tag into the type `Dynamic`.
+- **Built-in `dynamic` Function:** The global environment pre-declares `dynamic: All(X::TYPE) X -> Dynamic`. Value
+  applications like `dynamic(42)` package a value together with its type tag into the type `Dynamic`.
 - **Dynamic Type Inspection (`inspect`):**
   - `inspect target when Type1 [with b1] then body1 ... [else default] end` checks that `target` has type `Dynamic`.
   - Each `when Type with b` branch elaborates `Type` and binds `b` to `Type` in the branch body.
