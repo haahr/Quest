@@ -16,7 +16,9 @@ from pathlib import Path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from quest.diagnostics import DiagnosticRenderer, Severity
+from quest.interpreter import format_interactive_result
 from quest.pipeline import CompilerOptions, default_pipeline
+from quest.runtime import QOk, qvalue_to_str
 from quest.tokens import SourceMap
 
 
@@ -77,7 +79,8 @@ def run_driver(args: list[str]) -> int:
     parsed_args = arg_parser.parse_args(args)
 
     # Determine input source
-    if parsed_args.code is not None:
+    is_inline_code = parsed_args.code is not None
+    if is_inline_code:
         source_text = parsed_args.code
         file_name = "<string>"
     elif parsed_args.file is None or parsed_args.file == "-":
@@ -110,7 +113,19 @@ def run_driver(args: list[str]) -> int:
     # Output any requested phase dumps
     for phase_name in available_phases:
         if phase_name in result.dump_outputs:
-            sys.stdout.write(result.dump_outputs[phase_name] + "\n")
+            out_str = result.dump_outputs[phase_name]
+            if out_str:
+                sys.stdout.write(out_str + "\n")
+
+    # If evaluated inline code via -c, print the final phrase result (unless it's ok)
+    if is_inline_code and result.success and "interpret" not in result.dump_outputs:
+        typed_prog = result.artifacts.get("typecheck")
+        final_phrase = typed_prog.phrases[-1] if typed_prog and typed_prog.phrases else None
+        val = result.artifacts.get("interpret")
+        if val is not None:
+            out_str = format_interactive_result(final_phrase, val)
+            if out_str:
+                sys.stdout.write(out_str + "\n")
 
     # Render diagnostics if any occurred
     if result.diagnostics:

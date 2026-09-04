@@ -1825,7 +1825,7 @@ def _synth_infix_expr(expr: ast.ExprInfix, env: Environment, loop_depth: int) ->
     left_typed = synth_expr(expr.left, env, loop_depth)
     right_typed = synth_expr(expr.right, env, loop_depth)
 
-    if expr.op in ("+", "-", "*", "/", "mod"):
+    if expr.op in ("+", "-", "*", "/", "mod", "%"):
         if left_typed.type_val == INT_TYPE:
             if right_typed.type_val != INT_TYPE:
                 raise TypeError(
@@ -1842,8 +1842,8 @@ def _synth_infix_expr(expr: ast.ExprInfix, env: Environment, loop_depth: int) ->
             )
 
         if left_typed.type_val == REAL_TYPE:
-            if expr.op == "mod":
-                raise TypeError("Operator 'mod' is not defined for Real", offset=expr.offset)
+            if expr.op in ("mod", "%"):
+                raise TypeError(f"Operator '{expr.op}' is not defined for Real", offset=expr.offset)
             if right_typed.type_val != REAL_TYPE:
                 raise TypeError(
                     f"Operator '{expr.op}' requires both operands to be Real, but got "
@@ -1956,6 +1956,21 @@ def _synth_assignment(expr: ast.ExprInfix, env: Environment, loop_depth: int) ->
                 offset=sel_off,
             )
             return TypedAssign(target=target_select, value=rhs_typed, offset=expr.offset)
+
+        # Target 3: Array indexing (a[idx] := rhs)
+        case ast.ExprIndex(target=target, index=index, offset=idx_off):
+            target_typed = synth_expr(target, env, loop_depth)
+            target_type = target_typed.type_val.evaluate_lazily(env)
+            if not isinstance(target_type, QArrayType):
+                raise TypeError(f"Cannot index non-array type '{target_type}'", offset=idx_off)
+            index_typed = check_expr(index, INT_TYPE, env, loop_depth)
+            rhs_typed = check_expr(expr.right, target_type.element_type, env, loop_depth)
+            return TypedIndexAssign(
+                target=target_typed,
+                index=index_typed,
+                value=rhs_typed,
+                offset=expr.offset,
+            )
 
         case _:
             raise TypeError("Assignment target must be a mutable variable or field", offset=expr.left.offset)

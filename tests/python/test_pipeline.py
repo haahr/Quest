@@ -21,22 +21,30 @@ class TestPipeline(unittest.TestCase):
 
     def test_pipeline_phases_and_precursors(self):
         """Verifies phase registration and automatic precursor computation."""
-        self.assertEqual(self.pipeline.phase_names(), ["tokenize", "parse", "typecheck"])
+        self.assertEqual(
+            self.pipeline.phase_names(),
+            ["tokenize", "parse", "typecheck", "interpret"],
+        )
         self.assertEqual(self.pipeline.precursors_of("tokenize"), [])
         self.assertEqual(self.pipeline.precursors_of("parse"), ["tokenize"])
         self.assertEqual(self.pipeline.precursors_of("typecheck"), ["tokenize", "parse"])
+        self.assertEqual(
+            self.pipeline.precursors_of("interpret"),
+            ["tokenize", "parse", "typecheck"],
+        )
 
         with self.assertRaises(ValueError):
             self.pipeline.precursors_of("nonexistent")
 
     def test_execute_success(self):
-        """Verifies full execution through typecheck."""
+        """Verifies full execution through interpret."""
         res = self.pipeline.execute("let x: Int = 10;", "<test>")
         self.assertTrue(res.success)
-        self.assertEqual(res.final_phase, "typecheck")
+        self.assertEqual(res.final_phase, "interpret")
         self.assertIn("tokenize", res.artifacts)
         self.assertIn("parse", res.artifacts)
         self.assertIn("typecheck", res.artifacts)
+        self.assertIn("interpret", res.artifacts)
         self.assertFalse(res.has_errors)
 
     def test_stop_after_and_dump(self):
@@ -67,7 +75,7 @@ class TestPipeline(unittest.TestCase):
         try:
             res = self.pipeline.compile_file(temp_path)
             self.assertTrue(res.success)
-            self.assertEqual(res.final_phase, "typecheck")
+            self.assertEqual(res.final_phase, "interpret")
         finally:
             temp_path.unlink()
 
@@ -92,6 +100,33 @@ class TestPipeline(unittest.TestCase):
         self.assertTrue(res.has_errors)
         self.assertNotIn("typecheck", res.artifacts)
         self.assertTrue(any("Unexpected token" in d.message for d in res.diagnostics))
+
+    def test_interpret_dump(self):
+        """Verifies --dump-after interpret emits formatted value for expressions."""
+        opts = CompilerOptions(dump_after={"interpret"})
+        res = self.pipeline.execute("40 + 2;", "<test>", options=opts)
+        self.assertTrue(res.success)
+        self.assertEqual(res.final_phase, "interpret")
+        self.assertIn("interpret", res.dump_outputs)
+        self.assertEqual(res.dump_outputs["interpret"], "42 : Int")
+
+    def test_interpret_dump_ok_silent(self):
+        """Verifies --dump-after interpret produces empty output for ok / statements."""
+        opts = CompilerOptions(dump_after={"interpret"})
+        res = self.pipeline.execute("ok;", "<test>", options=opts)
+        self.assertTrue(res.success)
+        self.assertEqual(res.final_phase, "interpret")
+        self.assertIn("interpret", res.dump_outputs)
+        self.assertEqual(res.dump_outputs["interpret"], "")
+
+    def test_interpret_dump_declaration(self):
+        """Verifies --dump-after interpret produces signature for declarations."""
+        opts = CompilerOptions(dump_after={"interpret"})
+        res = self.pipeline.execute("let x: Int = 10;", "<test>", options=opts)
+        self.assertTrue(res.success)
+        self.assertEqual(res.final_phase, "interpret")
+        self.assertIn("interpret", res.dump_outputs)
+        self.assertEqual(res.dump_outputs["interpret"], "let x:Int = 10")
 
 
 if __name__ == "__main__":

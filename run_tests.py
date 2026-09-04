@@ -180,6 +180,8 @@ def main() -> int:
         if source_files:
             print("=== Golden Tests ===")
             for phase in phases_to_run:
+                if not (TESTS_GOLDEN_DIR / phase).exists():
+                    continue
                 print(f"--- Phase: {phase} ---")
                 for source_file in source_files:
                     total_golden += 1

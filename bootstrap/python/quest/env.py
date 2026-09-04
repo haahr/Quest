@@ -283,3 +283,7 @@ class Environment:
             body=QFunType(params=(QParam(name="x", type_val=dyn_var),), result_type=DYNAMIC_TYPE),
         )
         self.global_scope.declare_value(ValueSymbol(name="dynamic", type_val=dyn_fn_type))
+
+        # Built-in exception: DivideByZero
+        # Note: Binding DivideByZero at root level is an extension to Cardelli's spec.
+        self.global_scope.declare_value(ValueSymbol(name="DivideByZero", type_val=EXCEPTION_TYPE))

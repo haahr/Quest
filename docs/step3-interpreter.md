@@ -82,7 +82,7 @@ pre-linked modules and interfaces in the root environment:
 
 ## 4. Multi-Phase Implementation Plan
 
-### Phase 1: Runtime Values & Memory Model (`quest/runtime.py`)
+### Phase 1: Runtime Values & Memory Model (`quest/runtime.py`) [COMPLETE]
 - Define runtime value representation hierarchy (`QValue`):
   - **Primitives:** `QInt(value: int)`, `QReal(value: float)`, `QBool(value: bool)`, `QChar(value: str)`,
     `QString(value: str)`, `QOk()`.
@@ -103,7 +103,7 @@ pre-linked modules and interfaces in the root environment:
     - `QDynamicVal(value: QValue, type_val: QType)`
 - Canonical value string formatter (`qvalue_to_str(val: QValue) -> str`) and structural equality predicates.
 
-### Phase 2: Runtime Environment & Core Evaluation (`quest/interpreter.py`)
+### Phase 2: Runtime Environment & Core Evaluation (`quest/interpreter.py`) [COMPLETE]
 - `RuntimeEnvironment` with scoped lexical frame chains (`lookup`, `define`, `assign`, `push_scope`, `pop_scope`).
 - Arithmetic, logical, and relational operators (`+`, `-`, `*`, `/`, `mod`, `<`, `<=`, `>`, `>=`, `=`, `<>`).
 - Short-circuit boolean evaluations (`andif`, `orif`).
@@ -114,7 +114,7 @@ pre-linked modules and interfaces in the root environment:
   - Loop termination (`TypedExit` via internal Python control-flow exception `_LoopExit`).
   - Scoped blocks (`TypedBlock`).
 
-### Phase 3: Functions, Compound Structures & Mutation
+### Phase 3: Functions, Compound Structures & Mutation [COMPLETE]
 - First-class function closure creation (`TypedFun` -> `QClosure`).
 - Application evaluation (`TypedApp`): evaluate callee, evaluate arguments, bind parameters in fresh activation scope,
   evaluate body.
@@ -124,15 +124,21 @@ pre-linked modules and interfaces in the root environment:
 - Record field mutation (`r.field := value`).
 - Option/Variant construction and `case` pattern matching (`TypedCase`).
 
-### Phase 4: Exceptions & Cardelli Standard Library Modules (`quest/builtins.py`)
-- Exception declaration (`TypedExceptionDecl`).
-- Raising exceptions (`TypedRaise` via Python control-flow exception `QuestRuntimeException`).
+### Phase 3.4: Exceptions & Dynamic Types [COMPLETE]
+- Exception declaration (`TypedException`) creating unique `QExceptionVal` tag.
+- Raising exceptions (`TypedRaise`) via control-flow exception `QuestException`.
 - Try-handler evaluation (`TypedTry`): evaluate body; if exception matches handler tag, bind payload and evaluate
   handler body; otherwise propagate or fallback to `else_branch`.
+- Dynamic type packaging (`dynamic(val)`) into `QDynamicVal` and type inspection (`inspect dyn when Type ...`).
+- Language-level `dynamic.error` exception on unmatched inspect without `else`.
+- Cardelli-format uncaught exception diagnostics (`Exception: <name> with <payload>:<Type>`).
+
+### Phase 3.5: Cardelli Standard Library Modules (`quest/builtins.py`)
 - Pre-linked standard library module implementations: `writer: Writer`, `reader: Reader`, `conv: Conv`,
   `ascii: Ascii`, `string: StringOp`, `int: IntOp`, `real: RealOp`, `arrayOp: ArrayOp`.
+- Standard library root environment binding and signatures matching Cardelli's specifications.
 
-### Phase 5: Pipeline Integration, CLI & Interactive REPL (`quest/repl.py`)
+### Phase 3.6: Pipeline Integration, CLI & Interactive REPL (`quest/repl.py`)
 - `InterpretPhase` registered in `PhasePipeline` following `typecheck`:
   - Output: final phrase `QValue`.
   - Silent when `QOk`, formatted when non-ok.

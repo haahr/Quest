@@ -20,7 +20,7 @@ The compiler is built using a staged bootstrap methodology across seven distinct
 | :--- | :--- | :--- | :--- |
 | **Step 1** | Python | Front-End: Lexer, PEG Parser, and Untyped AST | **Complete** |
 | **Step 2** | Python | Typechecker: $F_{<:}^\omega$ Subtyping, Equi-Recursion, Elaboration | **Complete** |
-| **Step 3** | Python | Tree-Walking Interpreter & Interactive REPL | **In Progress** |
+| **Step 3** | Python | Tree-Walking Interpreter & Interactive REPL | **In Progress (3.1–3.4 Complete)** |
 | **Step 4** | Python | Bootstrap C Transpiler (emits C99 + Boehm GC) | Queued |
 | **Step 5** | Quest | Self-Hosted Front-End & C Compiler (written in Quest) | Queued |
 | **Step 6** | Quest | Self-Hosted Native AArch64 Compiler (Nanopass Pipeline) | Queued |
@@ -91,6 +91,8 @@ Comprehensive documentation for the language, formal semantics, and compiler sub
   AST structure.
 - [docs/type-system.md](docs/type-system.md): Higher-order type system, subkinding, equi-recursive coinductive
   subtyping, recursive contractiveness ($C \succ X$), and bidirectional term typing.
+- [docs/interpreter.md](docs/interpreter.md): Bootstrap tree-walking interpreter, runtime value hierarchy, scoped
+  environment, Cardelli identity semantics, and operational evaluation engine.
 - [docs/diagnostics.md](docs/diagnostics.md): Structured diagnostic error reporting, severity levels, and caret
   rendering.
 - [docs/runtime-design.md](docs/runtime-design.md): Compiled runtime architecture, evidence passing vs. fat pointers,

@@ -73,12 +73,24 @@ native **AArch64 (ARM64)** machine code and providing a **JIT compiler** for int
 - **Local Type Inference & Signatures:** Signature matching, manifest type/kind expansion (`Def`, `DEF`, `_`), and
   argument/parameter reconciliation.
 
-### Step 3: Bootstrap Tree-Walking Interpreter & REPL (Python) — *In Progress*
-- Tree-walking applicative-order interpreter.
-- Interactive REPL maintaining continuous compiler context and environment across phrases.
-- First-class closures, tuples, records, mutable cells (`var`), arrays, exceptions (`try...when...raise`), and basic
-  standard library interfaces (`IntOp`, `StringOp`, `ArrayOp`, `Conv`, `Dynamic`).
-- Detailed implementation plan in [step3-interpreter.md](step3-interpreter.md).
+### Step 3: Bootstrap Tree-Walking Interpreter & REPL (Python) — *In Progress (Phases 3.1–3.4 Complete)*
+- Tree-walking applicative-order interpreter executing typed AST representations.
+- Subphase progress:
+  - **Phase 3.1 (Runtime Values & Memory):** `QValue` class hierarchy, primitives, aggregates, heap reference cells
+    (`QRef`), Cardelli object identity (`is` / `isnot`), and deep structural equality. — *Complete*
+  - **Phase 3.2 (Environment & Core Evaluation):** Scoped lexical frames (`RuntimeEnvironment`), operators, truncation
+    towards zero for integer division/modulo, loops, and `DivideByZero` exception handling. — *Complete*
+  - **Phase 3.3 (Functions, Structures & Mutation):** Closures (`QClosure`), recursive bindings, record/tuple member
+    selection, mutable record fields, mutable arrays (`QArray`), and `case` pattern matching. — *Complete*
+  - **Phase 3.4 (Exceptions & Dynamic Types):** Exception declarations (`exception`), raising (`raise`), try-catch
+    handlers (`try...when...else`), dynamic type packaging (`dynamic`), type inspection (`inspect`), language-level
+    `dynamic.error`, and Cardelli-format exception diagnostics. — *Complete*
+  - **Phase 3.5 (Cardelli Standard Library Modules):** Pre-linked builtin modules: `writer`, `reader`, `conv`, `ascii`,
+    `int`, `real`, `string`, `arrayOp`. — *Next*
+  - **Phase 3.6 (Pipeline Integration, CLI & Interactive REPL):** `InterpretPhase` phase integration, `--interactive`
+    flag, and persistent interactive multi-line REPL. — *Queued*
+- Architectural design and decisions documented in [interpreter.md](interpreter.md); multi-phase plan in
+  [step3-interpreter.md](step3-interpreter.md).
 
 ### Step 4: Bootstrap C Transpiler (Python)
 - Multi-pass translation pipeline:
@@ -118,4 +130,5 @@ native **AArch64 (ARM64)** machine code and providing a **JIT compiler** for int
 - [type-system.md](type-system.md): Semantic types, subtyping theory, and elaboration.
 - [pipeline.md](pipeline.md): Compiler pipeline framework and CLI driver.
 - [runtime-design.md](runtime-design.md): Object representation (Evidence Passing vs Fat Pointers) and ABI.
+- [interpreter.md](interpreter.md): Interpreter runtime architecture, value model, and semantic decisions.
 - [step3-interpreter.md](step3-interpreter.md): Step 3 interpreter and REPL implementation plan.

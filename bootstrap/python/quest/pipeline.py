@@ -15,11 +15,19 @@ import quest.ast as ast
 from quest.diagnostics import Diagnostic, DiagnosticSink, FatalDiagnosticError, Severity
 from quest.env import Environment
 from quest.grammar import parse_quest_program
+from quest.interpreter import (
+    QuestException,
+    QuestRuntimeError,
+    RuntimeEnvironment,
+    eval_program,
+    format_interactive_result,
+)
 from quest.parser import ParserError
+from quest.runtime import QOk, QValue, qvalue_to_str
 from quest.tokenizer import Tokenizer, TokenizerError
 from quest.tokens import SourceMap, Token, TokenKind
 from quest.typechecker import elaborate_program, TypeError as QuestTypeError
-from quest.typed_ast import TypedProgram
+from quest.typed_ast import TypedBinding, TypedExpr, TypedProgram
 from quest.types import KindError
 
 
@@ -42,6 +50,7 @@ class CompilerContext:
     sink: DiagnosticSink = field(default_factory=DiagnosticSink)
     env: Environment = field(default_factory=Environment)
     options: CompilerOptions = field(default_factory=CompilerOptions)
+    runtime_env: RuntimeEnvironment = field(default_factory=RuntimeEnvironment.create_root_env)
 
     @classmethod
     def create(
@@ -50,10 +59,12 @@ class CompilerContext:
         file_name: str = "<stdin>",
         options: Optional[CompilerOptions] = None,
         env: Optional[Environment] = None,
+        runtime_env: Optional[RuntimeEnvironment] = None,
     ) -> CompilerContext:
         """Constructs a fresh CompilerContext with initialized SourceMap."""
         opts = options or CompilerOptions()
         environment = env if env is not None else Environment()
+        r_env = runtime_env if runtime_env is not None else RuntimeEnvironment.create_root_env()
         source_map = SourceMap(source_text, file_name)
         return cls(
             source_text=source_text,
@@ -62,6 +73,7 @@ class CompilerContext:
             sink=DiagnosticSink(),
             env=environment,
             options=opts,
+            runtime_env=r_env,
         )
 
 
@@ -77,6 +89,12 @@ class PipelineResult:
     @property
     def has_errors(self) -> bool:
         return any(d.severity in (Severity.ERROR, Severity.FATAL) for d in self.diagnostics)
+
+    @property
+    def final_artifact(self) -> Optional[Any]:
+        if self.final_phase and self.final_phase in self.artifacts:
+            return self.artifacts[self.final_phase]
+        return None
 
 
 class Phase(ABC):
@@ -163,6 +181,32 @@ class TypecheckPhase(Phase):
     def dump(self, output_data: Any, ctx: CompilerContext) -> str:
         typed_prog: TypedProgram = output_data
         return typed_prog.dump()
+
+
+class InterpretPhase(Phase):
+    """Interpretation phase: evaluates typed AST in tree-walking interpreter."""
+    name = "interpret"
+    description = "Evaluate typed AST in tree-walking interpreter"
+    artifact_name = "value"
+
+    def __init__(self) -> None:
+        self._last_final_phrase: Optional[TypedBinding | TypedExpr] = None
+
+    def run(self, input_data: Any, ctx: CompilerContext) -> Optional[QValue]:
+        typed_prog: TypedProgram = input_data
+        if typed_prog.phrases:
+            self._last_final_phrase = typed_prog.phrases[-1]
+        else:
+            self._last_final_phrase = None
+        try:
+            return eval_program(typed_prog, ctx.runtime_env)
+        except (QuestException, QuestRuntimeError) as error:
+            ctx.sink.emit(error.to_diagnostic())
+            return None
+
+    def dump(self, output_data: Any, ctx: CompilerContext) -> str:
+        val: QValue = output_data
+        return format_interactive_result(self._last_final_phrase, val)
 
 
 class PhasePipeline:
@@ -273,4 +317,5 @@ def default_pipeline() -> PhasePipeline:
     pipeline.register(TokenizePhase())
     pipeline.register(ParsePhase())
     pipeline.register(TypecheckPhase())
+    pipeline.register(InterpretPhase())
     return pipeline
