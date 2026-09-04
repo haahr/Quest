@@ -12,6 +12,19 @@ The ultimate objective of this project is a **fully self-hosted compiler written
 
 ---
 
+## Why?
+
+I read Luca Cardelli's paper [*Typeful Programming*](http://lucacardelli.name/Papers/TypefulProg.pdf) when I was an undergraduate and I was taken both by its philosophical arguments – *"There exists an identifiable programming style based on the widespread use of type
+information handled through mechanical typechecking techniques"* – and the power and elegance of its design. But, as far as I know, the original implementation was never made public and I never had a chance to use it.
+
+Flash forward nearly four decades, I'm late to the party on agentic programming and vibe coding, but have recently gotten a taste of how much is possible. I wanted a spare-time project to stretch my skills in directing a model to build something interesting, so I decided to build a version of Quest that I could actually play with.
+
+At the risk of having this project dismissed as AI slop, I will straightforwardly say that every line of code (and, other than this section, of documentation) in this project was written by Gemini (3.7 and 3.8 Flash, so far) in [Antigravity](https://antigravity.google/). I've been trying to keep the design clean and the code readable; I've found Dave Rensin's paper and methodology [*Elephants, Goldfish and the New Golden Age of Software Engineering (or, Design is the New Code)*](https://drensin.medium.com/elephants-goldfish-and-the-new-golden-age-of-software-engineering-c33641a48874) to be very helpful in that regard. But, if human-guided, AI-written code bothers you, please stay away.
+
+Otherwise, if you're interested in an interesting waypoint in the history of programming languages, take it out for a spin. *— Paul Haahr*
+
+---
+
 ## Roadmap Summary
 
 The compiler is built using a staged bootstrap methodology across seven distinct phases:
