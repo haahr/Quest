@@ -708,6 +708,26 @@ class TypedModule(TypedBinding):
 
 
 @dataclass(frozen=True)
+class TypedImportItem(TypedNode):
+    names: tuple[str, ...]
+    interface_name: str
+
+    def dump_header(self) -> str:
+        if self.names:
+            return f"({' '.join(repr(n) for n in self.names)}) : '{self.interface_name}'"
+        return f": '{self.interface_name}'"
+
+
+@dataclass(frozen=True)
+class TypedImport(TypedBinding):
+    """Import statement importing interfaces and modules."""
+    items: tuple[TypedImportItem, ...]
+
+    def dump_children(self) -> list[tuple[str, Any]]:
+        return [(":items", self.items)]
+
+
+@dataclass(frozen=True)
 class TypedProgram(TypedNode):
     """Top-level typed program AST."""
     phrases: tuple[Union[TypedBinding, TypedExpr], ...]

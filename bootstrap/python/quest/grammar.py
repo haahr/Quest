@@ -1175,11 +1175,33 @@ def build_quest_grammar() -> None:
         ),
     )
 
-    IMPORT.add_rule(
-        (Rep(IDE_LIST, T(TK.COLON), T(TK.IDENT), Opt(T(TK.SEMICOLON))),),
-        lambda items: tuple(
-            ast.ImportItem(names=item[0], interface_name=item[2].lexeme, offset=0) for item in items
+    # import ImportList
+    LINKAGE.add_rule(
+        (T(TK.KW_IMPORT), IMPORT),
+        lambda import_token, items: ast.ImportPhrase(items=items, offset=import_token.offset),
+    )
+    PHRASE.add_rule((LINKAGE,), lambda linkage: linkage)
+
+    IMPORT_ITEM.add_rule(
+        (IDE_LIST, T(TK.COLON), T(TK.IDENT)),
+        lambda names, colon_token, iface_token: ast.ImportItem(
+            names=names,
+            interface_name=iface_token.lexeme,
+            offset=colon_token.offset,
         ),
+    )
+    IMPORT_ITEM.add_rule(
+        (T(TK.COLON), T(TK.IDENT)),
+        lambda colon_token, iface_token: ast.ImportItem(
+            names=(),
+            interface_name=iface_token.lexeme,
+            offset=colon_token.offset,
+        ),
+    )
+
+    IMPORT.add_rule(
+        (Rep(IMPORT_ITEM, Opt(T(TK.SEMICOLON))),),
+        lambda items: tuple(item[0] for item in items),
     )
 
     PROGRAM.add_rule(

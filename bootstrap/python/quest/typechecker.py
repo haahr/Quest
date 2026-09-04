@@ -78,6 +78,8 @@ from quest.typed_ast import (
     TypedIndex,
     TypedIndexAssign,
     TypedInfix,
+    TypedImport,
+    TypedImportItem,
     TypedInspect,
     TypedInspectBranch,
     TypedInterface,
@@ -1618,6 +1620,11 @@ def elaborate_module(decl: ast.ModuleDecl, env: Environment) -> TypedModule:
     for imp in decl.imports:
         source_interface_scope = env.lookup_interface(imp.interface_name)
         if source_interface_scope is None:
+            from quest.builtins import BuiltinModuleRegistry
+            source_interface_scope = BuiltinModuleRegistry.get_interface(imp.interface_name, env)
+            if source_interface_scope is not None:
+                env.register_interface(imp.interface_name, source_interface_scope)
+        if source_interface_scope is None:
             raise TypeError(
                 f"Undefined interface '{imp.interface_name}' in import of module '{decl.name}'",
                 offset=decl.offset,
@@ -1762,6 +1769,46 @@ def elaborate_module(decl: ast.ModuleDecl, env: Environment) -> TypedModule:
     )
 
 
+def elaborate_import(phrase: ast.ImportPhrase, env: Environment) -> TypedImport:
+    """Elaborates a top-level import statement, loading interfaces/modules from BuiltinModuleRegistry."""
+    from quest.builtins import BuiltinModuleRegistry
+
+    typed_items: list[TypedImportItem] = []
+    for item in phrase.items:
+        iface_name = item.interface_name
+        iface_scope = env.lookup_interface(iface_name)
+        if iface_scope is None:
+            iface_scope = BuiltinModuleRegistry.get_interface(iface_name, env)
+            if iface_scope is not None:
+                env.register_interface(iface_name, iface_scope)
+
+        if iface_scope is None:
+            raise TypeError(
+                f"Undefined interface '{iface_name}' in import",
+                offset=getattr(item, "offset", phrase.offset),
+            )
+
+        if not item.names:
+            # import : Interface
+            # Direct interface import: bind interface types and kinds into current scope
+            for type_name, type_sym in iface_scope.types.items():
+                env.current_scope.declare_type(type_sym)
+            for kind_name, kind_sym in iface_scope.kinds.items():
+                env.current_scope.declare_kind(kind_sym)
+            typed_items.append(TypedImportItem(names=(), interface_name=iface_name))
+        else:
+            # import mod1, mod2: Interface
+            for mod_name in item.names:
+                mod_type = BuiltinModuleRegistry.get_module_type(mod_name, env)
+                if mod_type is None:
+                    mod_type = BuiltinModuleRegistry._build_record_type_from_scope(iface_scope)
+                env.register_module(mod_name, iface_scope)
+                env.current_scope.declare_value(ValueSymbol(name=mod_name, type_val=mod_type))
+            typed_items.append(TypedImportItem(names=item.names, interface_name=iface_name))
+
+    return TypedImport(items=tuple(typed_items), offset=phrase.offset)
+
+
 def elaborate_program(
     program: ast.Program,
     env: Optional[Environment] = None,
@@ -1777,6 +1824,8 @@ def elaborate_program(
                 typed_phrases.append(elaborate_interface(phrase, env))
             case ast.ModuleDecl():
                 typed_phrases.append(elaborate_module(phrase, env))
+            case ast.ImportPhrase():
+                typed_phrases.append(elaborate_import(phrase, env))
             case ast.BindingNode():
                 typed_phrases.append(_elaborate_binding(phrase, env, loop_depth=0))
             case ast.Expr():

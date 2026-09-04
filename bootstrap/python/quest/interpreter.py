@@ -77,12 +77,15 @@ from quest.typed_ast import (
     TypedIndex,
     TypedIndexAssign,
     TypedInfix,
+    TypedImport,
     TypedInspect,
     TypedInspectBranch,
+    TypedInterface,
     TypedInt,
     TypedLetType,
     TypedLetValue,
     TypedLoop,
+    TypedModule,
     TypedNode,
     TypedOk,
     TypedOption,
@@ -236,23 +239,25 @@ class RuntimeEnvironment:
 
 def _infer_qtype(val: QValue) -> QType:
     """Infers a default QType for dynamic values if not explicitly provided."""
-    if isinstance(val, QInt):
-        return INT_TYPE
-    if isinstance(val, QReal):
-        return REAL_TYPE
-    if isinstance(val, QBool):
-        return BOOL_TYPE
-    if isinstance(val, QChar):
-        return CHAR_TYPE
-    if isinstance(val, QString):
-        return STRING_TYPE
-    if isinstance(val, QOk):
-        return OK_TYPE
-    if isinstance(val, QExceptionVal):
-        return EXCEPTION_TYPE
-    if isinstance(val, QDynamicVal):
-        return DYNAMIC_TYPE
-    return OK_TYPE
+    match val:
+        case QInt():
+            return INT_TYPE
+        case QReal():
+            return REAL_TYPE
+        case QBool():
+            return BOOL_TYPE
+        case QChar():
+            return CHAR_TYPE
+        case QString():
+            return STRING_TYPE
+        case QOk():
+            return OK_TYPE
+        case QExceptionVal():
+            return EXCEPTION_TYPE
+        case QDynamicVal():
+            return DYNAMIC_TYPE
+        case _:
+            return OK_TYPE
 
 
 # ============================================================================
@@ -261,65 +266,72 @@ def _infer_qtype(val: QValue) -> QType:
 
 def _eval_int_arithmetic(op: str, a: int, b: int, offset: Optional[int] = None) -> int:
     """Evaluates integer arithmetic with C-style truncation and DivideByZero check."""
-    if op == "+":
-        return a + b
-    if op == "-":
-        return a - b
-    if op == "*":
-        return a * b
-    if op == "/":
-        if b == 0:
-            raise QuestException(DIVIDE_BY_ZERO_EXC, offset=offset)
-        # C-style truncation toward zero
-        return int(a / b)
-    if op in ("mod", "%"):
-        if b == 0:
-            raise QuestException(DIVIDE_BY_ZERO_EXC, offset=offset)
-        # C-style modulo: a - trunc(a / b) * b
-        return a - int(a / b) * b
-    raise QuestRuntimeError(f"Unknown integer arithmetic operator '{op}'", offset=offset)
+    match op:
+        case "+":
+            return a + b
+        case "-":
+            return a - b
+        case "*":
+            return a * b
+        case "/":
+            if b == 0:
+                raise QuestException(DIVIDE_BY_ZERO_EXC, offset=offset)
+            # C-style truncation toward zero
+            return int(a / b)
+        case "mod" | "%":
+            if b == 0:
+                raise QuestException(DIVIDE_BY_ZERO_EXC, offset=offset)
+            # C-style modulo: a - trunc(a / b) * b
+            return a - int(a / b) * b
+        case _:
+            raise QuestRuntimeError(f"Unknown integer arithmetic operator '{op}'", offset=offset)
 
 
 def _eval_real_arithmetic(op: str, a: float, b: float, offset: Optional[int] = None) -> float:
     """Evaluates real floating-point arithmetic."""
-    if op == "+":
-        return a + b
-    if op == "-":
-        return a - b
-    if op == "*":
-        return a * b
-    if op == "/":
-        if b == 0.0:
-            raise QuestException(DIVIDE_BY_ZERO_EXC, offset=offset)
-        return a / b
-    raise QuestRuntimeError(f"Unknown real arithmetic operator '{op}'", offset=offset)
+    match op:
+        case "+":
+            return a + b
+        case "-":
+            return a - b
+        case "*":
+            return a * b
+        case "/":
+            if b == 0.0:
+                raise QuestException(DIVIDE_BY_ZERO_EXC, offset=offset)
+            return a / b
+        case _:
+            raise QuestRuntimeError(f"Unknown real arithmetic operator '{op}'", offset=offset)
 
 
 def _eval_relational(op: str, left: QValue, right: QValue, offset: Optional[int] = None) -> bool:
     """Evaluates relational comparisons (<, <=, >, >=) for Int, Real, Char, String."""
-    if isinstance(left, QInt) and isinstance(right, QInt):
-        l_val, r_val = left.value, right.value
-    elif isinstance(left, QReal) and isinstance(right, QReal):
-        l_val, r_val = left.value, right.value
-    elif isinstance(left, QChar) and isinstance(right, QChar):
-        l_val, r_val = left.value, right.value
-    elif isinstance(left, QString) and isinstance(right, QString):
-        l_val, r_val = left.value, right.value
-    else:
-        raise QuestRuntimeError(
-            f"Relational operator '{op}' cannot compare types {left.type_name} and {right.type_name}",
-            offset=offset,
-        )
+    match (left, right):
+        case (QInt(value=l_val), QInt(value=r_val)):
+            pass
+        case (QReal(value=l_val), QReal(value=r_val)):
+            pass
+        case (QChar(value=l_val), QChar(value=r_val)):
+            pass
+        case (QString(value=l_val), QString(value=r_val)):
+            pass
+        case _:
+            raise QuestRuntimeError(
+                f"Relational operator '{op}' cannot compare types {left.type_name} and {right.type_name}",
+                offset=offset,
+            )
 
-    if op == "<":
-        return l_val < r_val
-    if op == "<=":
-        return l_val <= r_val
-    if op == ">":
-        return l_val > r_val
-    if op == ">=":
-        return l_val >= r_val
-    raise QuestRuntimeError(f"Unknown relational operator '{op}'", offset=offset)
+    match op:
+        case "<":
+            return l_val < r_val
+        case "<=":
+            return l_val <= r_val
+        case ">":
+            return l_val > r_val
+        case ">=":
+            return l_val >= r_val
+        case _:
+            raise QuestRuntimeError(f"Unknown relational operator '{op}'", offset=offset)
 
 
 # ============================================================================
@@ -328,380 +340,377 @@ def _eval_relational(op: str, left: QValue, right: QValue, offset: Optional[int]
 
 def eval_expr(expr: TypedExpr, env: RuntimeEnvironment) -> QValue:
     """Evaluates a typed expression within the given runtime environment."""
-
-    # 1. Literals
-    if isinstance(expr, TypedInt):
-        return QInt(expr.value)
-    if isinstance(expr, TypedReal):
-        return QReal(expr.value)
-    if isinstance(expr, TypedBool):
-        return TRUE_VALUE if expr.value else FALSE_VALUE
-    if isinstance(expr, TypedChar):
-        return QChar(expr.value)
-    if isinstance(expr, TypedString):
-        return QString(expr.value)
-    if isinstance(expr, TypedOk):
-        return OK_VALUE
-
-    # 2. Variables & Mutable References
-    if isinstance(expr, TypedVar):
-        return env.lookup(expr.name, offset=expr.offset)
-
-    if isinstance(expr, TypedVarCell):
-        inner_val = eval_expr(expr.value, env)
-        return QRef(inner_val)
-
-    if isinstance(expr, TypedDerefCell):
-        target_val = eval_expr(expr.target, env)
-        if isinstance(target_val, QRef):
-            return target_val.deref()
-        return target_val
-
-    if isinstance(expr, TypedAssign):
-        rhs_val = eval_expr(expr.value, env)
-        if isinstance(expr.target, TypedVar):
-            cell = env.lookup(expr.target.name, offset=expr.offset)
-            if isinstance(cell, QRef):
-                cell.assign(rhs_val)
-            else:
-                env.assign(expr.target.name, rhs_val, offset=expr.offset)
+    match expr:
+        # 1. Literals
+        case TypedInt(value=val):
+            return QInt(val)
+        case TypedReal(value=val):
+            return QReal(val)
+        case TypedBool(value=val):
+            return TRUE_VALUE if val else FALSE_VALUE
+        case TypedChar(value=val):
+            return QChar(val)
+        case TypedString(value=val):
+            return QString(val)
+        case TypedOk():
             return OK_VALUE
-        if isinstance(expr.target, TypedSelect):
-            rec_val = eval_expr(expr.target.target, env)
-            if not isinstance(rec_val, QRecord):
-                raise QuestRuntimeError("Field assignment target must be Record", offset=expr.offset)
-            field_cell = rec_val.get(expr.target.field)
-            if isinstance(field_cell, QRef):
-                field_cell.assign(rhs_val)
-            else:
-                rec_val.fields[expr.target.field] = rhs_val
-            return OK_VALUE
-        raise QuestRuntimeError("Unsupported assignment target in interpreter", offset=expr.offset)
 
-    # 3. Functions & Application
-    if isinstance(expr, TypedFun):
-        return QClosure(
-            params=tuple(p.name for p in expr.params),
-            body=expr.body,
-            env=env,
-        )
+        # 2. Variables & Mutable References
+        case TypedVar(name=name, offset=offset):
+            return env.lookup(name, offset=offset)
 
-    if isinstance(expr, TypedTypeApp):
-        callee = eval_expr(expr.func, env)
-        if isinstance(callee, QBuiltinFun) and callee.name == "dynamic" and expr.type_args:
-            target_type = expr.type_args[0]
-            return QBuiltinFun("dynamic", fn=lambda *args: QDynamicVal(args[0], target_type))
-        return callee
+        case TypedVarCell(value=val):
+            return QRef(eval_expr(val, env))
 
-    if isinstance(expr, TypedApp):
-        callee_val = eval_expr(expr.func, env)
-        arg_vals = [eval_expr(arg, env) for arg in expr.args]
+        case TypedDerefCell(target=tgt):
+            target_val = eval_expr(tgt, env)
+            return target_val.deref() if isinstance(target_val, QRef) else target_val
 
-        if isinstance(callee_val, QBuiltinFun):
-            return callee_val.fn(*arg_vals)
+        case TypedAssign(target=tgt, value=val, offset=offset):
+            rhs_val = eval_expr(val, env)
+            match tgt:
+                case TypedVar(name=name):
+                    cell = env.lookup(name, offset=offset)
+                    if isinstance(cell, QRef):
+                        cell.assign(rhs_val)
+                    else:
+                        env.assign(name, rhs_val, offset=offset)
+                    return OK_VALUE
+                case TypedSelect(target=rec_expr, field=field):
+                    rec_val = eval_expr(rec_expr, env)
+                    if not isinstance(rec_val, QRecord):
+                        raise QuestRuntimeError("Field assignment target must be Record", offset=offset)
+                    field_cell = rec_val.get(field)
+                    if isinstance(field_cell, QRef):
+                        field_cell.assign(rhs_val)
+                    else:
+                        rec_val.fields[field] = rhs_val
+                    return OK_VALUE
+                case _:
+                    raise QuestRuntimeError("Unsupported assignment target in interpreter", offset=offset)
 
-        if isinstance(callee_val, QClosure):
-            call_env = callee_val.env.push_scope()
-            for param_name, arg_val in zip(callee_val.params, arg_vals):
-                call_env.define(param_name, arg_val)
-            return eval_expr(callee_val.body, call_env)
-
-        raise QuestRuntimeError(
-            f"Cannot call non-function of type {callee_val.type_name}",
-            offset=expr.offset,
-        )
-
-    # 4. Infix Operations
-    if isinstance(expr, TypedInfix):
-        left_val = eval_expr(expr.left, env)
-        right_val = eval_expr(expr.right, env)
-
-        # Arithmetic
-        if expr.op in ("+", "-", "*", "/", "mod", "%"):
-            if isinstance(left_val, QInt) and isinstance(right_val, QInt):
-                return QInt(_eval_int_arithmetic(expr.op, left_val.value, right_val.value, offset=expr.offset))
-            if isinstance(left_val, QReal) and isinstance(right_val, QReal):
-                return QReal(_eval_real_arithmetic(expr.op, left_val.value, right_val.value, offset=expr.offset))
-            raise QuestRuntimeError(
-                f"Arithmetic operator '{expr.op}' requires Int or Real operands, got {left_val.type_name}",
-                offset=expr.offset,
+        # 3. Functions & Application
+        case TypedFun(params=params, body=body):
+            return QClosure(
+                params=tuple(p.name for p in params),
+                body=body,
+                env=env,
             )
 
-        # Relational
-        if expr.op in ("<", "<=", ">", ">="):
-            res = _eval_relational(expr.op, left_val, right_val, offset=expr.offset)
-            return TRUE_VALUE if res else FALSE_VALUE
+        case TypedTypeApp(func=func, type_args=type_args):
+            callee = eval_expr(func, env)
+            if isinstance(callee, QBuiltinFun) and callee.name == "dynamic" and type_args:
+                target_type = type_args[0]
+                return QBuiltinFun("dynamic", fn=lambda *args: QDynamicVal(args[0], target_type))
+            return callee
 
-        # Equality & Identity
-        if expr.op in ("is", "=="):
-            res = qvalue_is(left_val, right_val)
-            return TRUE_VALUE if res else FALSE_VALUE
-        if expr.op in ("isnot", "<>"):
-            res = not qvalue_is(left_val, right_val)
-            return TRUE_VALUE if res else FALSE_VALUE
+        case TypedApp(func=func, args=args, offset=offset):
+            callee_val = eval_expr(func, env)
+            arg_vals = [eval_expr(arg, env) for arg in args]
 
-        raise QuestRuntimeError(f"Unsupported infix operator '{expr.op}'", offset=expr.offset)
-
-    # 4. Conditionals (TypedIf)
-    if isinstance(expr, TypedIf):
-        cond_val = eval_expr(expr.cond, env)
-        if not isinstance(cond_val, QBool):
-            raise QuestRuntimeError("Conditional expression must evaluate to Bool", offset=expr.offset)
-        if cond_val.value:
-            return eval_expr(expr.then_branch, env)
-        else:
-            return eval_expr(expr.else_branch, env)
-
-    # 5. Scoped Blocks (TypedBlock)
-    if isinstance(expr, TypedBlock):
-        block_env = env.push_scope()
-        try:
-            for b in expr.bindings:
-                eval_binding(b, block_env)
-            return eval_expr(expr.result, block_env)
-        finally:
-            env = block_env.pop_scope()
-
-    # 6. Loops & Control Flow
-    if isinstance(expr, TypedLoop):
-        while True:
-            try:
-                eval_expr(expr.body, env)
-            except _LoopExit:
-                break
-        return OK_VALUE
-
-    if isinstance(expr, TypedWhile):
-        while True:
-            cond_val = eval_expr(expr.cond, env)
-            if not isinstance(cond_val, QBool):
-                raise QuestRuntimeError("While loop condition must evaluate to Bool", offset=expr.offset)
-            if not cond_val.value:
-                break
-            try:
-                eval_expr(expr.body, env)
-            except _LoopExit:
-                break
-        return OK_VALUE
-
-    if isinstance(expr, TypedFor):
-        start_val = eval_expr(expr.start, env)
-        stop_val = eval_expr(expr.stop, env)
-        if not isinstance(start_val, QInt) or not isinstance(stop_val, QInt):
-            raise QuestRuntimeError("For loop bounds must evaluate to Int", offset=expr.offset)
-
-        start_i = start_val.value
-        stop_i = stop_val.value
-        loop_env = env.push_scope()
-        try:
-            if not expr.is_downto:
-                cur = start_i
-                while cur <= stop_i:
-                    loop_env.define(expr.var_name, QInt(cur))
-                    try:
-                        eval_expr(expr.body, loop_env)
-                    except _LoopExit:
-                        break
-                    cur += 1
-            else:
-                cur = start_i
-                while cur >= stop_i:
-                    loop_env.define(expr.var_name, QInt(cur))
-                    try:
-                        eval_expr(expr.body, loop_env)
-                    except _LoopExit:
-                        break
-                    cur -= 1
-        finally:
-            env = loop_env.pop_scope()
-        return OK_VALUE
-
-    # 7. Aggregates: Records & Tuples
-    if isinstance(expr, TypedRecord):
-        rec_fields: dict[str, QValue] = {}
-        for f in expr.fields:
-            val = eval_expr(f.value, env)
-            if f.is_var:
-                rec_fields[f.name] = QRef(val)
-            else:
-                rec_fields[f.name] = val
-        return QRecord(rec_fields)
-
-    if isinstance(expr, TypedTuple):
-        elems = tuple(eval_expr(e, env) for e in expr.elements)
-        labels: Optional[tuple[Optional[str], ...]] = None
-        if isinstance(expr.type_val, QTupleType):
-            labels = tuple(f.name for f in expr.type_val.fields)
-        return QTuple(elements=elems, labels=labels)
-
-    if isinstance(expr, TypedSelect):
-        target_val = eval_expr(expr.target, env)
-        if isinstance(target_val, QRecord):
-            field_val = target_val.get(expr.field)
-            if isinstance(field_val, QRef):
-                return field_val.deref()
-            return field_val
-        if isinstance(target_val, QTuple):
-            return target_val.get_by_name(expr.field)
-        raise QuestRuntimeError(
-            f"Cannot select field '{expr.field}' from {target_val.type_name}",
-            offset=expr.offset,
-        )
-
-    # 8. Arrays: Creation, Repetition, Indexing, and Assignment
-    if isinstance(expr, TypedArray):
-        elems_list = [eval_expr(e, env) for e in expr.elements]
-        return QArray(elements=elems_list)
-
-    if isinstance(expr, TypedArrayRep):
-        count_val = eval_expr(expr.count, env)
-        if not isinstance(count_val, QInt):
-            raise QuestRuntimeError("Array count must evaluate to Int", offset=expr.offset)
-        if count_val.value < 0:
-            raise QuestException(ARRAY_OP_ERROR_EXC, offset=expr.offset)
-        init_val = eval_expr(expr.init_val, env)
-        return QArray(elements=[init_val for _ in range(count_val.value)])
-
-    if isinstance(expr, TypedIndex):
-        target_val = eval_expr(expr.target, env)
-        idx_val = eval_expr(expr.index, env)
-        if not isinstance(target_val, QArray):
-            raise QuestRuntimeError(f"Index target must be Array, got {target_val.type_name}", offset=expr.offset)
-        if not isinstance(idx_val, QInt):
-            raise QuestRuntimeError(f"Array index must be Int, got {idx_val.type_name}", offset=expr.offset)
-        if idx_val.value < 0 or idx_val.value >= target_val.size():
-            raise QuestException(ARRAY_OP_ERROR_EXC, offset=expr.offset)
-        return target_val.get(idx_val.value)
-
-    if isinstance(expr, TypedIndexAssign):
-        target_val = eval_expr(expr.target, env)
-        idx_val = eval_expr(expr.index, env)
-        rhs_val = eval_expr(expr.value, env)
-        if not isinstance(target_val, QArray):
-            raise QuestRuntimeError(f"Index target must be Array, got {target_val.type_name}", offset=expr.offset)
-        if not isinstance(idx_val, QInt):
-            raise QuestRuntimeError(f"Array index must be Int, got {idx_val.type_name}", offset=expr.offset)
-        if idx_val.value < 0 or idx_val.value >= target_val.size():
-            raise QuestException(ARRAY_OP_ERROR_EXC, offset=expr.offset)
-        target_val.set(idx_val.value, rhs_val)
-        return OK_VALUE
-
-    # 9. Variants, Options, and Pattern Matching
-    if isinstance(expr, TypedVariant):
-        payload = eval_expr(expr.payload, env) if expr.payload is not None else None
-        return QVariant(tag=expr.tag, payload=payload)
-
-    if isinstance(expr, TypedOption):
-        payload = eval_expr(expr.payload, env) if expr.payload is not None else None
-        return QOption(tag=expr.tag, payload=payload)
-
-    if isinstance(expr, TypedCase):
-        target_val = eval_expr(expr.target, env)
-        if not isinstance(target_val, (QVariant, QOption)):
-            raise QuestRuntimeError(
-                f"Case target must be Variant or Option, got {target_val.type_name}",
-                offset=expr.offset,
-            )
-        for branch in expr.branches:
-            if target_val.tag in branch.tags:
-                if branch.binder is not None:
-                    child_env = env.push_scope()
-                    child_env.define(
-                        branch.binder.name,
-                        target_val.payload if target_val.payload is not None else OK_VALUE,
+            match callee_val:
+                case QBuiltinFun(fn=fn):
+                    return fn(*arg_vals)
+                case QClosure(params=callee_params, body=body, env=closure_env):
+                    call_env = closure_env.push_scope()
+                    for param_name, arg_val in zip(callee_params, arg_vals):
+                        call_env.define(param_name, arg_val)
+                    return eval_expr(body, call_env)
+                case _:
+                    raise QuestRuntimeError(
+                        f"Cannot call non-function of type {callee_val.type_name}",
+                        offset=offset,
                     )
+
+        # 4. Infix Operations
+        case TypedInfix(left=left, op=op, right=right, offset=offset):
+            left_val = eval_expr(left, env)
+            right_val = eval_expr(right, env)
+
+            # Arithmetic
+            if op in ("+", "-", "*", "/", "mod", "%"):
+                match (left_val, right_val):
+                    case (QInt(value=l), QInt(value=r)):
+                        return QInt(_eval_int_arithmetic(op, l, r, offset=offset))
+                    case (QReal(value=l), QReal(value=r)):
+                        return QReal(_eval_real_arithmetic(op, l, r, offset=offset))
+                    case _:
+                        raise QuestRuntimeError(
+                            f"Arithmetic operator '{op}' requires Int or Real operands, got {left_val.type_name}",
+                            offset=offset,
+                        )
+
+            # Relational
+            if op in ("<", "<=", ">", ">="):
+                res = _eval_relational(op, left_val, right_val, offset=offset)
+                return TRUE_VALUE if res else FALSE_VALUE
+
+            # Equality & Identity
+            if op in ("is", "=="):
+                res = qvalue_is(left_val, right_val)
+                return TRUE_VALUE if res else FALSE_VALUE
+            if op in ("isnot", "<>"):
+                res = not qvalue_is(left_val, right_val)
+                return TRUE_VALUE if res else FALSE_VALUE
+
+            raise QuestRuntimeError(f"Unsupported infix operator '{op}'", offset=offset)
+
+        # 5. Conditionals
+        case TypedIf(cond=cond, then_branch=then_b, else_branch=else_b, offset=offset):
+            cond_val = eval_expr(cond, env)
+            match cond_val:
+                case QBool(value=True):
+                    return eval_expr(then_b, env)
+                case QBool(value=False):
+                    return eval_expr(else_b, env)
+                case _:
+                    raise QuestRuntimeError("Conditional expression must evaluate to Bool", offset=offset)
+
+        # 6. Scoped Blocks
+        case TypedBlock(bindings=bindings, result=result):
+            block_env = env.push_scope()
+            try:
+                for b in bindings:
+                    eval_binding(b, block_env)
+                return eval_expr(result, block_env)
+            finally:
+                env = block_env.pop_scope()
+
+        # 7. Loops & Control Flow
+        case TypedLoop(body=body):
+            while True:
+                try:
+                    eval_expr(body, env)
+                except _LoopExit:
+                    break
+            return OK_VALUE
+
+        case TypedWhile(cond=cond, body=body, offset=offset):
+            while True:
+                cond_val = eval_expr(cond, env)
+                match cond_val:
+                    case QBool(value=True):
+                        try:
+                            eval_expr(body, env)
+                        except _LoopExit:
+                            break
+                    case QBool(value=False):
+                        break
+                    case _:
+                        raise QuestRuntimeError("While loop condition must evaluate to Bool", offset=offset)
+            return OK_VALUE
+
+        case TypedFor(start=start, stop=stop, body=body, is_downto=is_downto, var_name=var_name, offset=offset):
+            start_val = eval_expr(start, env)
+            stop_val = eval_expr(stop, env)
+            match (start_val, stop_val):
+                case (QInt(value=start_i), QInt(value=stop_i)):
+                    loop_env = env.push_scope()
                     try:
-                        return eval_expr(branch.body, child_env)
+                        step = -1 if is_downto else 1
+                        cur = start_i
+                        while (cur <= stop_i) if not is_downto else (cur >= stop_i):
+                            loop_env.define(var_name, QInt(cur))
+                            try:
+                                eval_expr(body, loop_env)
+                            except _LoopExit:
+                                break
+                            cur += step
                     finally:
-                        env = child_env.pop_scope()
-                else:
-                    return eval_expr(branch.body, env)
-        if expr.else_branch is not None:
-            return eval_expr(expr.else_branch, env)
-        raise QuestRuntimeError(f"Unhandled case tag '{target_val.tag}'", offset=expr.offset)
+                        env = loop_env.pop_scope()
+                    return OK_VALUE
+                case _:
+                    raise QuestRuntimeError("For loop bounds must evaluate to Int", offset=offset)
 
-    # 10. Exceptions
-    if isinstance(expr, TypedException):
-        exc_val = QExceptionVal(name=expr.name)
-        if expr.name:
-            env.define(expr.name, exc_val)
-        return exc_val
+        case TypedExit():
+            raise _LoopExit()
 
-    if isinstance(expr, TypedRaise):
-        tag_val = eval_expr(expr.exc, env)
-        if not isinstance(tag_val, QExceptionVal):
-            raise QuestRuntimeError(
-                f"Target of raise must be Exception, got {tag_val.type_name}",
-                offset=expr.offset,
-            )
-        payload_val = eval_expr(expr.payload, env) if expr.payload is not None else None
-        payload_type = expr.payload.type_val if expr.payload is not None else None
-        raise QuestException(
-            exc_val=tag_val,
-            payload=payload_val,
-            payload_type=payload_type,
-            offset=expr.offset,
-        )
+        # 8. Aggregates: Records & Tuples
+        case TypedRecord(fields=fields):
+            rec_fields: dict[str, QValue] = {}
+            for f in fields:
+                val = eval_expr(f.value, env)
+                rec_fields[f.name] = QRef(val) if f.is_var else val
+            return QRecord(rec_fields)
 
-    if isinstance(expr, TypedTry):
-        try:
-            return eval_expr(expr.body, env)
-        except QuestException as raised_exc:
-            for branch in expr.branches:
-                pattern_val = eval_expr(branch.exc_pattern, env)
-                if (
-                    raised_exc.exc_val is pattern_val
-                    or raised_exc.exc_val.name == getattr(pattern_val, "name", None)
-                ):
+        case TypedTuple(elements=elements, type_val=type_val):
+            elems = tuple(eval_expr(e, env) for e in elements)
+            labels: Optional[tuple[Optional[str], ...]] = None
+            if isinstance(type_val, QTupleType):
+                labels = tuple(f.name for f in type_val.fields)
+            return QTuple(elements=elems, labels=labels)
+
+        case TypedSelect(target=target, field=field, offset=offset):
+            target_val = eval_expr(target, env)
+            match target_val:
+                case QRecord():
+                    field_val = target_val.get(field)
+                    return field_val.deref() if isinstance(field_val, QRef) else field_val
+                case QTuple():
+                    return target_val.get_by_name(field)
+                case _:
+                    raise QuestRuntimeError(
+                        f"Cannot select field '{field}' from {target_val.type_name}",
+                        offset=offset,
+                    )
+
+        # 9. Arrays: Creation, Repetition, Indexing, and Assignment
+        case TypedArray(elements=elements):
+            return QArray(elements=[eval_expr(e, env) for e in elements])
+
+        case TypedArrayRep(count=count, init_val=init_val, offset=offset):
+            count_val = eval_expr(count, env)
+            match count_val:
+                case QInt(value=c) if c >= 0:
+                    init_v = eval_expr(init_val, env)
+                    return QArray(elements=[init_v for _ in range(c)])
+                case QInt():
+                    raise QuestException(ARRAY_OP_ERROR_EXC, offset=offset)
+                case _:
+                    raise QuestRuntimeError("Array count must evaluate to Int", offset=offset)
+
+        case TypedIndex(target=target, index=index, offset=offset):
+            target_val = eval_expr(target, env)
+            idx_val = eval_expr(index, env)
+            match (target_val, idx_val):
+                case (QArray(), QInt(value=idx)):
+                    if idx < 0 or idx >= target_val.size():
+                        raise QuestException(ARRAY_OP_ERROR_EXC, offset=offset)
+                    return target_val.get(idx)
+                case (QArray(), _):
+                    raise QuestRuntimeError(f"Array index must be Int, got {idx_val.type_name}", offset=offset)
+                case _:
+                    raise QuestRuntimeError(f"Index target must be Array, got {target_val.type_name}", offset=offset)
+
+        case TypedIndexAssign(target=target, index=index, value=value, offset=offset):
+            target_val = eval_expr(target, env)
+            idx_val = eval_expr(index, env)
+            rhs_val = eval_expr(value, env)
+            match (target_val, idx_val):
+                case (QArray(), QInt(value=idx)):
+                    if idx < 0 or idx >= target_val.size():
+                        raise QuestException(ARRAY_OP_ERROR_EXC, offset=offset)
+                    target_val.set(idx, rhs_val)
+                    return OK_VALUE
+                case (QArray(), _):
+                    raise QuestRuntimeError(f"Array index must be Int, got {idx_val.type_name}", offset=offset)
+                case _:
+                    raise QuestRuntimeError(f"Index target must be Array, got {target_val.type_name}", offset=offset)
+
+        # 10. Variants, Options, and Pattern Matching
+        case TypedVariant(tag=tag, payload=payload):
+            p_val = eval_expr(payload, env) if payload is not None else None
+            return QVariant(tag=tag, payload=p_val)
+
+        case TypedOption(tag=tag, payload=payload):
+            p_val = eval_expr(payload, env) if payload is not None else None
+            return QOption(tag=tag, payload=p_val)
+
+        case TypedCase(target=target, branches=branches, else_branch=else_branch, offset=offset):
+            target_val = eval_expr(target, env)
+            if not isinstance(target_val, (QVariant, QOption)):
+                raise QuestRuntimeError(
+                    f"Case target must be Variant or Option, got {target_val.type_name}",
+                    offset=offset,
+                )
+            for branch in branches:
+                if target_val.tag in branch.tags:
                     if branch.binder is not None:
                         child_env = env.push_scope()
-                        actual_payload = (
-                            raised_exc.payload
-                            if raised_exc.payload is not None
-                            else OK_VALUE
+                        child_env.define(
+                            branch.binder.name,
+                            target_val.payload if target_val.payload is not None else OK_VALUE,
                         )
-                        child_env.define(branch.binder.name, actual_payload)
                         try:
                             return eval_expr(branch.body, child_env)
                         finally:
                             env = child_env.pop_scope()
                     else:
                         return eval_expr(branch.body, env)
-            if expr.else_branch is not None:
-                return eval_expr(expr.else_branch, env)
-            raise
+            if else_branch is not None:
+                return eval_expr(else_branch, env)
+            raise QuestRuntimeError(f"Unhandled case tag '{target_val.tag}'", offset=offset)
 
-    # 11. Dynamic Types & Type Inspection
-    if isinstance(expr, TypedInspect):
-        target_dyn = eval_expr(expr.target, env)
-        if not isinstance(target_dyn, QDynamicVal):
-            raise QuestRuntimeError(
-                f"Inspect target must be Dynamic, got {target_dyn.type_name}",
-                offset=expr.offset,
+        # 11. Exceptions
+        case TypedException(name=name):
+            exc_val = QExceptionVal(name=name)
+            if name:
+                env.define(name, exc_val)
+            return exc_val
+
+        case TypedRaise(exc=exc, payload=payload, offset=offset):
+            tag_val = eval_expr(exc, env)
+            if not isinstance(tag_val, QExceptionVal):
+                raise QuestRuntimeError(
+                    f"Target of raise must be Exception, got {tag_val.type_name}",
+                    offset=offset,
+                )
+            payload_val = eval_expr(payload, env) if payload is not None else None
+            payload_type = payload.type_val if payload is not None else None
+            raise QuestException(
+                exc_val=tag_val,
+                payload=payload_val,
+                payload_type=payload_type,
+                offset=offset,
             )
-        for branch in expr.branches:
-            if is_subtype(target_dyn.type_val, branch.match_type):
-                if branch.binders:
-                    child_env = env.push_scope()
-                    for b_sym in branch.binders:
-                        child_env.define(b_sym.name, target_dyn.value)
-                    try:
-                        return eval_expr(branch.body, child_env)
-                    finally:
-                        env = child_env.pop_scope()
-                else:
-                    return eval_expr(branch.body, env)
-        if expr.else_branch is not None:
-            return eval_expr(expr.else_branch, env)
-        raise QuestException(DYNAMIC_ERROR_EXC, offset=expr.offset)
 
-    if isinstance(expr, TypedExit):
-        raise _LoopExit()
+        case TypedTry(body=body, branches=branches, else_branch=else_branch, offset=offset):
+            try:
+                return eval_expr(body, env)
+            except QuestException as raised_exc:
+                for branch in branches:
+                    pattern_val = eval_expr(branch.exc_pattern, env)
+                    if (
+                        raised_exc.exc_val is pattern_val
+                        or raised_exc.exc_val.name == getattr(pattern_val, "name", None)
+                    ):
+                        if branch.binder is not None:
+                            child_env = env.push_scope()
+                            actual_payload = (
+                                raised_exc.payload
+                                if raised_exc.payload is not None
+                                else OK_VALUE
+                            )
+                            child_env.define(branch.binder.name, actual_payload)
+                            try:
+                                return eval_expr(branch.body, child_env)
+                            finally:
+                                env = child_env.pop_scope()
+                        else:
+                            return eval_expr(branch.body, env)
+                if else_branch is not None:
+                    return eval_expr(else_branch, env)
+                raise
 
-    raise QuestRuntimeError(
-        f"Unhandled expression node: {expr.__class__.__name__}",
-        offset=getattr(expr, "offset", 0),
-    )
+        # 12. Dynamic Types & Type Inspection
+        case TypedInspect(target=target, branches=branches, else_branch=else_branch, offset=offset):
+            target_dyn = eval_expr(target, env)
+            if not isinstance(target_dyn, QDynamicVal):
+                raise QuestRuntimeError(
+                    f"Inspect target must be Dynamic, got {target_dyn.type_name}",
+                    offset=offset,
+                )
+            for branch in branches:
+                if is_subtype(target_dyn.type_val, branch.match_type):
+                    if branch.binders:
+                        child_env = env.push_scope()
+                        for b_sym in branch.binders:
+                            child_env.define(b_sym.name, target_dyn.value)
+                        try:
+                            return eval_expr(branch.body, child_env)
+                        finally:
+                            env = child_env.pop_scope()
+                    else:
+                        return eval_expr(branch.body, env)
+            if else_branch is not None:
+                return eval_expr(else_branch, env)
+            raise QuestException(DYNAMIC_ERROR_EXC, offset=offset)
+
+        case _:
+            raise QuestRuntimeError(
+                f"Unhandled expression node: {expr.__class__.__name__}",
+                offset=getattr(expr, "offset", 0),
+            )
 
 
 # ============================================================================
@@ -710,31 +719,43 @@ def eval_expr(expr: TypedExpr, env: RuntimeEnvironment) -> QValue:
 
 def eval_binding(binding: TypedBinding, env: RuntimeEnvironment) -> QValue:
     """Evaluates a declaration or binding inside a block or top-level program."""
-    if isinstance(binding, TypedLetValue):
-        if binding.is_rec and isinstance(binding.value, TypedFun):
-            closure = QClosure(
-                params=tuple(p.name for p in binding.value.params),
-                body=binding.value.body,
-                env=env,
-                name=binding.name,
-            )
-            env.define(binding.name, closure)
-            return closure
-        val = eval_expr(binding.value, env)
-        if binding.symbol.is_var:
-            env.define(binding.name, QRef(val))
-        else:
-            env.define(binding.name, val)
-        return val
+    match binding:
+        case TypedLetValue(name=name, value=value, is_rec=is_rec, symbol=symbol):
+            if is_rec and isinstance(value, TypedFun):
+                closure = QClosure(
+                    params=tuple(p.name for p in value.params),
+                    body=value.body,
+                    env=env,
+                    name=name,
+                )
+                env.define(name, closure)
+                return closure
+            val = eval_expr(value, env)
+            if symbol.is_var:
+                env.define(name, QRef(val))
+            else:
+                env.define(name, val)
+            return val
 
-    if isinstance(binding, (TypedLetType, TypedDefKind)):
-        # Types and kinds are erased at runtime
-        return OK_VALUE
+        case TypedLetType() | TypedDefKind() | TypedInterface() | TypedModule():
+            # Types, kinds, and interface/module compile-time declarations are erased at runtime
+            return OK_VALUE
 
-    if isinstance(binding, TypedExprStmt):
-        return eval_expr(binding.expr, env)
+        case TypedImport(items=items):
+            from quest.builtins import BuiltinModuleRegistry
 
-    raise QuestRuntimeError(f"Unhandled binding node: {binding.__class__.__name__}")
+            for item in items:
+                for name in item.names:
+                    mod_val = BuiltinModuleRegistry.get_runtime_module(name)
+                    if mod_val is not None:
+                        env.define(name, mod_val)
+            return OK_VALUE
+
+        case TypedExprStmt(expr=inner_expr):
+            return eval_expr(inner_expr, env)
+
+        case _:
+            raise QuestRuntimeError(f"Unhandled binding node: {binding.__class__.__name__}")
 
 
 def eval_program(program: TypedProgram, env: Optional[RuntimeEnvironment] = None) -> QValue:
@@ -744,12 +765,13 @@ def eval_program(program: TypedProgram, env: Optional[RuntimeEnvironment] = None
 
     final_val: QValue = OK_VALUE
     for phrase in program.phrases:
-        if isinstance(phrase, TypedBinding):
-            final_val = eval_binding(phrase, env)
-        elif isinstance(phrase, TypedExpr):
-            final_val = eval_expr(phrase, env)
-        else:
-            raise QuestRuntimeError(f"Unknown top-level phrase: {phrase.__class__.__name__}")
+        match phrase:
+            case TypedBinding():
+                final_val = eval_binding(phrase, env)
+            case TypedExpr():
+                final_val = eval_expr(phrase, env)
+            case _:
+                raise QuestRuntimeError(f"Unknown top-level phrase: {phrase.__class__.__name__}")
 
     return final_val
 
@@ -762,34 +784,41 @@ def format_interactive_result(
     if phrase is None or val is None:
         return ""
 
-    if isinstance(phrase, TypedLetValue):
-        var_str = "var " if phrase.symbol.is_var else ""
-        type_str = str(phrase.symbol.type_val)
-        val_str = qvalue_to_str(val)
-        return f"let {var_str}{phrase.name}:{type_str} = {val_str}"
+    match phrase:
+        case TypedLetValue(name=name, symbol=symbol):
+            var_str = "var " if symbol.is_var else ""
+            type_str = str(symbol.type_val)
+            val_str = qvalue_to_str(val)
+            return f"let {var_str}{name}:{type_str} = {val_str}"
 
-    if isinstance(phrase, TypedLetType):
-        kind_str = str(phrase.symbol.kind)
-        if phrase.symbol.definition is not None:
-            return f"Let {phrase.name}::{kind_str} = {phrase.symbol.definition}"
-        return f"Let {phrase.name}::{kind_str}"
+        case TypedLetType(name=name, symbol=symbol):
+            kind_str = str(symbol.kind)
+            if symbol.definition is not None:
+                return f"Let {name}::{kind_str} = {symbol.definition}"
+            return f"Let {name}::{kind_str}"
 
-    if isinstance(phrase, TypedDefKind):
-        kind_str = str(phrase.symbol.kind)
-        return f"DEF {phrase.name} = {kind_str}"
+        case TypedDefKind(name=name, symbol=symbol):
+            kind_str = str(symbol.kind)
+            return f"DEF {name} = {kind_str}"
 
-    if isinstance(phrase, TypedExprStmt):
-        if isinstance(val, QOk):
+        case TypedImport() | TypedInterface() | TypedModule():
             return ""
-        if isinstance(phrase.expr, TypedException):
-            return f"exception {phrase.expr.name}"
-        return f"{qvalue_to_str(val)} : {phrase.expr.type_val}"
 
-    if isinstance(phrase, TypedExpr):
-        if isinstance(val, QOk):
+        case TypedExprStmt(expr=TypedException(name=name)):
+            return f"exception {name}"
+
+        case TypedExprStmt(expr=inner_expr):
+            if isinstance(val, QOk):
+                return ""
+            return f"{qvalue_to_str(val)} : {inner_expr.type_val}"
+
+        case TypedException(name=name):
+            return f"exception {name}"
+
+        case TypedExpr():
+            if isinstance(val, QOk):
+                return ""
+            return f"{qvalue_to_str(val)} : {phrase.type_val}"
+
+        case _:
             return ""
-        if isinstance(phrase, TypedException):
-            return f"exception {phrase.name}"
-        return f"{qvalue_to_str(val)} : {phrase.type_val}"
-
-    return ""

@@ -572,6 +572,11 @@ class ImportItem(ASTNode):
 
 
 @dataclass(frozen=True)
+class ImportPhrase(ASTNode):
+    items: tuple[ImportItem, ...]
+
+
+@dataclass(frozen=True)
 class InterfaceDecl(ASTNode):
     name: str
     signatures: tuple[BindingNode, ...]

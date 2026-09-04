@@ -20,6 +20,7 @@ from quest.runtime import (
     QInt,
     QReal,
     QString,
+    QTuple,
     qvalue_is,
 )
 
@@ -505,6 +506,164 @@ class TestDynamicAndInspect(unittest.TestCase):
         with self.assertRaises(QuestException) as cm:
             run_quest_code(code)
         self.assertEqual(cm.exception.exc_val.name, "dynamic.error")
+
+
+class TestStandardLibraryModules(unittest.TestCase):
+    """Verifies Cardelli standard library modules (Phase 3.5)."""
+
+    def test_import_conv_and_tilde(self):
+        code = """
+        import conv: Conv;
+        let pos = conv.int(42);
+        let neg = conv.int(0 - 42);
+        let posR = conv.real(3.14);
+        let negR = conv.real(0.0 - 2.5);
+        let b = conv.bool(true);
+        let okS = conv.okay();
+        tuple pos neg posR negR b okS end;
+        """
+        val = run_quest_code(code)
+        self.assertIsInstance(val, QTuple)
+        self.assertEqual(val.elements[0], QString("42"))
+        self.assertEqual(val.elements[1], QString("~42"))
+        self.assertEqual(val.elements[2], QString("3.14"))
+        self.assertEqual(val.elements[3], QString("~2.5"))
+        self.assertEqual(val.elements[4], QString("true"))
+        self.assertEqual(val.elements[5], QString("ok"))
+
+    def test_import_ascii(self):
+        code = """
+        import ascii: Ascii;
+        let c = ascii.char(65);
+        let v = ascii.val(c);
+        let bad = try ascii.char(999) when ascii.error then '?' end;
+        tuple c v bad end;
+        """
+        val = run_quest_code(code)
+        self.assertIsInstance(val, QTuple)
+        self.assertEqual(val.elements[0], QChar("A"))
+        self.assertEqual(val.elements[1], QInt(65))
+        self.assertEqual(val.elements[2], QChar("?"))
+
+    def test_import_int_op(self):
+        code = """
+        import int: IntOp;
+        let a = int.abs(0 - 100);
+        let mn = int.min(5 10);
+        let mx = int.max(5 10);
+        tuple a mn mx end;
+        """
+        val = run_quest_code(code)
+        self.assertIsInstance(val, QTuple)
+        self.assertEqual(val.elements[0], QInt(100))
+        self.assertEqual(val.elements[1], QInt(5))
+        self.assertEqual(val.elements[2], QInt(10))
+
+    def test_import_real_op(self):
+        code = """
+        import real: RealOp;
+        let fl = real.floor(3.9);
+        let rd = real.round(3.2);
+        let ab = real.abs(0.0 - 5.5);
+        let lt = real.smaller(1.0 2.0);
+        tuple fl rd ab lt end;
+        """
+        val = run_quest_code(code)
+        self.assertIsInstance(val, QTuple)
+        self.assertEqual(val.elements[0], QInt(3))
+        self.assertEqual(val.elements[1], QInt(3))
+        self.assertEqual(val.elements[2], QReal(5.5))
+        self.assertEqual(val.elements[3], TRUE_VALUE)
+
+    def test_import_string_op(self):
+        code = """
+        import string: StringOp;
+        let s = "hello";
+        let l = string.length(s);
+        let c = string.getChar(s 1);
+        string.setChar(s 0 'H');
+        let sub = string.getSub(s 0 2);
+        let catStr = string.cat(s " world");
+        tuple l c s sub catStr end;
+        """
+        val = run_quest_code(code)
+        self.assertIsInstance(val, QTuple)
+        self.assertEqual(val.elements[0], QInt(5))
+        self.assertEqual(val.elements[1], QChar("e"))
+        self.assertEqual(val.elements[2], QString("Hello"))
+        self.assertEqual(val.elements[3], QString("He"))
+        self.assertEqual(val.elements[4], QString("Hello world"))
+
+    def test_import_array_op(self):
+        code = """
+        import arrayOp: ArrayOp;
+        let a = arrayOp.new(4 10);
+        let sz = arrayOp.size(a);
+        arrayOp.set(a 2 99);
+        let item = arrayOp.get(a 2);
+        let errHandled = try
+            arrayOp.get(a 10)
+        when arrayOp.error then
+            0 - 1
+        end;
+        tuple sz item errHandled end;
+        """
+        val = run_quest_code(code)
+        self.assertIsInstance(val, QTuple)
+        self.assertEqual(val.elements[0], QInt(4))
+        self.assertEqual(val.elements[1], QInt(99))
+        self.assertEqual(val.elements[2], QInt(-1))
+
+    def test_import_dynamic_module(self):
+        code = """
+        import dynamic: Dynamic;
+        let d = dynamic.new(123);
+        let copied = dynamic.copy(d);
+        let extracted = dynamic.be(copied);
+        extracted;
+        """
+        self.assertEqual(run_quest_code(code), QInt(123))
+
+    def test_import_writer_and_reader_file(self):
+        import tempfile
+        with tempfile.NamedTemporaryFile(mode="w", delete=False) as f:
+            temp_name = f.name
+
+        try:
+            code = f"""
+            import writer: Writer reader: Reader;
+            let w = writer.file("{temp_name}");
+            writer.putString(w "Quest I/O\n");
+            writer.close(w);
+
+            let r = reader.file("{temp_name}");
+            let s = reader.getString(r 9);
+            reader.close(r);
+            s;
+            """
+            self.assertEqual(run_quest_code(code), QString("Quest I/O"))
+        finally:
+            import os
+            if os.path.exists(temp_name):
+                os.remove(temp_name)
+
+    def test_direct_interface_import(self):
+        code = """
+        import : Ascii;
+        let x: Int = 10;
+        x;
+        """
+        self.assertEqual(run_quest_code(code), QInt(10))
+
+    def test_multi_import_phrase(self):
+        code = """
+        import ascii: Ascii int: IntOp;
+        let c = ascii.val('Z');
+        let m = int.max(c 100);
+        m;
+        """
+        # ord('Z') = 90; max(90, 100) = 100
+        self.assertEqual(run_quest_code(code), QInt(100))
 
 
 if __name__ == "__main__":

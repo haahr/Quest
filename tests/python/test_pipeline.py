@@ -128,6 +128,19 @@ class TestPipeline(unittest.TestCase):
         self.assertIn("interpret", res.dump_outputs)
         self.assertEqual(res.dump_outputs["interpret"], "let x:Int = 10")
 
+    def test_interpret_dump_import(self):
+        """Verifies --dump-after interpret produces empty output for imports and evaluates imported calls."""
+        opts = CompilerOptions(dump_after={"interpret"})
+        res = self.pipeline.execute(
+            'import conv: Conv; conv.int(0 - 5);',
+            "<test>",
+            options=opts,
+        )
+        self.assertTrue(res.success)
+        self.assertEqual(res.final_phase, "interpret")
+        self.assertIn("interpret", res.dump_outputs)
+        self.assertEqual(res.dump_outputs["interpret"], '"~5" : String')
+
 
 if __name__ == "__main__":
     unittest.main()

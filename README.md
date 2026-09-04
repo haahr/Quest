@@ -33,7 +33,7 @@ The compiler is built using a staged bootstrap methodology across seven distinct
 | :--- | :--- | :--- | :--- |
 | **Step 1** | Python | Front-End: Lexer, PEG Parser, and Untyped AST | **Complete** |
 | **Step 2** | Python | Typechecker: $F_{<:}^\omega$ Subtyping, Equi-Recursion, Elaboration | **Complete** |
-| **Step 3** | Python | Tree-Walking Interpreter & Interactive REPL | **In Progress (3.1–3.4 Complete)** |
+| **Step 3** | Python | Tree-Walking Interpreter & Interactive REPL | **In Progress (3.1–3.5 Complete)** |
 | **Step 4** | Python | Bootstrap C Transpiler (emits C99 + Boehm GC) | Queued |
 | **Step 5** | Quest | Self-Hosted Front-End & C Compiler (written in Quest) | Queued |
 | **Step 6** | Quest | Self-Hosted Native AArch64 Compiler (Nanopass Pipeline) | Queued |

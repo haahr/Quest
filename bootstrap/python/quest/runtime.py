@@ -532,6 +532,48 @@ class QExceptionVal(QValue):
 
 
 # ============================================================================
+# 8. I/O Stream Handles (Writer.T and Reader.T)
+# ============================================================================
+
+class QWriter(QValue):
+    """Output stream handle wrapping a Python text stream or open file."""
+
+    def __init__(self, stream: Any, is_file: bool = False, file_name: Optional[str] = None):
+        self.stream = stream
+        self.is_file = is_file
+        self.file_name = file_name
+        self.is_closed = False
+
+    @property
+    def type_name(self) -> str:
+        return "Writer.T"
+
+    def to_str(self, visited: Optional[set[int]] = None) -> str:
+        if self.file_name:
+            return f"<writer:file {self.file_name}>"
+        return "<writer>"
+
+
+class QReader(QValue):
+    """Input stream handle wrapping a Python text stream or open file."""
+
+    def __init__(self, stream: Any, is_file: bool = False, file_name: Optional[str] = None):
+        self.stream = stream
+        self.is_file = is_file
+        self.file_name = file_name
+        self.is_closed = False
+
+    @property
+    def type_name(self) -> str:
+        return "Reader.T"
+
+    def to_str(self, visited: Optional[set[int]] = None) -> str:
+        if self.file_name:
+            return f"<reader:file {self.file_name}>"
+        return "<reader>"
+
+
+# ============================================================================
 # 8. Predicates: Identity & Structural Equality
 # ============================================================================
 

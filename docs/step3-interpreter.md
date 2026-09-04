@@ -133,10 +133,18 @@ pre-linked modules and interfaces in the root environment:
 - Language-level `dynamic.error` exception on unmatched inspect without `else`.
 - Cardelli-format uncaught exception diagnostics (`Exception: <name> with <payload>:<Type>`).
 
-### Phase 3.5: Cardelli Standard Library Modules (`quest/builtins.py`)
-- Pre-linked standard library module implementations: `writer: Writer`, `reader: Reader`, `conv: Conv`,
-  `ascii: Ascii`, `string: StringOp`, `int: IntOp`, `real: RealOp`, `arrayOp: ArrayOp`.
-- Standard library root environment binding and signatures matching Cardelli's specifications.
+### Phase 3.5: Cardelli Standard Library Modules & Import System (`quest/builtins.py`) [COMPLETE]
+- Standard library interfaces and runtime module implementations:
+  - `writer: Writer`: `output` (stdout), `err` (stderr), `file(name)`, `putString`, `putChar`, `flush`, `close`.
+  - `reader: Reader`: `input` (stdin), `file(name)`, `getString`, `getChar`, `more`, `ready` (returns 0), `close`.
+  - `conv: Conv`: string conversions formatting negative integers and reals with Cardelli tilde (`~42`).
+  - `ascii: Ascii`: `char(n)`, `val(c)`, and `ascii.error` bounds checking.
+  - `int: IntOp`: 64-bit bounds `minInt`, `maxInt`, `abs`, `min`, `max`.
+  - `real: RealOp`: IEEE-754 properties `minReal`, `maxReal`, `posEpsilon`, `negEpsilon`, `e`, arithmetic & comparisons.
+  - `string: StringOp`: mutable operations `length`, `getChar`, `setChar`, `getSub`, `setSub`, `cat`, `conc`, `equal`.
+  - `arrayOp: ArrayOp`: polymorphic operations (`new`, `size`, `get`, `set`) operating on native `QArray`.
+  - `dynamic: Dynamic`: `new`, `be`, `copy`, `extern` operating on dynamic envelopes.
+- Top-level `import` statements: `import mod: Interface` and `import : Interface` via `BuiltinModuleRegistry`.
 
 ### Phase 3.6: Pipeline Integration, CLI & Interactive REPL (`quest/repl.py`)
 - `InterpretPhase` registered in `PhasePipeline` following `typecheck`:

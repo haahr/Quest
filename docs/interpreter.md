@@ -254,6 +254,25 @@ The evaluator in `quest/interpreter.py` evaluates typed expressions and bindings
   - If no `when` branch matches and no `else` branch is supplied, raises the language-level exception `dynamic.error`
     (`DYNAMIC_ERROR_EXC`).
 
+### 4.11. Standard Library Modules & Import System
+- **Module Import Semantics:**
+  - Standard library modules and interfaces are not pre-bound in the root lexical environment; they must be imported
+    explicitly via top-level `import mod: Interface` or `import : Interface`.
+  - `BuiltinModuleRegistry` resolves standard interfaces (`Writer`, `Reader`, `Conv`, `Ascii`, `IntOp`, `RealOp`,
+    `StringOp`, `ArrayOp`, `Dynamic`) and provides runtime module records (`writer`, `reader`, etc.).
+- **I/O Streams & Files:**
+  - `writer.output` connects to `sys.stdout`; `writer.err` connects to `sys.stderr` (language extension).
+  - `writer.file(name)` and `reader.file(name)` manage real file handles, raising `writer.error` / `reader.error` on
+    I/O failures.
+  - `reader.input` connects to `sys.stdin`; `reader.ready()` returns 0.
+- **Cardelli Negative Number Conventions:**
+  - `conv.int` and `conv.real` prefix negative numbers with tilde `~` (e.g. `"~42"`).
+- **String Mutability:**
+  - `string.setChar` and `string.setSub` mutate `QString` values in-place while preserving object identity.
+- **Array Operations:**
+  - `arrayOp.new`, `arrayOp.size`, `arrayOp.get`, and `arrayOp.set` operate directly on the built-in `QArray` type
+    and raise `arrayOp.error` on boundary violations.
+
 ---
 
 ## 5. Implementation Status
@@ -264,7 +283,7 @@ The evaluator in `quest/interpreter.py` evaluates typed expressions and bindings
 | **3.2** | Environment & Core Eval | `RuntimeEnvironment`, scoping, operators, loops, DivideByZero | **Complete** |
 | **3.3** | Structures & Mutation | Record/tuple selection, array operations, `case` matching | **Complete** |
 | **3.4** | Exceptions & Dynamic | `try...with`, `raise`, `inspect`, dynamic type reflection | **Complete** |
-| **3.5** | Cardelli Stdlib Modules | `writer`, `reader`, `conv`, `ascii`, `string`, `int`, `real` | Planned |
+| **3.5** | Cardelli Stdlib Modules | 9 standard modules, I/O streams, files, import system | **Complete** |
 | **3.6** | Pipeline & REPL | `InterpretPhase`, `--interactive`, interactive terminal loop | Planned |
 
 ---
