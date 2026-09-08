@@ -282,6 +282,69 @@ class Phase3FunctionsTest(unittest.TestCase):
         typed_block = synth_expr(block)
         self.assertEqual(typed_block.type_val, INT_TYPE)
 
+    def test_let_rec_missing_return_type_raises_type_error(self) -> None:
+        """let rec f(n: Int) = ... without return type raises TypeError."""
+        binding = ast.LetValueBinding(
+            name="fib",
+            params=(
+                ast.FormalParam(
+                    name="n",
+                    type_annot=ast.TypePath(path=("Int",)),
+                    mode=ast.ParamMode.VALUE,
+                ),
+            ),
+            type_annot=None,
+            value=ast.ExprId(name="n"),
+            is_rec=True,
+        )
+        block = ast.ExprBlock(bindings=(binding, ast.ExprStmt(expr=ast.ExprInt(value=1, lexeme="1"))))
+        with self.assertRaises(TypeError) as ctx:
+            synth_expr(block)
+        self.assertIn(
+            "Recursive function 'fib' requires an explicit return type annotation",
+            str(ctx.exception),
+        )
+
+    def test_let_rec_missing_param_type_raises_type_error(self) -> None:
+        """let rec f(n) : Int = ... with unannotated parameter raises TypeError."""
+        binding = ast.LetValueBinding(
+            name="fib",
+            params=(
+                ast.FormalParam(
+                    name="n",
+                    type_annot=None,
+                    mode=ast.ParamMode.VALUE,
+                ),
+            ),
+            type_annot=ast.TypePath(path=("Int",)),
+            value=ast.ExprId(name="n"),
+            is_rec=True,
+        )
+        block = ast.ExprBlock(bindings=(binding, ast.ExprStmt(expr=ast.ExprInt(value=1, lexeme="1"))))
+        with self.assertRaises(TypeError) as ctx:
+            synth_expr(block)
+        self.assertIn(
+            "Parameter 'n' in recursive function 'fib' requires an explicit type annotation",
+            str(ctx.exception),
+        )
+
+    def test_let_rec_value_missing_type_raises_type_error(self) -> None:
+        """let rec f = 1 without type annotation raises TypeError."""
+        binding = ast.LetValueBinding(
+            name="f",
+            params=(),
+            type_annot=None,
+            value=ast.ExprInt(value=1, lexeme="1"),
+            is_rec=True,
+        )
+        block = ast.ExprBlock(bindings=(binding, ast.ExprStmt(expr=ast.ExprInt(value=1, lexeme="1"))))
+        with self.assertRaises(TypeError) as ctx:
+            synth_expr(block)
+        self.assertIn(
+            "Recursive definition 'f' requires an explicit type annotation",
+            str(ctx.exception),
+        )
+
     def test_all_type_as_function_type_elaboration(self) -> None:
         """All(y: Int) Int in elaborate_type elaborates to QFunType(y: Int) -> Int."""
         ast_all = ast.TypeAll(

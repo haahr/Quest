@@ -124,6 +124,27 @@ x := x + 1;
 Quest disallows implicit numeric coercions: `Int` and `Real` are disjoint types. Arithmetic between differing numeric
 types requires explicit conversion operations (`Real(n)`).
 
+### 5.4. Function Signatures and Recursive Bindings (`let rec`)
+- **Explicit Parameter Types:** Function parameters are syntactically signatures ($S$). In Quest, every value
+  parameter in a signature must provide an explicit type annotation (`x: Int` or `: Int`); parameter types are
+  not inferred from usage (Cardelli, *The Quest Language and System* §4).
+- **Explicit Return Types on Recursive Functions:**
+  While non-recursive functions allow omitting return types (`let f(S) = b` or `fun(S) b`) by synthesizing the
+  return type from the body, **recursive functions (`let rec`) require an explicit return type annotation**
+  (`let rec f(S): Ret = ...`).
+- **Typing Discipline & Context:**
+  Quest uses local bidirectional typechecking rather than global Hindley-Milner type inference. In a recursive
+  binding, the function identifier $f$ must be introduced into the typing context $\Gamma$ before typechecking
+  recursive calls within the function body:
+  $$\frac{\Gamma, f: \text{All}(S) \text{Ret} \vdash \text{fun}(S): \text{Ret } b \Leftarrow \text{All}(S) \text{Ret}}
+  {\Gamma \vdash \text{let rec } f(S): \text{Ret} = b}$$
+  Without an explicit return type annotation, $f$'s signature cannot be formed prior to checking the body.
+  Omitting return types or parameter types on recursive definitions triggers a compilation error.
+- **Recursive Value Bindings:**
+  Any recursive value binding without parameters (`let rec x: T = e`) similarly requires an explicit type
+  annotation, and its right-hand side entity must syntactically be a constructor or abstraction (Cardelli,
+  *Typeful Programming* §4.3).
+
 ---
 
 ## 6. Summary Complexity Matrix

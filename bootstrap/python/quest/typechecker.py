@@ -2235,11 +2235,23 @@ def _elaborate_binding(binding: ast.BindingNode, env: Environment, loop_depth: i
                 offset=binding.offset,
             )
             if is_rec:
+                if binding.type_annot is None:
+                    raise TypeError(
+                        f"Recursive function '{binding.name}' requires an explicit return type annotation",
+                        offset=binding.offset,
+                    )
+                for p in params:
+                    if p.type_annot is None:
+                        raise TypeError(
+                            f"Parameter '{p.name}' in recursive function '{binding.name}' "
+                            f"requires an explicit type annotation",
+                            offset=p.offset,
+                        )
                 param_types = tuple(
-                    elaborate_type(p.type_annot, env) if p.type_annot else DYNAMIC_TYPE
+                    elaborate_type(p.type_annot, env)
                     for p in params
                 )
-                ret_type = elaborate_type(binding.type_annot, env) if binding.type_annot else DYNAMIC_TYPE
+                ret_type = elaborate_type(binding.type_annot, env)
                 q_params = tuple(
                     QParam(
                         name=p.name,
@@ -2274,6 +2286,24 @@ def _elaborate_binding(binding: ast.BindingNode, env: Environment, loop_depth: i
                     is_rec=False,
                     offset=binding.offset,
                 )
+
+        case ast.LetValueBinding(is_rec=True):
+            if binding.type_annot is None:
+                raise TypeError(
+                    f"Recursive definition '{binding.name}' requires an explicit type annotation",
+                    offset=binding.offset,
+                )
+            expected = elaborate_type(binding.type_annot, env)
+            sym = ValueSymbol(name=binding.name, type_val=expected, is_var=binding.is_var)
+            env.current_scope.declare_value(sym)
+            typed_val = check_expr(binding.value, expected, env, loop_depth)
+            return TypedLetValue(
+                name=binding.name,
+                value=typed_val,
+                symbol=sym,
+                is_rec=True,
+                offset=binding.offset,
+            )
 
         case ast.LetValueBinding():
             if binding.type_annot is not None:
