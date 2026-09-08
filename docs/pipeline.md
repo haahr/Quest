@@ -63,7 +63,7 @@ Encapsulates runtime configuration:
 - `stop_after: Optional[str]`: Pipeline milestone to halt after (implicitly dumping output).
 - `dump_after: set[str]`: Intermediate phase outputs to dump to stdout while continuing pipeline execution.
 - `include_paths: list[Path]`: Search directories for imported interfaces and modules (`-I`).
-- `interactive: bool`: When true, echoes top-level binding signatures and evaluated values in batch mode.
+- `echo: bool`: When true, echoes top-level binding signatures and evaluated values in batch mode.
 - `show_offsets: bool`: Controls rendering of source offsets in AST dumps.
 - `show_values: bool`: Controls rendering of parsed literal values in token dumps.
 
@@ -102,16 +102,26 @@ Manages the sequence of passes and provides two primary entry points:
 
 ## 4. Command-Line Interface (`quest` / `quest_driver.py`)
 
-The unified driver accepts files, standard input, or inline code:
+The unified driver accepts files, standard input, inline code, or enters the interactive REPL:
 
 ```bash
-# Execute through default target (interpret/run)
+# Start interactive REPL directly:
+quest
+
+# Execute through default target (interpret/run) silently:
 quest file.quest
+
+# Echo top-level bindings and expression results in batch execution:
+quest --echo file.quest
+
+# Execute file, then drop into interactive REPL:
+quest -i file.quest
 
 # Stop after a specific phase and print its canonical output:
 quest --stop-after tokenize file.quest
 quest --stop-after parse file.quest
 quest --stop-after typecheck file.quest
+quest --stop-after interpret file.quest
 
 # Dump intermediate outputs while continuing:
 quest --dump-after parse --stop-after typecheck file.quest
@@ -121,9 +131,6 @@ quest -c "let x = 1;" --stop-after typecheck
 
 # Add search paths for imports:
 quest -I ./lib -I ./interfaces main.quest
-
-# Echo top-level bindings and expression results in batch execution:
-quest --interactive file.quest
 ```
 
 Accepts both dashed (`--stop-after`) and underscored (`--stop_after`) flag formats.

@@ -73,7 +73,7 @@ native **AArch64 (ARM64)** machine code and providing a **JIT compiler** for int
 - **Local Type Inference & Signatures:** Signature matching, manifest type/kind expansion (`Def`, `DEF`, `_`), and
   argument/parameter reconciliation.
 
-### Step 3: Bootstrap Tree-Walking Interpreter & REPL (Python) — *In Progress (Phases 3.1–3.5 Complete)*
+### Step 3: Bootstrap Tree-Walking Interpreter & REPL (Python) — *Complete (Phases 3.1–3.6)*
 - Tree-walking applicative-order interpreter executing typed AST representations.
 - Subphase progress:
   - **Phase 3.1 (Runtime Values & Memory):** `QValue` class hierarchy, primitives, aggregates, heap reference cells
@@ -87,10 +87,10 @@ native **AArch64 (ARM64)** machine code and providing a **JIT compiler** for int
     `dynamic.error`, and Cardelli-format exception diagnostics. — *Complete*
   - **Phase 3.5 (Cardelli Standard Library Modules):** Builtin modules (`writer`, `reader`, `conv`, `ascii`, `int`,
     `real`, `string`, `arrayOp`, `dynamic`), streams/files, and top-level `import` system. — *Complete*
-  - **Phase 3.6 (Pipeline Integration, CLI & Interactive REPL):** `InterpretPhase` phase integration, `--interactive`
-    flag, and persistent interactive multi-line REPL. — *Next*
-- Architectural design and decisions documented in [interpreter.md](interpreter.md); multi-phase plan in
-  [step3-interpreter.md](step3-interpreter.md).
+  - **Phase 3.6 (Pipeline Integration, CLI & Interactive REPL):** `InterpretPhase` integration, `--echo` batch mode,
+    `-i` / `--interactive` REPL launch, and persistent interactive multi-line REPL (`quest/repl.py`). — *Complete*
+- Interpreter architecture in [interpreter.md](interpreter.md); REPL guide in [repl.md](repl.md); implementation
+  plan in [step3-interpreter.md](step3-interpreter.md).
 
 ### Step 4: Bootstrap C Transpiler (Python)
 - Multi-pass translation pipeline:

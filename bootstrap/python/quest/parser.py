@@ -137,11 +137,18 @@ class Rule:
 class ParserError(Exception):
     """Raised when parsing fails, carrying location and message."""
 
-    def __init__(self, message: str, offset: int, length: int = 1):
+    def __init__(
+        self,
+        message: str,
+        offset: int,
+        length: int = 1,
+        token: Opt[Token] = None,
+    ):
         super().__init__(message)
         self.message = message
         self.offset = offset
         self.length = length
+        self.token = token
 
     def to_diagnostic(self) -> Diagnostic:
         """Converts this error into a structured Diagnostic object."""
@@ -213,7 +220,12 @@ class Parser:
             f"Unexpected token {farthest_token.lexeme!r} ({farthest_token.kind.name}), "
             f"expected: {expected_string}"
         )
-        raise ParserError(message, farthest_token.offset, max(1, farthest_token.length))
+        raise ParserError(
+            message,
+            farthest_token.offset,
+            max(1, farthest_token.length),
+            token=farthest_token,
+        )
 
     def parse_target(self, target: SyntaxTarget, pos: int) -> tuple[Opt[Any], int]:
         """Evaluates a target at the given token position with packrat memoization."""

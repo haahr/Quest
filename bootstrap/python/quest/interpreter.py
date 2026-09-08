@@ -15,7 +15,7 @@ Implements Phase 3.2 of the Quest compiler:
 from __future__ import annotations
 
 import math
-from typing import Optional
+from typing import Any, Optional
 
 from quest.diagnostics import Diagnostic, DiagnosticLabel, Severity
 from quest.runtime import (
@@ -214,6 +214,18 @@ class RuntimeEnvironment:
             self.parent.assign(name, new_value, offset)
             return
         raise QuestRuntimeError(f"Cannot assign to undefined symbol '{name}'", offset=offset)
+
+    def snapshot(self) -> dict[str, Any]:
+        """Captures a shallow copy of the current bindings and parent pointer."""
+        return {
+            "bindings": dict(self.bindings),
+            "parent": self.parent,
+        }
+
+    def restore(self, snap: dict[str, Any]) -> None:
+        """Restores bindings and parent from a previous snapshot."""
+        self.bindings = dict(snap["bindings"])
+        self.parent = snap["parent"]
 
     @classmethod
     def create_root_env(cls) -> RuntimeEnvironment:
@@ -758,22 +770,33 @@ def eval_binding(binding: TypedBinding, env: RuntimeEnvironment) -> QValue:
             raise QuestRuntimeError(f"Unhandled binding node: {binding.__class__.__name__}")
 
 
-def eval_program(program: TypedProgram, env: Optional[RuntimeEnvironment] = None) -> QValue:
-    """Evaluates an entire typed program sequentially, returning the final phrase value."""
+def eval_program_phrases(
+    program: TypedProgram,
+    env: Optional[RuntimeEnvironment] = None,
+) -> list[tuple[TypedBinding | TypedExpr, QValue]]:
+    """Evaluates an entire typed program sequentially, returning (phrase, value) pairs."""
     if env is None:
         env = RuntimeEnvironment.create_root_env()
 
-    final_val: QValue = OK_VALUE
+    results: list[tuple[TypedBinding | TypedExpr, QValue]] = []
     for phrase in program.phrases:
         match phrase:
             case TypedBinding():
-                final_val = eval_binding(phrase, env)
+                val = eval_binding(phrase, env)
+                results.append((phrase, val))
             case TypedExpr():
-                final_val = eval_expr(phrase, env)
+                val = eval_expr(phrase, env)
+                results.append((phrase, val))
             case _:
                 raise QuestRuntimeError(f"Unknown top-level phrase: {phrase.__class__.__name__}")
 
-    return final_val
+    return results
+
+
+def eval_program(program: TypedProgram, env: Optional[RuntimeEnvironment] = None) -> QValue:
+    """Evaluates an entire typed program sequentially, returning the final phrase value."""
+    results = eval_program_phrases(program, env)
+    return results[-1][1] if results else OK_VALUE
 
 
 def format_interactive_result(

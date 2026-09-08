@@ -239,6 +239,32 @@ class Environment:
     def lookup_module(self, name: str) -> Optional[Scope]:
         return self._modules.get(name)
 
+    def snapshot(self) -> dict[str, Any]:
+        """Captures a snapshot of the current environment state for rollback on error."""
+        return {
+            "symbol_counter": self._symbol_counter,
+            "interfaces": dict(self._interfaces),
+            "modules": dict(self._modules),
+            "scope_declarations": list(self.current_scope._declarations),
+            "scope_values": dict(self.current_scope._values),
+            "scope_types": dict(self.current_scope._types),
+            "scope_types_by_id": dict(self.current_scope._types_by_id),
+            "scope_kinds": dict(self.current_scope._kinds),
+            "scope_kinds_by_id": dict(self.current_scope._kinds_by_id),
+        }
+
+    def restore(self, snap: dict[str, Any]) -> None:
+        """Restores environment state from a previous snapshot."""
+        self._symbol_counter = snap["symbol_counter"]
+        self._interfaces = dict(snap["interfaces"])
+        self._modules = dict(snap["modules"])
+        self.current_scope._declarations = list(snap["scope_declarations"])
+        self.current_scope._values = dict(snap["scope_values"])
+        self.current_scope._types = dict(snap["scope_types"])
+        self.current_scope._types_by_id = dict(snap["scope_types_by_id"])
+        self.current_scope._kinds = dict(snap["scope_kinds"])
+        self.current_scope._kinds_by_id = dict(snap["scope_kinds_by_id"])
+
     # --- Built-in Initialization ---
 
     def _init_builtins(self) -> None:

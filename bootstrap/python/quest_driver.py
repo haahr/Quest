@@ -17,7 +17,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from quest.diagnostics import DiagnosticRenderer, Severity
 from quest.interpreter import format_interactive_result
-from quest.pipeline import CompilerOptions, default_pipeline
+from quest.pipeline import CompilerContext, CompilerOptions, default_pipeline
 from quest.runtime import QOk, qvalue_to_str
 from quest.tokens import SourceMap
 
@@ -41,6 +41,18 @@ def run_driver(args: list[str]) -> int:
         "-c", "--code", "--command",
         dest="code",
         help="Inline Quest code string to process.",
+    )
+    arg_parser.add_argument(
+        "-i", "--interactive",
+        dest="interactive",
+        action="store_true",
+        help="Run file, then enter interactive REPL (or enter REPL if no file).",
+    )
+    arg_parser.add_argument(
+        "--echo",
+        dest="echo",
+        action="store_true",
+        help="Echo Cardelli-format typescript for each top-level phrase in batch mode.",
     )
     arg_parser.add_argument(
         "--stop-after", "--stop_after",
@@ -83,7 +95,13 @@ def run_driver(args: list[str]) -> int:
     if is_inline_code:
         source_text = parsed_args.code
         file_name = "<string>"
-    elif parsed_args.file is None or parsed_args.file == "-":
+    elif parsed_args.file is None:
+        if parsed_args.interactive or sys.stdin.isatty():
+            from quest.repl import run_repl
+            return run_repl()
+        source_text = sys.stdin.read()
+        file_name = "<stdin>"
+    elif parsed_args.file == "-":
         source_text = sys.stdin.read()
         file_name = "<stdin>"
     else:
@@ -103,12 +121,14 @@ def run_driver(args: list[str]) -> int:
         stop_after=parsed_args.stop_after,
         dump_after=set(parsed_args.dump_after),
         include_paths=[Path(p) for p in parsed_args.include_paths],
+        echo=parsed_args.echo,
         show_offsets=parsed_args.show_offsets,
         show_values=parsed_args.show_values,
     )
 
     # Execute pipeline
-    result = pipeline.execute(source_text, file_name, options=options)
+    ctx = CompilerContext.create(source_text, file_name, options=options)
+    result = pipeline.execute(source_text, file_name, options=options, ctx=ctx)
 
     # Output any requested phase dumps
     for phase_name in available_phases:
@@ -118,7 +138,7 @@ def run_driver(args: list[str]) -> int:
                 sys.stdout.write(out_str + "\n")
 
     # If evaluated inline code via -c, print the final phrase result (unless it's ok)
-    if is_inline_code and result.success and "interpret" not in result.dump_outputs:
+    if is_inline_code and result.success and "interpret" not in result.dump_outputs and not parsed_args.echo:
         typed_prog = result.artifacts.get("typecheck")
         final_phrase = typed_prog.phrases[-1] if typed_prog and typed_prog.phrases else None
         val = result.artifacts.get("interpret")
@@ -138,7 +158,15 @@ def run_driver(args: list[str]) -> int:
     if any(d.severity == Severity.FATAL for d in result.diagnostics):
         return 70  # EX_SOFTWARE
 
-    return 0 if result.success else 1
+    if not result.success:
+        return 1
+
+    # If -i / --interactive was requested with a file, enter REPL with populated context
+    if parsed_args.interactive:
+        from quest.repl import run_repl
+        return run_repl(ctx=ctx)
+
+    return 0
 
 
 def main() -> int:

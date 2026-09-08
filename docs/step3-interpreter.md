@@ -146,13 +146,15 @@ pre-linked modules and interfaces in the root environment:
   - `dynamic: Dynamic`: `new`, `be`, `copy`, `extern` operating on dynamic envelopes.
 - Top-level `import` statements: `import mod: Interface` and `import : Interface` via `BuiltinModuleRegistry`.
 
-### Phase 3.6: Pipeline Integration, CLI & Interactive REPL (`quest/repl.py`)
+### Phase 3.6: Pipeline Integration, CLI & Interactive REPL (`quest/repl.py`) [COMPLETE]
 - `InterpretPhase` registered in `PhasePipeline` following `typecheck`:
   - Output: final phrase `QValue`.
   - Silent when `QOk`, formatted when non-ok.
-- CLI driver support: default execution runs through `interpret`. Flag `--interactive` enables top-level echo in batch.
-- Interactive multi-line REPL (`quest` without files) maintaining persistent `Environment` and `RuntimeEnvironment`.
-- Integration tests in `tests/python/test_interpreter.py` and compiler golden tests in `tests/golden/interpret/`.
+- CLI driver support: default execution runs through `interpret`. Flag `--echo` enables top-level echo in batch.
+- Interactive multi-line REPL (`quest` without files or `quest -i <file>`) maintaining persistent `Environment` and
+  `RuntimeEnvironment`. Documented in [docs/repl.md](repl.md).
+- Integration tests in `tests/python/test_repl.py` and compiler golden/error tests in `tests/golden/interpret/` and
+  `tests/errors/interpret/`.
 
 ---
 

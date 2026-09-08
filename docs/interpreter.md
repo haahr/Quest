@@ -284,12 +284,13 @@ The evaluator in `quest/interpreter.py` evaluates typed expressions and bindings
 | **3.3** | Structures & Mutation | Record/tuple selection, array operations, `case` matching | **Complete** |
 | **3.4** | Exceptions & Dynamic | `try...with`, `raise`, `inspect`, dynamic type reflection | **Complete** |
 | **3.5** | Cardelli Stdlib Modules | 9 standard modules, I/O streams, files, import system | **Complete** |
-| **3.6** | Pipeline & REPL | `InterpretPhase`, `--interactive`, interactive terminal loop | Planned |
+| **3.6** | Pipeline & REPL | `InterpretPhase`, `--echo`, `-i`, interactive REPL (`repl.py`) | **Complete** |
 
 ---
 
 ## See Also
 
+- [docs/repl.md](repl.md): Interactive REPL guide, prompts, multi-line rules, and terminal handling.
 - [docs/step3-interpreter.md](step3-interpreter.md): Multi-phase implementation roadmap for Step 3.
 - [docs/pipeline.md](pipeline.md): Compiler phase pipeline and unified CLI driver options.
 - [docs/type-system.md](type-system.md): Typechecker architecture, semantic types, and term typing rules.

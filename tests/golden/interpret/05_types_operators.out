@@ -1,0 +1,1 @@
+Let Pair::ALL(A :: TYPE) ALL(B :: TYPE) TYPE = Fun(A :: TYPE B :: TYPE) Tuple first: A second: B end

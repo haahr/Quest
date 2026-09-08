@@ -6,6 +6,7 @@ across compiler phases (tokenize, parse, typecheck, interpret, codegen).
 
 from __future__ import annotations
 
+import sys
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -20,6 +21,7 @@ from quest.interpreter import (
     QuestRuntimeError,
     RuntimeEnvironment,
     eval_program,
+    eval_program_phrases,
     format_interactive_result,
 )
 from quest.parser import ParserError
@@ -37,6 +39,7 @@ class CompilerOptions:
     stop_after: Optional[str] = None
     dump_after: set[str] = field(default_factory=set)
     include_paths: list[Path] = field(default_factory=list)
+    echo: bool = False
     show_offsets: bool = False
     show_values: bool = False
 
@@ -191,6 +194,11 @@ class InterpretPhase(Phase):
 
     def __init__(self) -> None:
         self._last_final_phrase: Optional[TypedBinding | TypedExpr] = None
+        self._last_phrase_results: list[tuple[TypedBinding | TypedExpr, QValue]] = []
+
+    @property
+    def last_phrase_results(self) -> list[tuple[TypedBinding | TypedExpr, QValue]]:
+        return self._last_phrase_results
 
     def run(self, input_data: Any, ctx: CompilerContext) -> Optional[QValue]:
         typed_prog: TypedProgram = input_data
@@ -199,7 +207,13 @@ class InterpretPhase(Phase):
         else:
             self._last_final_phrase = None
         try:
-            return eval_program(typed_prog, ctx.runtime_env)
+            self._last_phrase_results = eval_program_phrases(typed_prog, ctx.runtime_env)
+            if ctx.options.echo:
+                for phrase, val in self._last_phrase_results:
+                    out_str = format_interactive_result(phrase, val)
+                    if out_str:
+                        sys.stdout.write(out_str + "\n")
+            return self._last_phrase_results[-1][1] if self._last_phrase_results else OK_VALUE
         except (QuestException, QuestRuntimeError) as error:
             ctx.sink.emit(error.to_diagnostic())
             return None
@@ -305,6 +319,7 @@ class PhasePipeline:
     ) -> PipelineResult:
         """Executes the pipeline on an interactive REPL phrase, preserving context."""
         context = ctx or CompilerContext.create(phrase_text, "<repl>", options=options)
+        context.sink = DiagnosticSink()
         # Update source_text and source_map for this specific phrase
         context.source_text = phrase_text
         context.source_map = SourceMap(phrase_text, context.file_name)

@@ -1,0 +1,2 @@
+let arr = array of 1 2 3 end;
+let outOfBounds = arr[10]; (* ERROR: Exception: arrayOp.error *)
