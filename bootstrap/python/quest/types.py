@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Optional, Union
 
-from quest.diagnostics import Diagnostic, DiagnosticRenderer
+from quest.diagnostics import Diagnostic, DiagnosticRenderer, QuestCompilerError
 
 
 # ============================================================================
@@ -1237,7 +1237,7 @@ def is_subkind(sub: QKind, sup: QKind, env: Optional[Any] = None) -> bool:
 # 10. Kind Synthesis, Checking, and Well-Kindedness
 # ============================================================================
 
-class KindError(Exception):
+class KindError(QuestCompilerError):
     """Raised when kind synthesis, kind checking, or well-kindedness verification fails."""
 
     def __init__(
@@ -1246,10 +1246,9 @@ class KindError(Exception):
         offset: int = 0,
         help_text: Optional[str] = None,
         notes: Optional[list[str]] = None,
+        length: int = 1,
     ) -> None:
-        super().__init__(f"{message} at offset {offset}" if offset else message)
-        self.message = message
-        self.offset = offset
+        super().__init__(message=message, offset=offset, length=length)
         self.help_text = help_text
         self.notes = notes or []
 

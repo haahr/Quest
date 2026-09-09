@@ -13,17 +13,14 @@ from quest.tokens import (
     Token,
     TokenKind,
 )
-from quest.diagnostics import Diagnostic, DiagnosticRenderer
+from quest.diagnostics import Diagnostic, DiagnosticRenderer, QuestCompilerError
 
 
-class TokenizerError(Exception):
+class TokenizerError(QuestCompilerError):
     """Raised on lexical errors (unterminated literals, invalid characters, etc.)."""
 
     def __init__(self, message: str, offset: int, length: int = 1):
-        super().__init__(message)
-        self.message = message
-        self.offset = offset
-        self.length = length
+        super().__init__(message=message, offset=offset, length=length)
 
     def to_diagnostic(self) -> Diagnostic:
         """Converts this error into a structured Diagnostic object."""

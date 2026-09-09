@@ -105,12 +105,52 @@ class Diagnostic:
         )
 
 
-class FatalDiagnosticError(Exception):
+class QuestCompilerError(Exception):
+    """Base class for all Quest compilation and evaluation errors."""
+
+    def __init__(
+        self,
+        message: str,
+        offset: Optional[int] = 0,
+        length: int = 1,
+    ) -> None:
+        super().__init__(message)
+        self.message = message
+        self.offset = offset
+        self.length = length
+
+    def to_diagnostic(self, length: Optional[int] = None) -> Diagnostic:
+        """Converts this error into a structured Diagnostic object."""
+        len_val = length if length is not None else self.length
+        label = (
+            DiagnosticLabel(offset=self.offset, length=len_val, is_primary=True)
+            if self.offset is not None
+            else None
+        )
+        return Diagnostic(
+            severity=Severity.ERROR,
+            message=self.message,
+            primary_label=label,
+        )
+
+    def format_with_source(self, source_map: Any, length: Optional[int] = None) -> str:
+        """Renders this error as a formatted diagnostic message with source context."""
+        return DiagnosticRenderer.render_diagnostic(self.to_diagnostic(length), source_map)
+
+
+class FatalDiagnosticError(QuestCompilerError):
     """Raised immediately by DiagnosticSink when a FATAL diagnostic is emitted."""
 
     def __init__(self, diagnostic: Diagnostic) -> None:
-        super().__init__(diagnostic.message)
+        super().__init__(
+            message=diagnostic.message,
+            offset=diagnostic.primary_label.offset if diagnostic.primary_label else None,
+            length=diagnostic.primary_label.length if diagnostic.primary_label else 1,
+        )
         self.diagnostic = diagnostic
+
+    def to_diagnostic(self, length: Optional[int] = None) -> Diagnostic:
+        return self.diagnostic
 
 
 class DiagnosticSink:

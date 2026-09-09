@@ -54,7 +54,7 @@ from quest.env import (
     TypeSymbol,
     ValueSymbol,
 )
-from quest.diagnostics import Diagnostic, DiagnosticRenderer
+from quest.diagnostics import Diagnostic, DiagnosticRenderer, QuestCompilerError
 from quest.elaborate_types import (
     elaborate_kind,
     elaborate_kind_binding,
@@ -119,7 +119,7 @@ from quest.typed_ast import (
 )
 
 
-class TypeError(Exception):
+class QuestTypeError(QuestCompilerError):
     """Raised when a type error occurs during term elaboration and typechecking."""
 
     def __init__(
@@ -128,26 +128,25 @@ class TypeError(Exception):
         offset: int = 0,
         help_text: Optional[str] = None,
         notes: Optional[list[str]] = None,
+        length: int = 1,
     ) -> None:
-        super().__init__(f"{message} at offset {offset}" if offset else message)
-        self.message = message
-        self.offset = offset
+        super().__init__(message=message, offset=offset, length=length)
         self.help_text = help_text
         self.notes = notes or []
 
-    def to_diagnostic(self, length: int = 1) -> Diagnostic:
+    def to_diagnostic(self, length: Optional[int] = None) -> Diagnostic:
         """Converts this error into a structured Diagnostic object."""
         return Diagnostic.make_error(
             message=self.message,
-            offset=self.offset,
-            length=length,
+            offset=self.offset or 0,
+            length=length if length is not None else self.length,
             help_text=self.help_text,
             notes=self.notes,
         )
 
-    def format_with_source(self, source_map: Any, length: int = 1) -> str:
-        """Renders a diagnostic message with underlined source context."""
-        return DiagnosticRenderer.render_diagnostic(self.to_diagnostic(length), source_map)
+
+# Backward compatibility alias
+TypeError = QuestTypeError
 
 
 def check_no_escaping_path_types(
@@ -2086,6 +2085,29 @@ def elaborate_import(phrase: ast.ImportPhrase, env: Environment) -> TypedImport:
     return TypedImport(items=tuple(typed_items), offset=phrase.offset)
 
 
+def elaborate_phrase(
+    phrase: ast.ASTNode,
+    env: Environment,
+) -> TypedBinding | TypedExpr:
+    """Elaborates a single top-level phrase (interface, module, import, binding, or expr)."""
+    match phrase:
+        case ast.InterfaceDecl():
+            return elaborate_interface(phrase, env)
+        case ast.ModuleDecl():
+            return elaborate_module(phrase, env)
+        case ast.ImportPhrase():
+            return elaborate_import(phrase, env)
+        case ast.BindingNode():
+            return _elaborate_binding(phrase, env, loop_depth=0)
+        case ast.Expr():
+            return synth_expr(phrase, env, loop_depth=0)
+        case _:
+            raise TypeError(
+                f"Unsupported top-level phrase '{phrase}'",
+                offset=getattr(phrase, "offset", 0),
+            )
+
+
 def elaborate_program(
     program: ast.Program,
     env: Optional[Environment] = None,
@@ -2094,26 +2116,8 @@ def elaborate_program(
     if env is None:
         env = Environment()
 
-    typed_phrases: list[Union[TypedBinding, TypedExpr]] = []
-    for phrase in program.phrases:
-        match phrase:
-            case ast.InterfaceDecl():
-                typed_phrases.append(elaborate_interface(phrase, env))
-            case ast.ModuleDecl():
-                typed_phrases.append(elaborate_module(phrase, env))
-            case ast.ImportPhrase():
-                typed_phrases.append(elaborate_import(phrase, env))
-            case ast.BindingNode():
-                typed_phrases.append(_elaborate_binding(phrase, env, loop_depth=0))
-            case ast.Expr():
-                typed_phrases.append(synth_expr(phrase, env, loop_depth=0))
-            case _:
-                raise TypeError(
-                    f"Unsupported top-level phrase '{phrase}'",
-                    offset=getattr(phrase, "offset", 0),
-                )
-
-    return TypedProgram(phrases=tuple(typed_phrases), offset=program.offset)
+    typed_phrases = tuple(elaborate_phrase(phrase, env) for phrase in program.phrases)
+    return TypedProgram(phrases=typed_phrases, offset=program.offset)
 
 
 # ============================================================================

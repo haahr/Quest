@@ -13,7 +13,9 @@ from quest.pipeline import (
     PipelineResult,
     default_pipeline,
 )
+from quest.runtime import OK_VALUE
 from quest.typechecker import check_expr, synth_expr
+from quest.typed_ast import TypedBinding, TypedExpr, TypedProgram
 from quest.types import QKind, QType
 
 _parser_pipeline = default_pipeline()
@@ -94,18 +96,32 @@ def check_test_expr(
 def eval_test_source(
     source: str,
     env: Optional[RuntimeEnvironment] = None,
+    target: Optional[Union[str, SyntaxTarget]] = None,
 ) -> Any:
     """Parse, typecheck, and evaluate Quest source code, returning the resulting QValue.
 
-    Raises RuntimeError if compilation fails.
+    Raises QuestException or QuestRuntimeError on evaluation failure, or RuntimeError
+    if compilation fails during tokenize, parse, or typecheck.
     """
     pipeline = default_pipeline()
-    opts = CompilerOptions(stop_after="typecheck")
+    opts = CompilerOptions(stop_after="typecheck", target=target)
     res = pipeline.execute(source, "<test>", options=opts)
     if not res.success or res.final_artifact is None:
         diags = "\n".join(d.message for d in res.diagnostics)
         raise RuntimeError(f"Compilation failed for '{source}':\n{diags}")
-    return eval_program(res.final_artifact, env)
+    r_env = env if env is not None else RuntimeEnvironment.create_root_env()
+    artifact = res.final_artifact
+    match artifact:
+        case TypedProgram():
+            return eval_program(artifact, r_env)
+        case TypedExpr():
+            from quest.interpreter import eval_expr
+            return eval_expr(artifact, r_env)
+        case TypedBinding():
+            from quest.interpreter import eval_binding
+            return eval_binding(artifact, r_env)
+        case _:
+            return OK_VALUE
 
 
 

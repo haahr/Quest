@@ -13,24 +13,38 @@ from pathlib import Path
 from typing import Any, Optional
 
 import quest.ast as ast
-from quest.diagnostics import Diagnostic, DiagnosticSink, FatalDiagnosticError, Severity
+from quest.diagnostics import (
+    Diagnostic,
+    DiagnosticSink,
+    FatalDiagnosticError,
+    QuestCompilerError,
+    Severity,
+)
+from quest.elaborate_types import elaborate_kind, elaborate_type
 from quest.env import Environment
 from quest.grammar import parse_quest_program
 from quest.interpreter import (
     QuestException,
     QuestRuntimeError,
     RuntimeEnvironment,
+    eval_binding,
+    eval_expr,
     eval_program,
     eval_program_phrases,
     format_interactive_result,
 )
 from quest.parser import ParserError
-from quest.runtime import QOk, QValue, qvalue_to_str
+from quest.runtime import OK_VALUE, QOk, QValue, qvalue_to_str
 from quest.tokenizer import Tokenizer, TokenizerError
 from quest.tokens import SourceMap, Token, TokenKind
-from quest.typechecker import elaborate_program, TypeError as QuestTypeError
+from quest.typechecker import (
+    elaborate_phrase,
+    elaborate_program,
+    synth_expr,
+    TypeError as QuestTypeError,
+)
 from quest.typed_ast import TypedBinding, TypedExpr, TypedProgram
-from quest.types import KindError
+from quest.types import KindError, QKind, QType
 
 
 @dataclass
@@ -129,7 +143,7 @@ class TokenizePhase(Phase):
         tokenizer = Tokenizer(source_text, ctx.file_name)
         try:
             return tokenizer.tokenize_all()
-        except TokenizerError as error:
+        except QuestCompilerError as error:
             ctx.sink.emit(error.to_diagnostic())
             return None
 
@@ -159,7 +173,7 @@ class ParsePhase(Phase):
         tokens: list[Token] = input_data
         try:
             return parse_quest_program(tokens, ctx.source_map, target=ctx.options.target)
-        except ParserError as error:
+        except QuestCompilerError as error:
             ctx.sink.emit(error.to_diagnostic())
             return None
         except (ValueError, TypeError) as error:
@@ -178,17 +192,29 @@ class TypecheckPhase(Phase):
     description = "Elaborate AST terms and kinds into typed AST"
     artifact_name = "typed_ast"
 
-    def run(self, input_data: Any, ctx: CompilerContext) -> Optional[TypedProgram]:
-        tree: ast.Program = input_data
+    def run(self, input_data: Any, ctx: CompilerContext) -> Optional[Any]:
         try:
-            return elaborate_program(tree, ctx.env)
-        except (QuestTypeError, KindError) as error:
+            match input_data:
+                case ast.Program():
+                    return elaborate_program(input_data, ctx.env)
+                case ast.Expr():
+                    return synth_expr(input_data, ctx.env)
+                case ast.Type():
+                    return elaborate_type(input_data, ctx.env)
+                case ast.Kind():
+                    return elaborate_kind(input_data, ctx.env)
+                case ast.ASTNode():
+                    return elaborate_phrase(input_data, ctx.env)
+                case _:
+                    return input_data
+        except QuestCompilerError as error:
             ctx.sink.emit(error.to_diagnostic())
             return None
 
     def dump(self, output_data: Any, ctx: CompilerContext) -> str:
-        typed_prog: TypedProgram = output_data
-        return typed_prog.dump()
+        if hasattr(output_data, "dump"):
+            return output_data.dump()
+        return str(output_data)
 
 
 class InterpretPhase(Phase):
@@ -206,26 +232,59 @@ class InterpretPhase(Phase):
         return self._last_phrase_results
 
     def run(self, input_data: Any, ctx: CompilerContext) -> Optional[QValue]:
-        typed_prog: TypedProgram = input_data
-        if typed_prog.phrases:
-            self._last_final_phrase = typed_prog.phrases[-1]
-        else:
-            self._last_final_phrase = None
         try:
-            self._last_phrase_results = eval_program_phrases(typed_prog, ctx.runtime_env)
-            if ctx.options.echo:
-                for phrase, val in self._last_phrase_results:
-                    out_str = format_interactive_result(phrase, val)
-                    if out_str:
-                        sys.stdout.write(out_str + "\n")
-            return self._last_phrase_results[-1][1] if self._last_phrase_results else OK_VALUE
-        except (QuestException, QuestRuntimeError) as error:
+            match input_data:
+                case TypedProgram():
+                    if input_data.phrases:
+                        self._last_final_phrase = input_data.phrases[-1]
+                    else:
+                        self._last_final_phrase = None
+                    self._last_phrase_results = eval_program_phrases(input_data, ctx.runtime_env)
+                    if ctx.options.echo:
+                        for phrase, val in self._last_phrase_results:
+                            out_str = format_interactive_result(phrase, val)
+                            if out_str:
+                                sys.stdout.write(out_str + "\n")
+                    return self._last_phrase_results[-1][1] if self._last_phrase_results else OK_VALUE
+
+                case TypedExpr():
+                    self._last_final_phrase = input_data
+                    val = eval_expr(input_data, ctx.runtime_env)
+                    self._last_phrase_results = [(input_data, val)]
+                    if ctx.options.echo:
+                        out_str = format_interactive_result(input_data, val)
+                        if out_str:
+                            sys.stdout.write(out_str + "\n")
+                    return val
+
+                case TypedBinding():
+                    self._last_final_phrase = input_data
+                    val = eval_binding(input_data, ctx.runtime_env)
+                    self._last_phrase_results = [(input_data, val)]
+                    if ctx.options.echo:
+                        out_str = format_interactive_result(input_data, val)
+                        if out_str:
+                            sys.stdout.write(out_str + "\n")
+                    return val
+
+                case QType() | QKind():
+                    self._last_final_phrase = None
+                    self._last_phrase_results = []
+                    return OK_VALUE
+
+                case _:
+                    self._last_final_phrase = None
+                    self._last_phrase_results = []
+                    return OK_VALUE
+        except QuestCompilerError as error:
             ctx.sink.emit(error.to_diagnostic())
             return None
 
     def dump(self, output_data: Any, ctx: CompilerContext) -> str:
         val: QValue = output_data
-        return format_interactive_result(self._last_final_phrase, val)
+        if self._last_final_phrase is not None:
+            return format_interactive_result(self._last_final_phrase, val)
+        return qvalue_to_str(val)
 
 
 class PhasePipeline:

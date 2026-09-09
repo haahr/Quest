@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import Any, Callable, Optional as Opt, Union
 
 from quest.tokens import SourceMap, Token, TokenKind
-from quest.diagnostics import Diagnostic, DiagnosticRenderer
+from quest.diagnostics import Diagnostic, DiagnosticRenderer, QuestCompilerError
 
 
 # ============================================================================
@@ -134,7 +134,7 @@ class Rule:
 # 2. Parser Exception
 # ============================================================================
 
-class ParserError(Exception):
+class ParserError(QuestCompilerError):
     """Raised when parsing fails, carrying location and message."""
 
     def __init__(
@@ -144,10 +144,7 @@ class ParserError(Exception):
         length: int = 1,
         token: Opt[Token] = None,
     ):
-        super().__init__(message)
-        self.message = message
-        self.offset = offset
-        self.length = length
+        super().__init__(message=message, offset=offset, length=length)
         self.token = token
 
     def to_diagnostic(self) -> Diagnostic:

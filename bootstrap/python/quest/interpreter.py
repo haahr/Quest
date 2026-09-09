@@ -17,7 +17,7 @@ from __future__ import annotations
 import math
 from typing import Any, Optional
 
-from quest.diagnostics import Diagnostic, DiagnosticLabel, Severity
+from quest.diagnostics import Diagnostic, DiagnosticLabel, QuestCompilerError, Severity
 from quest.runtime import (
     FALSE_VALUE,
     OK_VALUE,
@@ -124,7 +124,7 @@ class _LoopExit(Exception):
     pass
 
 
-class QuestException(Exception):
+class QuestException(QuestCompilerError):
     """Language-level Quest exception (e.g. DivideByZero or user-raised exception)."""
 
     def __init__(
@@ -133,15 +133,16 @@ class QuestException(Exception):
         payload: Optional[QValue] = None,
         payload_type: Optional[QType] = None,
         offset: Optional[int] = None,
+        length: int = 1,
     ):
-        super().__init__(exc_val.to_str())
+        super().__init__(message=exc_val.to_str(), offset=offset, length=length)
         self.exc_val = exc_val
         self.payload = payload
         self.payload_type = payload_type
-        self.offset = offset
 
-    def to_diagnostic(self, length: int = 1) -> Diagnostic:
-        label = DiagnosticLabel(offset=self.offset, length=length) if self.offset is not None else None
+    def to_diagnostic(self, length: Optional[int] = None) -> Diagnostic:
+        len_val = length if length is not None else self.length
+        label = DiagnosticLabel(offset=self.offset, length=len_val) if self.offset is not None else None
         if self.payload is not None and not isinstance(self.payload, QOk):
             payload_str = qvalue_to_str(self.payload)
             type_str = f":{self.payload_type}" if self.payload_type is not None else ""
@@ -155,16 +156,15 @@ class QuestException(Exception):
         )
 
 
-class QuestRuntimeError(Exception):
+class QuestRuntimeError(QuestCompilerError):
     """System-level runtime evaluation error (e.g. undefined symbol)."""
 
-    def __init__(self, message: str, offset: Optional[int] = None):
-        super().__init__(message)
-        self.message = message
-        self.offset = offset
+    def __init__(self, message: str, offset: Optional[int] = None, length: int = 1):
+        super().__init__(message=message, offset=offset, length=length)
 
-    def to_diagnostic(self, length: int = 1) -> Diagnostic:
-        label = DiagnosticLabel(offset=self.offset, length=length) if self.offset is not None else None
+    def to_diagnostic(self, length: Optional[int] = None) -> Diagnostic:
+        len_val = length if length is not None else self.length
+        label = DiagnosticLabel(offset=self.offset, length=len_val) if self.offset is not None else None
         return Diagnostic(
             severity=Severity.ERROR,
             message=self.message,

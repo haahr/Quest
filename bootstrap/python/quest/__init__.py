@@ -121,9 +121,22 @@ from quest.typed_ast import (
     TypedVariantCheck,
     typed_ast_dump,
 )
+from quest.diagnostics import (
+    CodeSuggestion,
+    Diagnostic,
+    DiagnosticLabel,
+    DiagnosticRenderer,
+    DiagnosticSink,
+    FatalDiagnosticError,
+    QuestCompilerError,
+    Severity,
+)
 from quest.typechecker import (
-    TypeError as QuestTypeError,
+    QuestTypeError,
+    TypeError,
     check_expr,
+    elaborate_phrase,
+    elaborate_program,
     synth_expr,
 )
 
@@ -230,7 +243,16 @@ __all__ = [
     "TypedTypeWitness",
     "TypedVariantAssert",
     "TypedVariantCheck",
+    "QuestCompilerError",
+    "FatalDiagnosticError",
+    "Diagnostic",
+    "DiagnosticSink",
+    "DiagnosticRenderer",
+    "Severity",
     "QuestTypeError",
+    "TypeError",
     "check_expr",
+    "elaborate_phrase",
+    "elaborate_program",
     "synth_expr",
 ]

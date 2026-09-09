@@ -83,6 +83,44 @@ class TestPipeline(unittest.TestCase):
         self.assertTrue(res_expr.success)
         self.assertIn("parse", res_expr.artifacts)
 
+    def test_target_polymorphism_full_pipeline(self):
+        """Verifies full pipeline execution with expression, type, kind, and phrase targets."""
+        # 1. Expression target executed through interpret
+        res_expr = self.pipeline.execute("1 + 2", "<test>", target="expr")
+        self.assertTrue(res_expr.success)
+        self.assertEqual(res_expr.final_phase, "interpret")
+        from quest.typed_ast import TypedExpr
+        from quest.runtime import QInt
+        self.assertIsInstance(res_expr.artifacts["typecheck"], TypedExpr)
+        self.assertEqual(res_expr.artifacts["interpret"], QInt(3))
+
+        # 2. Type target executed through typecheck
+        opts_type = CompilerOptions(stop_after="typecheck", target="type")
+        res_type = self.pipeline.execute("Record x: Int end", "<test>", options=opts_type)
+        self.assertTrue(res_type.success)
+        from quest.types import QRecordType
+        self.assertIsInstance(res_type.artifacts["typecheck"], QRecordType)
+
+        # 3. Kind target executed through typecheck
+        opts_kind = CompilerOptions(stop_after="typecheck", target="kind")
+        res_kind = self.pipeline.execute("POWER(Int)", "<test>", options=opts_kind)
+        self.assertTrue(res_kind.success)
+        from quest.types import QPowerKind
+        self.assertIsInstance(res_kind.artifacts["typecheck"], QPowerKind)
+
+        # 4. Phrase target executed through interpret
+        res_phrase = self.pipeline.execute("let a: Int = 42", "<test>", target="phrase")
+        self.assertTrue(res_phrase.success)
+        self.assertEqual(res_phrase.artifacts["interpret"], QInt(42))
+
+        # 5. Dump output on expression target
+        opts_dump = CompilerOptions(target="expr", dump_after={"typecheck", "interpret"})
+        res_dump = self.pipeline.execute("10 * 5", "<test>", options=opts_dump)
+        self.assertTrue(res_dump.success)
+        self.assertIn("typecheck", res_dump.dump_outputs)
+        self.assertIn("interpret", res_dump.dump_outputs)
+        self.assertIn("50", res_dump.dump_outputs["interpret"])
+
     def test_compile_file(self):
         """Verifies compile_file loads and compiles from disk."""
         with tempfile.NamedTemporaryFile("w", suffix=".quest", delete=False) as f:

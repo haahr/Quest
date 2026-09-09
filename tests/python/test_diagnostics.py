@@ -10,8 +10,10 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "bootstra
 from quest.tokens import SourceMap
 from quest.tokenizer import TokenizerError
 from quest.parser import ParserError
-from quest.typechecker import TypeError as QuestTypeError
+from quest.typechecker import QuestTypeError, TypeError
 from quest.types import KindError
+from quest.interpreter import QuestException, QuestRuntimeError
+from quest.runtime import QExceptionVal, QInt
 from quest.diagnostics import (
     CodeSuggestion,
     Diagnostic,
@@ -19,6 +21,7 @@ from quest.diagnostics import (
     DiagnosticRenderer,
     DiagnosticSink,
     FatalDiagnosticError,
+    QuestCompilerError,
     Severity,
 )
 
@@ -180,7 +183,11 @@ class TestCompilerExceptionIntegration(unittest.TestCase):
         self.assertIn("test.quest:1:11: error: Expected semicolon", formatted)
 
     def test_type_error_diagnostic(self):
-        err = QuestTypeError("Cannot assign to immutable variable 'x'", offset=4, help_text="declare with 'let var x'")
+        err = QuestTypeError(
+            "Cannot assign to immutable variable 'x'",
+            offset=4,
+            help_text="declare with 'let var x'",
+        )
         diag = err.to_diagnostic()
         self.assertEqual(diag.severity, Severity.ERROR)
         self.assertEqual(diag.help_text, "declare with 'let var x'")
@@ -196,6 +203,43 @@ class TestCompilerExceptionIntegration(unittest.TestCase):
         formatted = err.format_with_source(self.source_map)
         self.assertIn("test.quest:1:1: error: Kind mismatch: expected TYPE", formatted)
         self.assertIn("= help: check kind bounds", formatted)
+
+    def test_runtime_error_diagnostic(self):
+        err = QuestRuntimeError("Variable 'z' not found", offset=4)
+        diag = err.to_diagnostic()
+        self.assertEqual(diag.severity, Severity.ERROR)
+        self.assertEqual(diag.message, "Variable 'z' not found")
+        formatted = err.format_with_source(self.source_map)
+        self.assertIn("test.quest:1:5: error: Variable 'z' not found", formatted)
+
+    def test_quest_exception_diagnostic(self):
+        exc_val = QExceptionVal("DivideByZero")
+        err = QuestException(exc_val=exc_val, offset=4)
+        diag = err.to_diagnostic()
+        self.assertEqual(diag.severity, Severity.ERROR)
+        self.assertIn("DivideByZero", diag.message)
+        formatted = err.format_with_source(self.source_map)
+        self.assertIn("test.quest:1:5: error: Exception: DivideByZero", formatted)
+
+    def test_quest_compiler_error_hierarchy(self):
+        """Verifies that all compiler phase exceptions inherit from QuestCompilerError."""
+        for exc_cls in [
+            TokenizerError,
+            ParserError,
+            QuestTypeError,
+            TypeError,
+            KindError,
+            QuestRuntimeError,
+            QuestException,
+            FatalDiagnosticError,
+        ]:
+            self.assertTrue(
+                issubclass(exc_cls, QuestCompilerError),
+                f"{exc_cls.__name__} should inherit from QuestCompilerError",
+            )
+
+        # TypeError is an alias for QuestTypeError
+        self.assertIs(TypeError, QuestTypeError)
 
 
 if __name__ == "__main__":
