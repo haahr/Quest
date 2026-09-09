@@ -286,6 +286,21 @@ class TypedRecord(TypedExpr):
 
 
 @dataclass(frozen=True)
+class TypedTypeWitness(TypedExpr):
+    """Witness type element in an existential tuple: Let A::K = T."""
+    name: str
+    witness_type: QType
+    bound: Optional[Any] = None
+    type_val: QType = field(default_factory=lambda: TYPE_KIND)
+
+    def dump_header(self) -> str:
+        return f"'{self.name}' = {self.witness_type}"
+
+    def dump_show_type(self) -> bool:
+        return False
+
+
+@dataclass(frozen=True)
 class TypedTuple(TypedExpr):
     """Tuple value construction: tuple e1, e2 end."""
     elements: tuple[TypedExpr, ...]

@@ -573,6 +573,35 @@ class QReader(QValue):
         return "<reader>"
 
 
+class QTypeValue(QValue):
+    """Runtime representation of a type witness/value."""
+
+    def __init__(
+        self,
+        type_val: Any,
+        bound: Optional[Any] = None,
+        name: Optional[str] = None,
+    ):
+        self.type_val = type_val
+        self.bound = bound
+        self.name = name
+
+    @property
+    def type_name(self) -> str:
+        return "Type"
+
+    def to_str(self, visited: Optional[set[int]] = None) -> str:
+        return str(self.type_val)
+
+    def __eq__(self, other: object) -> bool:
+        if isinstance(other, QTypeValue):
+            return self.type_val == other.type_val and self.name == other.name
+        return False
+
+    def __hash__(self) -> int:
+        return hash((self.type_val, self.name))
+
+
 # ============================================================================
 # 8. Predicates: Identity & Structural Equality
 # ============================================================================
@@ -593,6 +622,9 @@ def qvalue_is(v1: QValue, v2: QValue) -> bool:
         return v1.value is v2.value  # type: ignore[attr-defined]
     if isinstance(v1, (QInt, QReal, QChar)):
         return v1.value == v2.value  # type: ignore[attr-defined]
+    if isinstance(v1, QTypeValue):
+        assert isinstance(v2, QTypeValue)
+        return v1.type_val == v2.type_val
 
     # For all other types: pointer identity
     return v1 is v2
@@ -623,6 +655,10 @@ def qvalue_structural_eq(
 
     if isinstance(v1, (QBool, QInt, QReal, QChar, QString)):
         return v1.value == v2.value  # type: ignore[attr-defined]
+
+    if isinstance(v1, QTypeValue):
+        assert isinstance(v2, QTypeValue)
+        return v1.type_val == v2.type_val
 
     if isinstance(v1, QRecord):
         assert isinstance(v2, QRecord)

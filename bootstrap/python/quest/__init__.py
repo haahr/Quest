@@ -59,6 +59,10 @@ from quest.types import (
     OK_TYPE,
     DYNAMIC_TYPE,
     EXCEPTION_TYPE,
+    QTupleComponent,
+    QTupleField,
+    QTupleTypeFormal,
+    QTupleTypeBinding,
     QTupleType,
     QRecordField,
     QRecordType,
@@ -81,6 +85,9 @@ from quest.types import (
     QRecGroupType,
     QTypeVar,
     QAbstractType,
+    QPathType,
+    find_path_types,
+    type_mentions_symbol_ids,
     QTypeMeta,
     is_subtype,
     is_type_equal,
@@ -108,7 +115,10 @@ from quest.elaborate_types import (
     elaborate_mutual_rec_type_group,
 )
 import quest.typed_ast as typed_ast
-from quest.typed_ast import typed_ast_dump
+from quest.typed_ast import (
+    TypedTypeWitness,
+    typed_ast_dump,
+)
 from quest.typechecker import (
     TypeError as QuestTypeError,
     check_expr,
@@ -166,6 +176,10 @@ __all__ = [
     "OK_TYPE",
     "DYNAMIC_TYPE",
     "EXCEPTION_TYPE",
+    "QTupleComponent",
+    "QTupleField",
+    "QTupleTypeFormal",
+    "QTupleTypeBinding",
     "QTupleType",
     "QRecordField",
     "QRecordType",
@@ -211,6 +225,7 @@ __all__ = [
     "elaborate_mutual_rec_type_group",
     "typed_ast",
     "typed_ast_dump",
+    "TypedTypeWitness",
     "QuestTypeError",
     "check_expr",
     "synth_expr",

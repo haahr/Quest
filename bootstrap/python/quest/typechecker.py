@@ -25,8 +25,14 @@ from quest.types import (
     QQuantifier,
     QRecordField,
     QRecordType,
+    QTupleComponent,
     QTupleField,
     QTupleType,
+    QTupleTypeBinding,
+    QTupleTypeFormal,
+    QPathType,
+    find_path_types,
+    type_mentions_symbol_ids,
     QType,
     QTypeMeta,
     QTypeVar,
@@ -36,6 +42,7 @@ from quest.types import (
     REAL_TYPE,
     STRING_TYPE,
     TYPE_KIND,
+    check_kind,
     is_subkind,
     is_subtype,
     is_type_equal,
@@ -102,6 +109,7 @@ from quest.typed_ast import (
     TypedTryBranch,
     TypedTuple,
     TypedTypeApp,
+    TypedTypeWitness,
     TypedVar,
     TypedVarCell,
     TypedVariant,
@@ -138,6 +146,22 @@ class TypeError(Exception):
     def format_with_source(self, source_map: Any, length: int = 1) -> str:
         """Renders a diagnostic message with underlined source context."""
         return DiagnosticRenderer.render_diagnostic(self.to_diagnostic(length), source_map)
+
+
+def check_no_escaping_path_types(
+    typ: QType,
+    local_symbol_ids: set[int],
+    context_desc: str,
+    offset: int = 0,
+) -> None:
+    """Ensures that no abstract path-dependent types rooted at local variables escape."""
+    for p in find_path_types(typ):
+        if p.root_symbol_id in local_symbol_ids:
+            raise TypeError(
+                f"Abstract type '{p.root_name}.{p.field_name}' cannot escape {context_desc} "
+                f"in type '{typ}'",
+                offset=offset,
+            )
 
 
 # ============================================================================
@@ -434,6 +458,9 @@ def _synth_fun_expr(expr: ast.ExprFun, env: Environment, loop_depth: int) -> Typ
         else:
             body_typed = synth_expr(expr.body, env, loop_depth=0)
             ret_type = body_typed.type_val
+
+        local_symbol_ids = {sym.symbol_id for sym in env.current_scope.values.values()}
+        check_no_escaping_path_types(ret_type, local_symbol_ids, "function scope", expr.offset)
 
         fun_type = QFunType(params=tuple(q_params), result_type=ret_type)
         return TypedFun(
@@ -746,22 +773,64 @@ def _check_record_expr(
             field_typeds.append(
                 TypedRecordField(name=b.name, value=extra_val, is_var=b.is_var, offset=b.offset)
             )
-
     return TypedRecord(fields=tuple(field_typeds), type_val=expected_lazy, offset=expr.offset)
 
 
 def _synth_tuple_expr(expr: ast.ExprTuple, env: Environment, loop_depth: int) -> TypedTuple:
-    """Synthesizes a tuple constructor: tuple [name =] e1 ... end."""
+    """Synthesizes a tuple constructor: tuple ... end."""
+    env.push_scope("tuple_synth")
     elem_typeds: list[TypedExpr] = []
-    q_fields: list[QTupleField] = []
+    q_fields: list[QTupleComponent] = []
 
-    for b in expr.fields:
-        val_typed = synth_expr(b.value, env, loop_depth)
-        elem_typeds.append(val_typed)
-        q_fields.append(QTupleField(name=b.name, type_val=val_typed.type_val))
+    try:
+        for b in expr.fields:
+            if isinstance(b, (ast.LetTypeBinding, ast.DefTypeBinding)):
+                witness_type = elaborate_type(b.type_val, env)
+                if b.bound is not None:
+                    k_bound = elaborate_kind(b.bound, env)
+                else:
+                    k_bound = TYPE_KIND
+                check_kind(witness_type, k_bound, env)
+                sym_id = env.fresh_symbol_id()
+                env.current_scope.declare_type(
+                    TypeSymbol(
+                        name=b.name,
+                        symbol_id=sym_id,
+                        kind=k_bound,
+                        definition=witness_type,
+                    )
+                )
+                elem_typeds.append(
+                    TypedTypeWitness(
+                        name=b.name,
+                        witness_type=witness_type,
+                        bound=k_bound,
+                        offset=b.offset,
+                    )
+                )
+                q_fields.append(QTupleTypeBinding(name=b.name, type_val=witness_type, bound=k_bound))
+            elif isinstance(b, ast.TupleBinding):
+                if b.type_annot is not None:
+                    annot_type = elaborate_type(b.type_annot, env)
+                    val_typed = check_expr(b.value, annot_type, env, loop_depth)
+                else:
+                    val_typed = synth_expr(b.value, env, loop_depth)
+                elem_typeds.append(val_typed)
+                q_fields.append(QTupleField(name=b.name, type_val=val_typed.type_val))
+                if b.name is not None:
+                    env.current_scope.declare_value(
+                        ValueSymbol(name=b.name, type_val=val_typed.type_val)
+                    )
+            else:
+                raise TypeError(
+                    f"Unsupported tuple component '{b}'",
+                    offset=getattr(b, "offset", expr.offset),
+                )
 
-    tuple_type = QTupleType(tuple(q_fields))
-    return TypedTuple(elements=tuple(elem_typeds), type_val=tuple_type, offset=expr.offset)
+        tuple_type = QTupleType(tuple(q_fields))
+        return TypedTuple(elements=tuple(elem_typeds), type_val=tuple_type, offset=expr.offset)
+    finally:
+        env.pop_scope()
 
 
 def _check_tuple_expr(
@@ -787,17 +856,104 @@ def _check_tuple_expr(
             offset=expr.offset,
         )
 
+    env.push_scope("tuple_check")
+    witness_subst: dict[int, QType] = {}
     elem_typeds: list[TypedExpr] = []
-    for b, exp_f in zip(expr.fields, expected_lazy.fields):
-        if exp_f.name is not None and b.name is not None and b.name != exp_f.name:
-            raise TypeError(
-                f"Tuple field name mismatch: expected '{exp_f.name}', got '{b.name}'",
-                offset=b.offset,
-            )
-        val_typed = check_expr(b.value, exp_f.type_val, env, loop_depth)
-        elem_typeds.append(val_typed)
+    try:
+        for b, exp_f in zip(expr.fields, expected_lazy.fields):
+            match exp_f:
+                case QTupleTypeFormal(name=formal_name, symbol_id=formal_sym_id, bound=formal_bound):
+                    if not isinstance(b, (ast.LetTypeBinding, ast.DefTypeBinding)):
+                        raise TypeError(
+                            f"Expected type witness for type formal '{formal_name}', got value component",
+                            offset=getattr(b, "offset", expr.offset),
+                        )
+                    if b.name != formal_name:
+                        raise TypeError(
+                            f"Tuple type formal name mismatch: expected '{formal_name}', got '{b.name}'",
+                            offset=b.offset,
+                        )
+                    witness_type = elaborate_type(b.type_val, env)
+                    expected_bound = formal_bound.substitute(witness_subst)
+                    check_kind(witness_type, expected_bound, env)
+                    witness_subst[formal_sym_id] = witness_type
+                    env.current_scope.declare_type(
+                        TypeSymbol(
+                            name=formal_name,
+                            symbol_id=formal_sym_id,
+                            kind=expected_bound,
+                            definition=witness_type,
+                        )
+                    )
+                    elem_typeds.append(
+                        TypedTypeWitness(
+                            name=formal_name,
+                            witness_type=witness_type,
+                            bound=expected_bound,
+                            offset=b.offset,
+                        )
+                    )
 
-    return TypedTuple(elements=tuple(elem_typeds), type_val=expected_lazy, offset=expr.offset)
+                case QTupleTypeBinding(name=bind_name, type_val=bind_type, bound=bind_bound):
+                    if not isinstance(b, (ast.LetTypeBinding, ast.DefTypeBinding)):
+                        raise TypeError(
+                            f"Expected type binding for '{bind_name}', got value component",
+                            offset=getattr(b, "offset", expr.offset),
+                        )
+                    if b.name != bind_name:
+                        raise TypeError(
+                            f"Tuple type binding name mismatch: expected '{bind_name}', got '{b.name}'",
+                            offset=b.offset,
+                        )
+                    witness_type = elaborate_type(b.type_val, env)
+                    expected_type_val = bind_type.substitute(witness_subst)
+                    if not is_type_equal(witness_type, expected_type_val, env):
+                        raise TypeError(
+                            f"Type binding '{bind_name}' must match manifest type '{expected_type_val}', "
+                            f"got '{witness_type}'",
+                            offset=b.offset,
+                        )
+                    elem_typeds.append(
+                        TypedTypeWitness(
+                            name=bind_name,
+                            witness_type=witness_type,
+                            bound=bind_bound,
+                            offset=b.offset,
+                        )
+                    )
+
+                case QTupleField(name=field_name, type_val=field_type):
+                    if isinstance(b, (ast.LetTypeBinding, ast.DefTypeBinding)):
+                        raise TypeError(
+                            f"Unexpected type binding '{b.name}' for value field '{field_name}'",
+                            offset=b.offset,
+                        )
+                    if field_name is not None and b.name is not None and b.name != field_name:
+                        raise TypeError(
+                            f"Tuple field name mismatch: expected '{field_name}', got '{b.name}'",
+                            offset=b.offset,
+                        )
+                    expected_field_type = field_type.substitute(witness_subst)
+                    if getattr(b, "type_annot", None) is not None:
+                        annot_type = elaborate_type(b.type_annot, env)
+                        if not is_subtype(annot_type, expected_field_type, env):
+                            raise TypeError(
+                                f"Tuple field '{b.name}' declared type '{annot_type}' is not a subtype "
+                                f"of expected field type '{expected_field_type}'",
+                                offset=b.offset,
+                            )
+                        val_typed = check_expr(b.value, annot_type, env, loop_depth)
+                    else:
+                        val_typed = check_expr(b.value, expected_field_type, env, loop_depth)
+                    elem_typeds.append(val_typed)
+                    if field_name is not None:
+                        env.current_scope.declare_value(
+                            ValueSymbol(name=field_name, type_val=expected_field_type)
+                        )
+
+        return TypedTuple(elements=tuple(elem_typeds), type_val=expected_lazy, offset=expr.offset)
+    finally:
+        env.pop_scope()
 
 
 def _synth_select_expr(expr: ast.ExprSelect, env: Environment, loop_depth: int) -> TypedSelect:
@@ -844,7 +1000,49 @@ def _synth_select_expr(expr: ast.ExprSelect, env: Environment, loop_depth: int) 
                     f"Tuple type '{target_type}' has no field named '{expr.field}'",
                     offset=expr.offset,
                 )
-            return TypedSelect(target=target_typed, field=expr.field, type_val=tup_f.type_val, offset=expr.offset)
+            if isinstance(tup_f, (QTupleTypeFormal, QTupleTypeBinding)):
+                raise TypeError(
+                    f"Cannot select type component '{expr.field}' as a value expression",
+                    offset=expr.offset,
+                )
+
+            formal_sym_ids = {f.symbol_id for f in target_type.type_formals}
+            is_dependent = type_mentions_symbol_ids(tup_f.type_val, formal_sym_ids)
+
+            if is_dependent:
+                if not isinstance(expr.target, ast.ExprId):
+                    raise TypeError(
+                        f"Cannot select type-dependent member '{expr.field}' from compound or anonymous "
+                        f"existential tuple; bind to an immutable variable first",
+                        offset=expr.offset,
+                    )
+                val_sym = env.lookup_value(expr.target.name)
+                if val_sym is not None and val_sym.is_var:
+                    raise TypeError(
+                        f"Cannot select type-dependent member '{expr.field}' from mutable variable "
+                        f"'{expr.target.name}'; bind to an immutable variable first",
+                        offset=expr.offset,
+                    )
+                root_sym_id = val_sym.symbol_id if val_sym else 0
+                subst = {
+                    f.symbol_id: QPathType(
+                        root_name=expr.target.name,
+                        root_symbol_id=root_sym_id,
+                        field_name=f.name,
+                        bound=f.bound,
+                    )
+                    for f in target_type.type_formals
+                }
+                field_type = tup_f.type_val.substitute(subst)
+            else:
+                field_type = tup_f.type_val
+
+            return TypedSelect(
+                target=target_typed,
+                field=expr.field,
+                type_val=field_type,
+                offset=expr.offset,
+            )
 
         case _:
             raise TypeError(
@@ -1043,6 +1241,12 @@ def _elaborate_case_branches(
                     body_typed = check_expr(branch.body, expected_type, env, loop_depth)
                 else:
                     body_typed = synth_expr(branch.body, env, loop_depth)
+                    check_no_escaping_path_types(
+                        body_typed.type_val,
+                        {binder_sym.symbol_id},
+                        "case branch scope",
+                        branch.body.offset,
+                    )
             finally:
                 env.pop_scope()
         else:
@@ -1474,6 +1678,13 @@ def _synth_inspect_expr(expr: ast.ExprInspect, env: Environment, loop_depth: int
                     env.current_scope.declare_value(b_sym)
                     b_syms.append(b_sym)
                 h_body = synth_expr(branch.body, env, loop_depth)
+                b_ids = {s.symbol_id for s in b_syms}
+                check_no_escaping_path_types(
+                    h_body.type_val,
+                    b_ids,
+                    "inspect branch scope",
+                    branch.body.offset,
+                )
             finally:
                 env.pop_scope()
         else:
@@ -1875,8 +2086,8 @@ def _synth_infix_expr(expr: ast.ExprInfix, env: Environment, loop_depth: int) ->
     right_typed = synth_expr(expr.right, env, loop_depth)
 
     if expr.op in ("+", "-", "*", "/", "mod", "%"):
-        if left_typed.type_val == INT_TYPE:
-            if right_typed.type_val != INT_TYPE:
+        if is_subtype(left_typed.type_val, INT_TYPE, env):
+            if not is_subtype(right_typed.type_val, INT_TYPE, env):
                 raise TypeError(
                     f"Operator '{expr.op}' requires both operands to be Int, but got "
                     f"'{left_typed.type_val}' and '{right_typed.type_val}' (no numeric coercion)",
@@ -1890,10 +2101,10 @@ def _synth_infix_expr(expr: ast.ExprInfix, env: Environment, loop_depth: int) ->
                 offset=expr.offset,
             )
 
-        if left_typed.type_val == REAL_TYPE:
+        if is_subtype(left_typed.type_val, REAL_TYPE, env):
             if expr.op in ("mod", "%"):
                 raise TypeError(f"Operator '{expr.op}' is not defined for Real", offset=expr.offset)
-            if right_typed.type_val != REAL_TYPE:
+            if not is_subtype(right_typed.type_val, REAL_TYPE, env):
                 raise TypeError(
                     f"Operator '{expr.op}' requires both operands to be Real, but got "
                     f"'{left_typed.type_val}' and '{right_typed.type_val}' (no numeric coercion)",
@@ -1914,11 +2125,12 @@ def _synth_infix_expr(expr: ast.ExprInfix, env: Environment, loop_depth: int) ->
 
     # 4. Relational Operators (<, <=, >, >=)
     if expr.op in ("<", "<=", ">", ">="):
+        l_t, r_t = left_typed.type_val, right_typed.type_val
         if (
-            (left_typed.type_val == INT_TYPE and right_typed.type_val == INT_TYPE)
-            or (left_typed.type_val == REAL_TYPE and right_typed.type_val == REAL_TYPE)
-            or (left_typed.type_val == CHAR_TYPE and right_typed.type_val == CHAR_TYPE)
-            or (left_typed.type_val == STRING_TYPE and right_typed.type_val == STRING_TYPE)
+            (is_subtype(l_t, INT_TYPE, env) and is_subtype(r_t, INT_TYPE, env))
+            or (is_subtype(l_t, REAL_TYPE, env) and is_subtype(r_t, REAL_TYPE, env))
+            or (is_subtype(l_t, CHAR_TYPE, env) and is_subtype(r_t, CHAR_TYPE, env))
+            or (is_subtype(l_t, STRING_TYPE, env) and is_subtype(r_t, STRING_TYPE, env))
         ):
             return TypedInfix(
                 left=left_typed,
@@ -2150,6 +2362,9 @@ def _synth_block_expr(expr: ast.ExprBlock, env: Environment, loop_depth: int) ->
         else:
             result_expr = TypedOk(offset=expr.offset)
             result_type = OK_TYPE
+
+        local_symbol_ids = {sym.symbol_id for sym in env.current_scope.values.values()}
+        check_no_escaping_path_types(result_type, local_symbol_ids, "its scope", result_expr.offset)
 
         return TypedBlock(
             bindings=tuple(typed_bindings),

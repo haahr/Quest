@@ -355,11 +355,12 @@ class ExprInfix(Expr):
 class TupleBinding(ASTNode):
     name: Optional[str]
     value: Expr
+    type_annot: Optional[Type] = None
 
 
 @dataclass(frozen=True)
 class ExprTuple(Expr):
-    fields: tuple[TupleBinding, ...]
+    fields: tuple[Union[TupleBinding, LetTypeBinding, DefTypeBinding], ...]
 
 
 @dataclass(frozen=True)

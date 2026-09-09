@@ -1,0 +1,504 @@
+# Quest C Representation and Runtime ABI Design
+
+This document specifies the C representation of Quest values, types, aggregates, closures, environments, exceptions,
+and identifier mappings for **Step 4: Bootstrap C Transpiler** and the shared runtime in `runtime/`.
+
+These representations are designed to be shared directly with the **Step 6: Native AArch64 Backend** and future
+64-bit architectures (such as x86-64).
+
+---
+
+## 1. Design Goals and Architectural Principles
+
+1. **64-bit Word Uniformity:** Every Quest value in a generic variable, parameter, or aggregate field occupies
+   exactly one 64-bit word (`QVal`). All pointers and integer/floating-point primitives are 64 bits.
+2. **Recommended Synthesis for Aggregates:**
+   - Specific, typed C `struct` definitions for concrete, statically-known types (enabling natural field access and
+     seamless debugger inspection in `lldb` and `gdb`).
+   - Binary layout compatibility with uniform generic representations (`QVal[]`, `QVariant`), ensuring zero-cost
+     coercions for prefix tuple subtyping, evidence-passing record subtyping, and global variant tag dispatch.
+3. **Clean Identifier Namespacing:** Use prefix tags (`qv_`, `QT_`, `QK_`) to prevent collisions with C keywords and
+   standard library symbols.
+4. **Human-Readable Operator Mangling:** Map symbolic operators to descriptive English names
+   (e.g., `<-=` $\rightarrow$ `qv_sym_lessthan_minus_equals`).
+5. **Portable C99 Compile-Time Layout Enforcement:** Enforce ABI assumptions (word sizes, alignments, struct field
+   offsets) at compile time via portable static assertions.
+6. **Shared Runtime ABI:** Place common runtime definitions in a top-level `runtime/` directory usable by both
+   transpiled C and native assembly backends.
+
+---
+
+## 2. Compile-Time Layout Assertions in Portable C99
+
+To guarantee that C compilers lay out memory identically to our ABI expectations across platforms, we enforce layout
+properties at compile time via `static_assert`.
+
+While C11 standardizes `<assert.h>` `static_assert` as `_Static_assert`, portable C99 achieves compile-time assertions
+without language extensions via a standard negative-sized array in a typedef. This macro works uniformly with both
+`sizeof` and `<stddef.h>`'s `offsetof(...)` constructs because both evaluate to compile-time integer constants:
+
+```c
+/* runtime/quest_runtime.h */
+
+#include <stddef.h>
+
+#define Q_ASSERT_CONCAT_(a, b) a##b
+#define Q_ASSERT_CONCAT(a, b)  Q_ASSERT_CONCAT_(a, b)
+
+#ifndef static_assert
+#  if defined(__STDC_VERSION__) && __STDC_VERSION__ >= 201112L
+#    define static_assert(cond, msg) _Static_assert(cond, #msg)
+#  else
+#    define static_assert(cond, msg) \
+       typedef char Q_ASSERT_CONCAT(q_assert_##msg##_, __LINE__)[(cond) ? 1 : -1]
+#  endif
+#endif
+```
+
+If `cond` evaluates to 0, the array dimension is `-1`, triggering an immediate compiler error pointing to the
+declaration and printing the descriptive message token in the error output.
+
+---
+
+## 3. Primitives and the Universal Value Word (`QVal`)
+
+All Quest values stored in registers, local variable slots, arrays, and tuple/record fields are 64-bit words:
+
+```c
+#include <stdint.h>
+#include <stdbool.h>
+
+typedef int64_t QInt;
+typedef double  QReal;
+typedef bool    QBool;
+typedef char    QChar;
+
+typedef union QVal {
+    void    *p;   /* Heap pointers: records, tuples, arrays, strings, closures */
+    QInt     i;   /* 64-bit signed two's complement integer */
+    QReal    r;   /* 64-bit IEEE-754 double precision float */
+    uint64_t u;   /* Raw 64-bit unsigned word for bitwise/identity checks */
+} QVal;
+
+/* ABI layout assertions */
+static_assert(sizeof(QInt)     == 8, qint_must_be_8_bytes);
+static_assert(sizeof(QReal)    == 8, qreal_must_be_8_bytes);
+static_assert(sizeof(void *)   == 8, ptr_must_be_8_bytes);
+static_assert(sizeof(QVal)     == 8, qval_must_be_8_bytes);
+static_assert(sizeof(uint64_t) == 8, u64_must_be_8_bytes);
+```
+
+### ABI and Calling Convention Properties
+- Under **AAPCS64** (macOS and Linux AArch64), `QVal` is an 8-byte composite type containing integer/pointer members;
+  it is passed in a single **64-bit general-purpose register** (`x0`–`x7`) and returned in `x0`.
+- Under **System V AMD64** (x86-64), `QVal` is classified as `INTEGER` class and passed in `rdi`, `rsi`, `rdx`, etc.,
+  and returned in `rax`.
+- For non-generic, monomorphic Quest functions whose types are statically known, the transpiler generates native C
+  signatures (e.g. `QReal qv_add(QReal qv_a, QReal qv_b)`), allowing floats to remain in floating-point registers
+  (`d0`–`d7`) without `fmov` overhead.
+
+---
+
+## 4. Identifier Mapping and Operator Mangling
+
+### 4.1. Namespace Prefixes
+All Quest identifiers map to C identifiers using explicit namespace prefixes:
+- **`qv_` for Quest Values and Functions:**
+  - `fib` $\rightarrow$ `qv_fib`
+  - `factorial` $\rightarrow$ `qv_factorial`
+  - `x` $\rightarrow$ `qv_x`
+  - `int` $\rightarrow$ `qv_int` *(safely avoids collision with C `int`)*
+  - `default` $\rightarrow$ `qv_default` *(safely avoids collision with C `default`)*
+- **`QT_` for Quest Types:**
+  - `Int` $\rightarrow$ `QT_Int`
+  - `Real` $\rightarrow$ `QT_Real`
+  - `List` $\rightarrow$ `QT_List`
+- **`QK_` for Quest Kinds:**
+  - `TYPE` $\rightarrow$ `QK_TYPE`
+  - `POWER` $\rightarrow$ `QK_POWER`
+
+### 4.2. Operator and Symbol Name Mangling
+Quest supports arbitrary symbolic operator names. Symbolic characters map to human-readable names prefixed by `qv_sym_`:
+
+| Symbol | Mangle Segment | Symbol | Mangle Segment | Symbol | Mangle Segment |
+| :---: | :--- | :---: | :--- | :---: | :--- |
+| `+` | `plus` | `-` | `minus` | `*` | `star` |
+| `/` | `slash` | `=` | `equals` | `<` | `lessthan` |
+| `>` | `greaterthan` | `!` | `bang` | `?` | `question` |
+| `:` | `colon` | `@` | `at` | `#` | `hash` |
+| `$` | `dollar` | `%` | `percent` | `^` | `caret` |
+| `&` | `amp` | `|` | `pipe` | `~` | `tilde` |
+| `\` | `backslash` | `.` | `dot` | `'` | `prime` |
+
+#### Examples:
+- `+` $\rightarrow$ `qv_sym_plus`
+- `++` $\rightarrow$ `qv_sym_plus_plus`
+- `<-=` $\rightarrow$ `qv_sym_lessthan_minus_equals`
+- `<>` $\rightarrow$ `qv_sym_lessthan_greaterthan`
+- `:=` $\rightarrow$ `qv_sym_colon_equals`
+- `>>=` $\rightarrow$ `qv_sym_greaterthan_greaterthan_equals`
+
+---
+
+## 5. Aggregate Representations
+
+### 5.1. Tuples
+Tuples are ordered collections of 64-bit values. In Quest, tuple components can have explicit names
+(`Tuple a:Int b:Real end`) or be positional (`Tuple Int Real end`), or a mix of both.
+
+- **Field Naming Conventions:**
+  - **Named components** use the standard `qv_` value prefix: `qv_<name>`.
+  - **Unnamed positional components** use 0-indexed numerical tags: `_<index>` (`_0`, `_1`, etc.).
+  ```c
+  /* Quest: Tuple x:Int y:Real String end */
+  typedef struct QT_Tuple_x_Int_y_Real_String {
+      QInt     qv_x;  /* Named component: qv_x */
+      QReal    qv_y;  /* Named component: qv_y */
+      QString *_2;    /* Positional component: _2 */
+  } QT_Tuple_x_Int_y_Real_String;
+  ```
+
+- **Generic View:**
+  Any tuple pointer can be treated as a sequence of `QVal` words:
+  ```c
+  typedef struct QTuple {
+      QVal elements[];
+  } QTuple;
+  ```
+
+- **Zero-Cost Prefix Subtyping & Memoized Cast Verification:**
+  Because each field is 8 bytes at consecutive 8-byte offsets, a pointer to an extended tuple (e.g. 3 components) is
+  physically identical in its first 16 bytes to its prefix tuple (2 components). Passing an extended tuple to a
+  function expecting a prefix requires only a pointer cast in C:
+  ```c
+  QT_Tuple_x_Int_y_Real *sub = (QT_Tuple_x_Int_y_Real *)tuple_3;
+  ```
+  To guarantee that compiler layout and alignment assumptions hold true, the transpiler **memoizes every tuple
+  coercion pair** `(SourceTuple, TargetTuple)` encountered during translation. For each unique pair, the transpiler
+  emits compile-time `static_assert` statements verifying that the byte offset of each prefix field in `SourceTuple`
+  exactly matches the corresponding field in `TargetTuple`:
+  ```c
+  /* Memoized Tuple Coercion Assertions for (QT_Tuple_x_y_z -> QT_Tuple_x_y) */
+  static_assert(offsetof(QT_Tuple_x_y_z, qv_x) == offsetof(QT_Tuple_x_y, qv_x),
+                tuple_cast_offset_match_qv_x);
+  static_assert(offsetof(QT_Tuple_x_y_z, qv_y) == offsetof(QT_Tuple_x_y, qv_y),
+                tuple_cast_offset_match_qv_y);
+  ```
+  If field padding or struct alignment ever differs between the two types, compilation fails immediately.
+
+### 5.2. Records and Subtyping (Evidence Passing)
+Under Cardelli's structural subtyping with multiple inheritance, field offsets cannot be assigned globally.
+As established in `docs/runtime-design.md`, Quest uses the **Evidence Passing** model:
+
+1. **Concrete Record Payload:**
+   A flat heap-allocated block of 64-bit words containing all fields in declaration order:
+   ```c
+   typedef struct QT_Record_x_y_z {
+       QInt  qv_x;
+       QReal qv_y;
+       QBool qv_z;
+   } QT_Record_x_y_z;
+   ```
+2. **Evidence Dictionary (`QEvidenceDict`):**
+   A static table in `.rodata` containing byte offsets for fields expected by a signature:
+   ```c
+   typedef struct QEvidenceDict {
+       int32_t field_offsets[];
+   } QEvidenceDict;
+   ```
+3. **Field Access:**
+   - *Direct (concrete type statically known):* `r->qv_x` (direct load at fixed offset).
+   - *Subtyped (polymorphic/subsumed parameter):* `*(QVal *)((char *)r + dict->field_offsets[FIELD_IDX])`.
+
+### 5.3. Options and Variants (Sums)
+
+Cardelli's *Typeful Programming* establishes a fundamental distinction between **ordered sums (`Option`)** and
+**unordered sums (`Variant`)**. The C runtime reflects this exact distinction:
+
+#### 1. Option Types (Ordered, Dense 0-Indexed Enums with Inline Union Payloads)
+By language definition, `Option` types are strictly ordered collections of signatures (§4.5). Unlike variants, an
+option branch carries a full signature, meaning a branch may contain **zero, one, or multiple components**:
+```quest
+Let T =
+  Option
+    a                     (* 0 components *)
+    b with x:Bool end     (* 1 component:  x:Bool *)
+    c with x,y:String end (* 2 components: x,y:String *)
+  end;
+```
+Cardelli explicitly defines the `ordinal(o)` operator, which exposes the 0-based integer index of an option at
+runtime, and the `!` extraction operator, which unpacks the branch signature:
+```quest
+• bOption!b;
+» tuple 1 let x=true end : Tuple :Int x:Bool end
+```
+
+To support zero or multiple components without auxiliary heap allocations, each concrete `Option` type emits a C
+`struct` containing the 0-based `tag` followed by an **inline `union` of branch structs**:
+```c
+/* Generated for Option type T */
+typedef enum {
+    QTAG_T_a = 0,
+    QTAG_T_b = 1,
+    QTAG_T_c = 2,
+} QT_T_Tag;
+
+typedef struct QT_T {
+    int64_t tag; /* 0-based ordinal matching Cardelli's ordinal(o) */
+    union {
+        /* branch 'a' has 0 components */
+        struct {
+            QBool qv_x;
+        } b;
+        struct {
+            QString *qv_x;
+            QString *qv_y;
+        } c;
+    } u;
+} QT_T;
+```
+
+- **Generic View (`QOptionHeader`):** Because all payload components are 64-bit aligned words, generic runtime routines
+  (such as `ordinal(o)` or generic `!`) can inspect any option through a common header:
+  ```c
+  typedef struct QOptionHeader {
+      int64_t tag;
+      QVal    fields[]; /* Inline 64-bit payload fields */
+  } QOptionHeader;
+
+  static_assert(offsetof(QOptionHeader, fields) == 8, qoption_fields_at_offset_8);
+  ```
+- **Zero-Cost Prefix Subtyping:** Because every union branch in C begins at offset 0 of the union (offset 8 of the
+  struct), branch fields in a subtype maintain identical offsets in any extended supertype.
+- **Fast Pattern Matching:**
+  ```c
+  switch (opt->tag) {
+      case QTAG_T_a: /* 0 fields */ break;
+      case QTAG_T_b: use(opt->u.b.qv_x); break;
+      case QTAG_T_c: use(opt->u.c.qv_x, opt->u.c.qv_y); break;
+  }
+  ```
+
+#### 2. Variant Types (Unordered, Single 64-bit Payload, Evidence-Passing)
+Unlike options, variants are unordered and each branch has **exactly one type** $A_i$ (§6.3):
+```quest
+Variant x1:A1 .. xn:An end
+variant x of A with a end
+```
+If a branch requires no payload value, it uses the unit type `Ok` (`Variant mon,tue:Ok end`). Thus, every variant
+payload is always **exactly one 64-bit word** (`QVal`):
+```c
+typedef struct QVariant {
+    int64_t tag;     /* Local dense tag index (0, 1, ...) */
+    QVal    payload; /* Exactly one 64-bit word */
+} QVariant;
+
+static_assert(sizeof(QVariant) == 16, qvariant_must_be_16_bytes);
+static_assert(offsetof(QVariant, payload) == 8, qvariant_payload_at_offset_8);
+```
+- **Static Tag Remapping Dictionaries (`.rodata`):** When a variant is upcast across an unordered subtyping boundary,
+  the compiler passes a static `const int32_t tag_map[]`:
+  ```c
+  int64_t tag = tag_map ? tag_map[v->tag] : v->tag;
+  switch (tag) {
+      case 0: /* ... */ break;
+      case 1: /* ... */ break;
+  }
+  ```
+- **Specialization:** Eliminated entirely when the variant type is statically known.
+
+### 5.4. Arrays
+Arrays are mutable, length-prefixed buffers of 64-bit words:
+```c
+typedef struct QArray {
+    int64_t length;
+    QVal    data[];
+} QArray;
+
+static_assert(offsetof(QArray, data) == 8, qarray_data_at_offset_8);
+```
+
+### 5.5. Strings
+In Quest, strings are mutable character sequences (supporting Cardelli's `StringOp` interface):
+```c
+typedef struct QString {
+    int64_t length;
+    int64_t capacity;
+    char   *data;     /* Null-terminated UTF-8 / ASCII buffer */
+} QString;
+```
+
+---
+
+## 6. Closures and Calling Convention
+
+In Quest, functions are first-class and can capture lexical bindings:
+
+### 6.1. Closure Representation
+Every closure is a 2-word heap structure containing a C function pointer and an environment pointer:
+```c
+typedef struct QClosure {
+    QVal (*fn)(void *env, ...);
+    void *env;
+} QClosure;
+
+static_assert(sizeof(QClosure) == 16, qclosure_must_be_16_bytes);
+```
+
+### 6.2. Function Signatures and Invocation
+1. **Calling Convention:** Every compiled Quest function takes its captured environment pointer as its first
+   argument (`void *env`).
+2. **Top-Level / Non-Capturing Functions:** Use `env = NULL`.
+3. **Indirect Call Site:**
+   ```c
+   /* Calling closure f(arg1, arg2) */
+   QClosure *c = (QClosure *)qv_f.p;
+   QVal result = c->fn(c->env, qv_arg1, qv_arg2);
+   ```
+
+### 6.3. Environment Frames
+Captured variables are grouped into environment frame structs:
+```c
+typedef struct QT_Env_fib {
+    QInt qv_limit;
+    QClosure *qv_helper;
+} QT_Env_fib;
+```
+If a variable is mutated (`var`), it is stored as a `QRef *` heap cell:
+```c
+typedef struct QRef {
+    QVal value;
+} QRef;
+```
+
+---
+
+## 7. Exception Handling with `setjmp` and `longjmp`
+
+Quest's `try...when...else` and `raise` are lowered using a thread-local exception handler stack:
+
+```c
+#include <setjmp.h>
+
+typedef struct QExceptionVal {
+    const char *name;
+    QVal        payload;
+} QExceptionVal;
+
+typedef struct QExceptionHandler {
+    jmp_buf                     env_jmp;
+    struct QExceptionHandler   *prev;
+} QExceptionHandler;
+
+/* Thread-local or global handler chain */
+extern _Thread_local QExceptionHandler *quest_current_exception_handler;
+extern _Thread_local QExceptionVal      quest_current_exception;
+```
+
+### 7.1. Raising an Exception (`raise E with payload end`)
+```c
+void quest_raise(const char *name, QVal payload) {
+    if (!quest_current_exception_handler) {
+        /* Uncaught exception diagnostic */
+        quest_fatal_uncaught_exception(name, payload);
+    }
+    quest_current_exception.name = name;
+    quest_current_exception.payload = payload;
+    longjmp(quest_current_exception_handler->env_jmp, 1);
+}
+```
+
+### 7.2. Try-Handler Block (`try ... when ... else ... end`)
+```c
+QExceptionHandler q_handler;
+q_handler.prev = quest_current_exception_handler;
+quest_current_exception_handler = &q_handler;
+
+if (setjmp(q_handler.env_jmp) == 0) {
+    /* Protected body */
+    ...
+    quest_current_exception_handler = q_handler.prev; /* Pop handler on normal completion */
+} else {
+    /* Pop handler before executing catch block */
+    quest_current_exception_handler = q_handler.prev;
+    
+    if (quest_current_exception.name == qv_ExcTag1) {
+        /* Handle ExcTag1 */
+    } else if (quest_current_exception.name == qv_ExcTag2) {
+        /* Handle ExcTag2 */
+    } else {
+        /* Else clause, or re-raise if no matching when */
+        quest_raise(quest_current_exception.name, quest_current_exception.payload);
+    }
+}
+```
+
+---
+
+## 8. Dynamic Type Envelopes (`QDynamic`)
+
+The `Dynamic` type encapsulates a value and its runtime type representation:
+```c
+typedef struct QTypeDesc {
+    uint32_t    type_id;
+    const char *name;
+    /* Subtyping descriptor / structural descriptor */
+} QTypeDesc;
+
+typedef struct QDynamic {
+    QVal              value;
+    const QTypeDesc  *type_desc;
+} QDynamic;
+
+static_assert(sizeof(QDynamic) == 16, qdynamic_must_be_16_bytes);
+```
+`inspect d when T with x then ... end` checks `d->type_desc == &QT_Desc_T` (or subtyping against `QT_Desc_T`).
+
+---
+
+## 9. Memory Management Abstraction & `--nogc` Support
+
+All heap allocations route through two runtime allocator functions:
+- `quest_alloc(size_t bytes)`: Allocates memory that may contain pointers (scanned by GC).
+- `quest_alloc_atomic(size_t bytes)`: Allocates memory guaranteed not to contain pointers (e.g., string buffers,
+  atomic raw bytes).
+
+```c
+/* runtime/quest_runtime.h */
+
+#ifdef QUEST_NOGC
+#  include <stdlib.h>
+   static inline void *quest_alloc(size_t sz)        { return calloc(1, sz); }
+   static inline void *quest_alloc_atomic(size_t sz) { return malloc(sz); }
+   static inline void  quest_gc_init(void)           { /* no-op */ }
+#else
+#  include <gc.h>
+   static inline void *quest_alloc(size_t sz)        { return GC_MALLOC(sz); }
+   static inline void *quest_alloc_atomic(size_t sz) { return GC_MALLOC_ATOMIC(sz); }
+   static inline void  quest_gc_init(void)           { GC_INIT(); }
+#endif
+```
+
+- When compiled without flags, Quest links with Boehm GC (`-lgc`).
+- When invoked with `--nogc`, the compiler passes `-DQUEST_NOGC` and omits `-lgc`.
+
+---
+
+## 10. Shared `runtime/` Directory Structure
+
+The runtime files are located at the repository root and shared with future native code backends:
+```
+runtime/
+├── quest_runtime.h    /* Core ABI, QVal union, aggregate structs, macros, assertions */
+├── quest_runtime.c    /* Allocator wrappers, exception machinery, Cardelli builtins */
+├── quest_io.c         /* C implementation of Writer and Reader stream modules */
+└── quest_conv.c       /* C implementation of Conv, Ascii, IntOp, RealOp, StringOp */
+```
+
+---
+
+## See Also
+- [runtime-design.md](runtime-design.md): Evidence Passing vs. Fat Pointers and AAPCS64 register ABI.
+- [roadmap.md](roadmap.md): 7-stage compiler implementation roadmap.
+- [type-system.md](type-system.md): Quest higher-order subtyping and typing rules.
+- [step3-interpreter.md](step3-interpreter.md): Python interpreter architecture and standard library modules.

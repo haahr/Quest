@@ -135,6 +135,65 @@ def fold_value_postfix(primary: ast.Expr, operations: tuple[Any, ...]) -> ast.Ex
     return current
 
 
+def _process_tuple_bindings(bindings: tuple[Any, ...]) -> tuple[Any, ...]:
+    """Processes phrases inside a tuple constructor into tuple components."""
+    result: list[Any] = []
+    for item in bindings:
+        match item:
+            case ast.LetTypeBinding() | ast.DefTypeBinding():
+                result.append(item)
+            case ast.LetValueBinding(params=params) if params:
+                fn_expr = ast.ExprFun(
+                    params=params,
+                    return_type=item.type_annot,
+                    body=item.value,
+                    offset=item.offset,
+                )
+                result.append(
+                    ast.TupleBinding(
+                        name=item.name,
+                        value=fn_expr,
+                        offset=item.offset,
+                    )
+                )
+            case ast.LetValueBinding():
+                result.append(
+                    ast.TupleBinding(
+                        name=item.name,
+                        value=item.value,
+                        type_annot=item.type_annot,
+                        offset=item.offset,
+                    )
+                )
+            case ast.ExprStmt(expr=expr):
+                result.append(
+                    ast.TupleBinding(
+                        name=None,
+                        value=expr,
+                        offset=item.offset,
+                    )
+                )
+            case ast.TupleBinding():
+                result.append(item)
+            case ast.Expr():
+                result.append(
+                    ast.TupleBinding(
+                        name=None,
+                        value=item,
+                        offset=item.offset,
+                    )
+                )
+            case _:
+                result.append(
+                    ast.TupleBinding(
+                        name=getattr(item, "name", None),
+                        value=getattr(item, "value", getattr(item, "expr", item)),
+                        offset=getattr(item, "offset", 0),
+                    )
+                )
+    return tuple(result)
+
+
 # ============================================================================
 # 3. Quest Grammar Definition Builder
 # ============================================================================
@@ -692,14 +751,7 @@ def build_quest_grammar() -> None:
     PRIMARY_VALUE.add_rule(
         (T(TK.KW_TUPLE), BINDING, T(TK.KW_END)),
         lambda tuple_token, bindings, end_token: ast.ExprTuple(
-            fields=tuple(
-                ast.TupleBinding(
-                    name=getattr(item, "name", None),
-                    value=getattr(item, "value", getattr(item, "expr", item)),
-                    offset=item.offset,
-                )
-                for item in bindings
-            ),
+            fields=_process_tuple_bindings(bindings),
             offset=tuple_token.offset,
         ),
     )

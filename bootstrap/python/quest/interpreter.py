@@ -37,6 +37,7 @@ from quest.runtime import (
     QRef,
     QString,
     QTuple,
+    QTypeValue,
     QValue,
     QVariant,
     qvalue_is,
@@ -50,6 +51,11 @@ from quest.types import (
     INT_TYPE,
     OK_TYPE,
     QTupleType,
+    QTupleTypeFormal,
+    QTupleTypeBinding,
+    QTupleField,
+    QPathType,
+    QTypeVar,
     QType,
     REAL_TYPE,
     STRING_TYPE,
@@ -99,6 +105,7 @@ from quest.typed_ast import (
     TypedTryBranch,
     TypedTuple,
     TypedTypeApp,
+    TypedTypeWitness,
     TypedVar,
     TypedVarCell,
     TypedVariant,
@@ -545,12 +552,25 @@ def eval_expr(expr: TypedExpr, env: RuntimeEnvironment) -> QValue:
                 rec_fields[f.name] = QRef(val) if f.is_var else val
             return QRecord(rec_fields)
 
+        case TypedTypeWitness(name=name, witness_type=witness_type, bound=bound):
+            return QTypeValue(type_val=witness_type, bound=bound, name=name)
+
         case TypedTuple(elements=elements, type_val=type_val):
-            elems = tuple(eval_expr(e, env) for e in elements)
             labels: Optional[tuple[Optional[str], ...]] = None
             if isinstance(type_val, QTupleType):
                 labels = tuple(f.name for f in type_val.fields)
-            return QTuple(elements=elems, labels=labels)
+            tup_env = env.push_scope()
+            elems: list[QValue] = []
+            try:
+                for idx, e in enumerate(elements):
+                    val = eval_expr(e, tup_env)
+                    elems.append(val)
+                    lbl = labels[idx] if labels and idx < len(labels) else None
+                    if lbl is not None:
+                        tup_env.define(lbl, val)
+            finally:
+                tup_env.pop_scope()
+            return QTuple(elements=tuple(elems), labels=labels)
 
         case TypedSelect(target=target, field=field, offset=offset):
             target_val = eval_expr(target, env)
@@ -799,6 +819,46 @@ def eval_program(program: TypedProgram, env: Optional[RuntimeEnvironment] = None
     return results[-1][1] if results else OK_VALUE
 
 
+def format_value_with_type(val: QValue, typ: Optional[QType] = None) -> str:
+    """Formats a runtime value with respect to its static type (Cardelli §5.3)."""
+    if typ is None:
+        return qvalue_to_str(val)
+
+    if isinstance(typ, QPathType):
+        return "<hidden>"
+
+    if isinstance(val, QTypeValue):
+        if val.bound:
+            return f"<Hidden>::{val.bound}"
+        return "<Hidden>::TYPE"
+
+    if isinstance(val, QTuple) and isinstance(typ, QTupleType):
+        parts: list[str] = []
+        elem_idx = 0
+        for comp in typ.components:
+            if isinstance(comp, QTupleTypeFormal):
+                parts.append(f"<Hidden>::{comp.bound}")
+                elem_idx += 1
+            elif isinstance(comp, QTupleTypeBinding):
+                parts.append(f"Let {comp.name} = {comp.type_val}")
+                elem_idx += 1
+            elif isinstance(comp, QTupleField):
+                if elem_idx < len(val.elements):
+                    elem = val.elements[elem_idx]
+                    if isinstance(comp.type_val, (QPathType, QTypeVar)):
+                        elem_str = "<hidden>"
+                    else:
+                        elem_str = format_value_with_type(elem, comp.type_val)
+                    if comp.name:
+                        parts.append(f"{comp.name}={elem_str}")
+                    else:
+                        parts.append(elem_str)
+                    elem_idx += 1
+        return f"tuple {' '.join(parts)} end" if parts else "tuple end"
+
+    return qvalue_to_str(val)
+
+
 def format_interactive_result(
     phrase: Optional[TypedNode],
     val: Optional[QValue],
@@ -811,7 +871,7 @@ def format_interactive_result(
         case TypedLetValue(name=name, symbol=symbol):
             var_str = "var " if symbol.is_var else ""
             type_str = str(symbol.type_val)
-            val_str = qvalue_to_str(val)
+            val_str = format_value_with_type(val, symbol.type_val)
             return f"let {var_str}{name}:{type_str} = {val_str}"
 
         case TypedLetType(name=name, symbol=symbol):
@@ -833,7 +893,8 @@ def format_interactive_result(
         case TypedExprStmt(expr=inner_expr):
             if isinstance(val, QOk):
                 return ""
-            return f"{qvalue_to_str(val)} : {inner_expr.type_val}"
+            val_str = format_value_with_type(val, inner_expr.type_val)
+            return f"{val_str} : {inner_expr.type_val}"
 
         case TypedException(name=name):
             return f"exception {name}"
@@ -841,7 +902,8 @@ def format_interactive_result(
         case TypedExpr():
             if isinstance(val, QOk):
                 return ""
-            return f"{qvalue_to_str(val)} : {phrase.type_val}"
+            val_str = format_value_with_type(val, phrase.type_val)
+            return f"{val_str} : {phrase.type_val}"
 
         case _:
             return ""

@@ -14,7 +14,10 @@ from quest.types import (
     QAllKind,
     QKindVar,
     QType,
+    QTupleComponent,
     QTupleField,
+    QTupleTypeFormal,
+    QTupleTypeBinding,
     QTupleType,
     QRecordField,
     QRecordType,
@@ -37,6 +40,7 @@ from quest.types import (
     QRecGroupType,
     QTypeVar,
     QAbstractType,
+    QPathType,
     check_kind,
     check_kind_well_formed,
     check_type_contractive,
@@ -129,25 +133,101 @@ def elaborate_type(ast_type: ast.Type, env: Environment) -> QType:
                     return sym.definition
                 return QTypeVar(name=sym.name, symbol_id=sym.symbol_id, bound=sym.kind)
 
-            if len(path) == 2:
-                mod_name, type_name = path
-                mod_scope = env.lookup_module(mod_name) or env.lookup_interface(mod_name)
-                if mod_scope is None:
-                    raise KindError(
-                        f"Undefined module/interface '{mod_name}' in type path "
-                        f"'{mod_name}.{type_name}' at offset {offset}"
-                    )
-                sym = mod_scope.lookup_type(type_name)
-                if sym is None:
-                    raise KindError(
-                        f"Undefined type '{type_name}' in module/interface '{mod_name}' "
-                        f"at offset {offset}"
-                    )
-                if sym.definition is not None:
-                    return sym.definition
-                return QTypeVar(name=f"{mod_name}.{type_name}", symbol_id=sym.symbol_id, bound=sym.kind)
+            if len(path) >= 2:
+                # 1. Module or interface scope lookup
+                mod_scope = env.lookup_module(path[0]) or env.lookup_interface(path[0])
+                if mod_scope is not None:
+                    curr_scope = mod_scope
+                    for seg in path[1:-1]:
+                        curr_scope = curr_scope.lookup_module(seg) or curr_scope.lookup_interface(seg)
+                        if curr_scope is None:
+                            raise KindError(
+                                f"Undefined module/interface '{seg}' in type path '{'.'.join(path)}' "
+                                f"at offset {offset}"
+                            )
+                    type_name = path[-1]
+                    sym = curr_scope.lookup_type(type_name)
+                    if sym is None:
+                        raise KindError(
+                            f"Undefined type '{type_name}' in module/interface '{path[-2]}' "
+                            f"at offset {offset}"
+                        )
+                    if sym.definition is not None:
+                        return sym.definition
+                    return QTypeVar(name=".".join(path), symbol_id=sym.symbol_id, bound=sym.kind)
 
-            raise KindError(f"Multi-segment type paths not supported: '{'.'.join(path)}'")
+                # 2. Value binding lookup for path-dependent types (e.g. x.A or x.y.A)
+                val_sym = env.lookup_value(path[0])
+                if val_sym is not None:
+                    if val_sym.is_var:
+                        raise KindError(
+                            f"Cannot project type from mutable variable '{path[0]}' at offset {offset}"
+                        )
+                    curr_type = val_sym.type_val.evaluate_lazily(env)
+                    curr_root_name = path[0]
+                    curr_root_sym_id = val_sym.symbol_id
+                    for seg in path[1:-1]:
+                        if not isinstance(curr_type, QTupleType):
+                            raise KindError(
+                                f"Cannot project field '{seg}' from non-tuple type '{curr_type}' "
+                                f"at offset {offset}"
+                            )
+                        field_comp = curr_type.get_field(seg)
+                        if field_comp is None or not isinstance(field_comp, QTupleField):
+                            raise KindError(
+                                f"Tuple '{curr_root_name}' has no field named '{seg}' at offset {offset}"
+                            )
+                        curr_type = field_comp.type_val.evaluate_lazily(env)
+                        curr_root_name = f"{curr_root_name}.{seg}"
+
+                    type_name = path[-1]
+                    if not isinstance(curr_type, QTupleType):
+                        raise KindError(
+                            f"Cannot project type from non-tuple type '{curr_type}' at offset {offset}"
+                        )
+                    comp = curr_type.get_field(type_name)
+                    if comp is None:
+                        raise KindError(
+                            f"Tuple '{curr_root_name}' has no component named '{type_name}' at offset {offset}"
+                        )
+                    if isinstance(comp, QTupleTypeFormal):
+                        subst = {
+                            f.symbol_id: QPathType(
+                                root_name=curr_root_name,
+                                root_symbol_id=curr_root_sym_id,
+                                field_name=f.name,
+                                bound=f.bound,
+                            )
+                            for f in curr_type.type_formals
+                            if f.symbol_id != comp.symbol_id
+                        }
+                        bound = comp.bound.substitute_types(subst)
+                        return QPathType(
+                            root_name=curr_root_name,
+                            root_symbol_id=curr_root_sym_id,
+                            field_name=type_name,
+                            bound=bound,
+                        )
+                    elif isinstance(comp, QTupleTypeBinding):
+                        subst = {
+                            f.symbol_id: QPathType(
+                                root_name=curr_root_name,
+                                root_symbol_id=curr_root_sym_id,
+                                field_name=f.name,
+                                bound=f.bound,
+                            )
+                            for f in curr_type.type_formals
+                        }
+                        return comp.type_val.substitute(subst)
+                    else:
+                        raise KindError(
+                            f"Component '{type_name}' of tuple '{curr_root_name}' is a value field, "
+                            f"not a type component, at offset {offset}"
+                        )
+
+                raise KindError(
+                    f"Undefined identifier '{path[0]}' in type path '{'.'.join(path)}' at offset {offset}"
+                )
 
         case ast.TypeInfix(left=left, op=op, right=right, offset=offset):
             left_type = elaborate_type(left, env)
@@ -157,25 +237,73 @@ def elaborate_type(ast_type: ast.Type, env: Environment) -> QType:
             raise KindError(f"Unsupported infix type operator '{op}' at offset {offset}")
 
         case ast.TypeTuple(fields=tup_fields):
-            fields: list[QTupleField] = []
+            components: list[QTupleComponent] = []
             env.push_scope("tuple_sig")
             try:
                 for f in tup_fields:
-                    field_type = elaborate_type(f.type_sig, env)
-                    check_kind(field_type, TYPE_KIND, env)
-                    fields.append(QTupleField(name=f.name if f.name else None, type_val=field_type))
-                    if f.name:
-                        env.current_scope.declare_value(
-                            ValueSymbol(
-                                name=f.name,
-                                type_val=field_type,
-                                is_var=(f.mode == ast.ParamMode.VAR),
-                                is_out=(f.mode == ast.ParamMode.OUT),
+                    match f:
+                        case ast.TypeFormal(name=name, bound=bound):
+                            if not name or name == "_":
+                                raise KindError(
+                                    "Type formal in tuple signature must have an identifier",
+                                    offset=getattr(f, "offset", None),
+                                )
+                            bound_kind = elaborate_kind(bound, env)
+                            symbol_id = env.fresh_symbol_id()
+                            env.current_scope.declare_type(
+                                TypeSymbol(name=name, symbol_id=symbol_id, kind=bound_kind)
                             )
-                        )
+                            components.append(
+                                QTupleTypeFormal(name=name, symbol_id=symbol_id, bound=bound_kind)
+                            )
+
+                        case ast.FieldSig(name=name, type_sig=type_sig, mode=mode):
+                            field_type = elaborate_type(type_sig, env)
+                            check_kind(field_type, TYPE_KIND, env)
+                            components.append(
+                                QTupleField(name=name if name else None, type_val=field_type)
+                            )
+                            if name:
+                                env.current_scope.declare_value(
+                                    ValueSymbol(
+                                        name=name,
+                                        type_val=field_type,
+                                        is_var=(mode == ast.ParamMode.VAR),
+                                        is_out=(mode == ast.ParamMode.OUT),
+                                    )
+                                )
+
+                        case ast.LetTypeBinding(name=name, type_val=type_val, bound=bound):
+                            bound_kind = elaborate_kind(bound, env) if bound else None
+                            m_type = elaborate_type(type_val, env)
+                            if bound_kind:
+                                check_kind(m_type, bound_kind, env)
+                            else:
+                                check_kind(m_type, TYPE_KIND, env)
+                            symbol_id = env.fresh_symbol_id()
+                            env.current_scope.declare_type(
+                                TypeSymbol(
+                                    name=name,
+                                    symbol_id=symbol_id,
+                                    kind=bound_kind or TYPE_KIND,
+                                    definition=m_type,
+                                )
+                            )
+                            components.append(
+                                QTupleTypeBinding(name=name, type_val=m_type, bound=bound_kind)
+                            )
+
+                        case ast.DefKindBinding(name=name, kind_val=kind_val):
+                            k_val = elaborate_kind(kind_val, env)
+                            env.current_scope.declare_kind(
+                                KindSymbol(name=name, symbol_id=env.fresh_symbol_id(), kind=k_val)
+                            )
+
+                        case _:
+                            raise KindError(f"Unexpected item in tuple signature: {f}")
             finally:
                 env.pop_scope()
-            return QTupleType(tuple(fields))
+            return QTupleType(tuple(components))
 
         case ast.TypeRecord(fields=rec_fields):
             fields = tuple(

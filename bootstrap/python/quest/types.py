@@ -27,6 +27,10 @@ class QKind:
         """Substitutes type variables inside power kind bounds."""
         return self
 
+    def substitute(self, subst: dict[int, QType]) -> QKind:
+        """Alias for substitute_types."""
+        return self.substitute_types(subst)
+
 
 @dataclass(frozen=True)
 class QTypeKind(QKind):
@@ -222,7 +226,7 @@ EXCEPTION_TYPE = QExceptionType()
 
 @dataclass(frozen=True)
 class QTupleField:
-    """A single (optionally named) component in an ordered tuple type."""
+    """A single (optionally named) value component in an ordered tuple type: [name:] T."""
     name: Optional[str]
     type_val: QType
 
@@ -236,24 +240,80 @@ class QTupleField:
 
 
 @dataclass(frozen=True)
+class QTupleTypeFormal:
+    """A type formal component in an ordered tuple type: X::K."""
+    name: str
+    symbol_id: int
+    bound: QKind
+
+    def substitute(self, subst: dict[int, QType]) -> QTupleTypeFormal:
+        return QTupleTypeFormal(
+            name=self.name,
+            symbol_id=self.symbol_id,
+            bound=self.bound.substitute_types(subst),
+        )
+
+    def __str__(self) -> str:
+        return f"{self.name}::{self.bound}"
+
+
+@dataclass(frozen=True)
+class QTupleTypeBinding:
+    """A manifest type definition inside a tuple signature: Let X::K = T."""
+    name: str
+    type_val: QType
+    bound: Optional[QKind] = None
+
+    def substitute(self, subst: dict[int, QType]) -> QTupleTypeBinding:
+        return QTupleTypeBinding(
+            name=self.name,
+            type_val=self.type_val.substitute(subst),
+            bound=self.bound.substitute_types(subst) if self.bound else None,
+        )
+
+    def __str__(self) -> str:
+        bound_str = f"::{self.bound} " if self.bound else ""
+        return f"Let {self.name}{bound_str}= {self.type_val}"
+
+
+QTupleComponent = Union[QTupleField, QTupleTypeFormal, QTupleTypeBinding]
+
+
+@dataclass(frozen=True)
 class QTupleType(QType):
     """Ordered tuple type: Tuple [x:] T1 ... [y:] Tn end."""
-    fields: tuple[QTupleField, ...]
+    fields: tuple[QTupleComponent, ...]
 
-    def __init__(self, elements: tuple[Union[QType, QTupleField], ...] = ()) -> None:
-        normalized: list[QTupleField] = []
+    def __init__(self, elements: tuple[Union[QType, QTupleComponent], ...] = ()) -> None:
+        normalized: list[QTupleComponent] = []
         for item in elements:
-            if isinstance(item, QTupleField):
+            if isinstance(item, (QTupleField, QTupleTypeFormal, QTupleTypeBinding)):
                 normalized.append(item)
             else:
                 normalized.append(QTupleField(name=None, type_val=item))
         object.__setattr__(self, "fields", tuple(normalized))
 
     @property
-    def elements(self) -> tuple[QType, ...]:
-        return tuple(f.type_val for f in self.fields)
+    def components(self) -> tuple[QTupleComponent, ...]:
+        return self.fields
 
-    def get_field(self, name: str) -> Optional[QTupleField]:
+    @property
+    def elements(self) -> tuple[QType, ...]:
+        return tuple(f.type_val for f in self.fields if isinstance(f, (QTupleField, QTupleTypeBinding)))
+
+    @property
+    def value_fields(self) -> tuple[QTupleField, ...]:
+        return tuple(f for f in self.fields if isinstance(f, QTupleField))
+
+    @property
+    def type_formals(self) -> tuple[QTupleTypeFormal, ...]:
+        return tuple(f for f in self.fields if isinstance(f, QTupleTypeFormal))
+
+    @property
+    def is_existential(self) -> bool:
+        return any(isinstance(f, QTupleTypeFormal) for f in self.fields)
+
+    def get_field(self, name: str) -> Optional[QTupleComponent]:
         for f in self.fields:
             if f.name == name:
                 return f
@@ -265,20 +325,44 @@ class QTupleType(QType):
         if len(self.fields) != len(other.fields):
             return False
         for f1, f2 in zip(self.fields, other.fields):
-            if f1.name is not None and f2.name is not None and f1.name != f2.name:
+            if type(f1) is not type(f2):
                 return False
-            if f1.type_val != f2.type_val:
-                return False
+            if isinstance(f1, QTupleTypeFormal):
+                assert isinstance(f2, QTupleTypeFormal)
+                if f1.name != f2.name or f1.bound != f2.bound:
+                    return False
+            elif isinstance(f1, QTupleField):
+                assert isinstance(f2, QTupleField)
+                if f1.name is not None and f2.name is not None and f1.name != f2.name:
+                    return False
+                if f1.type_val != f2.type_val:
+                    return False
+            elif isinstance(f1, QTupleTypeBinding):
+                assert isinstance(f2, QTupleTypeBinding)
+                if f1.name != f2.name or f1.type_val != f2.type_val or f1.bound != f2.bound:
+                    return False
         return True
 
     def __hash__(self) -> int:
-        return hash(tuple(f.type_val for f in self.fields))
+        return hash(self.fields)
 
     def evaluate_lazily(self, env: Optional[Any] = None) -> QType:
         return self
 
     def substitute(self, subst: dict[int, QType]) -> QType:
-        return QTupleType(tuple(f.substitute(subst) for f in self.fields))
+        curr_subst = dict(subst)
+        new_fields: list[QTupleComponent] = []
+        for f in self.fields:
+            if isinstance(f, QTupleTypeFormal):
+                new_f = f.substitute(curr_subst)
+                new_fields.append(new_f)
+                if f.symbol_id in curr_subst:
+                    curr_subst.pop(f.symbol_id)
+            elif isinstance(f, (QTupleField, QTupleTypeBinding)):
+                new_fields.append(f.substitute(curr_subst))
+            else:
+                new_fields.append(f)
+        return QTupleType(tuple(new_fields))
 
     def __str__(self) -> str:
         elems = " ".join(str(f) for f in self.fields)
@@ -707,6 +791,149 @@ class QAbstractType(QType):
         return self.name
 
 
+@dataclass(frozen=True)
+class QPathType(QType):
+    """Path-dependent abstract type projected from an immutable value binding: x.A."""
+    root_name: str
+    root_symbol_id: int
+    field_name: str
+    bound: QKind = field(compare=False)
+
+    @property
+    def symbol_id(self) -> int:
+        return hash((self.root_symbol_id, self.field_name))
+
+    def evaluate_lazily(self, env: Optional[Any] = None) -> QType:
+        return self
+
+    def substitute(self, subst: dict[int, QType]) -> QType:
+        new_bound = self.bound.substitute_types(subst)
+        if new_bound != self.bound:
+            return QPathType(
+                root_name=self.root_name,
+                root_symbol_id=self.root_symbol_id,
+                field_name=self.field_name,
+                bound=new_bound,
+            )
+        return self
+
+    def __str__(self) -> str:
+        return f"{self.root_name}.{self.field_name}"
+
+
+def find_path_types(typ: QType) -> list[QPathType]:
+    """Finds all QPathType instances occurring anywhere within a QType."""
+    result: list[QPathType] = []
+    visited: set[int] = set()
+
+    def visit(t: QType) -> None:
+        t_id = id(t)
+        if t_id in visited:
+            return
+        visited.add(t_id)
+
+        if isinstance(t, QPathType):
+            result.append(t)
+            if isinstance(t.bound, QPowerKind):
+                visit(t.bound.bound)
+        elif isinstance(t, QFunType):
+            for p in t.params:
+                visit(p.type_val)
+            visit(t.result_type)
+        elif isinstance(t, QTupleType):
+            for f in t.fields:
+                if isinstance(f, (QTupleField, QTupleTypeBinding)):
+                    visit(f.type_val)
+                elif isinstance(f, QTupleTypeFormal):
+                    if isinstance(f.bound, QPowerKind):
+                        visit(f.bound.bound)
+        elif isinstance(t, QRecordType):
+            for rf in t.fields:
+                visit(rf.type_val)
+        elif isinstance(t, QAllType):
+            for q in t.quantifiers:
+                if isinstance(q.bound, QPowerKind):
+                    visit(q.bound.bound)
+            visit(t.body)
+        elif isinstance(t, QAutoType):
+            for rf in t.signature:
+                visit(rf.type_val)
+        elif isinstance(t, (QOptionType, QVariantType)):
+            for vf in t.fields:
+                if vf.payload_type is not None:
+                    visit(vf.payload_type)
+        elif isinstance(t, (QVarType, QArrayType, QOutType)):
+            visit(t.element_type)
+        elif isinstance(t, QTypeApp):
+            visit(t.constructor)
+            for arg in t.arguments:
+                visit(arg)
+        elif isinstance(t, QRecType):
+            visit(t.body)
+        elif isinstance(t, QRecGroupType):
+            for b in t.bindings:
+                visit(b[3])
+        elif isinstance(t, QExceptionType):
+            visit(t.payload_type)
+
+    visit(typ)
+    return result
+
+
+def type_mentions_symbol_ids(typ: QType, sym_ids: set[int]) -> bool:
+    """Returns True if the given type mentions any symbol ID from sym_ids."""
+    if not sym_ids:
+        return False
+    visited: set[int] = set()
+
+    def visit(t: QType) -> bool:
+        t_id = id(t)
+        if t_id in visited:
+            return False
+        visited.add(t_id)
+
+        if isinstance(t, (QTypeVar, QAbstractType)):
+            if t.symbol_id in sym_ids:
+                return True
+        elif isinstance(t, QPathType):
+            if isinstance(t.bound, QPowerKind) and visit(t.bound.bound):
+                return True
+        elif isinstance(t, QFunType):
+            if any(visit(p.type_val) for p in t.params) or visit(t.result_type):
+                return True
+        elif isinstance(t, QTupleType):
+            for f in t.fields:
+                if isinstance(f, (QTupleField, QTupleTypeBinding)) and visit(f.type_val):
+                    return True
+                elif isinstance(f, QTupleTypeFormal) and isinstance(f.bound, QPowerKind):
+                    if visit(f.bound.bound):
+                        return True
+        elif isinstance(t, QRecordType):
+            if any(visit(rf.type_val) for rf in t.fields):
+                return True
+        elif isinstance(t, QAllType):
+            if any(isinstance(q.bound, QPowerKind) and visit(q.bound.bound) for q in t.quantifiers):
+                return True
+            return visit(t.body)
+        elif isinstance(t, QAutoType):
+            return any(visit(rf.type_val) for rf in t.signature)
+        elif isinstance(t, (QOptionType, QVariantType)):
+            return any(vf.payload_type is not None and visit(vf.payload_type) for vf in t.fields)
+        elif isinstance(t, (QVarType, QArrayType, QOutType)):
+            return visit(t.element_type)
+        elif isinstance(t, QTypeApp):
+            return visit(t.constructor) or any(visit(arg) for arg in t.arguments)
+        elif isinstance(t, QRecType):
+            return visit(t.body)
+        elif isinstance(t, QRecGroupType):
+            return any(visit(b[3]) for b in t.bindings)
+        elif isinstance(t, QExceptionType):
+            return visit(t.payload_type)
+        return False
+
+    return visit(typ)
+
+
 # ============================================================================
 # 8. Type Inference Metavariable
 # ============================================================================
@@ -817,21 +1044,46 @@ def is_subtype(
     trail.add(pair)
 
     # 6. Type Variable bound checking
-    if isinstance(sub_lazy, (QTypeVar, QAbstractType)):
+    if isinstance(sub_lazy, (QTypeVar, QAbstractType, QPathType)):
         if sub_lazy.bound and isinstance(sub_lazy.bound, QPowerKind):
             if is_subtype(sub_lazy.bound.bound, sup_lazy, env, trail):
                 return True
 
     # 7. Pattern matching across type pairs
     match (sub_lazy, sup_lazy):
-        # Tuples: length match, matching field names, covariant elements
+        # Tuples: prefix match (Cardelli §7.1, §10.2), matching names, covariant elements / subkinds
         case (QTupleType(fields=sub_fields), QTupleType(fields=sup_fields)):
-            if len(sub_fields) != len(sup_fields):
+            if len(sub_fields) < len(sup_fields):
                 return False
-            for s_f, t_f in zip(sub_fields, sup_fields):
-                if t_f.name is not None and s_f.name != t_f.name:
-                    return False
-                if not is_subtype(s_f.type_val, t_f.type_val, env, trail):
+            curr_sup_fields = list(sup_fields)
+            for idx in range(len(curr_sup_fields)):
+                s_f = sub_fields[idx]
+                t_f = curr_sup_fields[idx]
+                if isinstance(s_f, QTupleTypeFormal) and isinstance(t_f, QTupleTypeFormal):
+                    if s_f.name != t_f.name or not is_subkind(s_f.bound, t_f.bound, env):
+                        return False
+                    if t_f.symbol_id != s_f.symbol_id:
+                        subst = {t_f.symbol_id: QTypeVar(s_f.name, s_f.symbol_id, s_f.bound)}
+                        for rem_idx in range(idx + 1, len(curr_sup_fields)):
+                            curr_sup_fields[rem_idx] = curr_sup_fields[rem_idx].substitute(subst)
+                elif isinstance(s_f, QTupleTypeBinding) and isinstance(t_f, QTupleTypeFormal):
+                    if s_f.name != t_f.name:
+                        return False
+                    if isinstance(t_f.bound, QPowerKind):
+                        if not is_subtype(s_f.type_val, t_f.bound.bound, env, trail):
+                            return False
+                    subst = {t_f.symbol_id: s_f.type_val}
+                    for rem_idx in range(idx + 1, len(curr_sup_fields)):
+                        curr_sup_fields[rem_idx] = curr_sup_fields[rem_idx].substitute(subst)
+                elif isinstance(s_f, QTupleField) and isinstance(t_f, QTupleField):
+                    if t_f.name is not None and s_f.name != t_f.name:
+                        return False
+                    if not is_subtype(s_f.type_val, t_f.type_val, env, trail):
+                        return False
+                elif isinstance(s_f, QTupleTypeBinding) and isinstance(t_f, QTupleTypeBinding):
+                    if s_f.name != t_f.name or not is_subtype(s_f.type_val, t_f.type_val, env, trail):
+                        return False
+                else:
                     return False
             return True
 
@@ -1192,8 +1444,15 @@ def check_type_contractive(
 
 def check_kind(type_val: QType, expected_kind: QKind, env: Optional[Any] = None) -> None:
     """Checks that type_val has a kind that is a subkind of expected_kind."""
+    expected_lazy = expected_kind.evaluate_lazily(env)
+    if isinstance(expected_lazy, QPowerKind):
+        if is_subtype(type_val, expected_lazy.bound, env):
+            return
+        raise KindError(
+            f"Kind mismatch: type '{type_val}' is not a subtype of bound '{expected_lazy.bound}'"
+        )
     synthesized = synth_kind(type_val, env)
-    if not is_subkind(synthesized, expected_kind, env):
+    if not is_subkind(synthesized, expected_lazy, env):
         raise KindError(
             f"Kind mismatch: type '{type_val}' has kind '{synthesized}', "
             f"which is not a subkind of expected kind '{expected_kind}'"
@@ -1207,9 +1466,37 @@ def synth_kind(type_val: QType, env: Optional[Any] = None) -> QKind:
               | QOkType() | QDynamicType() | QExceptionType()):
             return TYPE_KIND
 
-        case QTupleType(elements=elems):
-            for elem in elems:
-                check_kind(elem, TYPE_KIND, env)
+        case QTupleType(fields=fields):
+            if env is not None and hasattr(env, "push_scope"):
+                from quest.env import TypeSymbol
+                env.push_scope("tuple_kind_check")
+                try:
+                    for f in fields:
+                        if isinstance(f, QTupleTypeFormal):
+                            check_kind_well_formed(f.bound, env)
+                            env.current_scope.declare_type(
+                                TypeSymbol(name=f.name, symbol_id=f.symbol_id, kind=f.bound)
+                            )
+                        elif isinstance(f, QTupleField):
+                            check_kind(f.type_val, TYPE_KIND, env)
+                        elif isinstance(f, QTupleTypeBinding):
+                            check_kind(f.type_val, TYPE_KIND, env)
+                            env.current_scope.declare_type(
+                                TypeSymbol(
+                                    name=f.name,
+                                    symbol_id=env.fresh_symbol_id(),
+                                    kind=f.bound or TYPE_KIND,
+                                    definition=f.type_val,
+                                )
+                            )
+                finally:
+                    env.pop_scope()
+            else:
+                for f in fields:
+                    if isinstance(f, QTupleTypeFormal):
+                        check_kind_well_formed(f.bound, env)
+                    elif isinstance(f, (QTupleField, QTupleTypeBinding)):
+                        check_kind(f.type_val, TYPE_KIND, env)
             return TYPE_KIND
 
         case QRecordType(fields=fields):
@@ -1250,7 +1537,7 @@ def synth_kind(type_val: QType, env: Optional[Any] = None) -> QKind:
                     return sym.kind
             raise KindError(f"Unbound type variable '{name}' (#{sym_id})")
 
-        case QAbstractType(bound=bound):
+        case QAbstractType(bound=bound) | QPathType(bound=bound):
             check_kind_well_formed(bound, env)
             return bound
 
@@ -1403,11 +1690,28 @@ def qtype_dump(item: Union[QType, QKind], indent: int = 0) -> str:
              | QKindVar(name=name, symbol_id=sym_id):
             return f"({item.__class__.__name__} '{name}' #{sym_id})"
 
-        case QTupleType(elements=elems):
-            if not elems:
+        case QPathType(root_name=rname, root_symbol_id=rsym_id, field_name=fname):
+            return f"(QPathType '{rname}.{fname}' #{rsym_id})"
+
+        case QTupleType(fields=fields):
+            if not fields:
                 return "(QTupleType)"
-            elem_strs = "\n".join(f"{pad}    {qtype_dump(elem, indent + 2)}" for elem in elems)
-            return f"(QTupleType\n{pad}  :elements (\n{elem_strs}\n{pad}  ))"
+            field_strs = []
+            for f in fields:
+                if isinstance(f, QTupleTypeFormal):
+                    field_strs.append(
+                        f"{pad}    (QTupleTypeFormal '{f.name}' #{f.symbol_id} :: {f.bound})"
+                    )
+                elif isinstance(f, QTupleField):
+                    field_strs.append(
+                        f"{pad}    (QTupleField {f.name or ''} {qtype_dump(f.type_val, indent + 2)})"
+                    )
+                elif isinstance(f, QTupleTypeBinding):
+                    field_strs.append(
+                        f"{pad}    (QTupleTypeBinding '{f.name}' = {qtype_dump(f.type_val, indent + 2)})"
+                    )
+            f_joined = "\n".join(field_strs)
+            return f"(QTupleType\n{pad}  :fields (\n{f_joined}\n{pad}  ))"
 
         case QRecordType(fields=fields):
             if not fields:

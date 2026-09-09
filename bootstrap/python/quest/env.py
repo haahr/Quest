@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Optional
+from typing import Any, ClassVar, Optional
 
 from quest.types import (
     BOOL_TYPE,
@@ -41,6 +41,14 @@ class ValueSymbol(Symbol):
     type_val: QType
     is_var: bool = False
     is_out: bool = False
+    symbol_id: int = 0
+
+    _counter: ClassVar[int] = field(default=0, init=False, repr=False)
+
+    def __post_init__(self) -> None:
+        if self.symbol_id == 0:
+            ValueSymbol._counter += 1
+            self.symbol_id = ValueSymbol._counter
 
     def __str__(self) -> str:
         var_prefix = "var " if self.is_var else ("out " if self.is_out else "")
