@@ -8,15 +8,11 @@ from quest.env import Environment, ValueSymbol
 from quest.typechecker import TypeError, check_expr, synth_expr
 from quest.typed_ast import (
     TypedApp,
-    TypedDerefCell,
     TypedFun,
-    TypedInt,
-    TypedLetValue,
     TypedTypeApp,
     TypedVar,
 )
 from quest.types import (
-    BOOL_TYPE,
     INT_TYPE,
     OK_TYPE,
     QAllType,
@@ -26,11 +22,11 @@ from quest.types import (
     QRecordField,
     QRecordType,
     QTypeVar,
-    QVarType,
     REAL_TYPE,
     STRING_TYPE,
     TYPE_KIND,
 )
+from tests.python.helpers import parse_expr, parse_type
 
 
 class Phase3FunctionsTest(unittest.TestCase):
@@ -38,21 +34,7 @@ class Phase3FunctionsTest(unittest.TestCase):
 
     def test_fun_abstraction_synthesis(self) -> None:
         """fun(x: Int): Int x + 1 synthesizes QFunType(Int) -> Int."""
-        fn_expr = ast.ExprFun(
-            params=(
-                ast.FormalParam(
-                    name="x",
-                    type_annot=ast.TypePath(path=("Int",)),
-                    mode=ast.ParamMode.VALUE,
-                ),
-            ),
-            return_type=ast.TypePath(path=("Int",)),
-            body=ast.ExprInfix(
-                left=ast.ExprId(name="x"),
-                op="+",
-                right=ast.ExprInt(value=1, lexeme="1"),
-            ),
-        )
+        fn_expr = parse_expr("fun(x: Int): Int x + 1")
         typed = synth_expr(fn_expr)
         self.assertIsInstance(typed, TypedFun)
         self.assertEqual(len(typed.params), 1)
@@ -62,37 +44,20 @@ class Phase3FunctionsTest(unittest.TestCase):
 
     def test_fun_abstraction_omitted_return_type(self) -> None:
         """fun(x: Int) x + 1 infers return type Int from body."""
-        fn_expr = ast.ExprFun(
-            params=(
-                ast.FormalParam(
-                    name="x",
-                    type_annot=ast.TypePath(path=("Int",)),
-                    mode=ast.ParamMode.VALUE,
-                ),
-            ),
-            return_type=None,
-            body=ast.ExprInfix(
-                left=ast.ExprId(name="x"),
-                op="+",
-                right=ast.ExprInt(value=1, lexeme="1"),
-            ),
-        )
+        fn_expr = parse_expr("fun(x: Int) x + 1")
         typed = synth_expr(fn_expr)
         self.assertEqual(typed.type_val, QFunType(params=(QParam("x", INT_TYPE),), result_type=INT_TYPE))
 
     def test_fun_abstraction_checking_mode(self) -> None:
         """fun(x) x + 1 checked against (Int) -> Int infers parameter type."""
         expected_type = QFunType(params=(QParam("x", INT_TYPE),), result_type=INT_TYPE)
+        # AST with unannotated parameter for checking mode
         fn_expr = ast.ExprFun(
             params=(
                 ast.FormalParam(name="x", type_annot=None, mode=ast.ParamMode.VALUE),
             ),
             return_type=None,
-            body=ast.ExprInfix(
-                left=ast.ExprId(name="x"),
-                op="+",
-                right=ast.ExprInt(value=1, lexeme="1"),
-            ),
+            body=parse_expr("x + 1"),
         )
         typed = check_expr(fn_expr, expected_type)
         self.assertIsInstance(typed, TypedFun)
@@ -100,24 +65,12 @@ class Phase3FunctionsTest(unittest.TestCase):
         self.assertEqual(typed.type_val, expected_type)
 
     def test_function_application_monomorphic(self) -> None:
-        """(fun(x: Int): Int x + 1)(41) synthesizes Int."""
-        fn_expr = ast.ExprFun(
-            params=(
-                ast.FormalParam(
-                    name="x",
-                    type_annot=ast.TypePath(path=("Int",)),
-                    mode=ast.ParamMode.VALUE,
-                ),
-            ),
-            return_type=ast.TypePath(path=("Int",)),
-            body=ast.ExprInfix(
-                left=ast.ExprId(name="x"),
-                op="+",
-                right=ast.ExprInt(value=1, lexeme="1"),
-            ),
-        )
-        app_expr = ast.ExprApp(func=fn_expr, args=(ast.ExprInt(value=41, lexeme="41"),))
-        typed = synth_expr(app_expr)
+        """f(41) synthesizes Int."""
+        fn_expr = parse_expr("fun(x: Int): Int x + 1")
+        env = Environment()
+        env.current_scope.declare_value(ValueSymbol(name="f", type_val=synth_expr(fn_expr).type_val))
+        app_expr = parse_expr("f(41)")
+        typed = synth_expr(app_expr, env)
         self.assertIsInstance(typed, TypedApp)
         self.assertEqual(typed.type_val, INT_TYPE)
         self.assertEqual(len(typed.args), 1)
@@ -131,13 +84,7 @@ class Phase3FunctionsTest(unittest.TestCase):
         )
         env.current_scope.declare_value(ValueSymbol(name="f", type_val=fn_type))
 
-        app_expr = ast.ExprApp(
-            func=ast.ExprId(name="f"),
-            args=(
-                ast.ExprInt(value=10, lexeme="10"),
-                ast.ExprReal(value=2.5, lexeme="2.5"),
-            ),
-        )
+        app_expr = parse_expr("f(10 2.5)")
         typed = synth_expr(app_expr, env)
         self.assertIsInstance(typed, TypedApp)
         self.assertEqual(typed.type_val, REAL_TYPE)
@@ -155,7 +102,7 @@ class Phase3FunctionsTest(unittest.TestCase):
         env.current_scope.declare_value(ValueSymbol(name="imm", type_val=INT_TYPE, is_var=False))
 
         # Passing mutable variable succeeds
-        ok_call = ast.ExprApp(func=ast.ExprId(name="inc"), args=(ast.ExprId(name="c"),))
+        ok_call = parse_expr("inc(c)")
         typed = synth_expr(ok_call, env)
         self.assertIsInstance(typed, TypedApp)
         self.assertEqual(typed.type_val, OK_TYPE)
@@ -163,12 +110,12 @@ class Phase3FunctionsTest(unittest.TestCase):
         self.assertIsInstance(typed.args[0], TypedVar)
 
         # Passing immutable variable fails
-        err_call = ast.ExprApp(func=ast.ExprId(name="inc"), args=(ast.ExprId(name="imm"),))
+        err_call = parse_expr("inc(imm)")
         with self.assertRaises(TypeError):
             synth_expr(err_call, env)
 
         # Passing literal fails
-        lit_call = ast.ExprApp(func=ast.ExprId(name="inc"), args=(ast.ExprInt(value=5, lexeme="5"),))
+        lit_call = parse_expr("inc(5)")
         with self.assertRaises(TypeError):
             synth_expr(lit_call, env)
 
@@ -186,19 +133,19 @@ class Phase3FunctionsTest(unittest.TestCase):
             QRecordField("size", STRING_TYPE),
         ))
 
-        # get_dog: fun(out x: Dog): Ok
+        # getDog: fun(out x: Dog): Ok
         fn_type = QFunType(params=(QParam("x", dog_type, is_out=True),), result_type=OK_TYPE)
-        env.current_scope.declare_value(ValueSymbol(name="get_dog", type_val=fn_type))
+        env.current_scope.declare_value(ValueSymbol(name="getDog", type_val=fn_type))
 
         # Destination variable of type Animal (Dog <= Animal: valid!)
         env.current_scope.declare_value(ValueSymbol(name="pet", type_val=animal_type, is_var=True))
-        call_ok = ast.ExprApp(func=ast.ExprId(name="get_dog"), args=(ast.ExprId(name="pet"),))
+        call_ok = parse_expr("getDog(pet)")
         typed_ok = synth_expr(call_ok, env)
         self.assertEqual(typed_ok.type_val, OK_TYPE)
 
         # Destination variable of type Terrier (Dog <= Terrier is False: rejected!)
         env.current_scope.declare_value(ValueSymbol(name="tiny", type_val=terrier_type, is_var=True))
-        call_err = ast.ExprApp(func=ast.ExprId(name="get_dog"), args=(ast.ExprId(name="tiny"),))
+        call_err = parse_expr("getDog(tiny)")
         with self.assertRaises(TypeError):
             synth_expr(call_err, env)
 
@@ -216,7 +163,7 @@ class Phase3FunctionsTest(unittest.TestCase):
         env.current_scope.declare_value(ValueSymbol(name="id", type_val=all_id_type))
 
         # id(42)
-        call_int = ast.ExprApp(func=ast.ExprId(name="id"), args=(ast.ExprInt(value=42, lexeme="42"),))
+        call_int = parse_expr("id(42)")
         typed = synth_expr(call_int, env)
         self.assertIsInstance(typed, TypedApp)
         self.assertEqual(typed.type_val, INT_TYPE)
@@ -224,7 +171,7 @@ class Phase3FunctionsTest(unittest.TestCase):
         self.assertEqual(typed.func.type_args, (INT_TYPE,))
 
         # id("hello")
-        call_str = ast.ExprApp(func=ast.ExprId(name="id"), args=(ast.ExprString(value="hello", lexeme="'hello'"),))
+        call_str = parse_expr('id("hello")')
         typed_str = synth_expr(call_str, env)
         self.assertIsInstance(typed_str, TypedApp)
         self.assertEqual(typed_str.type_val, STRING_TYPE)
@@ -233,71 +180,17 @@ class Phase3FunctionsTest(unittest.TestCase):
 
     def test_let_function_shorthand_and_recursion(self) -> None:
         """let rec factorial(n: Int): Int = ... typechecks and binds properly."""
-        fact_binding = ast.LetValueBinding(
-            name="factorial",
-            params=(
-                ast.FormalParam(
-                    name="n",
-                    type_annot=ast.TypePath(path=("Int",)),
-                    mode=ast.ParamMode.VALUE,
-                ),
-            ),
-            type_annot=ast.TypePath(path=("Int",)),
-            value=ast.ExprIf(
-                cond=ast.ExprInfix(
-                    left=ast.ExprId(name="n"),
-                    op="==",
-                    right=ast.ExprInt(value=0, lexeme="0"),
-                ),
-                then_branch=ast.ExprInt(value=1, lexeme="1"),
-                else_branch=ast.ExprInfix(
-                    left=ast.ExprId(name="n"),
-                    op="*",
-                    right=ast.ExprApp(
-                        func=ast.ExprId(name="factorial"),
-                        args=(
-                            ast.ExprInfix(
-                                left=ast.ExprId(name="n"),
-                                op="-",
-                                right=ast.ExprInt(value=1, lexeme="1"),
-                            ),
-                        ),
-                    ),
-                ),
-            ),
-            is_rec=True,
-        )
-
-        block = ast.ExprBlock(
-            bindings=(
-                fact_binding,
-                ast.ExprStmt(
-                    expr=ast.ExprApp(
-                        func=ast.ExprId(name="factorial"),
-                        args=(ast.ExprInt(value=5, lexeme="5"),),
-                    )
-                ),
-            )
+        block = parse_expr(
+            "begin let rec factorial(n: Int): Int = "
+            "if n == 0 then 1 else n * factorial(n - 1) end; "
+            "factorial(5) end"
         )
         typed_block = synth_expr(block)
         self.assertEqual(typed_block.type_val, INT_TYPE)
 
     def test_let_rec_missing_return_type_raises_type_error(self) -> None:
         """let rec f(n: Int) = ... without return type raises TypeError."""
-        binding = ast.LetValueBinding(
-            name="fib",
-            params=(
-                ast.FormalParam(
-                    name="n",
-                    type_annot=ast.TypePath(path=("Int",)),
-                    mode=ast.ParamMode.VALUE,
-                ),
-            ),
-            type_annot=None,
-            value=ast.ExprId(name="n"),
-            is_rec=True,
-        )
-        block = ast.ExprBlock(bindings=(binding, ast.ExprStmt(expr=ast.ExprInt(value=1, lexeme="1"))))
+        block = parse_expr("begin let rec fib(n: Int) = n; 1 end")
         with self.assertRaises(TypeError) as ctx:
             synth_expr(block)
         self.assertIn(
@@ -307,6 +200,7 @@ class Phase3FunctionsTest(unittest.TestCase):
 
     def test_let_rec_missing_param_type_raises_type_error(self) -> None:
         """let rec f(n) : Int = ... with unannotated parameter raises TypeError."""
+        # Grammar requires parameter annotations, but typechecker defends against AST without annotations.
         binding = ast.LetValueBinding(
             name="fib",
             params=(
@@ -330,14 +224,7 @@ class Phase3FunctionsTest(unittest.TestCase):
 
     def test_let_rec_value_missing_type_raises_type_error(self) -> None:
         """let rec f = 1 without type annotation raises TypeError."""
-        binding = ast.LetValueBinding(
-            name="f",
-            params=(),
-            type_annot=None,
-            value=ast.ExprInt(value=1, lexeme="1"),
-            is_rec=True,
-        )
-        block = ast.ExprBlock(bindings=(binding, ast.ExprStmt(expr=ast.ExprInt(value=1, lexeme="1"))))
+        block = parse_expr("begin let rec f = 1; 1 end")
         with self.assertRaises(TypeError) as ctx:
             synth_expr(block)
         self.assertIn(
@@ -347,15 +234,7 @@ class Phase3FunctionsTest(unittest.TestCase):
 
     def test_all_type_as_function_type_elaboration(self) -> None:
         """All(y: Int) Int in elaborate_type elaborates to QFunType(y: Int) -> Int."""
-        ast_all = ast.TypeAll(
-            quantifiers=(
-                ast.Quantifier(
-                    name="y",
-                    bound=ast.KindPower(bound=ast.TypePath(path=("Int",))),
-                ),
-            ),
-            result_type=ast.TypePath(path=("Int",)),
-        )
+        ast_all = parse_type("All(y: Int) Int")
         elaborated = elaborate_type(ast_all, Environment())
         self.assertIsInstance(elaborated, QFunType)
         self.assertEqual(len(elaborated.params), 1)

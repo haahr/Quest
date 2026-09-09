@@ -42,6 +42,7 @@ class CompilerOptions:
     echo: bool = False
     show_offsets: bool = False
     show_values: bool = False
+    target: Optional[Any] = None
 
 
 @dataclass
@@ -154,17 +155,21 @@ class ParsePhase(Phase):
     description = "Parse token stream into untyped S-expression AST"
     artifact_name = "ast"
 
-    def run(self, input_data: Any, ctx: CompilerContext) -> Optional[ast.Program]:
+    def run(self, input_data: Any, ctx: CompilerContext) -> Optional[Any]:
         tokens: list[Token] = input_data
         try:
-            return parse_quest_program(tokens, ctx.source_map)
+            return parse_quest_program(tokens, ctx.source_map, target=ctx.options.target)
         except ParserError as error:
             ctx.sink.emit(error.to_diagnostic())
             return None
+        except (ValueError, TypeError) as error:
+            ctx.sink.emit(Diagnostic.make_error(str(error), 0))
+            return None
 
     def dump(self, output_data: Any, ctx: CompilerContext) -> str:
-        tree: ast.Program = output_data
-        return ast.ast_dump(tree, show_offsets=ctx.options.show_offsets)
+        if isinstance(output_data, ast.ASTNode):
+            return ast.ast_dump(output_data, show_offsets=ctx.options.show_offsets)
+        return str(output_data)
 
 
 class TypecheckPhase(Phase):
@@ -258,9 +263,12 @@ class PhasePipeline:
         file_name: str = "<stdin>",
         options: Optional[CompilerOptions] = None,
         ctx: Optional[CompilerContext] = None,
+        target: Optional[Any] = None,
     ) -> PipelineResult:
         """Executes the pipeline on source_text."""
         opts = options or CompilerOptions()
+        if target is not None:
+            opts.target = target
         context = ctx or CompilerContext.create(source_text, file_name, opts)
         context.options = opts
 

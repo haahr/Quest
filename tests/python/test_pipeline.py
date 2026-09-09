@@ -66,6 +66,23 @@ class TestPipeline(unittest.TestCase):
         self.assertIn("parse", res.dump_outputs)
         self.assertIn("typecheck", res.dump_outputs)
 
+    def test_target_option(self):
+        """Verifies target option allows parsing types, kinds, or expressions directly."""
+        opts_type = CompilerOptions(stop_after="parse", target="type")
+        res_type = self.pipeline.execute("Record x: Int end", "<test>", options=opts_type)
+        self.assertTrue(res_type.success)
+        self.assertIn("parse", res_type.artifacts)
+
+        opts_kind = CompilerOptions(stop_after="parse", target="kind")
+        res_kind = self.pipeline.execute("POWER(Int)", "<test>", options=opts_kind)
+        self.assertTrue(res_kind.success)
+        self.assertIn("parse", res_kind.artifacts)
+
+        opts_expr = CompilerOptions(stop_after="parse", target="expr")
+        res_expr = self.pipeline.execute("1 + 2", "<test>", options=opts_expr)
+        self.assertTrue(res_expr.success)
+        self.assertIn("parse", res_expr.artifacts)
+
     def test_compile_file(self):
         """Verifies compile_file loads and compiles from disk."""
         with tempfile.NamedTemporaryFile("w", suffix=".quest", delete=False) as f:

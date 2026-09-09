@@ -225,8 +225,16 @@ def build_quest_grammar() -> None:
     KIND.add_rule(
         (T(TK.KW_ALL_KIND), T(TK.LPAREN), TYPE_SIGNATURE, T(TK.RPAREN), KIND),
         lambda all_token, left_paren, signature, right_paren, kind_body: ast.KindAll(
-            param_name=getattr(signature, "name", "_"),
-            param_kind=getattr(signature, "bound", ast.KindType(offset=left_paren.offset)),
+            param_name=getattr(
+                signature[0] if isinstance(signature, tuple) and signature else signature,
+                "name",
+                "_",
+            ),
+            param_kind=getattr(
+                signature[0] if isinstance(signature, tuple) and signature else signature,
+                "bound",
+                ast.KindType(offset=left_paren.offset),
+            ),
             body_kind=kind_body,
             offset=all_token.offset,
         ),
@@ -1278,7 +1286,36 @@ def build_quest_grammar() -> None:
 build_quest_grammar()
 
 
-def parse_quest_program(tokens: list[Token], source_map: SourceMap) -> ast.Program:
-    """Convenience helper to parse tokens using the standard Quest grammar starting at PROGRAM."""
+def resolve_syntax_target(target: SyntaxTarget | str | None) -> SyntaxTarget:
+    """Resolves a start symbol string or SyntaxTarget to a grammar SyntaxTarget."""
+    if target is None:
+        return PROGRAM
+    if isinstance(target, SyntaxTarget):
+        return target
+    if isinstance(target, str):
+        mapping = {
+            "program": PROGRAM,
+            "phrase": PHRASE,
+            "type": TYPE,
+            "kind": KIND,
+            "expr": VALUE,
+            "value": VALUE,
+            "signature": SIGNATURE,
+        }
+        resolved = mapping.get(target.lower())
+        if resolved is not None:
+            return resolved
+        available = sorted(mapping.keys())
+        raise ValueError(f"Unknown start target '{target}'. Available: {available}")
+    raise TypeError(f"Expected str or SyntaxTarget, got {type(target).__name__}")
+
+
+def parse_quest_program(
+    tokens: list[Token],
+    source_map: SourceMap,
+    target: SyntaxTarget | str | None = None,
+) -> Any:
+    """Convenience helper to parse tokens using the standard Quest grammar starting at target."""
+    syntax_target = resolve_syntax_target(target)
     parser = Parser(tokens, source_map)
-    return parser.parse(PROGRAM)
+    return parser.parse(syntax_target)
