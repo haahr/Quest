@@ -13,7 +13,7 @@ from quest.env import Environment
 from quest.interpreter import RuntimeEnvironment
 from quest.pipeline import CompilerContext, default_pipeline
 from quest.runtime import QClosure, QInt, QTuple, QTypeValue
-from quest.typechecker import TypeError as QuestTypeError
+from quest.diagnostics import QuestTypeError
 from quest.types import (
     INT_TYPE,
     OK_TYPE,

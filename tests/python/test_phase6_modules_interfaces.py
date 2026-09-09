@@ -2,11 +2,13 @@
 
 import unittest
 
+from quest.diagnostics import QuestTypeError as TypeError
 from quest.env import Environment
-from quest.typechecker import (
-    TypeError,
+from quest.modules import (
     elaborate_interface,
     elaborate_module,
+)
+from quest.typechecker import (
     elaborate_program,
     synth_expr,
 )

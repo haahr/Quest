@@ -153,6 +153,32 @@ class FatalDiagnosticError(QuestCompilerError):
         return self.diagnostic
 
 
+class QuestTypeError(QuestCompilerError):
+    """Raised when a type error occurs during term elaboration and typechecking."""
+
+    def __init__(
+        self,
+        message: str,
+        offset: int = 0,
+        help_text: Optional[str] = None,
+        notes: Optional[list[str]] = None,
+        length: int = 1,
+    ):
+        super().__init__(message=message, offset=offset, length=length)
+        self.help_text = help_text
+        self.notes = notes or []
+
+    def to_diagnostic(self, length: Optional[int] = None) -> Diagnostic:
+        len_val = length if length is not None else self.length
+        return Diagnostic.make_error(
+            message=self.message,
+            offset=self.offset if self.offset is not None else 0,
+            length=len_val,
+            help_text=self.help_text,
+            notes=self.notes,
+        )
+
+
 class DiagnosticSink:
     """Collects diagnostics during compiler phases, supporting error accumulation and fatal aborts."""
 

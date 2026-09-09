@@ -15,8 +15,8 @@ from quest.env import (
     Environment,
     ValueSymbol,
 )
+from quest.diagnostics import QuestTypeError
 from quest.tokens import SourceMap
-from quest.typechecker import TypeError as QuestTypeError
 from quest.typed_ast import (
     TypedAssign,
     TypedBlock,

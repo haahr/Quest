@@ -3,7 +3,7 @@
 import unittest
 
 from quest.env import Environment, ValueSymbol
-from quest.typechecker import TypeError
+from quest.diagnostics import QuestTypeError as TypeError
 from quest.typed_ast import (
     TypedException,
     TypedInspect,

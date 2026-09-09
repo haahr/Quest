@@ -2,9 +2,8 @@
 
 import unittest
 
+from quest.diagnostics import QuestTypeError as TypeError
 from quest.env import Environment, TypeSymbol, ValueSymbol
-from quest.env import Environment, TypeSymbol, ValueSymbol
-from quest.typechecker import TypeError
 from quest.typed_ast import (
     TypedArray,
     TypedArrayRep,

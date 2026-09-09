@@ -129,11 +129,15 @@ from quest.diagnostics import (
     DiagnosticSink,
     FatalDiagnosticError,
     QuestCompilerError,
+    QuestTypeError,
     Severity,
 )
+from quest.modules import (
+    elaborate_import,
+    elaborate_interface,
+    elaborate_module,
+)
 from quest.typechecker import (
-    QuestTypeError,
-    TypeError,
     check_expr,
     elaborate_phrase,
     elaborate_program,
@@ -250,7 +254,9 @@ __all__ = [
     "DiagnosticRenderer",
     "Severity",
     "QuestTypeError",
-    "TypeError",
+    "elaborate_import",
+    "elaborate_interface",
+    "elaborate_module",
     "check_expr",
     "elaborate_phrase",
     "elaborate_program",

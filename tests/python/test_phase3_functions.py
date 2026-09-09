@@ -4,8 +4,9 @@ import unittest
 
 import quest.ast as ast
 from quest.elaborate_types import elaborate_type
+from quest.diagnostics import QuestTypeError as TypeError
 from quest.env import Environment, ValueSymbol
-from quest.typechecker import TypeError, check_expr, synth_expr
+from quest.typechecker import check_expr, synth_expr
 from quest.typed_ast import (
     TypedApp,
     TypedFun,

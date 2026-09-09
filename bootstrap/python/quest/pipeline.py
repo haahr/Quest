@@ -41,7 +41,6 @@ from quest.typechecker import (
     elaborate_phrase,
     elaborate_program,
     synth_expr,
-    TypeError as QuestTypeError,
 )
 from quest.typed_ast import TypedBinding, TypedExpr, TypedProgram
 from quest.types import KindError, QKind, QType

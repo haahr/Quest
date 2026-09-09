@@ -10,7 +10,6 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "bootstra
 from quest.tokens import SourceMap
 from quest.tokenizer import TokenizerError
 from quest.parser import ParserError
-from quest.typechecker import QuestTypeError, TypeError
 from quest.types import KindError
 from quest.interpreter import QuestException, QuestRuntimeError
 from quest.runtime import QExceptionVal, QInt
@@ -22,6 +21,7 @@ from quest.diagnostics import (
     DiagnosticSink,
     FatalDiagnosticError,
     QuestCompilerError,
+    QuestTypeError,
     Severity,
 )
 
@@ -227,7 +227,6 @@ class TestCompilerExceptionIntegration(unittest.TestCase):
             TokenizerError,
             ParserError,
             QuestTypeError,
-            TypeError,
             KindError,
             QuestRuntimeError,
             QuestException,
@@ -237,9 +236,6 @@ class TestCompilerExceptionIntegration(unittest.TestCase):
                 issubclass(exc_cls, QuestCompilerError),
                 f"{exc_cls.__name__} should inherit from QuestCompilerError",
             )
-
-        # TypeError is an alias for QuestTypeError
-        self.assertIs(TypeError, QuestTypeError)
 
 
 if __name__ == "__main__":
