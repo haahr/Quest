@@ -19,7 +19,13 @@ import sys
 from typing import Any, Callable, Optional
 
 from quest.env import Environment, Scope, TypeSymbol, ValueSymbol
-from quest.interpreter import ARRAY_OP_ERROR_EXC, DYNAMIC_ERROR_EXC, QuestException, _infer_qtype
+from quest.interpreter import (
+    ARRAY_OP_ERROR_EXC,
+    DYNAMIC_ERROR_EXC,
+    QuestException,
+    QuestRuntimeError,
+    _infer_qtype,
+)
 from quest.runtime import (
     FALSE_VALUE,
     OK_VALUE,
@@ -75,6 +81,93 @@ def _make_poly_fn_type(type_param_name: str, symbol_id: int, fn_type: QFunType) 
     return QAllType(quantifiers=(quant,), body=fn_type)
 
 
+def qchecked(error_exc: Optional[QExceptionVal], *expected_types: type) -> Callable:
+    """Decorator to validate that arguments passed to a builtin function match expected types.
+
+    If error_exc is provided, raises QuestException(error_exc) on mismatch;
+    otherwise, raises QuestRuntimeError with a descriptive message.
+    """
+    def decorator(fn: Callable) -> Callable:
+        def wrapper(*args: Any) -> Any:
+            if len(args) != len(expected_types):
+                if error_exc is not None:
+                    raise QuestException(error_exc)
+                raise QuestRuntimeError(f"Expected {len(expected_types)} arguments, got {len(args)}")
+            for arg, exp_type in zip(args, expected_types):
+                if not isinstance(arg, exp_type):
+                    if error_exc is not None:
+                        raise QuestException(error_exc)
+                    raise QuestRuntimeError(
+                        f"Expected argument of type {exp_type.__name__}, got {type(arg).__name__}"
+                    )
+            return fn(*args)
+        return wrapper
+    return decorator
+
+
+class ModuleBuilder:
+    """Builder to declaratively construct a Quest standard library interface and module."""
+
+    def __init__(self, mod_name: str, iface_name: str, registry: type[BuiltinModuleRegistry]):
+        self.mod_name = mod_name
+        self.iface_name = iface_name
+        self.registry = registry
+        registry._ensure_initialized()
+        self.scope = Scope(name=f"interface_{iface_name}")
+        self.record_dict: dict[str, QValue] = {}
+
+    def def_type(
+        self,
+        name: str,
+        symbol_id: int,
+        kind: Any,
+        definition: Optional[QType] = None,
+    ) -> TypeSymbol:
+        sym = TypeSymbol(name=name, symbol_id=symbol_id, kind=kind, definition=definition)
+        self.scope.declare_type(sym)
+        return sym
+
+    def def_const(self, name: str, type_val: QType, runtime_val: QValue) -> None:
+        self.scope.declare_value(ValueSymbol(name=name, type_val=type_val))
+        self.record_dict[name] = runtime_val
+
+    def def_scope_val(self, name: str, type_val: QType) -> None:
+        """Declares a value in the interface scope only (omitted from runtime record)."""
+        self.scope.declare_value(ValueSymbol(name=name, type_val=type_val))
+
+    def def_fn(
+        self,
+        name: str,
+        params: list[tuple[str, QType]],
+        result_type: QType,
+        fn: Callable,
+    ) -> None:
+        fn_type = _make_fn_type(params, result_type)
+        self.scope.declare_value(ValueSymbol(name=name, type_val=fn_type))
+        self.record_dict[name] = QBuiltinFun(f"{self.mod_name}.{name}", fn)
+
+    def def_poly_fn(
+        self,
+        name: str,
+        type_param_name: str,
+        type_param_id: int,
+        params: list[tuple[str, QType]],
+        result_type: QType,
+        fn: Callable,
+    ) -> None:
+        fn_type = _make_fn_type(params, result_type)
+        poly_type = _make_poly_fn_type(type_param_name, type_param_id, fn_type)
+        self.scope.declare_value(ValueSymbol(name=name, type_val=poly_type))
+        self.record_dict[name] = QBuiltinFun(f"{self.mod_name}.{name}", fn)
+
+    def finish(self) -> QRecord:
+        self.registry._interfaces[self.iface_name] = self.scope
+        rec = QRecord(self.record_dict)
+        self.registry._modules[self.mod_name] = rec
+        self.registry._module_types[self.mod_name] = self.registry._build_record_type_from_scope(self.scope)
+        return rec
+
+
 class BuiltinModuleRegistry:
     """Central registry of Cardelli standard library interfaces and runtime modules."""
 
@@ -86,6 +179,7 @@ class BuiltinModuleRegistry:
     _STRING_ERROR_EXC = QExceptionVal("string.error")
 
     # Module instances cache
+    _initialized: bool = False
     _modules: dict[str, QRecord] = {}
     _interfaces: dict[str, Scope] = {}
     _module_types: dict[str, QType] = {}
@@ -110,8 +204,9 @@ class BuiltinModuleRegistry:
 
     @classmethod
     def _ensure_initialized(cls, env: Optional[Environment] = None) -> None:
-        if cls._modules:
+        if cls._initialized:
             return
+        cls._initialized = True
 
         e = env if env is not None else Environment()
 
@@ -120,52 +215,23 @@ class BuiltinModuleRegistry:
         # --------------------------------------------------------------------
         writer_t_id = e.fresh_symbol_id()
         writer_t = QTypeVar(name="Writer.T", symbol_id=writer_t_id, bound=TYPE_KIND)
-        writer_scope = Scope(name="interface_Writer")
-        writer_scope.declare_type(TypeSymbol(name="T", symbol_id=writer_t_id, kind=TYPE_KIND, definition=None))
-        writer_scope.declare_value(ValueSymbol(name="error", type_val=EXCEPTION_TYPE))
-        writer_scope.declare_value(ValueSymbol(name="output", type_val=writer_t))
-        writer_scope.declare_value(ValueSymbol(name="err", type_val=writer_t))
-        writer_scope.declare_value(ValueSymbol(name="file", type_val=_make_fn_type([("name", STRING_TYPE)], writer_t)))
-        writer_scope.declare_value(
-            ValueSymbol(
-                name="putString",
-                type_val=_make_fn_type([("writer", writer_t), ("string", STRING_TYPE)], OK_TYPE),
-            )
-        )
-        writer_scope.declare_value(
-            ValueSymbol(
-                name="putChar",
-                type_val=_make_fn_type([("writer", writer_t), ("char", CHAR_TYPE)], OK_TYPE),
-            )
-        )
-        writer_scope.declare_value(
-            ValueSymbol(
-                name="putSubString",
-                type_val=_make_fn_type(
-                    [("writer", writer_t), ("string", STRING_TYPE), ("start", INT_TYPE), ("size", INT_TYPE)],
-                    OK_TYPE,
-                ),
-            )
-        )
-        writer_scope.declare_value(
-            ValueSymbol(name="flush", type_val=_make_fn_type([("writer", writer_t)], OK_TYPE))
-        )
-        writer_scope.declare_value(
-            ValueSymbol(name="close", type_val=_make_fn_type([("writer", writer_t)], OK_TYPE))
-        )
-        cls._interfaces["Writer"] = writer_scope
+        w_b = ModuleBuilder("writer", "Writer", cls)
+        w_b.def_type("T", writer_t_id, TYPE_KIND, definition=None)
+        w_b.def_const("error", EXCEPTION_TYPE, cls._WRITER_ERROR_EXC)
+        w_b.def_const("output", writer_t, QWriter(sys.stdout, is_file=False))
+        w_b.def_const("err", writer_t, QWriter(sys.stderr, is_file=False))
 
-        def _writer_file(name_val: QValue) -> QWriter:
-            if not isinstance(name_val, QString):
-                raise QuestException(cls._WRITER_ERROR_EXC)
+        @qchecked(cls._WRITER_ERROR_EXC, QString)
+        def _writer_file(name_val: QString) -> QWriter:
             try:
                 f = open(name_val.value, "w", encoding="utf-8")
                 return QWriter(stream=f, is_file=True, file_name=name_val.value)
             except OSError:
                 raise QuestException(cls._WRITER_ERROR_EXC)
 
-        def _writer_put_string(w: QValue, s: QValue) -> QOk:
-            if not isinstance(w, QWriter) or not isinstance(s, QString) or w.is_closed:
+        @qchecked(cls._WRITER_ERROR_EXC, QWriter, QString)
+        def _writer_put_string(w: QWriter, s: QString) -> QOk:
+            if w.is_closed:
                 raise QuestException(cls._WRITER_ERROR_EXC)
             try:
                 w.stream.write(s.value)
@@ -173,8 +239,9 @@ class BuiltinModuleRegistry:
             except OSError:
                 raise QuestException(cls._WRITER_ERROR_EXC)
 
-        def _writer_put_char(w: QValue, c: QValue) -> QOk:
-            if not isinstance(w, QWriter) or not isinstance(c, QChar) or w.is_closed:
+        @qchecked(cls._WRITER_ERROR_EXC, QWriter, QChar)
+        def _writer_put_char(w: QWriter, c: QChar) -> QOk:
+            if w.is_closed:
                 raise QuestException(cls._WRITER_ERROR_EXC)
             try:
                 w.stream.write(c.value)
@@ -182,14 +249,9 @@ class BuiltinModuleRegistry:
             except OSError:
                 raise QuestException(cls._WRITER_ERROR_EXC)
 
-        def _writer_put_sub_string(w: QValue, s: QValue, start: QValue, size: QValue) -> QOk:
-            if (
-                not isinstance(w, QWriter)
-                or not isinstance(s, QString)
-                or not isinstance(start, QInt)
-                or not isinstance(size, QInt)
-                or w.is_closed
-            ):
+        @qchecked(cls._WRITER_ERROR_EXC, QWriter, QString, QInt, QInt)
+        def _writer_put_sub_string(w: QWriter, s: QString, start: QInt, size: QInt) -> QOk:
+            if w.is_closed:
                 raise QuestException(cls._WRITER_ERROR_EXC)
             st, sz = start.value, size.value
             if st < 0 or sz < 0 or st + sz > len(s.value):
@@ -200,8 +262,9 @@ class BuiltinModuleRegistry:
             except OSError:
                 raise QuestException(cls._WRITER_ERROR_EXC)
 
-        def _writer_flush(w: QValue) -> QOk:
-            if not isinstance(w, QWriter) or w.is_closed:
+        @qchecked(cls._WRITER_ERROR_EXC, QWriter)
+        def _writer_flush(w: QWriter) -> QOk:
+            if w.is_closed:
                 raise QuestException(cls._WRITER_ERROR_EXC)
             try:
                 w.stream.flush()
@@ -209,9 +272,8 @@ class BuiltinModuleRegistry:
             except OSError:
                 raise QuestException(cls._WRITER_ERROR_EXC)
 
-        def _writer_close(w: QValue) -> QOk:
-            if not isinstance(w, QWriter):
-                raise QuestException(cls._WRITER_ERROR_EXC)
+        @qchecked(cls._WRITER_ERROR_EXC, QWriter)
+        def _writer_close(w: QWriter) -> QOk:
             if not w.is_closed:
                 try:
                     if w.is_file:
@@ -223,62 +285,31 @@ class BuiltinModuleRegistry:
                     raise QuestException(cls._WRITER_ERROR_EXC)
             return OK_VALUE
 
-        writer_mod = QRecord({
-            "error": cls._WRITER_ERROR_EXC,
-            "output": QWriter(sys.stdout, is_file=False),
-            "err": QWriter(sys.stderr, is_file=False),
-            "file": QBuiltinFun("writer.file", _writer_file),
-            "putString": QBuiltinFun("writer.putString", _writer_put_string),
-            "putChar": QBuiltinFun("writer.putChar", _writer_put_char),
-            "putSubString": QBuiltinFun("writer.putSubString", _writer_put_sub_string),
-            "flush": QBuiltinFun("writer.flush", _writer_flush),
-            "close": QBuiltinFun("writer.close", _writer_close),
-        })
-        cls._modules["writer"] = writer_mod
-        cls._module_types["writer"] = cls._build_record_type_from_scope(writer_scope)
+        w_b.def_fn("file", [("name", STRING_TYPE)], writer_t, _writer_file)
+        w_b.def_fn("putString", [("writer", writer_t), ("string", STRING_TYPE)], OK_TYPE, _writer_put_string)
+        w_b.def_fn("putChar", [("writer", writer_t), ("char", CHAR_TYPE)], OK_TYPE, _writer_put_char)
+        w_b.def_fn(
+            "putSubString",
+            [("writer", writer_t), ("string", STRING_TYPE), ("start", INT_TYPE), ("size", INT_TYPE)],
+            OK_TYPE,
+            _writer_put_sub_string,
+        )
+        w_b.def_fn("flush", [("writer", writer_t)], OK_TYPE, _writer_flush)
+        w_b.def_fn("close", [("writer", writer_t)], OK_TYPE, _writer_close)
+        w_b.finish()
 
         # --------------------------------------------------------------------
         # 2. Reader Interface & Module
         # --------------------------------------------------------------------
         reader_t_id = e.fresh_symbol_id()
         reader_t = QTypeVar(name="Reader.T", symbol_id=reader_t_id, bound=TYPE_KIND)
-        reader_scope = Scope(name="interface_Reader")
-        reader_scope.declare_type(TypeSymbol(name="T", symbol_id=reader_t_id, kind=TYPE_KIND, definition=None))
-        reader_scope.declare_value(ValueSymbol(name="error", type_val=EXCEPTION_TYPE))
-        reader_scope.declare_value(ValueSymbol(name="input", type_val=reader_t))
-        reader_scope.declare_value(ValueSymbol(name="file", type_val=_make_fn_type([("name", STRING_TYPE)], reader_t)))
-        reader_scope.declare_value(
-            ValueSymbol(name="more", type_val=_make_fn_type([("reader", reader_t)], BOOL_TYPE))
-        )
-        reader_scope.declare_value(
-            ValueSymbol(name="ready", type_val=_make_fn_type([("reader", reader_t)], INT_TYPE))
-        )
-        reader_scope.declare_value(
-            ValueSymbol(name="getChar", type_val=_make_fn_type([("reader", reader_t)], CHAR_TYPE))
-        )
-        reader_scope.declare_value(
-            ValueSymbol(
-                name="getString",
-                type_val=_make_fn_type([("reader", reader_t), ("size", INT_TYPE)], STRING_TYPE),
-            )
-        )
-        reader_scope.declare_value(
-            ValueSymbol(
-                name="getSubString",
-                type_val=_make_fn_type(
-                    [("reader", reader_t), ("string", STRING_TYPE), ("start", INT_TYPE), ("size", INT_TYPE)],
-                    OK_TYPE,
-                ),
-            )
-        )
-        reader_scope.declare_value(
-            ValueSymbol(name="close", type_val=_make_fn_type([("reader", reader_t)], OK_TYPE))
-        )
-        cls._interfaces["Reader"] = reader_scope
+        r_b = ModuleBuilder("reader", "Reader", cls)
+        r_b.def_type("T", reader_t_id, TYPE_KIND, definition=None)
+        r_b.def_const("error", EXCEPTION_TYPE, cls._READER_ERROR_EXC)
+        r_b.def_const("input", reader_t, QReader(sys.stdin, is_file=False))
 
-        def _reader_file(name_val: QValue) -> QReader:
-            if not isinstance(name_val, QString):
-                raise QuestException(cls._READER_ERROR_EXC)
+        @qchecked(cls._READER_ERROR_EXC, QString)
+        def _reader_file(name_val: QString) -> QReader:
             try:
                 f = open(name_val.value, "r", encoding="utf-8")
                 return QReader(stream=f, is_file=True, file_name=name_val.value)
@@ -286,15 +317,15 @@ class BuiltinModuleRegistry:
                 raise QuestException(cls._READER_ERROR_EXC)
 
         def _reader_read_one(r: QReader) -> str:
-            """Internal helper to read 1 char taking peek buffer into account."""
             peek = getattr(r, "_peek_char", None)
             if peek is not None:
                 r._peek_char = None
                 return peek
             return r.stream.read(1)
 
-        def _reader_more(r: QValue) -> QBool:
-            if not isinstance(r, QReader) or r.is_closed:
+        @qchecked(cls._READER_ERROR_EXC, QReader)
+        def _reader_more(r: QReader) -> QBool:
+            if r.is_closed:
                 raise QuestException(cls._READER_ERROR_EXC)
             peek = getattr(r, "_peek_char", None)
             if peek is not None:
@@ -308,14 +339,15 @@ class BuiltinModuleRegistry:
             except OSError:
                 raise QuestException(cls._READER_ERROR_EXC)
 
-        def _reader_ready(r: QValue) -> QInt:
-            if not isinstance(r, QReader) or r.is_closed:
+        @qchecked(cls._READER_ERROR_EXC, QReader)
+        def _reader_ready(r: QReader) -> QInt:
+            if r.is_closed:
                 raise QuestException(cls._READER_ERROR_EXC)
-            # Trivially returns 0 as specified
             return QInt(0)
 
-        def _reader_get_char(r: QValue) -> QChar:
-            if not isinstance(r, QReader) or r.is_closed:
+        @qchecked(cls._READER_ERROR_EXC, QReader)
+        def _reader_get_char(r: QReader) -> QChar:
+            if r.is_closed:
                 raise QuestException(cls._READER_ERROR_EXC)
             try:
                 ch = _reader_read_one(r)
@@ -325,8 +357,9 @@ class BuiltinModuleRegistry:
             except OSError:
                 raise QuestException(cls._READER_ERROR_EXC)
 
-        def _reader_get_string(r: QValue, size: QValue) -> QString:
-            if not isinstance(r, QReader) or not isinstance(size, QInt) or r.is_closed:
+        @qchecked(cls._READER_ERROR_EXC, QReader, QInt)
+        def _reader_get_string(r: QReader, size: QInt) -> QString:
+            if r.is_closed:
                 raise QuestException(cls._READER_ERROR_EXC)
             sz = size.value
             if sz < 0:
@@ -345,14 +378,9 @@ class BuiltinModuleRegistry:
                     raise QuestException(cls._READER_ERROR_EXC)
             return QString("".join(buf))
 
-        def _reader_get_sub_string(r: QValue, s: QValue, start: QValue, size: QValue) -> QOk:
-            if (
-                not isinstance(r, QReader)
-                or not isinstance(s, QString)
-                or not isinstance(start, QInt)
-                or not isinstance(size, QInt)
-                or r.is_closed
-            ):
+        @qchecked(cls._READER_ERROR_EXC, QReader, QString, QInt, QInt)
+        def _reader_get_sub_string(r: QReader, s: QString, start: QInt, size: QInt) -> QOk:
+            if r.is_closed:
                 raise QuestException(cls._READER_ERROR_EXC)
             st, sz = start.value, size.value
             if st < 0 or sz < 0 or st + sz > len(s.value):
@@ -361,9 +389,8 @@ class BuiltinModuleRegistry:
             s.value = s.value[:st] + read_str + s.value[st + len(read_str) :]
             return OK_VALUE
 
-        def _reader_close(r: QValue) -> QOk:
-            if not isinstance(r, QReader):
-                raise QuestException(cls._READER_ERROR_EXC)
+        @qchecked(cls._READER_ERROR_EXC, QReader)
+        def _reader_close(r: QReader) -> QOk:
             if not r.is_closed:
                 try:
                     if r.is_file:
@@ -373,31 +400,24 @@ class BuiltinModuleRegistry:
                     raise QuestException(cls._READER_ERROR_EXC)
             return OK_VALUE
 
-        reader_mod = QRecord({
-            "error": cls._READER_ERROR_EXC,
-            "input": QReader(sys.stdin, is_file=False),
-            "file": QBuiltinFun("reader.file", _reader_file),
-            "more": QBuiltinFun("reader.more", _reader_more),
-            "ready": QBuiltinFun("reader.ready", _reader_ready),
-            "getChar": QBuiltinFun("reader.getChar", _reader_get_char),
-            "getString": QBuiltinFun("reader.getString", _reader_get_string),
-            "getSubString": QBuiltinFun("reader.getSubString", _reader_get_sub_string),
-            "close": QBuiltinFun("reader.close", _reader_close),
-        })
-        cls._modules["reader"] = reader_mod
-        cls._module_types["reader"] = cls._build_record_type_from_scope(reader_scope)
+        r_b.def_fn("file", [("name", STRING_TYPE)], reader_t, _reader_file)
+        r_b.def_fn("more", [("reader", reader_t)], BOOL_TYPE, _reader_more)
+        r_b.def_fn("ready", [("reader", reader_t)], INT_TYPE, _reader_ready)
+        r_b.def_fn("getChar", [("reader", reader_t)], CHAR_TYPE, _reader_get_char)
+        r_b.def_fn("getString", [("reader", reader_t), ("size", INT_TYPE)], STRING_TYPE, _reader_get_string)
+        r_b.def_fn(
+            "getSubString",
+            [("reader", reader_t), ("string", STRING_TYPE), ("start", INT_TYPE), ("size", INT_TYPE)],
+            OK_TYPE,
+            _reader_get_sub_string,
+        )
+        r_b.def_fn("close", [("reader", reader_t)], OK_TYPE, _reader_close)
+        r_b.finish()
 
         # --------------------------------------------------------------------
         # 3. Conv Interface & Module (Tilde ~ for negative numbers)
         # --------------------------------------------------------------------
-        conv_scope = Scope(name="interface_Conv")
-        conv_scope.declare_value(ValueSymbol(name="okay", type_val=_make_fn_type([], STRING_TYPE)))
-        conv_scope.declare_value(ValueSymbol(name="bool", type_val=_make_fn_type([("b", BOOL_TYPE)], STRING_TYPE)))
-        conv_scope.declare_value(ValueSymbol(name="int", type_val=_make_fn_type([("n", INT_TYPE)], STRING_TYPE)))
-        conv_scope.declare_value(ValueSymbol(name="real", type_val=_make_fn_type([("r", REAL_TYPE)], STRING_TYPE)))
-        conv_scope.declare_value(ValueSymbol(name="char", type_val=_make_fn_type([("c", CHAR_TYPE)], STRING_TYPE)))
-        conv_scope.declare_value(ValueSymbol(name="string", type_val=_make_fn_type([("s", STRING_TYPE)], STRING_TYPE)))
-        cls._interfaces["Conv"] = conv_scope
+        conv_b = ModuleBuilder("conv", "Conv", cls)
 
         def _conv_int(n: QValue) -> QString:
             if not isinstance(n, QInt):
@@ -416,316 +436,155 @@ class BuiltinModuleRegistry:
                 s += ".0"
             return QString(f"~{s}" if is_neg else s)
 
-        conv_mod = QRecord({
-            "okay": QBuiltinFun("conv.okay", lambda: QString("ok")),
-            "bool": QBuiltinFun("conv.bool", lambda b: QString("true" if getattr(b, "value", False) else "false")),
-            "int": QBuiltinFun("conv.int", _conv_int),
-            "real": QBuiltinFun("conv.real", _conv_real),
-            "char": QBuiltinFun("conv.char", lambda c: QString(c.to_str() if isinstance(c, QChar) else "")),
-            "string": QBuiltinFun("conv.string", lambda s: QString(s.to_str() if isinstance(s, QString) else "")),
-        })
-        cls._modules["conv"] = conv_mod
-        cls._module_types["conv"] = cls._build_record_type_from_scope(conv_scope)
+        conv_b.def_fn("okay", [], STRING_TYPE, lambda: QString("ok"))
+        conv_b.def_fn(
+            "bool",
+            [("b", BOOL_TYPE)],
+            STRING_TYPE,
+            lambda b: QString("true" if getattr(b, "value", False) else "false"),
+        )
+        conv_b.def_fn("int", [("n", INT_TYPE)], STRING_TYPE, _conv_int)
+        conv_b.def_fn("real", [("r", REAL_TYPE)], STRING_TYPE, _conv_real)
+        conv_b.def_fn(
+            "char",
+            [("c", CHAR_TYPE)],
+            STRING_TYPE,
+            lambda c: QString(c.to_str() if isinstance(c, QChar) else ""),
+        )
+        conv_b.def_fn(
+            "string",
+            [("s", STRING_TYPE)],
+            STRING_TYPE,
+            lambda s: QString(s.to_str() if isinstance(s, QString) else ""),
+        )
+        conv_b.finish()
 
         # --------------------------------------------------------------------
         # 4. Ascii Interface & Module
         # --------------------------------------------------------------------
-        ascii_scope = Scope(name="interface_Ascii")
-        ascii_scope.declare_value(ValueSymbol(name="error", type_val=EXCEPTION_TYPE))
-        ascii_scope.declare_value(ValueSymbol(name="char", type_val=_make_fn_type([("n", INT_TYPE)], CHAR_TYPE)))
-        ascii_scope.declare_value(ValueSymbol(name="val", type_val=_make_fn_type([("c", CHAR_TYPE)], INT_TYPE)))
-        cls._interfaces["Ascii"] = ascii_scope
+        asc_b = ModuleBuilder("ascii", "Ascii", cls)
+        asc_b.def_const("error", EXCEPTION_TYPE, cls._ASCII_ERROR_EXC)
 
-        def _ascii_char(n: QValue) -> QChar:
-            if not isinstance(n, QInt) or n.value < 0 or n.value > 255:
+        @qchecked(cls._ASCII_ERROR_EXC, QInt)
+        def _ascii_char(n: QInt) -> QChar:
+            if n.value < 0 or n.value > 255:
                 raise QuestException(cls._ASCII_ERROR_EXC)
             return QChar(chr(n.value))
 
-        def _ascii_val(c: QValue) -> QInt:
-            if not isinstance(c, QChar):
-                raise QuestException(cls._ASCII_ERROR_EXC)
+        @qchecked(cls._ASCII_ERROR_EXC, QChar)
+        def _ascii_val(c: QChar) -> QInt:
             return QInt(ord(c.value))
 
-        ascii_mod = QRecord({
-            "error": cls._ASCII_ERROR_EXC,
-            "char": QBuiltinFun("ascii.char", _ascii_char),
-            "val": QBuiltinFun("ascii.val", _ascii_val),
-        })
-        cls._modules["ascii"] = ascii_mod
-        cls._module_types["ascii"] = cls._build_record_type_from_scope(ascii_scope)
+        asc_b.def_fn("char", [("n", INT_TYPE)], CHAR_TYPE, _ascii_char)
+        asc_b.def_fn("val", [("c", CHAR_TYPE)], INT_TYPE, _ascii_val)
+        asc_b.finish()
 
         # --------------------------------------------------------------------
         # 5. IntOp Interface & Module
         # --------------------------------------------------------------------
-        int_scope = Scope(name="interface_IntOp")
-        int_scope.declare_value(ValueSymbol(name="error", type_val=EXCEPTION_TYPE))
-        int_scope.declare_value(ValueSymbol(name="minInt", type_val=INT_TYPE))
-        int_scope.declare_value(ValueSymbol(name="maxInt", type_val=INT_TYPE))
-        int_scope.declare_value(ValueSymbol(name="abs", type_val=_make_fn_type([("n", INT_TYPE)], INT_TYPE)))
-        int_scope.declare_value(
-            ValueSymbol(name="min", type_val=_make_fn_type([("a", INT_TYPE), ("b", INT_TYPE)], INT_TYPE))
-        )
-        int_scope.declare_value(
-            ValueSymbol(name="max", type_val=_make_fn_type([("a", INT_TYPE), ("b", INT_TYPE)], INT_TYPE))
-        )
-        cls._interfaces["IntOp"] = int_scope
-
-        int_mod = QRecord({
-            "error": cls._INT_ERROR_EXC,
-            "minInt": QInt(-9223372036854775808),
-            "maxInt": QInt(9223372036854775807),
-            "abs": QBuiltinFun("int.abs", lambda n: QInt(abs(n.value))),
-            "min": QBuiltinFun("int.min", lambda a, b: QInt(min(a.value, b.value))),
-            "max": QBuiltinFun("int.max", lambda a, b: QInt(max(a.value, b.value))),
-        })
-        cls._modules["int"] = int_mod
-        cls._module_types["int"] = cls._build_record_type_from_scope(int_scope)
+        int_b = ModuleBuilder("int", "IntOp", cls)
+        int_b.def_const("error", EXCEPTION_TYPE, cls._INT_ERROR_EXC)
+        int_b.def_const("minInt", INT_TYPE, QInt(-9223372036854775808))
+        int_b.def_const("maxInt", INT_TYPE, QInt(9223372036854775807))
+        int_b.def_fn("abs", [("n", INT_TYPE)], INT_TYPE, lambda n: QInt(abs(n.value)))
+        int_b.def_fn("min", [("a", INT_TYPE), ("b", INT_TYPE)], INT_TYPE, lambda a, b: QInt(min(a.value, b.value)))
+        int_b.def_fn("max", [("a", INT_TYPE), ("b", INT_TYPE)], INT_TYPE, lambda a, b: QInt(max(a.value, b.value)))
+        int_b.finish()
 
         # --------------------------------------------------------------------
         # 6. RealOp Interface & Module
         # --------------------------------------------------------------------
-        real_scope = Scope(name="interface_RealOp")
-        real_scope.declare_value(ValueSymbol(name="error", type_val=EXCEPTION_TYPE))
-        real_scope.declare_value(ValueSymbol(name="minReal", type_val=REAL_TYPE))
-        real_scope.declare_value(ValueSymbol(name="maxReal", type_val=REAL_TYPE))
-        real_scope.declare_value(ValueSymbol(name="posEpsilon", type_val=REAL_TYPE))
-        real_scope.declare_value(ValueSymbol(name="negEpsilon", type_val=REAL_TYPE))
-        real_scope.declare_value(ValueSymbol(name="e", type_val=REAL_TYPE))
-        real_scope.declare_value(ValueSymbol(name="int", type_val=_make_fn_type([("n", INT_TYPE)], REAL_TYPE)))
-        real_scope.declare_value(ValueSymbol(name="floor", type_val=_make_fn_type([("r", REAL_TYPE)], INT_TYPE)))
-        real_scope.declare_value(ValueSymbol(name="round", type_val=_make_fn_type([("r", REAL_TYPE)], INT_TYPE)))
-        real_scope.declare_value(ValueSymbol(name="abs", type_val=_make_fn_type([("r", REAL_TYPE)], REAL_TYPE)))
-        real_scope.declare_value(ValueSymbol(name="log", type_val=_make_fn_type([("r", REAL_TYPE)], REAL_TYPE)))
-        real_scope.declare_value(
-            ValueSymbol(name="min", type_val=_make_fn_type([("a", REAL_TYPE), ("b", REAL_TYPE)], REAL_TYPE))
-        )
-        real_scope.declare_value(
-            ValueSymbol(name="max", type_val=_make_fn_type([("a", REAL_TYPE), ("b", REAL_TYPE)], REAL_TYPE))
-        )
-        real_scope.declare_value(
-            ValueSymbol(name="plus", type_val=_make_fn_type([("a", REAL_TYPE), ("b", REAL_TYPE)], REAL_TYPE))
-        )
-        real_scope.declare_value(
-            ValueSymbol(name="diff", type_val=_make_fn_type([("a", REAL_TYPE), ("b", REAL_TYPE)], REAL_TYPE))
-        )
-        real_scope.declare_value(
-            ValueSymbol(name="mul", type_val=_make_fn_type([("a", REAL_TYPE), ("b", REAL_TYPE)], REAL_TYPE))
-        )
-        real_scope.declare_value(
-            ValueSymbol(name="div", type_val=_make_fn_type([("a", REAL_TYPE), ("b", REAL_TYPE)], REAL_TYPE))
-        )
-        real_scope.declare_value(
-            ValueSymbol(name="exp", type_val=_make_fn_type([("a", REAL_TYPE), ("b", REAL_TYPE)], REAL_TYPE))
-        )
-        real_scope.declare_value(
-            ValueSymbol(name="smaller", type_val=_make_fn_type([("a", REAL_TYPE), ("b", REAL_TYPE)], BOOL_TYPE))
-        )
-        real_scope.declare_value(
-            ValueSymbol(name="greater", type_val=_make_fn_type([("a", REAL_TYPE), ("b", REAL_TYPE)], BOOL_TYPE))
-        )
-        real_scope.declare_value(
-            ValueSymbol(name="smallerEq", type_val=_make_fn_type([("a", REAL_TYPE), ("b", REAL_TYPE)], BOOL_TYPE))
-        )
-        real_scope.declare_value(
-            ValueSymbol(name="greaterEq", type_val=_make_fn_type([("a", REAL_TYPE), ("b", REAL_TYPE)], BOOL_TYPE))
-        )
-        cls._interfaces["RealOp"] = real_scope
+        real_b = ModuleBuilder("real", "RealOp", cls)
+        real_b.def_const("error", EXCEPTION_TYPE, cls._REAL_ERROR_EXC)
+        real_b.def_const("minReal", REAL_TYPE, QReal(-sys.float_info.max))
+        real_b.def_const("maxReal", REAL_TYPE, QReal(sys.float_info.max))
+        real_b.def_const("posEpsilon", REAL_TYPE, QReal(sys.float_info.epsilon))
+        real_b.def_const("negEpsilon", REAL_TYPE, QReal(-sys.float_info.epsilon))
+        real_b.def_const("e", REAL_TYPE, QReal(math.e))
 
-        def _real_log(r: QValue) -> QReal:
-            if not isinstance(r, QReal) or r.value <= 0.0:
+        @qchecked(cls._REAL_ERROR_EXC, QReal)
+        def _real_log(r: QReal) -> QReal:
+            if r.value <= 0.0:
                 raise QuestException(cls._REAL_ERROR_EXC)
             return QReal(math.log(r.value))
 
-        def _real_div(a: QValue, b: QValue) -> QReal:
-            if not isinstance(a, QReal) or not isinstance(b, QReal) or b.value == 0.0:
+        @qchecked(cls._REAL_ERROR_EXC, QReal, QReal)
+        def _real_div(a: QReal, b: QReal) -> QReal:
+            if b.value == 0.0:
                 raise QuestException(cls._REAL_ERROR_EXC)
             return QReal(a.value / b.value)
 
-        def _real_exp(a: QValue, b: QValue) -> QReal:
-            if not isinstance(a, QReal) or not isinstance(b, QReal):
-                raise QuestException(cls._REAL_ERROR_EXC)
+        @qchecked(cls._REAL_ERROR_EXC, QReal, QReal)
+        def _real_exp(a: QReal, b: QReal) -> QReal:
             try:
                 return QReal(math.pow(a.value, b.value))
             except (ValueError, OverflowError):
                 raise QuestException(cls._REAL_ERROR_EXC)
 
-        real_mod = QRecord({
-            "error": cls._REAL_ERROR_EXC,
-            "minReal": QReal(-sys.float_info.max),
-            "maxReal": QReal(sys.float_info.max),
-            "posEpsilon": QReal(sys.float_info.epsilon),
-            "negEpsilon": QReal(-sys.float_info.epsilon),
-            "e": QReal(math.e),
-            "int": QBuiltinFun("real.int", lambda n: QReal(float(n.value))),
-            "floor": QBuiltinFun("real.floor", lambda r: QInt(math.floor(r.value))),
-            "round": QBuiltinFun("real.round", lambda r: QInt(round(r.value))),
-            "abs": QBuiltinFun("real.abs", lambda r: QReal(abs(r.value))),
-            "log": QBuiltinFun("real.log", _real_log),
-            "min": QBuiltinFun("real.min", lambda a, b: QReal(min(a.value, b.value))),
-            "max": QBuiltinFun("real.max", lambda a, b: QReal(max(a.value, b.value))),
-            "plus": QBuiltinFun("real.plus", lambda a, b: QReal(a.value + b.value)),
-            "diff": QBuiltinFun("real.diff", lambda a, b: QReal(a.value - b.value)),
-            "mul": QBuiltinFun("real.mul", lambda a, b: QReal(a.value * b.value)),
-            "div": QBuiltinFun("real.div", _real_div),
-            "exp": QBuiltinFun("real.exp", _real_exp),
-            "smaller": QBuiltinFun("real.smaller", lambda a, b: QBool(a.value < b.value)),
-            "greater": QBuiltinFun("real.greater", lambda a, b: QBool(a.value > b.value)),
-            "smallerEq": QBuiltinFun("real.smallerEq", lambda a, b: QBool(a.value <= b.value)),
-            "greaterEq": QBuiltinFun("real.greaterEq", lambda a, b: QBool(a.value >= b.value)),
-        })
-        cls._modules["real"] = real_mod
-        cls._module_types["real"] = cls._build_record_type_from_scope(real_scope)
+        real_b.def_fn("int", [("n", INT_TYPE)], REAL_TYPE, lambda n: QReal(float(n.value)))
+        real_b.def_fn("floor", [("r", REAL_TYPE)], INT_TYPE, lambda r: QInt(math.floor(r.value)))
+        real_b.def_fn("round", [("r", REAL_TYPE)], INT_TYPE, lambda r: QInt(round(r.value)))
+        real_b.def_fn("abs", [("r", REAL_TYPE)], REAL_TYPE, lambda r: QReal(abs(r.value)))
+        real_b.def_fn("log", [("r", REAL_TYPE)], REAL_TYPE, _real_log)
+        real_b.def_fn("min", [("a", REAL_TYPE), ("b", REAL_TYPE)], REAL_TYPE, lambda a, b: QReal(min(a.value, b.value)))
+        real_b.def_fn("max", [("a", REAL_TYPE), ("b", REAL_TYPE)], REAL_TYPE, lambda a, b: QReal(max(a.value, b.value)))
+        real_b.def_fn("plus", [("a", REAL_TYPE), ("b", REAL_TYPE)], REAL_TYPE, lambda a, b: QReal(a.value + b.value))
+        real_b.def_fn("diff", [("a", REAL_TYPE), ("b", REAL_TYPE)], REAL_TYPE, lambda a, b: QReal(a.value - b.value))
+        real_b.def_fn("mul", [("a", REAL_TYPE), ("b", REAL_TYPE)], REAL_TYPE, lambda a, b: QReal(a.value * b.value))
+        real_b.def_fn("div", [("a", REAL_TYPE), ("b", REAL_TYPE)], REAL_TYPE, _real_div)
+        real_b.def_fn("exp", [("a", REAL_TYPE), ("b", REAL_TYPE)], REAL_TYPE, _real_exp)
+        real_b.def_fn("smaller", [("a", REAL_TYPE), ("b", REAL_TYPE)], BOOL_TYPE, lambda a, b: QBool(a.value < b.value))
+        real_b.def_fn("greater", [("a", REAL_TYPE), ("b", REAL_TYPE)], BOOL_TYPE, lambda a, b: QBool(a.value > b.value))
+        real_b.def_fn(
+            "smallerEq",
+            [("a", REAL_TYPE), ("b", REAL_TYPE)],
+            BOOL_TYPE,
+            lambda a, b: QBool(a.value <= b.value),
+        )
+        real_b.def_fn(
+            "greaterEq",
+            [("a", REAL_TYPE), ("b", REAL_TYPE)],
+            BOOL_TYPE,
+            lambda a, b: QBool(a.value >= b.value),
+        )
+        real_b.finish()
 
         # --------------------------------------------------------------------
         # 7. StringOp Interface & Module
         # --------------------------------------------------------------------
-        string_scope = Scope(name="interface_StringOp")
-        string_scope.declare_value(ValueSymbol(name="error", type_val=EXCEPTION_TYPE))
-        string_scope.declare_value(
-            ValueSymbol(name="new", type_val=_make_fn_type([("size", INT_TYPE), ("init", CHAR_TYPE)], STRING_TYPE))
-        )
-        string_scope.declare_value(
-            ValueSymbol(name="isEmpty", type_val=_make_fn_type([("string", STRING_TYPE)], BOOL_TYPE))
-        )
-        string_scope.declare_value(
-            ValueSymbol(name="length", type_val=_make_fn_type([("string", STRING_TYPE)], INT_TYPE))
-        )
-        string_scope.declare_value(
-            ValueSymbol(
-                name="getChar",
-                type_val=_make_fn_type([("string", STRING_TYPE), ("index", INT_TYPE)], CHAR_TYPE),
-            )
-        )
-        string_scope.declare_value(
-            ValueSymbol(
-                name="setChar",
-                type_val=_make_fn_type(
-                    [("string", STRING_TYPE), ("index", INT_TYPE), ("char", CHAR_TYPE)],
-                    OK_TYPE,
-                ),
-            )
-        )
-        string_scope.declare_value(
-            ValueSymbol(
-                name="getSub",
-                type_val=_make_fn_type(
-                    [("source", STRING_TYPE), ("start", INT_TYPE), ("size", INT_TYPE)],
-                    STRING_TYPE,
-                ),
-            )
-        )
-        string_scope.declare_value(
-            ValueSymbol(
-                name="setSub",
-                type_val=_make_fn_type(
-                    [
-                        ("dest", STRING_TYPE),
-                        ("destStart", INT_TYPE),
-                        ("source", STRING_TYPE),
-                        ("sourceStart", INT_TYPE),
-                        ("sourceSize", INT_TYPE),
-                    ],
-                    OK_TYPE,
-                ),
-            )
-        )
-        string_scope.declare_value(
-            ValueSymbol(
-                name="cat",
-                type_val=_make_fn_type([("s1", STRING_TYPE), ("s2", STRING_TYPE)], STRING_TYPE),
-            )
-        )
-        string_scope.declare_value(
-            ValueSymbol(
-                name="catSub",
-                type_val=_make_fn_type(
-                    [
-                        ("s1", STRING_TYPE),
-                        ("start1", INT_TYPE),
-                        ("size1", INT_TYPE),
-                        ("s2", STRING_TYPE),
-                        ("start2", INT_TYPE),
-                        ("size2", INT_TYPE),
-                    ],
-                    STRING_TYPE,
-                ),
-            )
-        )
-        string_scope.declare_value(
-            ValueSymbol(
-                name="conc",
-                type_val=_make_fn_type([("a", QArrayType(STRING_TYPE))], STRING_TYPE),
-            )
-        )
-        string_scope.declare_value(
-            ValueSymbol(
-                name="equal",
-                type_val=_make_fn_type([("s1", STRING_TYPE), ("s2", STRING_TYPE)], BOOL_TYPE),
-            )
-        )
-        string_scope.declare_value(
-            ValueSymbol(
-                name="equalSub",
-                type_val=_make_fn_type(
-                    [
-                        ("s1", STRING_TYPE),
-                        ("start1", INT_TYPE),
-                        ("size1", INT_TYPE),
-                        ("s2", STRING_TYPE),
-                        ("start2", INT_TYPE),
-                        ("size2", INT_TYPE),
-                    ],
-                    BOOL_TYPE,
-                ),
-            )
-        )
-        string_scope.declare_value(
-            ValueSymbol(
-                name="precedes",
-                type_val=_make_fn_type([("s1", STRING_TYPE), ("s2", STRING_TYPE)], BOOL_TYPE),
-            )
-        )
-        cls._interfaces["StringOp"] = string_scope
+        str_b = ModuleBuilder("string", "StringOp", cls)
+        str_b.def_const("error", EXCEPTION_TYPE, cls._STRING_ERROR_EXC)
 
-        def _string_new(size: QValue, init: QValue) -> QString:
-            if not isinstance(size, QInt) or not isinstance(init, QChar) or size.value < 0:
+        @qchecked(cls._STRING_ERROR_EXC, QInt, QChar)
+        def _string_new(size: QInt, init: QChar) -> QString:
+            if size.value < 0:
                 raise QuestException(cls._STRING_ERROR_EXC)
             return QString(init.value * size.value)
 
-        def _string_get_char(s: QValue, index: QValue) -> QChar:
-            if not isinstance(s, QString) or not isinstance(index, QInt):
-                raise QuestException(cls._STRING_ERROR_EXC)
+        @qchecked(cls._STRING_ERROR_EXC, QString, QInt)
+        def _string_get_char(s: QString, index: QInt) -> QChar:
             idx = index.value
             if idx < 0 or idx >= len(s.value):
                 raise QuestException(cls._STRING_ERROR_EXC)
             return QChar(s.value[idx])
 
-        def _string_set_char(s: QValue, index: QValue, char: QValue) -> QOk:
-            if not isinstance(s, QString) or not isinstance(index, QInt) or not isinstance(char, QChar):
-                raise QuestException(cls._STRING_ERROR_EXC)
+        @qchecked(cls._STRING_ERROR_EXC, QString, QInt, QChar)
+        def _string_set_char(s: QString, index: QInt, char: QChar) -> QOk:
             idx = index.value
             if idx < 0 or idx >= len(s.value):
                 raise QuestException(cls._STRING_ERROR_EXC)
             s.value = s.value[:idx] + char.value + s.value[idx + 1 :]
             return OK_VALUE
 
-        def _string_get_sub(s: QValue, start: QValue, size: QValue) -> QString:
-            if not isinstance(s, QString) or not isinstance(start, QInt) or not isinstance(size, QInt):
-                raise QuestException(cls._STRING_ERROR_EXC)
+        @qchecked(cls._STRING_ERROR_EXC, QString, QInt, QInt)
+        def _string_get_sub(s: QString, start: QInt, size: QInt) -> QString:
             st, sz = start.value, size.value
             if st < 0 or sz < 0 or st + sz > len(s.value):
                 raise QuestException(cls._STRING_ERROR_EXC)
             return QString(s.value[st : st + sz])
 
-        def _string_set_sub(dest: QValue, d_st: QValue, src: QValue, s_st: QValue, sz: QValue) -> QOk:
-            if (
-                not isinstance(dest, QString)
-                or not isinstance(src, QString)
-                or not isinstance(d_st, QInt)
-                or not isinstance(s_st, QInt)
-                or not isinstance(sz, QInt)
-            ):
-                raise QuestException(cls._STRING_ERROR_EXC)
+        @qchecked(cls._STRING_ERROR_EXC, QString, QInt, QString, QInt, QInt)
+        def _string_set_sub(dest: QString, d_st: QInt, src: QString, s_st: QInt, sz: QInt) -> QOk:
             dst_idx, src_idx, count = d_st.value, s_st.value, sz.value
             if (
                 dst_idx < 0
@@ -739,14 +598,14 @@ class BuiltinModuleRegistry:
             dest.value = dest.value[:dst_idx] + chunk + dest.value[dst_idx + count :]
             return OK_VALUE
 
-        def _string_cat_sub(s1: QValue, st1: QValue, sz1: QValue, s2: QValue, st2: QValue, sz2: QValue) -> QString:
+        @qchecked(cls._STRING_ERROR_EXC, QString, QInt, QInt, QString, QInt, QInt)
+        def _string_cat_sub(s1: QString, st1: QInt, sz1: QInt, s2: QString, st2: QInt, sz2: QInt) -> QString:
             sub1 = _string_get_sub(s1, st1, sz1).value
             sub2 = _string_get_sub(s2, st2, sz2).value
             return QString(sub1 + sub2)
 
-        def _string_conc(arr: QValue) -> QString:
-            if not isinstance(arr, QArray):
-                raise QuestException(cls._STRING_ERROR_EXC)
+        @qchecked(cls._STRING_ERROR_EXC, QArray)
+        def _string_conc(arr: QArray) -> QString:
             parts: list[str] = []
             for elem in arr.elements:
                 if not isinstance(elem, QString):
@@ -754,111 +613,146 @@ class BuiltinModuleRegistry:
                 parts.append(elem.value)
             return QString("".join(parts))
 
-        def _string_equal_sub(s1: QValue, st1: QValue, sz1: QValue, s2: QValue, st2: QValue, sz2: QValue) -> QBool:
+        @qchecked(cls._STRING_ERROR_EXC, QString, QInt, QInt, QString, QInt, QInt)
+        def _string_equal_sub(s1: QString, st1: QInt, sz1: QInt, s2: QString, st2: QInt, sz2: QInt) -> QBool:
             sub1 = _string_get_sub(s1, st1, sz1).value
             sub2 = _string_get_sub(s2, st2, sz2).value
             return QBool(sub1 == sub2)
 
-        string_mod = QRecord({
-            "error": cls._STRING_ERROR_EXC,
-            "new": QBuiltinFun("string.new", _string_new),
-            "isEmpty": QBuiltinFun("string.isEmpty", lambda s: QBool(len(s.value) == 0)),
-            "length": QBuiltinFun("string.length", lambda s: QInt(len(s.value))),
-            "getChar": QBuiltinFun("string.getChar", _string_get_char),
-            "setChar": QBuiltinFun("string.setChar", _string_set_char),
-            "getSub": QBuiltinFun("string.getSub", _string_get_sub),
-            "setSub": QBuiltinFun("string.setSub", _string_set_sub),
-            "cat": QBuiltinFun("string.cat", lambda s1, s2: QString(s1.value + s2.value)),
-            "catSub": QBuiltinFun("string.catSub", _string_cat_sub),
-            "conc": QBuiltinFun("string.conc", _string_conc),
-            "equal": QBuiltinFun("string.equal", lambda s1, s2: QBool(s1.value == s2.value)),
-            "equalSub": QBuiltinFun("string.equalSub", _string_equal_sub),
-            "precedes": QBuiltinFun("string.precedes", lambda s1, s2: QBool(s1.value <= s2.value)),
-        })
-        cls._modules["string"] = string_mod
-        cls._module_types["string"] = cls._build_record_type_from_scope(string_scope)
+        str_b.def_fn("new", [("size", INT_TYPE), ("init", CHAR_TYPE)], STRING_TYPE, _string_new)
+        str_b.def_fn("isEmpty", [("string", STRING_TYPE)], BOOL_TYPE, lambda s: QBool(len(s.value) == 0))
+        str_b.def_fn("length", [("string", STRING_TYPE)], INT_TYPE, lambda s: QInt(len(s.value)))
+        str_b.def_fn("getChar", [("string", STRING_TYPE), ("index", INT_TYPE)], CHAR_TYPE, _string_get_char)
+        str_b.def_fn(
+            "setChar",
+            [("string", STRING_TYPE), ("index", INT_TYPE), ("char", CHAR_TYPE)],
+            OK_TYPE,
+            _string_set_char,
+        )
+        str_b.def_fn(
+            "getSub",
+            [("source", STRING_TYPE), ("start", INT_TYPE), ("size", INT_TYPE)],
+            STRING_TYPE,
+            _string_get_sub,
+        )
+        str_b.def_fn(
+            "setSub",
+            [
+                ("dest", STRING_TYPE),
+                ("destStart", INT_TYPE),
+                ("source", STRING_TYPE),
+                ("sourceStart", INT_TYPE),
+                ("sourceSize", INT_TYPE),
+            ],
+            OK_TYPE,
+            _string_set_sub,
+        )
+        str_b.def_fn(
+            "cat",
+            [("s1", STRING_TYPE), ("s2", STRING_TYPE)],
+            STRING_TYPE,
+            lambda s1, s2: QString(s1.value + s2.value),
+        )
+        str_b.def_fn(
+            "catSub",
+            [
+                ("s1", STRING_TYPE),
+                ("start1", INT_TYPE),
+                ("size1", INT_TYPE),
+                ("s2", STRING_TYPE),
+                ("start2", INT_TYPE),
+                ("size2", INT_TYPE),
+            ],
+            STRING_TYPE,
+            _string_cat_sub,
+        )
+        str_b.def_fn("conc", [("a", QArrayType(STRING_TYPE))], STRING_TYPE, _string_conc)
+        str_b.def_fn(
+            "equal",
+            [("s1", STRING_TYPE), ("s2", STRING_TYPE)],
+            BOOL_TYPE,
+            lambda s1, s2: QBool(s1.value == s2.value),
+        )
+        str_b.def_fn(
+            "equalSub",
+            [
+                ("s1", STRING_TYPE),
+                ("start1", INT_TYPE),
+                ("size1", INT_TYPE),
+                ("s2", STRING_TYPE),
+                ("start2", INT_TYPE),
+                ("size2", INT_TYPE),
+            ],
+            BOOL_TYPE,
+            _string_equal_sub,
+        )
+        str_b.def_fn(
+            "precedes",
+            [("s1", STRING_TYPE), ("s2", STRING_TYPE)],
+            BOOL_TYPE,
+            lambda s1, s2: QBool(s1.value <= s2.value),
+        )
+        str_b.finish()
 
         # --------------------------------------------------------------------
         # 8. ArrayOp Interface & Module
         # --------------------------------------------------------------------
         arr_a_id = e.fresh_symbol_id()
         arr_a = QTypeVar(name="A", symbol_id=arr_a_id, bound=TYPE_KIND)
-        arrayop_scope = Scope(name="interface_ArrayOp")
-        arrayop_scope.declare_value(ValueSymbol(name="error", type_val=EXCEPTION_TYPE))
-        arrayop_scope.declare_value(
-            ValueSymbol(
-                name="new",
-                type_val=_make_poly_fn_type(
-                    "A",
-                    arr_a_id,
-                    _make_fn_type([("size", INT_TYPE), ("init", arr_a)], QArrayType(arr_a)),
-                ),
-            )
-        )
-        arrayop_scope.declare_value(
-            ValueSymbol(
-                name="size",
-                type_val=_make_poly_fn_type("A", arr_a_id, _make_fn_type([("array", QArrayType(arr_a))], INT_TYPE)),
-            )
-        )
-        arrayop_scope.declare_value(
-            ValueSymbol(
-                name="get",
-                type_val=_make_poly_fn_type(
-                    "A",
-                    arr_a_id,
-                    _make_fn_type([("array", QArrayType(arr_a)), ("index", INT_TYPE)], arr_a),
-                ),
-            )
-        )
-        arrayop_scope.declare_value(
-            ValueSymbol(
-                name="set",
-                type_val=_make_poly_fn_type(
-                    "A",
-                    arr_a_id,
-                    _make_fn_type([("array", QArrayType(arr_a)), ("index", INT_TYPE), ("item", arr_a)], OK_TYPE),
-                ),
-            )
-        )
-        cls._interfaces["ArrayOp"] = arrayop_scope
+        arr_b = ModuleBuilder("arrayOp", "ArrayOp", cls)
+        arr_b.def_const("error", EXCEPTION_TYPE, ARRAY_OP_ERROR_EXC)
 
-        def _array_new(size: QValue, init: QValue) -> QArray:
-            if not isinstance(size, QInt) or size.value < 0:
+        @qchecked(ARRAY_OP_ERROR_EXC, QInt, QValue)
+        def _array_new(size: QInt, init: QValue) -> QArray:
+            if size.value < 0:
                 raise QuestException(ARRAY_OP_ERROR_EXC)
             return QArray([init for _ in range(size.value)])
 
-        def _array_size(arr: QValue) -> QInt:
-            if not isinstance(arr, QArray):
-                raise QuestException(ARRAY_OP_ERROR_EXC)
+        @qchecked(ARRAY_OP_ERROR_EXC, QArray)
+        def _array_size(arr: QArray) -> QInt:
             return QInt(arr.size())
 
-        def _array_get(arr: QValue, idx: QValue) -> QValue:
-            if not isinstance(arr, QArray) or not isinstance(idx, QInt):
-                raise QuestException(ARRAY_OP_ERROR_EXC)
+        @qchecked(ARRAY_OP_ERROR_EXC, QArray, QInt)
+        def _array_get(arr: QArray, idx: QInt) -> QValue:
             i = idx.value
             if i < 0 or i >= arr.size():
                 raise QuestException(ARRAY_OP_ERROR_EXC)
             return arr.get(i)
 
-        def _array_set(arr: QValue, idx: QValue, item: QValue) -> QOk:
-            if not isinstance(arr, QArray) or not isinstance(idx, QInt):
-                raise QuestException(ARRAY_OP_ERROR_EXC)
+        @qchecked(ARRAY_OP_ERROR_EXC, QArray, QInt, QValue)
+        def _array_set(arr: QArray, idx: QInt, item: QValue) -> QOk:
             i = idx.value
             if i < 0 or i >= arr.size():
                 raise QuestException(ARRAY_OP_ERROR_EXC)
             arr.set(i, item)
             return OK_VALUE
 
-        arrayop_mod = QRecord({
-            "error": ARRAY_OP_ERROR_EXC,
-            "new": QBuiltinFun("arrayOp.new", _array_new),
-            "size": QBuiltinFun("arrayOp.size", _array_size),
-            "get": QBuiltinFun("arrayOp.get", _array_get),
-            "set": QBuiltinFun("arrayOp.set", _array_set),
-        })
-        cls._modules["arrayOp"] = arrayop_mod
-        cls._module_types["arrayOp"] = cls._build_record_type_from_scope(arrayop_scope)
+        arr_b.def_poly_fn(
+            "new",
+            "A",
+            arr_a_id,
+            [("size", INT_TYPE), ("init", arr_a)],
+            QArrayType(arr_a),
+            _array_new,
+        )
+        arr_b.def_poly_fn("size", "A", arr_a_id, [("array", QArrayType(arr_a))], INT_TYPE, _array_size)
+        arr_b.def_poly_fn(
+            "get",
+            "A",
+            arr_a_id,
+            [("array", QArrayType(arr_a)), ("index", INT_TYPE)],
+            arr_a,
+            _array_get,
+        )
+        arr_b.def_poly_fn(
+            "set",
+            "A",
+            arr_a_id,
+            [("array", QArrayType(arr_a)), ("index", INT_TYPE), ("item", arr_a)],
+            OK_TYPE,
+            _array_set,
+        )
+        arr_b.finish()
 
         # --------------------------------------------------------------------
         # 9. Dynamic Interface & Module
@@ -867,60 +761,41 @@ class BuiltinModuleRegistry:
         dyn_t = QTypeVar(name="Dynamic.T", symbol_id=dyn_t_id, bound=TYPE_KIND)
         dyn_a_id = e.fresh_symbol_id()
         dyn_a = QTypeVar(name="A", symbol_id=dyn_a_id, bound=TYPE_KIND)
-        dynamic_scope = Scope(name="interface_Dynamic")
-        dynamic_scope.declare_type(TypeSymbol(name="T", symbol_id=dyn_t_id, kind=TYPE_KIND, definition=DYNAMIC_TYPE))
-        dynamic_scope.declare_value(ValueSymbol(name="error", type_val=EXCEPTION_TYPE))
-        dynamic_scope.declare_value(
-            ValueSymbol(
-                name="new",
-                type_val=_make_poly_fn_type("A", dyn_a_id, _make_fn_type([("a", dyn_a)], dyn_t)),
-            )
-        )
-        dynamic_scope.declare_value(
-            ValueSymbol(
-                name="be",
-                type_val=_make_poly_fn_type("A", dyn_a_id, _make_fn_type([("d", dyn_t)], dyn_a)),
-            )
-        )
-        dynamic_scope.declare_value(
-            ValueSymbol(name="copy", type_val=_make_fn_type([("d", dyn_t)], dyn_t))
-        )
-        dynamic_scope.declare_value(
-            ValueSymbol(name="intern", type_val=_make_fn_type([("rd", reader_t)], dyn_t))
-        )
-        dynamic_scope.declare_value(
-            ValueSymbol(name="extern", type_val=_make_fn_type([("wr", writer_t), ("d", dyn_t)], OK_TYPE))
-        )
-        cls._interfaces["Dynamic"] = dynamic_scope
+        dyn_b = ModuleBuilder("dynamic", "Dynamic", cls)
+        dyn_b.def_type("T", dyn_t_id, TYPE_KIND, definition=DYNAMIC_TYPE)
+        dyn_b.def_const("error", EXCEPTION_TYPE, DYNAMIC_ERROR_EXC)
 
+        @qchecked(DYNAMIC_ERROR_EXC, QValue)
         def _dynamic_new(val: QValue) -> QDynamicVal:
             return QDynamicVal(value=val, type_val=_infer_qtype(val))
 
-        def _dynamic_be(d: QValue) -> QValue:
-            if not isinstance(d, QDynamicVal):
-                raise QuestException(DYNAMIC_ERROR_EXC)
+        @qchecked(DYNAMIC_ERROR_EXC, QDynamicVal)
+        def _dynamic_be(d: QDynamicVal) -> QValue:
             return d.value
 
-        def _dynamic_copy(d: QValue) -> QDynamicVal:
-            if not isinstance(d, QDynamicVal):
-                raise QuestException(DYNAMIC_ERROR_EXC)
+        @qchecked(DYNAMIC_ERROR_EXC, QDynamicVal)
+        def _dynamic_copy(d: QDynamicVal) -> QDynamicVal:
             return QDynamicVal(value=d.value, type_val=d.type_val)
 
-        def _dynamic_extern(wr: QValue, d: QValue) -> QOk:
-            if not isinstance(wr, QWriter) or not isinstance(d, QDynamicVal) or wr.is_closed:
+        @qchecked(DYNAMIC_ERROR_EXC, QWriter, QDynamicVal)
+        def _dynamic_extern(wr: QWriter, d: QDynamicVal) -> QOk:
+            if wr.is_closed:
                 raise QuestException(DYNAMIC_ERROR_EXC)
             wr.stream.write(d.to_str())
             return OK_VALUE
 
-        dynamic_mod = QRecord({
-            "error": DYNAMIC_ERROR_EXC,
-            "new": QBuiltinFun("dynamic.new", _dynamic_new),
-            "be": QBuiltinFun("dynamic.be", _dynamic_be),
-            "copy": QBuiltinFun("dynamic.copy", _dynamic_copy),
-            "extern": QBuiltinFun("dynamic.extern", _dynamic_extern),
-        })
-        cls._modules["dynamic"] = dynamic_mod
-        cls._module_types["dynamic"] = cls._build_record_type_from_scope(dynamic_scope)
+        dyn_b.def_poly_fn("new", "A", dyn_a_id, [("a", dyn_a)], dyn_t, _dynamic_new)
+        dyn_b.def_poly_fn("be", "A", dyn_a_id, [("d", dyn_t)], dyn_a, _dynamic_be)
+        dyn_b.def_fn("copy", [("d", dyn_t)], dyn_t, _dynamic_copy)
+        dyn_b.def_scope_val("intern", _make_fn_type([("rd", reader_t)], dyn_t))
+        dyn_b.def_fn("extern", [("wr", writer_t), ("d", dyn_t)], OK_TYPE, _dynamic_extern)
+        dyn_b.finish()
+
+    @classmethod
+    def _build_record_type_from_scope(cls, scope: Scope) -> QRecordType:
+        """Constructs a QRecordType matching the values exposed by an interface scope."""
+        fields = [QRecordField(name=name, type_val=sym.type_val) for name, sym in scope.values.items()]
+        return QRecordType(tuple(fields))
 
     @classmethod
     def _build_record_type_from_scope(cls, scope: Scope) -> QRecordType:
