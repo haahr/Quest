@@ -8,10 +8,8 @@ import unittest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "bootstrap", "python"))
 
 from quest.elaborate_types import (
-    elaborate_kind,
     elaborate_kind_binding,
     elaborate_mutual_rec_type_group,
-    elaborate_type,
     elaborate_type_binding,
 )
 from quest.env import (
@@ -40,7 +38,11 @@ from quest.types import (
     QTypeFun,
     is_subtype,
 )
-from tests.python.helpers import parse_kind, parse_phrase, parse_type
+from tests.python.helpers import (
+    elaborate_test_kind,
+    elaborate_test_type,
+    parse_phrase,
+)
 
 
 class TestKindElaboration(unittest.TestCase):
@@ -49,18 +51,17 @@ class TestKindElaboration(unittest.TestCase):
 
     def test_elaborate_base_and_power_kinds(self):
         # TYPE
-        k_type = elaborate_kind(parse_kind("TYPE"), self.env)
+        k_type = elaborate_test_kind("TYPE", self.env)
         self.assertEqual(k_type, TYPE_KIND)
 
         # POWER(Int)
-        k_power = elaborate_kind(parse_kind("POWER(Int)"), self.env)
+        k_power = elaborate_test_kind("POWER(Int)", self.env)
         self.assertIsInstance(k_power, QPowerKind)
         self.assertEqual(k_power.bound, INT_TYPE)
 
     def test_elaborate_kind_all_operator(self):
         # ALL(X :: TYPE) TYPE
-        ast_all = parse_kind("ALL(X :: TYPE) TYPE")
-        k_all = elaborate_kind(ast_all, self.env)
+        k_all = elaborate_test_kind("ALL(X :: TYPE) TYPE", self.env)
         self.assertIsInstance(k_all, QAllKind)
         self.assertEqual(k_all.param_name, "X")
         self.assertEqual(k_all.param_kind, TYPE_KIND)
@@ -71,13 +72,13 @@ class TestKindElaboration(unittest.TestCase):
         self.env.global_scope.declare_kind(
             KindSymbol(name="MyKind", symbol_id=self.env.fresh_symbol_id(), kind=TYPE_KIND)
         )
-        k_id = elaborate_kind(parse_kind("MyKind"), self.env)
+        k_id = elaborate_test_kind("MyKind", self.env)
         self.assertIsInstance(k_id, QKindVar)
         self.assertEqual(k_id.name, "MyKind")
 
         # Unbound kind error
         with self.assertRaises(KindError):
-            elaborate_kind(parse_kind("UnknownKind"), self.env)
+            elaborate_test_kind("UnknownKind", self.env)
 
 
 class TestTypeElaboration(unittest.TestCase):
@@ -86,7 +87,7 @@ class TestTypeElaboration(unittest.TestCase):
 
     def test_elaborate_type_path_primitive_and_module(self):
         # Int
-        t_int = elaborate_type(parse_type("Int"), self.env)
+        t_int = elaborate_test_type("Int", self.env)
         self.assertEqual(t_int, INT_TYPE)
 
         # Mod.T
@@ -96,21 +97,19 @@ class TestTypeElaboration(unittest.TestCase):
         )
         self.env.register_module("Mod", mod_scope)
 
-        t_mod = elaborate_type(parse_type("Mod.T"), self.env)
+        t_mod = elaborate_test_type("Mod.T", self.env)
         self.assertEqual(t_mod, STRING_TYPE)
 
     def test_elaborate_infix_function_type(self):
         # Int -> String
-        ast_fn = parse_type("Int -> String")
-        t_fn = elaborate_type(ast_fn, self.env)
+        t_fn = elaborate_test_type("Int -> String", self.env)
         self.assertIsInstance(t_fn, QFunType)
         self.assertEqual(t_fn.params[0].type_val, INT_TYPE)
         self.assertEqual(t_fn.result_type, STRING_TYPE)
 
     def test_elaborate_records_and_tuples(self):
         # Record x: Int var y: Real end
-        ast_rec = parse_type("Record x: Int var y: Real end")
-        t_rec = elaborate_type(ast_rec, self.env)
+        t_rec = elaborate_test_type("Record x: Int var y: Real end", self.env)
         self.assertIsInstance(t_rec, QRecordType)
         self.assertEqual(len(t_rec.fields), 2)
         self.assertEqual(t_rec.fields[0].name, "x")
@@ -118,15 +117,13 @@ class TestTypeElaboration(unittest.TestCase):
         self.assertTrue(t_rec.fields[1].is_var)
 
         # Tuple a: Int b: String end
-        ast_tup = parse_type("Tuple a: Int b: String end")
-        t_tup = elaborate_type(ast_tup, self.env)
+        t_tup = elaborate_test_type("Tuple a: Int b: String end", self.env)
         self.assertIsInstance(t_tup, QTupleType)
         self.assertEqual(t_tup.elements, (INT_TYPE, STRING_TYPE))
 
     def test_elaborate_variants_and_options(self):
         # Option red green with val: Int end end
-        ast_opt = parse_type("Option red green with val: Int end end")
-        t_opt = elaborate_type(ast_opt, self.env)
+        t_opt = elaborate_test_type("Option red green with val: Int end end", self.env)
         self.assertIsInstance(t_opt, QOptionType)
         self.assertEqual(len(t_opt.options), 2)
         self.assertIsNone(t_opt.options[0].payload_type)
@@ -137,15 +134,13 @@ class TestTypeElaboration(unittest.TestCase):
 
     def test_elaborate_polymorphic_and_operators(self):
         # All(X::TYPE) X -> X
-        ast_all = parse_type("All(X::TYPE) X -> X")
-        t_all = elaborate_type(ast_all, self.env)
+        t_all = elaborate_test_type("All(X::TYPE) X -> X", self.env)
         self.assertIsInstance(t_all, QAllType)
         self.assertEqual(len(t_all.quantifiers), 1)
         self.assertEqual(t_all.quantifiers[0].name, "X")
 
         # Fun(A::TYPE B::TYPE) Tuple a: A b: B end
-        ast_fun = parse_type("Fun(A::TYPE B::TYPE) Tuple a: A b: B end")
-        t_fun = elaborate_type(ast_fun, self.env)
+        t_fun = elaborate_test_type("Fun(A::TYPE B::TYPE) Tuple a: A b: B end", self.env)
         self.assertIsInstance(t_fun, QTypeFun)
 
         # Pair(Int String)
@@ -153,18 +148,17 @@ class TestTypeElaboration(unittest.TestCase):
             parse_phrase("Let Pair = Fun(A::TYPE B::TYPE) Tuple a: A b: B end;"),
             self.env,
         )
-        ast_app = parse_type("Pair(Int String)")
-        t_app = elaborate_type(ast_app, self.env)
+        t_app = elaborate_test_type("Pair(Int String)", self.env)
         self.assertIsInstance(t_app, QTypeApp)
         evaluated = t_app.evaluate_lazily(self.env)
         self.assertEqual(evaluated, QTupleType((INT_TYPE, STRING_TYPE)))
 
     def test_elaborate_recursive_type(self):
         # Rec(L::TYPE) Option nil cons with val: Record head: Int tail: L end end end
-        ast_rec = parse_type(
-            "Rec(L::TYPE) Option nil cons with val: Record head: Int tail: L end end end"
+        t_rec = elaborate_test_type(
+            "Rec(L::TYPE) Option nil cons with val: Record head: Int tail: L end end end",
+            self.env,
         )
-        t_rec = elaborate_type(ast_rec, self.env)
         self.assertIsInstance(t_rec, QRecType)
         self.assertEqual(t_rec.var_name, "L")
         self.assertTrue(is_subtype(t_rec, t_rec))

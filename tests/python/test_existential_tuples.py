@@ -4,11 +4,8 @@ import unittest
 from typing import Any
 
 from quest.ast import (
-    FieldSig,
     KindType,
-    ParamMode,
     TypeFormal,
-    TypePath,
     TypeTuple,
 )
 from quest.elaborate_types import elaborate_type
@@ -32,19 +29,22 @@ from quest.types import (
     QTypeVar,
     is_subtype,
 )
+from tests.python.helpers import (
+    assert_pipeline_failure,
+    assert_pipeline_success,
+    elaborate_test_type,
+    run_pipeline,
+)
 
 
 class TestExistentialTuplesPhase1(unittest.TestCase):
     """Verifies Phase 1: tuple type representation and signature elaboration."""
 
     def setUp(self) -> None:
-        self.pipeline = default_pipeline()
         self.env = Environment()
 
     def run_source(self, source: str) -> None:
-        ctx = CompilerContext.create(source, "<test>", env=self.env)
-        result = self.pipeline.execute(source, "<test>", ctx=ctx)
-        self.assertTrue(result.success, f"Pipeline failed: {result.diagnostics}")
+        assert_pipeline_success(source, env=self.env)
 
     def test_cardelli_abstract_tuple_signature_elaboration(self) -> None:
         """Cardelli §5.3: Let T = Tuple A::TYPE a:A f(x:A):Int end;"""
@@ -145,30 +145,12 @@ class TestExistentialTuplesPhase2(unittest.TestCase):
     """Verifies Phase 2: tuple subtyping & extended subsignatures."""
 
     def setUp(self) -> None:
-        self.pipeline = default_pipeline()
         self.env = Environment()
-
-    def elaborate(self, source: str) -> QTupleType:
-        ctx = CompilerContext.create(source, "<test>", env=self.env)
-        res = self.pipeline.execute(source, "<test>", ctx=ctx)
-        self.assertTrue(res.success, f"Elaboration failed: {res.diagnostics}")
-        # Return the last defined type
-        for name in ["T", "Point", "ColorPoint", "Vehicle", "Object", "T1", "T2"]:
-            sym = self.env.lookup_type(name)
-            if sym is not None and sym.definition is not None:
-                if isinstance(sym.definition, QTupleType):
-                    return sym.definition
-        self.fail("No QTupleType found in environment")
 
     def test_prefix_subtyping_simple_tuples(self) -> None:
         """Cardelli §7.1: Vehicle <: Object (prefix subtyping)."""
-        object_tup = QTupleType((
-            QTupleField(name="age", type_val=INT_TYPE),
-        ))
-        vehicle_tup = QTupleType((
-            QTupleField(name="age", type_val=INT_TYPE),
-            QTupleField(name="speed", type_val=INT_TYPE),
-        ))
+        object_tup = elaborate_test_type("Tuple age: Int end", self.env)
+        vehicle_tup = elaborate_test_type("Tuple age: Int speed: Int end", self.env)
 
         # Vehicle <: Object
         self.assertTrue(is_subtype(vehicle_tup, object_tup, self.env))
@@ -177,39 +159,14 @@ class TestExistentialTuplesPhase2(unittest.TestCase):
 
     def test_cardelli_abstract_tuple_subtyping(self) -> None:
         """Cardelli §7.1: ColorPoint <: Point."""
-        id_pt = self.env.fresh_symbol_id()
-        point_type = QTupleType((
-            QTupleTypeFormal(name="A", symbol_id=id_pt, bound=TYPE_KIND),
-            QTupleField(
-                name="new",
-                type_val=QFunType((INT_TYPE, INT_TYPE), QTypeVar("A", id_pt, TYPE_KIND)),
-            ),
-            QTupleField(
-                name="x",
-                type_val=QFunType((QTypeVar("A", id_pt, TYPE_KIND),), INT_TYPE),
-            ),
-        ))
-
-        id_cp = self.env.fresh_symbol_id()
-        color_point_type = QTupleType((
-            QTupleTypeFormal(name="A", symbol_id=id_cp, bound=TYPE_KIND),
-            QTupleField(
-                name="new",
-                type_val=QFunType((INT_TYPE, INT_TYPE), QTypeVar("A", id_cp, TYPE_KIND)),
-            ),
-            QTupleField(
-                name="x",
-                type_val=QFunType((QTypeVar("A", id_cp, TYPE_KIND),), INT_TYPE),
-            ),
-            QTupleField(
-                name="paint",
-                type_val=QFunType((QTypeVar("A", id_cp, TYPE_KIND), INT_TYPE), OK_TYPE),
-            ),
-            QTupleField(
-                name="color",
-                type_val=QFunType((QTypeVar("A", id_cp, TYPE_KIND),), INT_TYPE),
-            ),
-        ))
+        point_type = elaborate_test_type(
+            "Tuple A::TYPE new(x:Int y:Int):A x(p:A):Int end",
+            self.env,
+        )
+        color_point_type = elaborate_test_type(
+            "Tuple A::TYPE new(x:Int y:Int):A x(p:A):Int paint(p:A c:Int):Ok color(p:A):Int end",
+            self.env,
+        )
 
         # ColorPoint <: Point
         self.assertTrue(is_subtype(color_point_type, point_type, self.env))
@@ -218,17 +175,8 @@ class TestExistentialTuplesPhase2(unittest.TestCase):
 
     def test_component_name_mismatch_rejected(self) -> None:
         """Rule 4: Component names must match identically (no alpha-conversion)."""
-        id1 = self.env.fresh_symbol_id()
-        t1 = QTupleType((
-            QTupleTypeFormal(name="A", symbol_id=id1, bound=TYPE_KIND),
-            QTupleField(name="a", type_val=QTypeVar("A", id1, TYPE_KIND)),
-        ))
-
-        id2 = self.env.fresh_symbol_id()
-        t2 = QTupleType((
-            QTupleTypeFormal(name="B", symbol_id=id2, bound=TYPE_KIND),
-            QTupleField(name="a", type_val=QTypeVar("B", id2, TYPE_KIND)),
-        ))
+        t1 = elaborate_test_type("Tuple A::TYPE a:A end", self.env)
+        t2 = elaborate_test_type("Tuple B::TYPE a:B end", self.env)
 
         # Distinct type formal names A vs B: must NOT be subtypes
         self.assertFalse(is_subtype(t1, t2, self.env))
@@ -236,27 +184,14 @@ class TestExistentialTuplesPhase2(unittest.TestCase):
 
     def test_value_field_name_mismatch_rejected(self) -> None:
         """Value field names must match if present in supertype."""
-        t1 = QTupleType((
-            QTupleField(name="x", type_val=INT_TYPE),
-        ))
-        t2 = QTupleType((
-            QTupleField(name="y", type_val=INT_TYPE),
-        ))
+        t1 = elaborate_test_type("Tuple x: Int end", self.env)
+        t2 = elaborate_test_type("Tuple y: Int end", self.env)
         self.assertFalse(is_subtype(t1, t2, self.env))
 
     def test_type_formal_subkinding(self) -> None:
         """Type formal subkinding: POWER(Int) <:: TYPE."""
-        id1 = self.env.fresh_symbol_id()
-        sub_tup = QTupleType((
-            QTupleTypeFormal(name="A", symbol_id=id1, bound=QPowerKind(INT_TYPE)),
-            QTupleField(name="a", type_val=QTypeVar("A", id1, QPowerKind(INT_TYPE))),
-        ))
-
-        id2 = self.env.fresh_symbol_id()
-        sup_tup = QTupleType((
-            QTupleTypeFormal(name="A", symbol_id=id2, bound=TYPE_KIND),
-            QTupleField(name="a", type_val=QTypeVar("A", id2, TYPE_KIND)),
-        ))
+        sub_tup = elaborate_test_type("Tuple A::POWER(Int) a:A end", self.env)
+        sup_tup = elaborate_test_type("Tuple A::TYPE a:A end", self.env)
 
         # A::POWER(Int) <: A::TYPE
         self.assertTrue(is_subtype(sub_tup, sup_tup, self.env))
@@ -265,16 +200,8 @@ class TestExistentialTuplesPhase2(unittest.TestCase):
 
     def test_manifest_type_binding_subtype_of_formal(self) -> None:
         """Manifest type binding Tuple Def A::TYPE = Int a:A end <: Tuple A::TYPE a:A end."""
-        id2 = self.env.fresh_symbol_id()
-        sup_tup = QTupleType((
-            QTupleTypeFormal(name="A", symbol_id=id2, bound=TYPE_KIND),
-            QTupleField(name="a", type_val=QTypeVar("A", id2, TYPE_KIND)),
-        ))
-
-        manifest_sub = QTupleType((
-            QTupleTypeBinding(name="A", type_val=INT_TYPE, bound=TYPE_KIND),
-            QTupleField(name="a", type_val=INT_TYPE),
-        ))
+        manifest_sub = elaborate_test_type("Tuple Def A::TYPE = Int a:A end", self.env)
+        sup_tup = elaborate_test_type("Tuple A::TYPE a:A end", self.env)
 
         self.assertTrue(is_subtype(manifest_sub, sup_tup, self.env))
 
@@ -283,32 +210,14 @@ class TestExistentialTuplesPhase3(unittest.TestCase):
     """Verifies Phase 3: existential tuple packing, witness checking, and execution."""
 
     def setUp(self) -> None:
-        self.pipeline = default_pipeline()
         self.env = Environment()
         self.runtime_env = RuntimeEnvironment.create_root_env()
 
     def run_source(self, source: str) -> CompilerContext:
-        ctx = CompilerContext.create(
-            source,
-            "<test>",
-            env=self.env,
-            runtime_env=self.runtime_env,
-        )
-        res = self.pipeline.execute(source, "<test>", ctx=ctx)
-        self.assertTrue(res.success, f"Pipeline failed: {res.diagnostics}")
-        return ctx
+        return assert_pipeline_success(source, env=self.env, runtime_env=self.runtime_env)
 
     def check_failure(self, source: str, expected_substr: str) -> None:
-        ctx = CompilerContext.create(
-            source,
-            "<test>",
-            env=self.env,
-            runtime_env=self.runtime_env,
-        )
-        res = self.pipeline.execute(source, "<test>", ctx=ctx)
-        self.assertFalse(res.success, f"Expected pipeline failure, but succeeded: {res}")
-        messages = " ".join(d.message for d in res.diagnostics)
-        self.assertIn(expected_substr, messages)
+        assert_pipeline_failure(source, expected_substr, env=self.env, runtime_env=self.runtime_env)
 
     def test_cardelli_existential_tuple_packing_and_execution(self) -> None:
         """Cardelli §5.3: Packing existential tuple with witness and value fields."""
@@ -420,16 +329,7 @@ class TestExistentialTuplesPhase4(unittest.TestCase):
         return ctx, res.final_artifact
 
     def check_failure(self, source: str, expected_substr: str) -> None:
-        ctx = CompilerContext.create(
-            source,
-            "<test>",
-            env=self.env,
-            runtime_env=self.runtime_env,
-        )
-        res = self.pipeline.execute(source, "<test>", ctx=ctx)
-        self.assertFalse(res.success, f"Expected pipeline failure, but succeeded: {res}")
-        messages = " ".join(d.message for d in res.diagnostics)
-        self.assertIn(expected_substr, messages)
+        assert_pipeline_failure(source, expected_substr, env=self.env, runtime_env=self.runtime_env)
 
     def test_cardelli_section_5_3_end_to_end(self) -> None:
         """Cardelli §5.3: packing, dot-projection, path-type annotation, and application."""

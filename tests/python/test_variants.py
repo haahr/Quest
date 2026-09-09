@@ -2,11 +2,9 @@
 
 import unittest
 
-from quest.ast import VariantFieldSig
-from quest.elaborate_types import elaborate_type
 from quest.env import Environment
 from quest.interpreter import RuntimeEnvironment
-from quest.pipeline import CompilerContext, default_pipeline
+from quest.pipeline import CompilerContext
 from quest.runtime import QBool, QInt, QOk, QVariant
 from quest.types import (
     INT_TYPE,
@@ -16,42 +14,21 @@ from quest.types import (
     QVariantType,
     is_subtype,
 )
+from tests.python.helpers import assert_pipeline_failure, assert_pipeline_success
 
 
 class TestVariants(unittest.TestCase):
     """Verifies Variant types from Cardelli's Typeful Programming §6.3."""
 
     def setUp(self) -> None:
-        self.pipeline = default_pipeline()
         self.env = Environment()
         self.runtime_env = RuntimeEnvironment.create_root_env()
 
     def run_source(self, source: str) -> CompilerContext:
-        ctx = CompilerContext.create(
-            source,
-            "<test>",
-            env=self.env,
-            runtime_env=self.runtime_env,
-        )
-        res = self.pipeline.execute(source, "<test>", ctx=ctx)
-        self.assertTrue(res.success, f"Pipeline failed: {res.diagnostics}")
-        return ctx
+        return assert_pipeline_success(source, env=self.env, runtime_env=self.runtime_env)
 
     def check_failure(self, source: str, expected_substr: str) -> None:
-        ctx = CompilerContext.create(
-            source,
-            "<test>",
-            env=self.env,
-            runtime_env=self.runtime_env,
-        )
-        res = self.pipeline.execute(source, "<test>", ctx=ctx)
-        self.assertFalse(res.success, f"Expected pipeline failure, but succeeded: {res}")
-        messages = " ".join(d.message for d in res.diagnostics)
-        self.assertIn(
-            expected_substr,
-            messages,
-            f"Expected substring '{expected_substr}' not found in diagnostics: {messages}",
-        )
+        assert_pipeline_failure(source, expected_substr, env=self.env, runtime_env=self.runtime_env)
 
     def test_variant_type_elaboration(self) -> None:
         """Cardelli §6.3 Day variant signature elaborates correctly."""

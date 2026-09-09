@@ -26,7 +26,11 @@ from quest.types import (
     STRING_TYPE,
     TYPE_KIND,
 )
-from tests.python.helpers import parse_expr, parse_type
+from tests.python.helpers import (
+    elaborate_test_type,
+    parse_expr,
+    synth_test_expr,
+)
 
 
 class Phase3FunctionsTest(unittest.TestCase):
@@ -34,8 +38,7 @@ class Phase3FunctionsTest(unittest.TestCase):
 
     def test_fun_abstraction_synthesis(self) -> None:
         """fun(x: Int): Int x + 1 synthesizes QFunType(Int) -> Int."""
-        fn_expr = parse_expr("fun(x: Int): Int x + 1")
-        typed = synth_expr(fn_expr)
+        typed = synth_test_expr("fun(x: Int): Int x + 1")
         self.assertIsInstance(typed, TypedFun)
         self.assertEqual(len(typed.params), 1)
         self.assertEqual(typed.params[0].name, "x")
@@ -44,8 +47,7 @@ class Phase3FunctionsTest(unittest.TestCase):
 
     def test_fun_abstraction_omitted_return_type(self) -> None:
         """fun(x: Int) x + 1 infers return type Int from body."""
-        fn_expr = parse_expr("fun(x: Int) x + 1")
-        typed = synth_expr(fn_expr)
+        typed = synth_test_expr("fun(x: Int) x + 1")
         self.assertEqual(typed.type_val, QFunType(params=(QParam("x", INT_TYPE),), result_type=INT_TYPE))
 
     def test_fun_abstraction_checking_mode(self) -> None:
@@ -66,11 +68,10 @@ class Phase3FunctionsTest(unittest.TestCase):
 
     def test_function_application_monomorphic(self) -> None:
         """f(41) synthesizes Int."""
-        fn_expr = parse_expr("fun(x: Int): Int x + 1")
+        fn_type = synth_test_expr("fun(x: Int): Int x + 1").type_val
         env = Environment()
-        env.current_scope.declare_value(ValueSymbol(name="f", type_val=synth_expr(fn_expr).type_val))
-        app_expr = parse_expr("f(41)")
-        typed = synth_expr(app_expr, env)
+        env.current_scope.declare_value(ValueSymbol(name="f", type_val=fn_type))
+        typed = synth_test_expr("f(41)", env)
         self.assertIsInstance(typed, TypedApp)
         self.assertEqual(typed.type_val, INT_TYPE)
         self.assertEqual(len(typed.args), 1)
@@ -84,8 +85,7 @@ class Phase3FunctionsTest(unittest.TestCase):
         )
         env.current_scope.declare_value(ValueSymbol(name="f", type_val=fn_type))
 
-        app_expr = parse_expr("f(10 2.5)")
-        typed = synth_expr(app_expr, env)
+        typed = synth_test_expr("f(10 2.5)", env)
         self.assertIsInstance(typed, TypedApp)
         self.assertEqual(typed.type_val, REAL_TYPE)
 
@@ -102,22 +102,19 @@ class Phase3FunctionsTest(unittest.TestCase):
         env.current_scope.declare_value(ValueSymbol(name="imm", type_val=INT_TYPE, is_var=False))
 
         # Passing mutable variable succeeds
-        ok_call = parse_expr("inc(c)")
-        typed = synth_expr(ok_call, env)
+        typed = synth_test_expr("inc(c)", env)
         self.assertIsInstance(typed, TypedApp)
         self.assertEqual(typed.type_val, OK_TYPE)
         # Arg passed as lvalue location TypedVar
         self.assertIsInstance(typed.args[0], TypedVar)
 
         # Passing immutable variable fails
-        err_call = parse_expr("inc(imm)")
         with self.assertRaises(TypeError):
-            synth_expr(err_call, env)
+            synth_test_expr("inc(imm)", env)
 
         # Passing literal fails
-        lit_call = parse_expr("inc(5)")
         with self.assertRaises(TypeError):
-            synth_expr(lit_call, env)
+            synth_test_expr("inc(5)", env)
 
     def test_out_parameter_covariance(self) -> None:
         """out parameters require a mutable location where param_type <= location_type."""
@@ -139,15 +136,13 @@ class Phase3FunctionsTest(unittest.TestCase):
 
         # Destination variable of type Animal (Dog <= Animal: valid!)
         env.current_scope.declare_value(ValueSymbol(name="pet", type_val=animal_type, is_var=True))
-        call_ok = parse_expr("getDog(pet)")
-        typed_ok = synth_expr(call_ok, env)
+        typed_ok = synth_test_expr("getDog(pet)", env)
         self.assertEqual(typed_ok.type_val, OK_TYPE)
 
         # Destination variable of type Terrier (Dog <= Terrier is False: rejected!)
         env.current_scope.declare_value(ValueSymbol(name="tiny", type_val=terrier_type, is_var=True))
-        call_err = parse_expr("getDog(tiny)")
         with self.assertRaises(TypeError):
-            synth_expr(call_err, env)
+            synth_test_expr("getDog(tiny)", env)
 
     def test_polymorphic_application_inference(self) -> None:
         """Polymorphic call id(42) infers X = Int and wraps in TypedTypeApp."""
@@ -163,16 +158,14 @@ class Phase3FunctionsTest(unittest.TestCase):
         env.current_scope.declare_value(ValueSymbol(name="id", type_val=all_id_type))
 
         # id(42)
-        call_int = parse_expr("id(42)")
-        typed = synth_expr(call_int, env)
+        typed = synth_test_expr("id(42)", env)
         self.assertIsInstance(typed, TypedApp)
         self.assertEqual(typed.type_val, INT_TYPE)
         self.assertIsInstance(typed.func, TypedTypeApp)
         self.assertEqual(typed.func.type_args, (INT_TYPE,))
 
         # id("hello")
-        call_str = parse_expr('id("hello")')
-        typed_str = synth_expr(call_str, env)
+        typed_str = synth_test_expr('id("hello")', env)
         self.assertIsInstance(typed_str, TypedApp)
         self.assertEqual(typed_str.type_val, STRING_TYPE)
         self.assertIsInstance(typed_str.func, TypedTypeApp)
@@ -180,19 +173,17 @@ class Phase3FunctionsTest(unittest.TestCase):
 
     def test_let_function_shorthand_and_recursion(self) -> None:
         """let rec factorial(n: Int): Int = ... typechecks and binds properly."""
-        block = parse_expr(
+        typed_block = synth_test_expr(
             "begin let rec factorial(n: Int): Int = "
             "if n == 0 then 1 else n * factorial(n - 1) end; "
             "factorial(5) end"
         )
-        typed_block = synth_expr(block)
         self.assertEqual(typed_block.type_val, INT_TYPE)
 
     def test_let_rec_missing_return_type_raises_type_error(self) -> None:
         """let rec f(n: Int) = ... without return type raises TypeError."""
-        block = parse_expr("begin let rec fib(n: Int) = n; 1 end")
         with self.assertRaises(TypeError) as ctx:
-            synth_expr(block)
+            synth_test_expr("begin let rec fib(n: Int) = n; 1 end")
         self.assertIn(
             "Recursive function 'fib' requires an explicit return type annotation",
             str(ctx.exception),
@@ -224,9 +215,8 @@ class Phase3FunctionsTest(unittest.TestCase):
 
     def test_let_rec_value_missing_type_raises_type_error(self) -> None:
         """let rec f = 1 without type annotation raises TypeError."""
-        block = parse_expr("begin let rec f = 1; 1 end")
         with self.assertRaises(TypeError) as ctx:
-            synth_expr(block)
+            synth_test_expr("begin let rec f = 1; 1 end")
         self.assertIn(
             "Recursive definition 'f' requires an explicit type annotation",
             str(ctx.exception),
@@ -234,8 +224,7 @@ class Phase3FunctionsTest(unittest.TestCase):
 
     def test_all_type_as_function_type_elaboration(self) -> None:
         """All(y: Int) Int in elaborate_type elaborates to QFunType(y: Int) -> Int."""
-        ast_all = parse_type("All(y: Int) Int")
-        elaborated = elaborate_type(ast_all, Environment())
+        elaborated = elaborate_test_type("All(y: Int) Int")
         self.assertIsInstance(elaborated, QFunType)
         self.assertEqual(len(elaborated.params), 1)
         self.assertEqual(elaborated.params[0].name, "y")

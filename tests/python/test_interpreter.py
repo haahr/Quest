@@ -2,6 +2,8 @@
 
 import unittest
 
+from typing import Any, Optional
+
 from quest.interpreter import (
     DIVIDE_BY_ZERO_EXC,
     QuestException,
@@ -10,7 +12,6 @@ from quest.interpreter import (
     eval_expr,
     eval_program,
 )
-from quest.pipeline import CompilerOptions, default_pipeline
 from quest.runtime import (
     FALSE_VALUE,
     OK_VALUE,
@@ -23,50 +24,67 @@ from quest.runtime import (
     QTuple,
     qvalue_is,
 )
+from tests.python.helpers import eval_test_source
 
 
 def run_quest_code(source: str, env: RuntimeEnvironment | None = None):
     """Helper to parse, typecheck, and evaluate Quest source code."""
-    pipeline = default_pipeline()
-    opts = CompilerOptions(stop_after="typecheck")
-    res = pipeline.execute(source, "<test>", options=opts)
-    if not res.success or res.final_artifact is None:
-        diags = "\n".join(d.message for d in res.diagnostics)
-        raise RuntimeError(f"Compilation failed:\n{diags}")
-    return eval_program(res.final_artifact, env)
+    return eval_test_source(source, env)
 
 
-class TestLiteralEvaluation(unittest.TestCase):
+class InterpreterTestCase(unittest.TestCase):
+    """Base test case providing assert_eval helper for Quest values."""
+
+    def assert_eval(
+        self,
+        source: str,
+        expected: Any,
+        env: Optional[RuntimeEnvironment] = None,
+    ) -> None:
+        val = run_quest_code(source, env)
+        if isinstance(expected, bool):
+            self.assertEqual(val, TRUE_VALUE if expected else FALSE_VALUE)
+        elif isinstance(expected, int):
+            self.assertEqual(val, QInt(expected))
+        elif isinstance(expected, float):
+            self.assertEqual(val, QReal(expected))
+        elif isinstance(expected, str):
+            self.assertEqual(val, QString(expected))
+        else:
+            self.assertEqual(val, expected)
+
+
+class TestLiteralEvaluation(InterpreterTestCase):
     """Tests for evaluating literal expressions."""
 
     def test_primitives(self):
-        self.assertEqual(run_quest_code("42;"), QInt(42))
-        self.assertEqual(run_quest_code("3.14;"), QReal(3.14))
-        self.assertEqual(run_quest_code("true;"), TRUE_VALUE)
-        self.assertEqual(run_quest_code("false;"), FALSE_VALUE)
+        self.assert_eval("42;", 42)
+        self.assert_eval("3.14;", 3.14)
+        self.assert_eval("true;", True)
+        self.assert_eval("false;", False)
         self.assertEqual(run_quest_code("'z';"), QChar("z"))
-        self.assertEqual(run_quest_code('"hello";'), QString("hello"))
+        self.assert_eval('"hello";', "hello")
         self.assertEqual(run_quest_code("ok;"), OK_VALUE)
 
 
-class TestArithmetic(unittest.TestCase):
+class TestArithmetic(InterpreterTestCase):
     """Tests for integer and real arithmetic, truncation toward zero, and DivideByZero."""
 
     def test_int_arithmetic(self):
-        self.assertEqual(run_quest_code("10 + 20;"), QInt(30))
-        self.assertEqual(run_quest_code("50 - 15;"), QInt(35))
-        self.assertEqual(run_quest_code("6 * 7;"), QInt(42))
+        self.assert_eval("10 + 20;", 30)
+        self.assert_eval("50 - 15;", 35)
+        self.assert_eval("6 * 7;", 42)
 
     def test_integer_division_truncation(self):
         # Positive operands
-        self.assertEqual(run_quest_code("7 / 2;"), QInt(3))
-        self.assertEqual(run_quest_code("7 % 2;"), QInt(1))
+        self.assert_eval("7 / 2;", 3)
+        self.assert_eval("7 % 2;", 1)
 
         # Negative operands: Cardelli C-style truncation toward zero
-        self.assertEqual(run_quest_code("{0 - 7} / 2;"), QInt(-3))
-        self.assertEqual(run_quest_code("{0 - 7} % 2;"), QInt(-1))
-        self.assertEqual(run_quest_code("7 / {0 - 2};"), QInt(-3))
-        self.assertEqual(run_quest_code("7 % {0 - 2};"), QInt(1))
+        self.assert_eval("{0 - 7} / 2;", -3)
+        self.assert_eval("{0 - 7} % 2;", -1)
+        self.assert_eval("7 / {0 - 2};", -3)
+        self.assert_eval("7 % {0 - 2};", 1)
 
     def test_divide_by_zero_exception(self):
         with self.assertRaises(QuestException) as ctx1:
@@ -78,39 +96,39 @@ class TestArithmetic(unittest.TestCase):
         self.assertEqual(ctx2.exception.exc_val.name, "DivideByZero")
 
     def test_real_arithmetic(self):
-        self.assertEqual(run_quest_code("1.5 + 2.5;"), QReal(4.0))
-        self.assertEqual(run_quest_code("5.0 - 1.25;"), QReal(3.75))
-        self.assertEqual(run_quest_code("2.5 * 4.0;"), QReal(10.0))
-        self.assertEqual(run_quest_code("9.0 / 2.0;"), QReal(4.5))
+        self.assert_eval("1.5 + 2.5;", 4.0)
+        self.assert_eval("5.0 - 1.25;", 3.75)
+        self.assert_eval("2.5 * 4.0;", 10.0)
+        self.assert_eval("9.0 / 2.0;", 4.5)
 
         with self.assertRaises(QuestException):
             run_quest_code("1.0 / 0.0;")
 
 
-class TestRelationalAndEquality(unittest.TestCase):
+class TestRelationalAndEquality(InterpreterTestCase):
     """Tests for relational operators and equality predicates."""
 
     def test_relational(self):
-        self.assertEqual(run_quest_code("1 < 2;"), TRUE_VALUE)
-        self.assertEqual(run_quest_code("2 <= 2;"), TRUE_VALUE)
-        self.assertEqual(run_quest_code("3 > 5;"), FALSE_VALUE)
-        self.assertEqual(run_quest_code("5 >= 5;"), TRUE_VALUE)
+        self.assert_eval("1 < 2;", True)
+        self.assert_eval("2 <= 2;", True)
+        self.assert_eval("3 > 5;", False)
+        self.assert_eval("5 >= 5;", True)
 
         # Reals
-        self.assertEqual(run_quest_code("1.5 < 2.5;"), TRUE_VALUE)
+        self.assert_eval("1.5 < 2.5;", True)
         # Chars
         self.assertEqual(run_quest_code("'a' < 'b';"), TRUE_VALUE)
         # Strings
-        self.assertEqual(run_quest_code('"abc" < "abd";'), TRUE_VALUE)
+        self.assert_eval('"abc" < "abd";', True)
 
     def test_equality(self):
-        self.assertEqual(run_quest_code("10 is 10;"), TRUE_VALUE)
-        self.assertEqual(run_quest_code("10 isnot 20;"), TRUE_VALUE)
-        self.assertEqual(run_quest_code("10 is 20;"), FALSE_VALUE)
-        self.assertEqual(run_quest_code("10 <> 20;"), TRUE_VALUE)
+        self.assert_eval("10 is 10;", True)
+        self.assert_eval("10 isnot 20;", True)
+        self.assert_eval("10 is 20;", False)
+        self.assert_eval("10 <> 20;", True)
 
 
-class TestVariablesAndMutability(unittest.TestCase):
+class TestVariablesAndMutability(InterpreterTestCase):
     """Tests for variable bindings, mutation, and scoping."""
 
     def test_immutable_let(self):
@@ -119,7 +137,7 @@ class TestVariablesAndMutability(unittest.TestCase):
         let y = 20;
         x + y;
         """
-        self.assertEqual(run_quest_code(code), QInt(30))
+        self.assert_eval(code, 30)
 
     def test_mutable_var(self):
         code = """
@@ -128,7 +146,7 @@ class TestVariablesAndMutability(unittest.TestCase):
         count := count * 2;
         count;
         """
-        self.assertEqual(run_quest_code(code), QInt(10))
+        self.assert_eval(code, 10)
 
     def test_scoped_blocks(self):
         code = """
@@ -139,15 +157,15 @@ class TestVariablesAndMutability(unittest.TestCase):
         end;
         res + x;
         """
-        self.assertEqual(run_quest_code(code), QInt(155))
+        self.assert_eval(code, 155)
 
 
-class TestConditionalsAndLogic(unittest.TestCase):
+class TestConditionalsAndLogic(InterpreterTestCase):
     """Tests for conditionals and short-circuit boolean logic."""
 
     def test_if_then_else(self):
-        self.assertEqual(run_quest_code("if 1 < 2 then 10 else 20 end;"), QInt(10))
-        self.assertEqual(run_quest_code("if 2 < 1 then 10 else 20 end;"), QInt(20))
+        self.assert_eval("if 1 < 2 then 10 else 20 end;", 10)
+        self.assert_eval("if 2 < 1 then 10 else 20 end;", 20)
 
     def test_short_circuit_andif_orif(self):
         # andif should not evaluate right side if left is false
@@ -156,7 +174,7 @@ class TestConditionalsAndLogic(unittest.TestCase):
         let res = {1 > 2} andif {begin evaluated := true; true end};
         evaluated;
         """
-        self.assertEqual(run_quest_code(code_andif), FALSE_VALUE)
+        self.assert_eval(code_andif, False)
 
         # orif should not evaluate right side if left is true
         code_orif = """
@@ -164,10 +182,10 @@ class TestConditionalsAndLogic(unittest.TestCase):
         let res = {1 < 2} orif {begin evaluated := true; false end};
         evaluated;
         """
-        self.assertEqual(run_quest_code(code_orif), FALSE_VALUE)
+        self.assert_eval(code_orif, False)
 
 
-class TestLoopsAndControlFlow(unittest.TestCase):
+class TestLoopsAndControlFlow(InterpreterTestCase):
     """Tests for while loops, infinite loops with exit, and for loops."""
 
     def test_while_loop(self):
@@ -178,7 +196,7 @@ class TestLoopsAndControlFlow(unittest.TestCase):
         end;
         i;
         """
-        self.assertEqual(run_quest_code(code), QInt(5))
+        self.assert_eval(code, 5)
 
     def test_loop_with_exit(self):
         code = """
@@ -192,7 +210,7 @@ class TestLoopsAndControlFlow(unittest.TestCase):
         end;
         i;
         """
-        self.assertEqual(run_quest_code(code), QInt(7))
+        self.assert_eval(code, 7)
 
     def test_for_upto_inclusive(self):
         code = """
@@ -203,7 +221,7 @@ class TestLoopsAndControlFlow(unittest.TestCase):
         sum;
         """
         # 1 + 2 + 3 + 4 + 5 = 15
-        self.assertEqual(run_quest_code(code), QInt(15))
+        self.assert_eval(code, 15)
 
     def test_for_downto_inclusive(self):
         code = """
@@ -214,7 +232,7 @@ class TestLoopsAndControlFlow(unittest.TestCase):
         prod;
         """
         # 4 * 3 * 2 * 1 = 24
-        self.assertEqual(run_quest_code(code), QInt(24))
+        self.assert_eval(code, 24)
 
     def test_for_zero_iterations(self):
         code = """
@@ -224,7 +242,7 @@ class TestLoopsAndControlFlow(unittest.TestCase):
         end;
         count;
         """
-        self.assertEqual(run_quest_code(code), QInt(0))
+        self.assert_eval(code, 0)
 
 
 class TestExpressionsControlFlowSource(unittest.TestCase):
