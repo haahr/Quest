@@ -338,7 +338,16 @@ def build_quest_grammar() -> None:
     PRIMARY_TYPE.add_rule(
         (T(TK.KW_VARIANT_TYPE), VALUE_SIGNATURE, T(TK.KW_END)),
         lambda variant_token, signatures, end_token: ast.TypeVariant(
-            fields=signatures, offset=variant_token.offset
+            fields=tuple(
+                ast.VariantFieldSig(
+                    tag=sig.name,
+                    type_sig=sig.type_sig,
+                    is_var=sig.is_var,
+                    offset=sig.offset,
+                )
+                for sig in signatures
+            ),
+            offset=variant_token.offset,
         ),
     )
     # Auto [ide] HasKind with Signature end

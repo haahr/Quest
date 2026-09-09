@@ -109,6 +109,8 @@ from quest.typed_ast import (
     TypedVar,
     TypedVarCell,
     TypedVariant,
+    TypedVariantAssert,
+    TypedVariantCheck,
     TypedWhile,
 )
 
@@ -637,6 +639,31 @@ def eval_expr(expr: TypedExpr, env: RuntimeEnvironment) -> QValue:
         case TypedOption(tag=tag, payload=payload):
             p_val = eval_expr(payload, env) if payload is not None else None
             return QOption(tag=tag, payload=p_val)
+
+        case TypedVariantCheck(target=target, tag=tag, offset=offset):
+            target_val = eval_expr(target, env)
+            if not isinstance(target_val, (QVariant, QOption)):
+                raise QuestRuntimeError(
+                    f"Variant query target must be Variant or Option, got {target_val.type_name}",
+                    offset=offset,
+                )
+            return QBool(target_val.tag == tag)
+
+        case TypedVariantAssert(target=target, tag=tag, offset=offset):
+            target_val = eval_expr(target, env)
+            if not isinstance(target_val, (QVariant, QOption)):
+                raise QuestRuntimeError(
+                    f"Variant assert target must be Variant or Option, got {target_val.type_name}",
+                    offset=offset,
+                )
+            if target_val.tag != tag:
+                raise QuestRuntimeError(
+                    f"Variant tag mismatch in '!': expected '{tag}', got '{target_val.tag}'",
+                    offset=offset,
+                )
+            if target_val.payload is not None:
+                return target_val.payload
+            return QOk()
 
         case TypedCase(target=target, branches=branches, else_branch=else_branch, offset=offset):
             target_val = eval_expr(target, env)

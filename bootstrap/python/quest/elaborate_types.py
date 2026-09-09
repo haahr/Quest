@@ -317,15 +317,21 @@ def elaborate_type(ast_type: ast.Type, env: Environment) -> QType:
             return QRecordType(fields)
 
         case ast.TypeVariant(fields=var_fields):
-            variants = tuple(
-                QVariantField(
-                    name=v.tag,
-                    type_val=elaborate_type(v.type_sig, env) if v.type_sig else None,
-                    is_var=v.is_var,
+            variants: list[QVariantField] = []
+            seen_tags: set[str] = set()
+            for v in var_fields:
+                tag = getattr(v, "tag", getattr(v, "name", ""))
+                if tag in seen_tags:
+                    raise KindError(f"Duplicate variant tag '{tag}'", offset=getattr(v, "offset", None))
+                seen_tags.add(tag)
+                variants.append(
+                    QVariantField(
+                        name=tag,
+                        type_val=elaborate_type(v.type_sig, env) if v.type_sig else None,
+                        is_var=v.is_var,
+                    )
                 )
-                for v in var_fields
-            )
-            return QVariantType(variants)
+            return QVariantType(tuple(variants))
 
         case ast.TypeOption(variants=opt_variants):
             options: list[QOptionField] = []

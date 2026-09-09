@@ -160,6 +160,10 @@ class VariantFieldSig(ASTNode):
     type_sig: Type
     is_var: bool = False
 
+    @property
+    def name(self) -> str:
+        return self.tag
+
 
 @dataclass(frozen=True)
 class TypeVariant(Type):

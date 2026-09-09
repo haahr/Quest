@@ -117,6 +117,8 @@ from quest.elaborate_types import (
 import quest.typed_ast as typed_ast
 from quest.typed_ast import (
     TypedTypeWitness,
+    TypedVariantAssert,
+    TypedVariantCheck,
     typed_ast_dump,
 )
 from quest.typechecker import (
@@ -226,6 +228,8 @@ __all__ = [
     "typed_ast",
     "typed_ast_dump",
     "TypedTypeWitness",
+    "TypedVariantAssert",
+    "TypedVariantCheck",
     "QuestTypeError",
     "check_expr",
     "synth_expr",

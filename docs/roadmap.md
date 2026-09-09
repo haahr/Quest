@@ -20,7 +20,7 @@ native **AArch64 (ARM64)** machine code and providing a **JIT compiler** for int
 |  [Step 2] Bidirectional Typechecker & Type Evaluator (Kernel F<: subtyping)       |
 |       │   [COMPLETE]                                                              |
 |       ▼                                                                           |
-|  [Step 3] Tree-Walking Interpreter & Interactive REPL [IN PROGRESS]               |
+|  [Step 3] Tree-Walking Interpreter & Interactive REPL [COMPLETE]                  |
 |       │                                                                           |
 |       ▼                                                                           |
 |  [Step 4] Bootstrap C Transpiler (Compiles Quest AST -> C99 + Boehm GC -> Binary) |

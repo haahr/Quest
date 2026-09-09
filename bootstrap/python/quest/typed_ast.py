@@ -442,6 +442,34 @@ class TypedOption(TypedExpr):
 
 
 @dataclass(frozen=True)
+class TypedVariantCheck(TypedExpr):
+    """Variant/Option tag check: target?tag."""
+    target: TypedExpr
+    tag: str
+    type_val: QType
+
+    def dump_header(self) -> str:
+        return f"'{self.tag}'"
+
+    def dump_children(self) -> list[tuple[str, Any]]:
+        return [(":target", self.target)]
+
+
+@dataclass(frozen=True)
+class TypedVariantAssert(TypedExpr):
+    """Variant/Option tag assertion/extraction: target!tag."""
+    target: TypedExpr
+    tag: str
+    type_val: QType
+
+    def dump_header(self) -> str:
+        return f"'{self.tag}'"
+
+    def dump_children(self) -> list[tuple[str, Any]]:
+        return [(":target", self.target)]
+
+
+@dataclass(frozen=True)
 class TypedCaseBranch(TypedNode):
     """A branch in a case discrimination: when tag1, tag2 => body."""
     tags: tuple[str, ...]

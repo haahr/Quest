@@ -113,6 +113,8 @@ from quest.typed_ast import (
     TypedVar,
     TypedVarCell,
     TypedVariant,
+    TypedVariantAssert,
+    TypedVariantCheck,
     TypedWhile,
 )
 
@@ -379,6 +381,12 @@ def synth_expr(
 
         case ast.ExprVariant():
             return _synth_variant_expr(expr, env, loop_depth)
+
+        case ast.ExprVariantCheck():
+            return _synth_variant_check_expr(expr, env, loop_depth)
+
+        case ast.ExprVariantAssert():
+            return _synth_variant_assert_expr(expr, env, loop_depth)
 
         case ast.ExprCase():
             return _synth_case_expr(expr, env, loop_depth)
@@ -1107,6 +1115,64 @@ def _synth_variant_expr(expr: ast.ExprVariant, env: Environment, loop_depth: int
         payload_typed = None
 
     return TypedVariant(tag=expr.tag, type_val=var_type, payload=payload_typed, offset=expr.offset)
+
+
+def _synth_variant_check_expr(
+    expr: ast.ExprVariantCheck, env: Environment, loop_depth: int
+) -> TypedVariantCheck:
+    """Synthesizes a variant/option tag query: target?tag."""
+    target_typed = synth_expr(expr.target, env, loop_depth)
+    target_type = target_typed.type_val.evaluate_lazily(env)
+    if isinstance(target_type, QVariantType):
+        field = target_type.get_variant(expr.tag)
+        if field is None:
+            raise TypeError(
+                f"Tag '{expr.tag}' is not a valid variant of type '{target_type}'",
+                offset=expr.offset,
+            )
+    elif isinstance(target_type, QOptionType):
+        opt = target_type.get_option(expr.tag)
+        if opt is None:
+            raise TypeError(
+                f"Tag '{expr.tag}' is not a valid option of type '{target_type}'",
+                offset=expr.offset,
+            )
+    else:
+        raise TypeError(
+            f"Variant query '?' requires Variant or Option target, got '{target_type}'",
+            offset=expr.offset,
+        )
+    return TypedVariantCheck(target=target_typed, tag=expr.tag, type_val=BOOL_TYPE, offset=expr.offset)
+
+
+def _synth_variant_assert_expr(
+    expr: ast.ExprVariantAssert, env: Environment, loop_depth: int
+) -> TypedVariantAssert:
+    """Synthesizes a variant/option payload extraction: target!tag."""
+    target_typed = synth_expr(expr.target, env, loop_depth)
+    target_type = target_typed.type_val.evaluate_lazily(env)
+    if isinstance(target_type, QVariantType):
+        field = target_type.get_variant(expr.tag)
+        if field is None:
+            raise TypeError(
+                f"Tag '{expr.tag}' is not a valid variant of type '{target_type}'",
+                offset=expr.offset,
+            )
+        result_type = field.type_val if field.type_val is not None else OK_TYPE
+    elif isinstance(target_type, QOptionType):
+        opt = target_type.get_option(expr.tag)
+        if opt is None:
+            raise TypeError(
+                f"Tag '{expr.tag}' is not a valid option of type '{target_type}'",
+                offset=expr.offset,
+            )
+        result_type = opt.payload_type if opt.payload_type is not None else OK_TYPE
+    else:
+        raise TypeError(
+            f"Variant assertion '!' requires Variant or Option target, got '{target_type}'",
+            offset=expr.offset,
+        )
+    return TypedVariantAssert(target=target_typed, tag=expr.tag, type_val=result_type, offset=expr.offset)
 
 
 def _synth_case_expr(expr: ast.ExprCase, env: Environment, loop_depth: int) -> TypedCase:
