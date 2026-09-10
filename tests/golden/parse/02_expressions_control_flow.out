@@ -32,7 +32,7 @@
         :right (ExprInfix
           :left (ExprInfix
             :left (ExprId 'x')
-            :op '<>'
+            :op 'isnot'
             :right (ExprInt 0 '0')
           )
           :op 'orif'

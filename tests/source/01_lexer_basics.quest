@@ -12,5 +12,5 @@ end;
 
 let add(p1: T p2: T): T = tuple
     let x = p1.x + p2.x
-    let y = p1.y + p2.y
+    let y = p1.y ++ p2.y
 end;

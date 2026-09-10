@@ -118,14 +118,22 @@ class TestTypecheckerPhase2(unittest.TestCase):
         self.assertIsInstance(typed_plus_int, TypedInfix)
         self.assertEqual(typed_plus_int.type_val, INT_TYPE)
 
-        # Valid Real arithmetic
-        typed_plus_real = synth_test_expr("1.0 + 2.5", self.env)
+        # Valid Real arithmetic (doubled operators)
+        typed_plus_real = synth_test_expr("1.0 ++ 2.5", self.env)
         self.assertIsInstance(typed_plus_real, TypedInfix)
         self.assertEqual(typed_plus_real.type_val, REAL_TYPE)
+
+        # No operator overloading: + is strictly Int, ++ is strictly Real
+        with self.assertRaises(QuestTypeError):
+            synth_test_expr("1.0 + 2.5", self.env)
+        with self.assertRaises(QuestTypeError):
+            synth_test_expr("1 ++ 2", self.env)
 
         # Mixed Int + Real: STRICT REJECTION (no numeric coercion)
         with self.assertRaises(QuestTypeError):
             synth_test_expr("1 + 2.0", self.env)
+        with self.assertRaises(QuestTypeError):
+            synth_test_expr("1.0 ++ 2", self.env)
 
         # % on Int vs % on Real
         self.assertEqual(synth_test_expr("10 % 3", self.env).type_val, INT_TYPE)
@@ -143,11 +151,30 @@ class TestTypecheckerPhase2(unittest.TestCase):
         self.assertEqual(typed_or.type_val, BOOL_TYPE)
 
     def test_relational_and_equality_operators(self):
-        # Relational <
+        # Relational < for Int
         self.assertEqual(synth_test_expr("3 < 5", self.env).type_val, BOOL_TYPE)
+
+        # Relational << for Real
+        self.assertEqual(synth_test_expr("3.0 << 5.0", self.env).type_val, BOOL_TYPE)
+
+        # < on Real is rejected (no overloading)
+        with self.assertRaises(QuestTypeError):
+            synth_test_expr("3.0 < 5.0", self.env)
 
         # Equality is
         self.assertEqual(synth_test_expr('"a" is "b"', self.env).type_val, BOOL_TYPE)
+
+        # String concatenation <>
+        typed_concat = synth_test_expr('"hello " <> "world"', self.env)
+        self.assertEqual(typed_concat.type_val, STRING_TYPE)
+
+        # <> on Int is rejected (strictly string concatenation)
+        with self.assertRaises(QuestTypeError):
+            synth_test_expr("10 <> 20", self.env)
+
+        # Boolean eager operations /\ and \/
+        self.assertEqual(synth_test_expr("true /\\ false", self.env).type_val, BOOL_TYPE)
+        self.assertEqual(synth_test_expr("true \\/ false", self.env).type_val, BOOL_TYPE)
 
         # Incompatible comparison
         with self.assertRaises(QuestTypeError):

@@ -4,7 +4,7 @@ let x = 10;
 let y = 20;
 
 let sum = x + y * 2;
-let boolVal = {x < y} andif {{x <> 0} orif {y is 20}};
+let boolVal = {x < y} andif {{x isnot 0} orif {y is 20}};
 
 let testIf(n: Int): Int =
     if n < 0 then

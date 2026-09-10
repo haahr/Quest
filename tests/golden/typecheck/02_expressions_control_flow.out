@@ -16,7 +16,7 @@
           :left (TypedVar 'x' :type Int)
           :right (TypedVar 'y' :type Int))
         :then (TypedIf :type Bool
-          :cond (TypedInfix '<>' :type Bool
+          :cond (TypedInfix 'isnot' :type Bool
             :left (TypedVar 'x' :type Int)
             :right (TypedInt 0 :type Int))
           :then (TypedBool true)

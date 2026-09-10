@@ -58,7 +58,7 @@
                 :target (ExprId 'p1')
                 :field 'y'
               )
-              :op '+'
+              :op '++'
               :right (ExprSelect
                 :target (ExprId 'p2')
                 :field 'y'

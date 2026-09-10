@@ -66,6 +66,17 @@ class TestLiteralEvaluation(InterpreterTestCase):
         self.assert_eval('"hello";', "hello")
         self.assertEqual(run_quest_code("ok;"), OK_VALUE)
 
+    def test_negative_literals(self):
+        self.assert_eval("~42;", -42)
+        self.assert_eval("~3.14;", -3.14)
+        self.assert_eval("~5.1E~4;", -0.00051)
+        self.assert_eval("3.2E~4;", 0.00032)
+        self.assert_eval("~7 / 2;", -3)
+        self.assert_eval("~7 % 2;", -1)
+        self.assert_eval("10 - ~3;", 13)
+        self.assert_eval("~10 + 3;", -7)
+        self.assert_eval("~5.0 ++ 2.5;", -2.5)
+
 
 class TestArithmetic(InterpreterTestCase):
     """Tests for integer and real arithmetic, truncation toward zero, and DivideByZero."""
@@ -96,36 +107,44 @@ class TestArithmetic(InterpreterTestCase):
         self.assertEqual(ctx2.exception.exc_val.name, "DivideByZero")
 
     def test_real_arithmetic(self):
-        self.assert_eval("1.5 + 2.5;", 4.0)
-        self.assert_eval("5.0 - 1.25;", 3.75)
-        self.assert_eval("2.5 * 4.0;", 10.0)
-        self.assert_eval("9.0 / 2.0;", 4.5)
+        self.assert_eval("1.5 ++ 2.5;", 4.0)
+        self.assert_eval("5.0 -- 1.25;", 3.75)
+        self.assert_eval("2.5 ** 4.0;", 10.0)
+        self.assert_eval("9.0 // 2.0;", 4.5)
+        self.assert_eval("2.0 ^^ 3.0;", 8.0)
 
         with self.assertRaises(QuestException):
-            run_quest_code("1.0 / 0.0;")
+            run_quest_code("1.0 // 0.0;")
 
 
 class TestRelationalAndEquality(InterpreterTestCase):
     """Tests for relational operators and equality predicates."""
 
     def test_relational(self):
+        # Int relational
         self.assert_eval("1 < 2;", True)
         self.assert_eval("2 <= 2;", True)
         self.assert_eval("3 > 5;", False)
         self.assert_eval("5 >= 5;", True)
 
-        # Reals
-        self.assert_eval("1.5 < 2.5;", True)
-        # Chars
-        self.assertEqual(run_quest_code("'a' < 'b';"), TRUE_VALUE)
-        # Strings
-        self.assert_eval('"abc" < "abd";', True)
+        # Real relational (doubled operators)
+        self.assert_eval("1.5 << 2.5;", True)
+        self.assert_eval("2.5 <<= 2.5;", True)
+        self.assert_eval("3.0 >> 5.0;", False)
+        self.assert_eval("5.0 >>= 5.0;", True)
 
     def test_equality(self):
         self.assert_eval("10 is 10;", True)
         self.assert_eval("10 isnot 20;", True)
         self.assert_eval("10 is 20;", False)
-        self.assert_eval("10 <> 20;", True)
+        self.assert_eval("10 == 10;", True)
+
+    def test_string_concatenation(self):
+        self.assert_eval('"hello " <> "world";', "hello world")
+
+    def test_eager_boolean(self):
+        self.assert_eval("true /\\ false;", False)
+        self.assert_eval("true \\/ false;", True)
 
 
 class TestVariablesAndMutability(InterpreterTestCase):
@@ -253,7 +272,7 @@ class TestExpressionsControlFlowSource(unittest.TestCase):
         let x = 10;
         let y = 20;
         let sum = x + y * 2;
-        let boolVal = {x < y} andif {{x <> 0} orif {y is 20}};
+        let boolVal = {x < y} andif {{x isnot 0} orif {y is 20}};
         boolVal;
         """
         self.assertEqual(run_quest_code(code), TRUE_VALUE)
@@ -533,9 +552,9 @@ class TestStandardLibraryModules(unittest.TestCase):
         code = """
         import conv: Conv;
         let pos = conv.int(42);
-        let neg = conv.int(0 - 42);
+        let neg = conv.int(~42);
         let posR = conv.real(3.14);
-        let negR = conv.real(0.0 - 2.5);
+        let negR = conv.real(~2.5);
         let b = conv.bool(true);
         let okS = conv.okay();
         tuple pos neg posR negR b okS end;
@@ -582,7 +601,7 @@ class TestStandardLibraryModules(unittest.TestCase):
         import real: RealOp;
         let fl = real.floor(3.9);
         let rd = real.round(3.2);
-        let ab = real.abs(0.0 - 5.5);
+        let ab = real.abs(0.0 -- 5.5);
         let lt = real.smaller(1.0 2.0);
         tuple fl rd ab lt end;
         """

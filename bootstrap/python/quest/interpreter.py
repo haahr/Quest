@@ -308,51 +308,58 @@ def _eval_int_arithmetic(op: str, a: int, b: int, offset: Optional[int] = None) 
             raise QuestRuntimeError(f"Unknown integer arithmetic operator '{op}'", offset=offset)
 
 
-def _eval_real_arithmetic(op: str, a: float, b: float, offset: Optional[int] = None) -> float:
-    """Evaluates real floating-point arithmetic."""
+def _eval_int_relational(op: str, a: int, b: int, offset: Optional[int] = None) -> bool:
+    """Evaluates integer relational comparisons (<, <=, >, >=)."""
     match op:
-        case "+":
+        case "<":
+            return a < b
+        case "<=":
+            return a <= b
+        case ">":
+            return a > b
+        case ">=":
+            return a >= b
+        case _:
+            raise QuestRuntimeError(f"Unknown integer relational operator '{op}'", offset=offset)
+
+
+def _eval_real_arithmetic(op: str, a: float, b: float, offset: Optional[int] = None) -> float:
+    """Evaluates real floating-point arithmetic (++, --, **, //, ^^)."""
+    match op:
+        case "++":
             return a + b
-        case "-":
+        case "--":
             return a - b
-        case "*":
+        case "**":
             return a * b
-        case "/":
+        case "//":
             if b == 0.0:
                 raise QuestException(DIVIDE_BY_ZERO_EXC, offset=offset)
             return a / b
+        case "^^":
+            if a == 0.0 and b < 0.0:
+                raise QuestException(DIVIDE_BY_ZERO_EXC, offset=offset)
+            try:
+                return math.pow(a, b)
+            except (ValueError, OverflowError) as e:
+                raise QuestRuntimeError(f"Real exponentiation error: {e}", offset=offset)
         case _:
             raise QuestRuntimeError(f"Unknown real arithmetic operator '{op}'", offset=offset)
 
 
-def _eval_relational(op: str, left: QValue, right: QValue, offset: Optional[int] = None) -> bool:
-    """Evaluates relational comparisons (<, <=, >, >=) for Int, Real, Char, String."""
-    match (left, right):
-        case (QInt(value=l_val), QInt(value=r_val)):
-            pass
-        case (QReal(value=l_val), QReal(value=r_val)):
-            pass
-        case (QChar(value=l_val), QChar(value=r_val)):
-            pass
-        case (QString(value=l_val), QString(value=r_val)):
-            pass
-        case _:
-            raise QuestRuntimeError(
-                f"Relational operator '{op}' cannot compare types {left.type_name} and {right.type_name}",
-                offset=offset,
-            )
-
+def _eval_real_relational(op: str, a: float, b: float, offset: Optional[int] = None) -> bool:
+    """Evaluates real relational comparisons (<<, <<=, >>, >>=)."""
     match op:
-        case "<":
-            return l_val < r_val
-        case "<=":
-            return l_val <= r_val
-        case ">":
-            return l_val > r_val
-        case ">=":
-            return l_val >= r_val
+        case "<<":
+            return a < b
+        case "<<=":
+            return a <= b
+        case ">>":
+            return a > b
+        case ">>=":
+            return a >= b
         case _:
-            raise QuestRuntimeError(f"Unknown relational operator '{op}'", offset=offset)
+            raise QuestRuntimeError(f"Unknown real relational operator '{op}'", offset=offset)
 
 
 # ============================================================================
@@ -448,29 +455,74 @@ def eval_expr(expr: TypedExpr, env: RuntimeEnvironment) -> QValue:
             left_val = eval_expr(left, env)
             right_val = eval_expr(right, env)
 
-            # Arithmetic
+            # Integer Arithmetic
             if op in ("+", "-", "*", "/", "mod", "%"):
-                match (left_val, right_val):
-                    case (QInt(value=l), QInt(value=r)):
-                        return QInt(_eval_int_arithmetic(op, l, r, offset=offset))
-                    case (QReal(value=l), QReal(value=r)):
-                        return QReal(_eval_real_arithmetic(op, l, r, offset=offset))
-                    case _:
-                        raise QuestRuntimeError(
-                            f"Arithmetic operator '{op}' requires Int or Real operands, got {left_val.type_name}",
-                            offset=offset,
-                        )
+                if isinstance(left_val, QInt) and isinstance(right_val, QInt):
+                    return QInt(_eval_int_arithmetic(op, left_val.value, right_val.value, offset=offset))
+                raise QuestRuntimeError(
+                    f"Operator '{op}' requires Int operands, got {left_val.type_name} and {right_val.type_name}",
+                    offset=offset,
+                )
 
-            # Relational
+            # Integer Relational
             if op in ("<", "<=", ">", ">="):
-                res = _eval_relational(op, left_val, right_val, offset=offset)
-                return TRUE_VALUE if res else FALSE_VALUE
+                if isinstance(left_val, QInt) and isinstance(right_val, QInt):
+                    res = _eval_int_relational(op, left_val.value, right_val.value, offset=offset)
+                    return TRUE_VALUE if res else FALSE_VALUE
+                raise QuestRuntimeError(
+                    f"Operator '{op}' requires Int operands, got {left_val.type_name} and {right_val.type_name}",
+                    offset=offset,
+                )
+
+            # Real Arithmetic
+            if op in ("++", "--", "**", "//", "^^"):
+                if isinstance(left_val, QReal) and isinstance(right_val, QReal):
+                    return QReal(_eval_real_arithmetic(op, left_val.value, right_val.value, offset=offset))
+                raise QuestRuntimeError(
+                    f"Operator '{op}' requires Real operands, got {left_val.type_name} and {right_val.type_name}",
+                    offset=offset,
+                )
+
+            # Real Relational
+            if op in ("<<", "<<=", ">>", ">>="):
+                if isinstance(left_val, QReal) and isinstance(right_val, QReal):
+                    res = _eval_real_relational(op, left_val.value, right_val.value, offset=offset)
+                    return TRUE_VALUE if res else FALSE_VALUE
+                raise QuestRuntimeError(
+                    f"Operator '{op}' requires Real operands, got {left_val.type_name} and {right_val.type_name}",
+                    offset=offset,
+                )
+
+            # String Concatenation
+            if op == "<>":
+                if isinstance(left_val, QString) and isinstance(right_val, QString):
+                    return QString(left_val.value + right_val.value)
+                raise QuestRuntimeError(
+                    f"Operator '<>' requires String operands, got {left_val.type_name} and {right_val.type_name}",
+                    offset=offset,
+                )
+
+            # Boolean Eager Operations
+            if op == "/\\":
+                if isinstance(left_val, QBool) and isinstance(right_val, QBool):
+                    return TRUE_VALUE if (left_val.value and right_val.value) else FALSE_VALUE
+                raise QuestRuntimeError(
+                    f"Operator '/\\' requires Bool operands, got {left_val.type_name} and {right_val.type_name}",
+                    offset=offset,
+                )
+            if op == "\\/":
+                if isinstance(left_val, QBool) and isinstance(right_val, QBool):
+                    return TRUE_VALUE if (left_val.value or right_val.value) else FALSE_VALUE
+                raise QuestRuntimeError(
+                    f"Operator '\\/' requires Bool operands, got {left_val.type_name} and {right_val.type_name}",
+                    offset=offset,
+                )
 
             # Equality & Identity
             if op in ("is", "=="):
                 res = qvalue_is(left_val, right_val)
                 return TRUE_VALUE if res else FALSE_VALUE
-            if op in ("isnot", "<>"):
+            if op == "isnot":
                 res = not qvalue_is(left_val, right_val)
                 return TRUE_VALUE if res else FALSE_VALUE
 

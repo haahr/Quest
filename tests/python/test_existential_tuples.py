@@ -362,7 +362,7 @@ class TestExistentialTuplesPhase4(unittest.TestCase):
         let t1: T = tuple Let A::TYPE = Int let a = 0 end;
         let bad = t1.a + 1;
         """
-        self.check_failure(source, "Arithmetic operator '+' requires Int or Real operands, got 't1.A'")
+        self.check_failure(source, "synthesized type 't1.A' is not a subtype of expected type 'Int'")
 
     def test_bounded_path_dependent_subtyping(self) -> None:
         """Type formal with POWER bound allows subtyping: tb.A <: Int."""

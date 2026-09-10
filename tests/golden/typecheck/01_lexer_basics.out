@@ -16,7 +16,7 @@
                 :target (TypedVar 'p1' :type Tuple x: Int y: Real end))
               :right (TypedSelect 'x' :type Int
                 :target (TypedVar 'p2' :type Tuple x: Int y: Real end)))
-            (TypedInfix '+' :type Real
+            (TypedInfix '++' :type Real
               :left (TypedSelect 'y' :type Real
                 :target (TypedVar 'p1' :type Tuple x: Int y: Real end))
               :right (TypedSelect 'y' :type Real

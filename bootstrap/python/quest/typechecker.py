@@ -154,6 +154,44 @@ def check_no_escaping_path_types(
 
 
 # ============================================================================
+# Operator Signatures (Cardelli §4.2)
+# ============================================================================
+
+# Operator signature table for non-overloaded Quest infix operators:
+# Maps operator symbol -> (expected_left_type, expected_right_type, result_type)
+INFIX_OPERATORS: dict[str, tuple[QType, QType, QType]] = {
+    # Integer arithmetic
+    "+": (INT_TYPE, INT_TYPE, INT_TYPE),
+    "-": (INT_TYPE, INT_TYPE, INT_TYPE),
+    "*": (INT_TYPE, INT_TYPE, INT_TYPE),
+    "/": (INT_TYPE, INT_TYPE, INT_TYPE),
+    "%": (INT_TYPE, INT_TYPE, INT_TYPE),
+    "mod": (INT_TYPE, INT_TYPE, INT_TYPE),
+    # Integer relational
+    "<": (INT_TYPE, INT_TYPE, BOOL_TYPE),
+    "<=": (INT_TYPE, INT_TYPE, BOOL_TYPE),
+    ">": (INT_TYPE, INT_TYPE, BOOL_TYPE),
+    ">=": (INT_TYPE, INT_TYPE, BOOL_TYPE),
+    # Real arithmetic (doubled)
+    "++": (REAL_TYPE, REAL_TYPE, REAL_TYPE),
+    "--": (REAL_TYPE, REAL_TYPE, REAL_TYPE),
+    "**": (REAL_TYPE, REAL_TYPE, REAL_TYPE),
+    "//": (REAL_TYPE, REAL_TYPE, REAL_TYPE),
+    "^^": (REAL_TYPE, REAL_TYPE, REAL_TYPE),
+    # Real relational (doubled)
+    "<<": (REAL_TYPE, REAL_TYPE, BOOL_TYPE),
+    "<<=": (REAL_TYPE, REAL_TYPE, BOOL_TYPE),
+    ">>": (REAL_TYPE, REAL_TYPE, BOOL_TYPE),
+    ">>=": (REAL_TYPE, REAL_TYPE, BOOL_TYPE),
+    # String concatenation
+    "<>": (STRING_TYPE, STRING_TYPE, STRING_TYPE),
+    # Boolean eager operations
+    "/\\": (BOOL_TYPE, BOOL_TYPE, BOOL_TYPE),
+    "\\/": (BOOL_TYPE, BOOL_TYPE, BOOL_TYPE),
+}
+
+
+# ============================================================================
 # Bidirectional Typechecker & Elaboration Engine
 # ============================================================================
 
@@ -1927,73 +1965,23 @@ class TypeElaborator:
                     offset=expr.offset,
                 )
 
-        # 3. Arithmetic Operators (+, -, *, /, mod)
-        left_typed = self.synth_expr(expr.left, env, loop_depth)
-        right_typed = self.synth_expr(expr.right, env, loop_depth)
-
-        if expr.op in ("+", "-", "*", "/", "mod", "%"):
-            if is_subtype(left_typed.type_val, INT_TYPE, env):
-                if not is_subtype(right_typed.type_val, INT_TYPE, env):
-                    raise TypeError(
-                        f"Operator '{expr.op}' requires both operands to be Int, but got "
-                        f"'{left_typed.type_val}' and '{right_typed.type_val}' (no numeric coercion)",
-                        offset=expr.offset,
-                    )
-                return TypedInfix(
-                    left=left_typed,
-                    op=expr.op,
-                    right=right_typed,
-                    type_val=INT_TYPE,
-                    offset=expr.offset,
-                )
-
-            if is_subtype(left_typed.type_val, REAL_TYPE, env):
-                if expr.op in ("mod", "%"):
-                    raise TypeError(f"Operator '{expr.op}' is not defined for Real", offset=expr.offset)
-                if not is_subtype(right_typed.type_val, REAL_TYPE, env):
-                    raise TypeError(
-                        f"Operator '{expr.op}' requires both operands to be Real, but got "
-                        f"'{left_typed.type_val}' and '{right_typed.type_val}' (no numeric coercion)",
-                        offset=expr.offset,
-                    )
-                return TypedInfix(
-                    left=left_typed,
-                    op=expr.op,
-                    right=right_typed,
-                    type_val=REAL_TYPE,
-                    offset=expr.offset,
-                )
-
-            raise TypeError(
-                f"Arithmetic operator '{expr.op}' requires Int or Real operands, got '{left_typed.type_val}'",
+        # 3. Non-overloaded operators (Arithmetic, Relational, String concatenation, Eager boolean)
+        if expr.op in INFIX_OPERATORS:
+            exp_l, exp_r, res_type = INFIX_OPERATORS[expr.op]
+            left_typed = self.check_expr(expr.left, exp_l, env, loop_depth)
+            right_typed = self.check_expr(expr.right, exp_r, env, loop_depth)
+            return TypedInfix(
+                left=left_typed,
+                op=expr.op,
+                right=right_typed,
+                type_val=res_type,
                 offset=expr.offset,
             )
 
-        # 4. Relational Operators (<, <=, >, >=)
-        if expr.op in ("<", "<=", ">", ">="):
-            l_t, r_t = left_typed.type_val, right_typed.type_val
-            if (
-                (is_subtype(l_t, INT_TYPE, env) and is_subtype(r_t, INT_TYPE, env))
-                or (is_subtype(l_t, REAL_TYPE, env) and is_subtype(r_t, REAL_TYPE, env))
-                or (is_subtype(l_t, CHAR_TYPE, env) and is_subtype(r_t, CHAR_TYPE, env))
-                or (is_subtype(l_t, STRING_TYPE, env) and is_subtype(r_t, STRING_TYPE, env))
-            ):
-                return TypedInfix(
-                    left=left_typed,
-                    op=expr.op,
-                    right=right_typed,
-                    type_val=BOOL_TYPE,
-                    offset=expr.offset,
-                )
-
-            raise TypeError(
-                f"Relational operator '{expr.op}' requires operands of the same comparable type "
-                f"(Int, Real, Char, or String), got '{left_typed.type_val}' and '{right_typed.type_val}'",
-                offset=expr.offset,
-            )
-
-        # 5. Equality Operators (==, <>, is, isnot)
-        if expr.op in ("==", "<>", "is", "isnot"):
+        # 4. Identity and Equality Operators (==, is, isnot)
+        if expr.op in ("==", "is", "isnot"):
+            left_typed = self.synth_expr(expr.left, env, loop_depth)
+            right_typed = self.synth_expr(expr.right, env, loop_depth)
             if (
                 is_subtype(left_typed.type_val, right_typed.type_val, env)
                 or is_subtype(right_typed.type_val, left_typed.type_val, env)

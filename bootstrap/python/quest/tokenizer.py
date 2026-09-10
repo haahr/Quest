@@ -109,10 +109,13 @@ class Tokenizer:
 
     def _lex_number(self) -> Token:
         start = self.cursor
+        if self.source_text[self.cursor] == "~":
+            self.cursor += 1
+
         while self.cursor < self.length and self.source_text[self.cursor].isdigit():
             self.cursor += 1
 
-        # Check for decimal point followed by a digit: e.g. 2.0
+        # Check for decimal point followed by a digit: e.g. 2.0 or ~2.0
         if (
             self.cursor < self.length
             and self.source_text[self.cursor] == "."
@@ -122,11 +125,11 @@ class Tokenizer:
             while self.cursor < self.length and self.source_text[self.cursor].isdigit():
                 self.cursor += 1
 
-            # Optional exponent: e.g. 2.0e-5, 3.14E+2
+            # Optional exponent: e.g. 2.0e-5, 3.14E+2, ~5.1E~4
             if self.cursor < self.length and self.source_text[self.cursor] in "eE":
                 exponent_start = self.cursor
                 self.cursor += 1
-                if self.cursor < self.length and self.source_text[self.cursor] in "+-":
+                if self.cursor < self.length and self.source_text[self.cursor] in "+-~":
                     self.cursor += 1
                 if not (self.cursor < self.length and self.source_text[self.cursor].isdigit()):
                     raise TokenizerError(
@@ -138,15 +141,17 @@ class Tokenizer:
                     self.cursor += 1
 
             lexeme = self.source_text[start:self.cursor]
+            normalized = lexeme.replace("~", "-")
             try:
-                number_value = float(lexeme)
+                number_value = float(normalized)
             except ValueError:
                 raise TokenizerError(f"Invalid real literal '{lexeme}'", start, len(lexeme))
             return Token(TokenKind.REAL_LIT, lexeme, number_value, start)
 
         lexeme = self.source_text[start:self.cursor]
+        normalized = lexeme.replace("~", "-")
         try:
-            number_value = int(lexeme)
+            number_value = int(normalized)
         except ValueError:
             raise TokenizerError(f"Invalid integer literal '{lexeme}'", start, len(lexeme))
         return Token(TokenKind.INT_LIT, lexeme, number_value, start)
@@ -260,6 +265,9 @@ class Tokenizer:
             # Stop if we see (* which is comment opener
             if self.source_text[self.cursor] == "(" and self._peek(1) == "*":
                 break
+            # Stop if we see ~ followed by a digit (start of a negative number literal)
+            if self.source_text[self.cursor] == "~" and self._peek(1).isdigit():
+                break
             self.cursor += 1
 
         lexeme = self.source_text[start:self.cursor]
@@ -291,8 +299,8 @@ class Tokenizer:
             self.cursor += 1
             return Token(TokenKind.DOT, ".", None, start)
 
-        # 3. Numeric literals (strictly unsigned)
-        if char.isdigit():
+        # 3. Numeric literals (unsigned or negative with Cardelli tilde ~)
+        if char.isdigit() or (char == "~" and self._peek(1).isdigit()):
             return self._lex_number()
 
         # 4. Character literal
