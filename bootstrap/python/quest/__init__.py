@@ -138,6 +138,7 @@ from quest.modules import (
     elaborate_module,
 )
 from quest.typechecker import (
+    TypeElaborator,
     check_expr,
     elaborate_phrase,
     elaborate_program,
@@ -257,6 +258,7 @@ __all__ = [
     "elaborate_import",
     "elaborate_interface",
     "elaborate_module",
+    "TypeElaborator",
     "check_expr",
     "elaborate_phrase",
     "elaborate_program",

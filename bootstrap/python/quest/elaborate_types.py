@@ -73,14 +73,11 @@ def elaborate_kind(ast_kind: ast.Kind, env: Environment) -> QKind:
         case ast.KindAll(param_name=pname, param_kind=pkind, body_kind=bkind):
             param_kind_val = elaborate_kind(pkind, env)
             symbol_id = env.fresh_symbol_id()
-            env.push_scope(f"kind_{pname}")
-            try:
+            with env.scoped(f"kind_{pname}"):
                 env.current_scope.declare_type(
                     TypeSymbol(name=pname, symbol_id=symbol_id, kind=param_kind_val)
                 )
                 body_kind_val = elaborate_kind(bkind, env)
-            finally:
-                env.pop_scope()
             return QAllKind(
                 param_name=pname,
                 param_id=symbol_id,
@@ -238,8 +235,7 @@ def elaborate_type(ast_type: ast.Type, env: Environment) -> QType:
 
         case ast.TypeTuple(fields=tup_fields):
             components: list[QTupleComponent] = []
-            env.push_scope("tuple_sig")
-            try:
+            with env.scoped("tuple_sig"):
                 for f in tup_fields:
                     match f:
                         case ast.TypeFormal(name=name, bound=bound):
@@ -301,8 +297,6 @@ def elaborate_type(ast_type: ast.Type, env: Environment) -> QType:
 
                         case _:
                             raise KindError(f"Unexpected item in tuple signature: {f}")
-            finally:
-                env.pop_scope()
             return QTupleType(tuple(components))
 
         case ast.TypeRecord(fields=rec_fields):
@@ -351,8 +345,7 @@ def elaborate_type(ast_type: ast.Type, env: Environment) -> QType:
             return QOptionType(tuple(options))
 
         case ast.TypeFun(params=params, body=body):
-            env.push_scope("type_fun")
-            try:
+            with env.scoped("type_fun"):
                 formals: list[QTypeFormal] = []
                 for p in params:
                     bound_kind = elaborate_kind(p.bound, env)
@@ -363,8 +356,6 @@ def elaborate_type(ast_type: ast.Type, env: Environment) -> QType:
                     formals.append(QTypeFormal(name=p.name, symbol_id=symbol_id, bound=bound_kind))
                 body_type = elaborate_type(body, env)
                 return QTypeFun(params=tuple(formals), body=body_type)
-            finally:
-                env.pop_scope()
 
         case ast.TypeApp(constructor=ctor, arguments=arguments):
             ctor_type = elaborate_type(ctor, env)
@@ -372,8 +363,7 @@ def elaborate_type(ast_type: ast.Type, env: Environment) -> QType:
             return QTypeApp(constructor=ctor_type, arguments=args)
 
         case ast.TypeAll(quantifiers=quants_ast, result_type=res_type):
-            env.push_scope("all_type")
-            try:
+            with env.scoped("all_type"):
                 quants: list[QQuantifier] = []
                 val_params: list[QParam] = []
                 for q in quants_ast:
@@ -394,12 +384,9 @@ def elaborate_type(ast_type: ast.Type, env: Environment) -> QType:
                 if quants:
                     return QAllType(quantifiers=tuple(quants), body=fn_body)
                 return fn_body
-            finally:
-                env.pop_scope()
 
         case ast.TypeAuto(type_param=tparam, kind_bound=kbound, signature=signature):
-            env.push_scope("auto_type")
-            try:
+            with env.scoped("auto_type"):
                 kind_bound_val = elaborate_kind(kbound, env)
                 param_name = tparam or "T"
                 symbol_id = env.fresh_symbol_id()
@@ -420,12 +407,9 @@ def elaborate_type(ast_type: ast.Type, env: Environment) -> QType:
                     kind_bound=kind_bound_val,
                     signature=fields,
                 )
-            finally:
-                env.pop_scope()
 
         case ast.TypeRec(var_name=vname, bound=bound_ast, body=body_ast):
-            env.push_scope(f"rec_{vname}")
-            try:
+            with env.scoped(f"rec_{vname}"):
                 bound = elaborate_kind(bound_ast, env)
                 symbol_id = env.fresh_symbol_id()
                 env.current_scope.declare_type(
@@ -445,8 +429,6 @@ def elaborate_type(ast_type: ast.Type, env: Environment) -> QType:
                     bound=bound,
                     body=body,
                 )
-            finally:
-                env.pop_scope()
 
         case ast.TypeArray(element_type=elem):
             return QArrayType(elaborate_type(elem, env))
@@ -509,8 +491,7 @@ def elaborate_type_binding(
     if binding.params:
         # Desugar parameterized type definition Let T(X::K): ResultKind = Body into TypeFun
         target_bound = declared_bound if declared_bound is not None else TYPE_KIND
-        env.push_scope(f"type_fun_{binding.name}")
-        try:
+        with env.scoped(f"type_fun_{binding.name}"):
             formals: list[QTypeFormal] = []
             for p in binding.params:
                 p_bound = elaborate_kind(p.bound, env)
@@ -520,8 +501,6 @@ def elaborate_type_binding(
             body_type = elaborate_type(binding.type_val, env)
             check_kind(body_type, target_bound, env)
             qtype_val = QTypeFun(params=tuple(formals), body=body_type)
-        finally:
-            env.pop_scope()
 
         # Fold parameter kinds into overall operator kind telescope
         overall_kind: QKind = target_bound
@@ -536,8 +515,7 @@ def elaborate_type_binding(
     elif binding.is_rec:
         # Single recursive type definition Let Rec T = Body
         target_bound = declared_bound if declared_bound is not None else TYPE_KIND
-        env.push_scope(f"rec_{binding.name}")
-        try:
+        with env.scoped(f"rec_{binding.name}"):
             env.current_scope.declare_type(TypeSymbol(name=binding.name, symbol_id=symbol_id, kind=target_bound))
             body_type = elaborate_type(binding.type_val, env)
             check_kind(body_type, target_bound, env)
@@ -549,8 +527,6 @@ def elaborate_type_binding(
                 env=env,
             )
             qtype_val = QRecType(var_name=binding.name, symbol_id=symbol_id, bound=target_bound, body=body_type)
-        finally:
-            env.pop_scope()
         bound_kind = target_bound
     else:
         qtype_val = elaborate_type(binding.type_val, env)
@@ -580,8 +556,7 @@ def elaborate_mutual_rec_type_group(
         pre_symbols.append((b.name, sym_id, bound, b))
 
     # 2. Push temporary scope and register all abstract type symbols
-    env.push_scope("mutual_rec_group")
-    try:
+    with env.scoped("mutual_rec_group"):
         for name, sym_id, bound, _ in pre_symbols:
             env.current_scope.declare_type(TypeSymbol(name=name, symbol_id=sym_id, kind=bound))
 
@@ -599,8 +574,6 @@ def elaborate_mutual_rec_type_group(
                 env=env,
             )
             group_entries.append((name, sym_id, bound, body_type))
-    finally:
-        env.pop_scope()
 
     # 4. Construct QRecGroupType for each binding and declare in the enclosing scope
     group_tuple = tuple(group_entries)

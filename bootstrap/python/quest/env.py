@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from typing import Any, ClassVar, Optional
 
@@ -215,6 +217,15 @@ class Environment:
         popped = self.current_scope
         self.current_scope = self.current_scope.parent
         return popped
+
+    @contextmanager
+    def scoped(self, name: str = "local") -> Iterator[Scope]:
+        """RAII context manager for entering and exiting a lexical child scope."""
+        self.push_scope(name)
+        try:
+            yield self.current_scope
+        finally:
+            self.pop_scope()
 
     # --- Direct Delegation Lookups ---
 
