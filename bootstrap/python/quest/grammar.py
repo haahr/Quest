@@ -28,6 +28,7 @@ MODULE = SyntaxTarget("Module")
 LINKAGE = SyntaxTarget("Linkage")
 IMPORT = SyntaxTarget("Import")
 IMPORT_ITEM = SyntaxTarget("ImportItem")
+IDE = SyntaxTarget("Ide")
 IDE_LIST = SyntaxTarget("IdeList")
 
 KIND = SyntaxTarget("Kind")
@@ -70,7 +71,7 @@ HAS_MUT_TYPE = SyntaxTarget("HasMutType")
 HAS_KIND = SyntaxTarget("HasKind")
 
 ALL_SYNTAX_TARGETS: tuple[SyntaxTarget, ...] = (
-    PROGRAM, PHRASE, INTERFACE, MODULE, LINKAGE, IMPORT, IMPORT_ITEM, IDE_LIST,
+    PROGRAM, PHRASE, INTERFACE, MODULE, LINKAGE, IMPORT, IMPORT_ITEM, IDE, IDE_LIST,
     KIND, PRIMARY_KIND,
     TYPE, POSTFIX_TYPE, POSTFIX_TYPE_OP, PRIMARY_TYPE, TYPE_SIGNATURE, VALUE_SIGNATURE, OPTION_SIGNATURE, SIGNATURE,
     VALUE, POSTFIX_VALUE, POSTFIX_OP, PRIMARY_VALUE, INFIX_OP, BINDING, TYPE_BINDING, VALUE_BINDING,
@@ -132,7 +133,44 @@ def fold_value_postfix(primary: ast.Expr, operations: tuple[Any, ...]) -> ast.Ex
             )
         elif operation_kind == "index":
             current = ast.ExprIndex(target=current, index=operation[1], offset=current.offset)
+        elif operation_kind == "listfix_rep":
+            current = ast.ExprApp(
+                func=current,
+                args=(
+                    ast.ExprArrayRep(
+                        count=operation[1],
+                        init_val=operation[2],
+                        offset=operation[3],
+                    ),
+                ),
+                offset=current.offset,
+            )
+        elif operation_kind == "listfix_elements":
+            arr = _build_array_expr(operation[2], operation[1])
+            current = ast.ExprApp(
+                func=current,
+                args=(arr,),
+                offset=current.offset,
+            )
     return current
+
+
+def _build_array_expr(offset: int, bindings: tuple[Any, ...]) -> ast.ExprArray:
+    """Builds an ExprArray from bindings, extracting leading element type if present."""
+    bindings_tuple = (
+        bindings
+        if isinstance(bindings, tuple)
+        else ((bindings,) if bindings else ())
+    )
+    elem_type = None
+    raw_elements = list(bindings_tuple)
+    if raw_elements and isinstance(raw_elements[0], ast.TypeArgument):
+        elem_type = raw_elements.pop(0).type_val
+    elements = tuple(
+        item.expr if isinstance(item, ast.ExprStmt) else item
+        for item in raw_elements
+    )
+    return ast.ExprArray(elements=elements, element_type=elem_type, offset=offset)
 
 
 def _process_tuple_bindings(bindings: tuple[Any, ...]) -> tuple[Any, ...]:
@@ -194,6 +232,216 @@ def _process_tuple_bindings(bindings: tuple[Any, ...]) -> tuple[Any, ...]:
     return tuple(result)
 
 
+def _build_option_payload(with_binding: Any, offset: int) -> Optional[ast.Expr]:
+    """Processes phrases inside an option with clause into an expression payload."""
+    if not with_binding or len(with_binding) < 2 or not with_binding[1]:
+        return None
+    items = with_binding[1]
+    if isinstance(items, tuple):
+        if len(items) == 1 and isinstance(items[0], ast.ExprStmt) and isinstance(items[0].expr, ast.ExprTuple):
+            return items[0].expr
+        fields = _process_tuple_bindings(items)
+        return ast.ExprTuple(fields=fields, offset=offset)
+    if isinstance(items, ast.Expr):
+        return items
+    return None
+
+
+
+def _build_curried_field_sig(
+    var_token: Optional[Token],
+    out_token: Optional[Token],
+    identifiers: tuple[str, ...],
+    param_groups: tuple[Any, ...],
+    colon_token: Token,
+    return_type: ast.Type,
+) -> tuple[ast.FieldSig, ...]:
+    current_type: ast.Type = return_type
+    for i in range(len(param_groups) - 1, -1, -1):
+        grp_sigs = param_groups[i][1]
+        current_type = ast.TypeAll(
+            quantifiers=tuple(
+                ast.Quantifier(
+                    name=getattr(sig, "name", "_") or "_",
+                    bound=(
+                        ast.KindPower(bound=sig.type_sig)
+                        if hasattr(sig, "type_sig") and sig.type_sig is not None
+                        else getattr(sig, "bound", ast.KindType(offset=colon_token.offset))
+                    ),
+                    mode=getattr(sig, "mode", ast.ParamMode.VALUE),
+                    offset=getattr(sig, "offset", colon_token.offset),
+                )
+                for sig in grp_sigs
+            ),
+            result_type=current_type,
+            offset=colon_token.offset,
+        )
+    mode = (
+        ast.ParamMode.VAR
+        if var_token
+        else (ast.ParamMode.OUT if out_token else ast.ParamMode.VALUE)
+    )
+    return tuple(
+        ast.FieldSig(
+            name=name,
+            type_sig=current_type,
+            mode=mode,
+            offset=colon_token.offset,
+        )
+        for name in identifiers
+    )
+
+
+def _build_curried_fun_expr(
+    param_groups: tuple[Any, ...],
+    ret_type: Optional[tuple[Token, ast.Type]],
+    val_expr: ast.Expr,
+    offset: int,
+) -> ast.Expr:
+    return_type_node = ret_type[1] if ret_type else None
+    if not param_groups:
+        return ast.ExprFun(
+            params=(),
+            return_type=return_type_node,
+            body=val_expr,
+            type_params=(),
+            offset=offset,
+        )
+    current_body: ast.Expr = val_expr
+    for i in range(len(param_groups) - 1, -1, -1):
+        grp_sigs = param_groups[i][1]
+        type_params = tuple(sig for sig in grp_sigs if isinstance(sig, ast.TypeFormal))
+        value_params = tuple(
+            ast.FormalParam(name=sig.name, type_annot=sig.type_sig, mode=sig.mode, offset=sig.offset)
+            for sig in grp_sigs
+            if isinstance(sig, ast.FieldSig) and sig.name is not None
+        )
+        g_ret_type = return_type_node if i == len(param_groups) - 1 else None
+        current_body = ast.ExprFun(
+            params=value_params,
+            return_type=g_ret_type,
+            body=current_body,
+            type_params=type_params,
+            offset=offset,
+        )
+    return current_body
+
+
+def _build_curried_value_decl(
+    var_token: Optional[Token],
+    ident_token: Token,
+    param_groups: tuple[Any, ...],
+    ret_type: Optional[tuple[Token, ast.Type]],
+    val_expr: ast.Expr,
+) -> ast.LetValueBinding:
+    return_type_node = ret_type[1] if ret_type else None
+    if not param_groups:
+        return ast.LetValueBinding(
+            name=ident_token.lexeme,
+            value=val_expr,
+            params=(),
+            type_annot=return_type_node,
+            is_var=bool(var_token),
+            offset=ident_token.offset,
+        )
+
+    full_type_annot: Optional[ast.Type] = None
+    if return_type_node is not None:
+        full_type_annot = return_type_node
+        for i in range(len(param_groups) - 1, -1, -1):
+            grp_sigs = param_groups[i][1]
+            full_type_annot = ast.TypeAll(
+                quantifiers=tuple(
+                    ast.Quantifier(
+                        name=getattr(sig, "name", "_") or "_",
+                        bound=(
+                            ast.KindPower(bound=sig.type_sig)
+                            if hasattr(sig, "type_sig") and sig.type_sig is not None
+                            else getattr(sig, "bound", ast.KindType(offset=ident_token.offset))
+                        ),
+                        mode=getattr(sig, "mode", ast.ParamMode.VALUE),
+                        offset=getattr(sig, "offset", ident_token.offset),
+                    )
+                    for sig in grp_sigs
+                ),
+                result_type=full_type_annot,
+                offset=ident_token.offset,
+            )
+
+    current_body: ast.Expr = val_expr
+    for i in range(len(param_groups) - 1, -1, -1):
+        grp_sigs = param_groups[i][1]
+        type_params = tuple(sig for sig in grp_sigs if isinstance(sig, ast.TypeFormal))
+        value_params = tuple(
+            ast.FormalParam(name=sig.name, type_annot=sig.type_sig, mode=sig.mode, offset=sig.offset)
+            for sig in grp_sigs
+            if isinstance(sig, ast.FieldSig) and sig.name is not None
+        )
+        g_ret_type = return_type_node if i == len(param_groups) - 1 else None
+
+        if i == 0 and len(param_groups) == 1 and not type_params:
+            return ast.LetValueBinding(
+                name=ident_token.lexeme,
+                value=current_body,
+                params=value_params,
+                type_annot=g_ret_type,
+                is_var=bool(var_token),
+                offset=ident_token.offset,
+            )
+
+        current_body = ast.ExprFun(
+            params=value_params,
+            return_type=g_ret_type,
+            body=current_body,
+            type_params=type_params,
+            offset=ident_token.offset,
+        )
+
+    return ast.LetValueBinding(
+        name=ident_token.lexeme,
+        value=current_body,
+        params=(),
+        type_annot=full_type_annot,
+        is_var=bool(var_token),
+        offset=ident_token.offset,
+    )
+
+
+
+def _build_type_decl(
+    ident_token: Token,
+    param_groups: tuple[Any, ...],
+    kind_bound: Optional[ast.Kind],
+    type_node: ast.Type,
+) -> ast.LetTypeBinding:
+    all_formals: list[ast.TypeFormal] = []
+    for grp in param_groups:
+        sigs = grp[1]
+        for sig in sigs:
+            if isinstance(sig, ast.TypeFormal):
+                all_formals.append(sig)
+            elif isinstance(sig, ast.FieldSig):
+                all_formals.append(
+                    ast.TypeFormal(
+                        name=sig.name or "_",
+                        bound=ast.KindType(offset=sig.offset),
+                        offset=sig.offset,
+                    )
+                )
+    type_fun = ast.TypeFun(
+        params=tuple(all_formals),
+        result_kind=kind_bound,
+        body=type_node,
+        offset=ident_token.offset,
+    )
+    return ast.LetTypeBinding(
+        name=ident_token.lexeme,
+        type_val=type_fun,
+        bound=None,
+        offset=ident_token.offset,
+    )
+
+
 # ============================================================================
 # 3. Quest Grammar Definition Builder
 # ============================================================================
@@ -210,13 +458,16 @@ def build_quest_grammar() -> None:
     # ------------------------------------------------------------------------
     # Helper: Identifiers & Lists
     # ------------------------------------------------------------------------
+    IDE.add_rule((T(TK.IDENT),), lambda ident_token: ident_token)
+    IDE.add_rule((T(TK.SYMBOLIC_INFIX),), lambda token: token)
+
     # ide , IdeList
     IDE_LIST.add_rule(
-        (T(TK.IDENT), T(TK.COMMA), IDE_LIST),
+        (IDE, T(TK.COMMA), IDE_LIST),
         lambda ident_token, comma_token, rest: (ident_token.lexeme,) + rest,
     )
     # ide
-    IDE_LIST.add_rule((T(TK.IDENT),), lambda ident_token: (ident_token.lexeme,))
+    IDE_LIST.add_rule((IDE,), lambda ident_token: (ident_token.lexeme,))
 
     # ------------------------------------------------------------------------
     # Kinds (Level 2)
@@ -308,7 +559,7 @@ def build_quest_grammar() -> None:
         lambda all_token, left_paren, signatures, right_paren, result_type: ast.TypeAll(
             quantifiers=tuple(
                 ast.Quantifier(
-                    name=getattr(sig, "name", "_"),
+                    name=getattr(sig, "name", "_") or "_",
                     bound=(
                         getattr(sig, "bound", None)
                         or (
@@ -317,6 +568,7 @@ def build_quest_grammar() -> None:
                             else ast.KindType(offset=left_paren.offset)
                         )
                     ),
+                    mode=getattr(sig, "mode", ast.ParamMode.VALUE),
                     offset=getattr(sig, "offset", left_paren.offset),
                 )
                 for sig in signatures
@@ -411,7 +663,7 @@ def build_quest_grammar() -> None:
     )
     # Out ( Type )
     PRIMARY_TYPE.add_rule(
-        (T(TK.KW_OUT), T(TK.LPAREN), TYPE, T(TK.RPAREN)),
+        (T(TK.KW_OUT_TYPE), T(TK.LPAREN), TYPE, T(TK.RPAREN)),
         lambda out_token, left_paren, element_type, right_paren: ast.TypeOut(
             element_type=element_type, offset=out_token.offset
         ),
@@ -429,6 +681,24 @@ def build_quest_grammar() -> None:
     PRIMARY_TYPE.add_rule(
         (T(TK.IDENT),),
         lambda ident_token: ast.TypePath(path=(ident_token.lexeme,), offset=ident_token.offset),
+    )
+    PRIMARY_TYPE.add_rule(
+        (T(TK.LBRACE), T(TK.SYMBOLIC_INFIX), T(TK.RBRACE)),
+        lambda left_brace, token, right_brace: ast.TypePath(
+            path=(token.lexeme,), offset=token.offset
+        ),
+    )
+    PRIMARY_TYPE.add_rule(
+        (T(TK.SYMBOLIC_INFIX), T(TK.LPAREN), Opt(TYPE_BINDING), T(TK.RPAREN)),
+        lambda token, left_paren, binding_payload, right_paren: ast.TypeApp(
+            constructor=ast.TypePath(path=(token.lexeme,), offset=token.offset),
+            arguments=(
+                binding_payload
+                if isinstance(binding_payload, tuple)
+                else ((binding_payload,) if binding_payload else ())
+            ),
+            offset=token.offset,
+        ),
     )
     # { Type }
     PRIMARY_TYPE.add_rule(
@@ -456,47 +726,19 @@ def build_quest_grammar() -> None:
         (T(TK.KW_DEF), Opt(T(TK.KW_REC_TYPE)), TYPE_DECL),
         lambda def_token, rec_token, type_declaration: type_declaration,
     )
-    # [var | out] IdeList ( Signature ) : Type (ValueFormals)
+    # [var | out] IdeList {"(" Signature ")"} : Type (ValueFormals)
     TYPE_SIGNATURE.add_rule(
         (
             Opt(T(TK.KW_VAR)),
             Opt(T(TK.KW_OUT)),
             IDE_LIST,
-            T(TK.LPAREN),
-            SIGNATURE,
-            T(TK.RPAREN),
+            Rep(T(TK.LPAREN), SIGNATURE, T(TK.RPAREN)),
             T(TK.COLON),
             TYPE,
         ),
-        (
-            lambda var_token, out_token, identifiers, left_paren, signatures, right_paren, colon_token,
-            return_type: tuple(
-                ast.FieldSig(
-                    name=name,
-                    type_sig=ast.TypeAll(
-                        quantifiers=tuple(
-                            ast.Quantifier(
-                                name=getattr(sig, "name", "_"),
-                                bound=(
-                                    ast.KindPower(bound=sig.type_sig)
-                                    if hasattr(sig, "type_sig") and sig.type_sig is not None
-                                    else getattr(sig, "bound", ast.KindType(offset=left_paren.offset))
-                                ),
-                                offset=getattr(sig, "offset", left_paren.offset),
-                            )
-                            for sig in signatures
-                        ),
-                        result_type=return_type,
-                        offset=left_paren.offset,
-                    ),
-                    mode=(
-                        ast.ParamMode.VAR
-                        if var_token
-                        else (ast.ParamMode.OUT if out_token else ast.ParamMode.VALUE)
-                    ),
-                    offset=colon_token.offset,
-                )
-                for name in identifiers
+        lambda var_token, out_token, identifiers, param_groups, colon_token, return_type: (
+            _build_curried_field_sig(
+                var_token, out_token, identifiers, param_groups, colon_token, return_type
             )
         ),
     )
@@ -524,6 +766,11 @@ def build_quest_grammar() -> None:
             ast.TypeFormal(name=name, bound=kind_bound, offset=kind_bound.offset)
             for name in (identifiers or ("_",))
         ),
+    )
+    # HasMutType (Anonymous tuple/signature field :Int or :Var(Int) or :Out(Int))
+    TYPE_SIGNATURE.add_rule(
+        (HAS_MUT_TYPE,),
+        lambda mut_field: (mut_field,),
     )
 
     # [var] IdeList HasType (Record/Variant type signatures)
@@ -593,6 +840,24 @@ def build_quest_grammar() -> None:
     POSTFIX_OP.add_rule(
         (T(TK.LBRACKET), VALUE, T(TK.RBRACKET)),
         lambda left_bracket, index_expr, right_bracket: ("index", index_expr),
+    )
+    # Listfix application: f of(count init) and f of ... end
+    POSTFIX_OP.add_rule(
+        (T(TK.KW_OF), T(TK.LPAREN), VALUE, VALUE, T(TK.RPAREN)),
+        lambda of_token, lp, cnt, init, rp: (
+            "listfix_rep",
+            cnt,
+            init,
+            of_token.offset,
+        ),
+    )
+    POSTFIX_OP.add_rule(
+        (T(TK.KW_OF), Opt(BINDING), T(TK.KW_END)),
+        lambda of_token, bindings, end_token: (
+            "listfix_elements",
+            bindings or (),
+            of_token.offset,
+        ),
     )
 
     # Literals
@@ -749,18 +1014,11 @@ def build_quest_grammar() -> None:
         ),
     )
 
-    # fun ( Signature ) [: Type] Value
+    # fun { ( Signature ) } [: Type] Value
     PRIMARY_VALUE.add_rule(
-        (T(TK.KW_FUN), T(TK.LPAREN), SIGNATURE, T(TK.RPAREN), Opt(T(TK.COLON), TYPE), VALUE),
-        lambda fun_token, left_paren, signatures, right_paren, return_type, body_expr: ast.ExprFun(
-            params=tuple(
-                ast.FormalParam(name=sig.name, type_annot=sig.type_sig, mode=sig.mode, offset=sig.offset)
-                for sig in signatures
-                if isinstance(sig, ast.FieldSig)
-            ),
-            return_type=return_type[1] if return_type else None,
-            body=body_expr,
-            offset=fun_token.offset,
+        (T(TK.KW_FUN), Rep(T(TK.LPAREN), SIGNATURE, T(TK.RPAREN)), Opt(T(TK.COLON), TYPE), VALUE),
+        lambda fun_token, param_groups, return_type, body_expr: _build_curried_fun_expr(
+            param_groups, return_type, body_expr, fun_token.offset
         ),
     )
 
@@ -792,24 +1050,39 @@ def build_quest_grammar() -> None:
         ),
     )
     PRIMARY_VALUE.add_rule(
-        (T(TK.KW_ARRAY), T(TK.KW_OF), BINDING, T(TK.KW_END)),
-        lambda array_token, of_token, bindings, end_token: ast.ExprArray(
-            elements=tuple(item.expr if isinstance(item, ast.ExprStmt) else item for item in bindings),
-            offset=array_token.offset,
+        (T(TK.KW_ARRAY), T(TK.KW_OF), Opt(BINDING), T(TK.KW_END)),
+        lambda array_token, of_token, bindings, end_token: (
+            _build_array_expr(array_token.offset, bindings or ())
         ),
     )
 
     # option (ide | ordinal(Value)) of Type [with Binding] end
     PRIMARY_VALUE.add_rule(
-        (T(TK.KW_OPTION), T(TK.IDENT), T(TK.KW_OF), TYPE, Opt(T(TK.KW_WITH), BINDING), T(TK.KW_END)),
-        lambda option_token, ident_token, of_token, option_type, with_binding, end_token: ast.ExprOption(
-            tag=ident_token.lexeme,
+        (T(TK.KW_OPTION), IDE, T(TK.KW_OF), TYPE, Opt(T(TK.KW_WITH), BINDING), T(TK.KW_END)),
+        lambda option_token, ide, of_token, option_type, with_binding, end_token: ast.ExprOption(
+            tag=ide.lexeme if hasattr(ide, "lexeme") else str(ide),
             option_type=option_type,
-            payload=(
-                with_binding[1][0]
-                if with_binding and isinstance(with_binding[1], tuple) and len(with_binding[1]) == 1
-                else (with_binding[1] if with_binding else None)
-            ),
+            payload=_build_option_payload(with_binding, option_token.offset),
+            offset=option_token.offset,
+        ),
+    )
+    PRIMARY_VALUE.add_rule(
+        (
+            T(TK.KW_OPTION),
+            T(TK.KW_ORDINAL),
+            T(TK.LPAREN),
+            VALUE,
+            T(TK.RPAREN),
+            T(TK.KW_OF),
+            TYPE,
+            Opt(T(TK.KW_WITH), BINDING),
+            T(TK.KW_END),
+        ),
+        lambda option_token, ord_token, lp, ord_val, rp, of_token, option_type, with_binding, end_token: ast.ExprOption(
+            tag=None,
+            option_type=option_type,
+            payload=_build_option_payload(with_binding, option_token.offset),
+            ordinal_expr=ord_val,
             offset=option_token.offset,
         ),
     )
@@ -914,11 +1187,72 @@ def build_quest_grammar() -> None:
         (T(TK.IDENT),),
         lambda ident_token: ast.ExprId(name=ident_token.lexeme, offset=ident_token.offset),
     )
+    # { infix } (Stand-alone infix identifier, e.g. {+})
+    PRIMARY_VALUE.add_rule(
+        (T(TK.LBRACE), T(TK.SYMBOLIC_INFIX), T(TK.RBRACE)),
+        lambda left_brace, token, right_brace: ast.ExprId(
+            name=token.lexeme, offset=token.offset
+        ),
+    )
+    # prefix infix application: +(x y)
+    PRIMARY_VALUE.add_rule(
+        (T(TK.SYMBOLIC_INFIX), T(TK.LPAREN), Opt(BINDING), T(TK.RPAREN)),
+        lambda token, left_paren, binding_payload, right_paren: ast.ExprApp(
+            func=ast.ExprId(name=token.lexeme, offset=token.offset),
+            args=tuple(
+                argument.expr if isinstance(argument, ast.ExprStmt) else argument
+                for argument in (
+                    binding_payload
+                    if isinstance(binding_payload, tuple)
+                    else ((binding_payload,) if binding_payload else ())
+                )
+            ),
+            offset=token.offset,
+        ),
+    )
 
     # { Value }
     PRIMARY_VALUE.add_rule(
         (T(TK.LBRACE), VALUE, T(TK.RBRACE)),
         lambda left_brace, inner_expr, right_brace: inner_expr,
+    )
+
+    # Monadic Operators: not, extent, ordinal (Cardelli §4.2, §4.3, §4.5)
+    PRIMARY_VALUE.add_rule(
+        (T(TK.KW_NOT), POSTFIX_VALUE),
+        lambda tok, val: ast.ExprApp(
+            func=ast.ExprId(name="not", offset=tok.offset),
+            args=(val,),
+            offset=tok.offset,
+        ),
+    )
+    PRIMARY_VALUE.add_rule(
+        (T(TK.KW_NOT),),
+        lambda tok: ast.ExprId(name="not", offset=tok.offset),
+    )
+    PRIMARY_VALUE.add_rule(
+        (T(TK.KW_EXTENT), POSTFIX_VALUE),
+        lambda tok, val: ast.ExprApp(
+            func=ast.ExprId(name="extent", offset=tok.offset),
+            args=(val,),
+            offset=tok.offset,
+        ),
+    )
+    PRIMARY_VALUE.add_rule(
+        (T(TK.KW_EXTENT),),
+        lambda tok: ast.ExprId(name="extent", offset=tok.offset),
+    )
+    PRIMARY_VALUE.add_rule(
+        (T(TK.KW_ORDINAL), POSTFIX_VALUE),
+        lambda tok, val: ast.ExprApp(
+            func=ast.ExprId(name="ordinal", offset=tok.offset),
+            args=(val,),
+            offset=tok.offset,
+        ),
+    )
+    PRIMARY_VALUE.add_rule(
+        (T(TK.KW_ORDINAL),),
+        lambda tok: ast.ExprId(name="ordinal", offset=tok.offset),
     )
 
     # ------------------------------------------------------------------------
@@ -951,46 +1285,37 @@ def build_quest_grammar() -> None:
     # Declarations
     # ------------------------------------------------------------------------
     KIND_DECL.add_rule(
-        (T(TK.IDENT), T(TK.EQUAL), KIND),
+        (IDE, T(TK.EQUAL), KIND),
         lambda ident_token, equal_token, kind_node: ast.DefKindBinding(
             name=ident_token.lexeme, kind_val=kind_node, offset=ident_token.offset
         ),
     )
 
     TYPE_DECL.add_rule(
-        (T(TK.IDENT), Opt(HAS_KIND), T(TK.EQUAL), TYPE),
-        lambda ident_token, kind_bound, equal_token, type_node: ast.LetTypeBinding(
-            name=ident_token.lexeme,
-            type_val=type_node,
-            bound=kind_bound,
-            offset=ident_token.offset,
+        (IDE, Rep(T(TK.LPAREN), SIGNATURE, T(TK.RPAREN)), Opt(HAS_KIND), T(TK.EQUAL), TYPE),
+        lambda ident_token, param_groups, kind_bound, equal_token, type_node: (
+            _build_type_decl(ident_token, param_groups, kind_bound, type_node)
+            if param_groups
+            else ast.LetTypeBinding(
+                name=ident_token.lexeme,
+                type_val=type_node,
+                bound=kind_bound,
+                offset=ident_token.offset,
+            )
         ),
     )
 
     VALUE_DECL.add_rule(
         (
             Opt(T(TK.KW_VAR)),
-            T(TK.IDENT),
-            Opt(T(TK.LPAREN), SIGNATURE, T(TK.RPAREN)),
+            IDE,
+            Rep(T(TK.LPAREN), SIGNATURE, T(TK.RPAREN)),
             Opt(T(TK.COLON), TYPE),
             T(TK.EQUAL),
             VALUE,
         ),
-        lambda var_token, ident_token, formals, ret_type, equal_token, val_expr: ast.LetValueBinding(
-            name=ident_token.lexeme,
-            value=val_expr,
-            params=(
-                tuple(
-                    ast.FormalParam(name=sig.name, type_annot=sig.type_sig, mode=sig.mode, offset=sig.offset)
-                    for sig in formals[1]
-                    if isinstance(sig, ast.FieldSig)
-                )
-                if formals and isinstance(formals[1], tuple)
-                else ()
-            ),
-            type_annot=ret_type[1] if ret_type else None,
-            is_var=bool(var_token),
-            offset=ident_token.offset,
+        lambda var_token, ident_token, param_groups, ret_type, equal_token, val_expr: (
+            _build_curried_value_decl(var_token, ident_token, param_groups, ret_type, val_expr)
         ),
     )
 
@@ -1133,9 +1458,60 @@ def build_quest_grammar() -> None:
     )
 
     # ------------------------------------------------------------------------
-    # HasType / HasKind
+    # HasType / HasMutType / HasKind
     # ------------------------------------------------------------------------
     HAS_TYPE.add_rule((T(TK.COLON), TYPE), lambda colon_token, type_node: type_node)
+
+    # : Var ( Type )
+    HAS_MUT_TYPE.add_rule(
+        (T(TK.COLON), T(TK.KW_VAR_TYPE), T(TK.LPAREN), TYPE, T(TK.RPAREN)),
+        lambda colon, var_tok, lp, type_node, rp: ast.FieldSig(
+            name=None,
+            type_sig=type_node,
+            mode=ast.ParamMode.VAR,
+            offset=colon.offset,
+        ),
+    )
+    # : Out ( Type )
+    HAS_MUT_TYPE.add_rule(
+        (T(TK.COLON), T(TK.KW_OUT_TYPE), T(TK.LPAREN), TYPE, T(TK.RPAREN)),
+        lambda colon, out_tok, lp, type_node, rp: ast.FieldSig(
+            name=None,
+            type_sig=type_node,
+            mode=ast.ParamMode.OUT,
+            offset=colon.offset,
+        ),
+    )
+    # var : Type
+    HAS_MUT_TYPE.add_rule(
+        (T(TK.KW_VAR), T(TK.COLON), TYPE),
+        lambda var_tok, colon, type_node: ast.FieldSig(
+            name=None,
+            type_sig=type_node,
+            mode=ast.ParamMode.VAR,
+            offset=var_tok.offset,
+        ),
+    )
+    # out : Type
+    HAS_MUT_TYPE.add_rule(
+        (T(TK.KW_OUT), T(TK.COLON), TYPE),
+        lambda out_tok, colon, type_node: ast.FieldSig(
+            name=None,
+            type_sig=type_node,
+            mode=ast.ParamMode.OUT,
+            offset=out_tok.offset,
+        ),
+    )
+    # : Type
+    HAS_MUT_TYPE.add_rule(
+        (T(TK.COLON), TYPE),
+        lambda colon, type_node: ast.FieldSig(
+            name=None,
+            type_sig=type_node,
+            mode=ast.ParamMode.VALUE,
+            offset=colon.offset,
+        ),
+    )
 
     HAS_KIND.add_rule(
         (T(TK.SUBTYPE), TYPE),
@@ -1232,6 +1608,20 @@ def build_quest_grammar() -> None:
             bound=type_declaration.bound,
             is_rec=bool(rec_token),
             offset=def_token.offset,
+        ),
+    )
+    # : Type (TypeArgument in call bindings / phrases)
+    PHRASE.add_rule(
+        (T(TK.COLON), TYPE),
+        lambda colon_token, type_node: ast.TypeArgument(
+            type_val=type_node, offset=colon_token.offset
+        ),
+    )
+    # :: Kind (KindArgument in call bindings / phrases)
+    PHRASE.add_rule(
+        (T(TK.COLON_COLON), KIND),
+        lambda colon_token, kind_node: ast.KindArgument(
+            kind_val=kind_node, offset=colon_token.offset
         ),
     )
     # Top-level Value Expression

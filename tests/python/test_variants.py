@@ -5,7 +5,7 @@ import unittest
 from quest.env import Environment
 from quest.interpreter import RuntimeEnvironment
 from quest.pipeline import CompilerContext
-from quest.runtime import QBool, QInt, QOk, QVariant
+from quest.runtime import QBool, QInt, QOk, QTuple, QVariant, qvalue_to_str
 from quest.types import (
     INT_TYPE,
     OK_TYPE,
@@ -149,7 +149,7 @@ class TestVariants(unittest.TestCase):
             let isGreen: Bool = cRed?green;
             let isBlue: Bool = cBlue?blue;
 
-            let redOk: Ok = cRed!red;
+            let redPayload = cRed!red;
             let bluePayload = cBlue!blue;
             let blueVal: Int = bluePayload.val;
             """
@@ -157,7 +157,8 @@ class TestVariants(unittest.TestCase):
         self.assertEqual(self.runtime_env.lookup("isRed"), QBool(True))
         self.assertEqual(self.runtime_env.lookup("isGreen"), QBool(False))
         self.assertEqual(self.runtime_env.lookup("isBlue"), QBool(True))
-        self.assertEqual(self.runtime_env.lookup("redOk"), QOk())
+        self.assertEqual(qvalue_to_str(self.runtime_env.lookup("redPayload")), "tuple 0 end")
+        self.assertEqual(qvalue_to_str(self.runtime_env.lookup("bluePayload")), "tuple 2 val=100 end")
         self.assertEqual(self.runtime_env.lookup("blueVal"), QInt(100))
 
 

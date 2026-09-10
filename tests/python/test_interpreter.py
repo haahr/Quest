@@ -512,7 +512,7 @@ class TestDynamicAndInspect(unittest.TestCase):
 
     def test_dynamic_packaging_and_inspect(self):
         code = """
-        let d = dynamic(42);
+        let d = dynamic.new(42);
         let res = inspect d
             when Int with n then n + 1
             else 0
@@ -523,7 +523,7 @@ class TestDynamicAndInspect(unittest.TestCase):
 
     def test_inspect_multiple_branches(self):
         code = """
-        let d = dynamic("hello");
+        let d = dynamic.new("hello");
         let res = inspect d
             when Int with n then 1
             when String with s then 2
@@ -535,7 +535,7 @@ class TestDynamicAndInspect(unittest.TestCase):
 
     def test_inspect_unmatched_raises_dynamic_error(self):
         code = """
-        let d = dynamic(42);
+        let d = dynamic.new(42);
         inspect d
             when String with s then 1
         end;

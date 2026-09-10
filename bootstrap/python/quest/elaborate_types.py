@@ -371,8 +371,14 @@ def elaborate_type(ast_type: ast.Type, env: Environment) -> QType:
                     if isinstance(bound_kind, QPowerKind):
                         # Value formal parameter: x : T (represented via Power(T))
                         val_type = bound_kind.bound
-                        val_params.append(QParam(name=q.name, type_val=val_type))
-                        env.current_scope.declare_value(ValueSymbol(name=q.name, type_val=val_type))
+                        is_var = getattr(q, "mode", ast.ParamMode.VALUE) == ast.ParamMode.VAR
+                        is_out = getattr(q, "mode", ast.ParamMode.VALUE) == ast.ParamMode.OUT
+                        val_params.append(
+                            QParam(name=q.name, type_val=val_type, is_var=is_var, is_out=is_out)
+                        )
+                        env.current_scope.declare_value(
+                            ValueSymbol(name=q.name, type_val=val_type, is_var=is_var)
+                        )
                     else:
                         symbol_id = env.fresh_symbol_id()
                         env.current_scope.declare_type(

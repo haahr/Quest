@@ -396,6 +396,20 @@ class TypedDerefCell(TypedExpr):
 
 
 @dataclass(frozen=True)
+class TypedSelectRef(TypedExpr):
+    """Reference to a mutable record field (for var/out arguments): @r.f."""
+    target: TypedExpr
+    field: str
+    type_val: QType
+
+    def dump_header(self) -> str:
+        return f".{self.field} (ref)"
+
+    def dump_children(self) -> list[tuple[str, Any]]:
+        return [(":target", self.target)]
+
+
+@dataclass(frozen=True)
 class TypedAssign(TypedExpr):
     """Assignment to mutable reference or record field: target := value."""
     target: TypedExpr
@@ -429,16 +443,23 @@ class TypedVariant(TypedExpr):
 
 @dataclass(frozen=True)
 class TypedOption(TypedExpr):
-    """Option injection: option tag with value end."""
-    tag: str
+    """Option injection: option tag or ordinal with value end."""
+    tag: Optional[str]
     type_val: QOptionType
     payload: Optional[TypedExpr] = None
+    ordinal: int = 0
+    ordinal_expr: Optional[TypedExpr] = None
 
     def dump_header(self) -> str:
-        return f"'{self.tag}'"
+        return f"'{self.tag}'" if self.tag is not None else "ordinal"
 
     def dump_children(self) -> list[tuple[str, Any]]:
-        return [(":payload", self.payload)] if self.payload else []
+        res: list[tuple[str, Any]] = []
+        if self.ordinal_expr is not None:
+            res.append((":ordinal", self.ordinal_expr))
+        if self.payload is not None:
+            res.append((":payload", self.payload))
+        return res
 
 
 @dataclass(frozen=True)

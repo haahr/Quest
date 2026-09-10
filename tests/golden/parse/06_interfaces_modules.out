@@ -21,12 +21,14 @@
                 :bound (KindPower
                   :bound (TypePath ('Stack'))
                 )
+                :mode VALUE
               )
               (Quantifier
                 :name 'x'
                 :bound (KindPower
                   :bound (TypePath ('Int'))
                 )
+                :mode VALUE
               )
             )
             :result_type (TypePath ('Stack'))
@@ -42,6 +44,7 @@
                 :bound (KindPower
                   :bound (TypePath ('Stack'))
                 )
+                :mode VALUE
               )
             )
             :result_type (TypePath ('Int'))

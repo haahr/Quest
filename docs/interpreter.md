@@ -84,8 +84,12 @@ a human-readable `type_name` and a `to_str(visited)` method supporting cycle det
 - **`QArray(elements: list[QValue])`:**
   - Represents fixed-size, mutable linear buffers (`get(i)`, `set(i, val)`, `size()`).
   - Formats as `array of 1 2 3 end`.
-- **`QVariant(tag: str, payload: Optional[QValue])` & `QOption(tag: str, payload: Optional[QValue])`:**
+- **`QList(elements: tuple[QValue, ...])`:**
+  - Represents immutable linear lists.
+  - Formats as `list of 1 2 3 end` (or `list of end` for empty lists).
+- **`QVariant(tag, payload)` & `QOption(tag, payload, ordinal=0)`:**
   - Represent tagged sum types with optional payloads.
+  - `QOption` tracks the zero-based declaration index `ordinal` of the tag, accessible via the `ordinal` operator.
   - Formats as `variant red with 42 end` or `option none end`.
 
 ### 2.3. Closures, Functions, and Mutability
@@ -100,7 +104,7 @@ a human-readable `type_name` and a `to_str(visited)` method supporting cycle det
     variable parameters (`:var`).
   - Supports `deref() -> QValue` and `assign(new_value: QValue)`. Formats as `ref(<val>)`.
 - **`QDynamicVal(value: QValue, type_val: Any)` & `QExceptionVal(name: str, payload: Optional[QValue])`:**
-  - Envelopes for dynamic typing (`dynamic(v : T)`) and runtime exception tagging.
+  - Envelopes for dynamic typing (`dynamic.new(:T v)`) and runtime exception tagging.
 
 ---
 
@@ -115,7 +119,13 @@ The evaluator in `quest/interpreter.py` evaluates typed expressions and bindings
 - `define(name, value)`: Binds a symbol in the local frame.
 - `lookup(name)`: Searches outward from innermost to outermost frame; raises `QuestRuntimeError` if missing.
 - `assign(name, new_value)`: Resolves an existing variable and either mutates its `QRef` cell or updates the binding.
-- `create_root_env()`: Factory pre-populating standard constants: `true`, `false`, `ok`, and `DivideByZero`.
+- `create_root_env()`: Factory pre-populating:
+  - Standard constants: `true`, `false`, `ok`, and `DivideByZero`.
+  - Monadic operators: `not` (boolean negation), `extent` (array size), `ordinal` (option tag index).
+  - Dyadic arithmetic and comparison operators: `+`, `-`, `*`, `/`, `%`, `mod`, `<`, `<=`, `>`, `>=`,
+    `++`, `--`, `**`, `//`, `^^`, `<<`, `<<=`, `>>`, `>>=`, `<>`, `/\`, `\/`, `is`, `isnot`.
+  - Pre-linked standard library module records: `arrayOp`, `ascii`, `conv`, `dynamic`, `int`, `list`, `reader`,
+    `real`, `string`, `writer`.
 
 ### 3.2. Evaluation Rules
 
@@ -126,11 +136,14 @@ The evaluator in `quest/interpreter.py` evaluates typed expressions and bindings
   - `TypedVarCell(value)`: Allocates a new heap reference cell `QRef(eval_expr(value))`.
   - `TypedAssign(target, value)`: Evaluates `value`, mutates the target reference cell, and returns `OK_VALUE`.
 - **Arithmetic & Modulo:**
-  - Evaluates `+`, `-`, `*`, `/`, `mod`, and `%`.
-  - Supports `Int` and `Real` operands.
+  - Evaluates integer operators (`+`, `-`, `*`, `/`, `mod`, `%`) and real operators (`++`, `--`, `**`, `//`, `^^`).
 - **Relational & Equality:**
-  - Comparisons `<`, `<=`, `>`, `>=` on `Int`, `Real`, `Char`, and `String`.
-  - Equality `is` and `==` via `qvalue_is()`; inequality `isnot` and `<>`.
+  - Integer comparisons `<`, `<=`, `>`, `>=`.
+  - Real comparisons `<<`, `<<=`, `>>`, `>>=`.
+  - String concatenation `<>`.
+  - Equality `is` via `qvalue_is()`; inequality `isnot`.
+- **Monadic Operators:**
+  - Evaluates `not` (inverts `QBool`), `extent` (returns `QInt` array size), and `ordinal` (returns `QInt` tag index).
 - **Conditionals:**
   - `TypedIf`: Evaluates condition; conditionally evaluates `then_branch` or `else_branch`. Short-circuit logic
     (`andif`, `orif`) is handled directly via desugared `TypedIf` nodes.
@@ -145,6 +158,7 @@ The evaluator in `quest/interpreter.py` evaluates typed expressions and bindings
   - `TypedRecord`: Evaluates fields, wrapping mutable fields (`is_var=True`) in `QRef`. Formats with sorted keys.
   - `TypedTuple`: Evaluates elements, preserving component labels from `QTupleType`. Supports `t.fieldName`.
   - `TypedSelect`: Resolves field on `QRecord` or `QTuple`; automatically dereferences `QRef` in value positions.
+  - `TypedSelectRef`: Resolves field on `QRecord` returning the underlying `QRef` without dereferencing (for `@r.f`).
 - **Arrays & Mutation:**
   - `TypedArray`: Evaluates elements into mutable `QArray`.
   - `TypedArrayRep`: Evaluates `init_val` exactly once and replicates it across `count` slots.
@@ -152,7 +166,12 @@ The evaluator in `quest/interpreter.py` evaluates typed expressions and bindings
   - `TypedIndexAssign`: Array element mutation `arr[i] := v`. Raises `arrayOp.error` if out of bounds.
   - `TypedAssign`: Extends to record field mutation `r.field := v`.
 - **Variants, Options, and Pattern Matching:**
-  - `TypedVariant` / `TypedOption`: Injects tag with optional evaluated payload.
+  - `TypedVariant`: Injects tag with optional evaluated payload into `QVariant`.
+  - `TypedOption`: Injects tag with optional evaluated payload and branch `ordinal`. Supports runtime ordinal
+    expressions (`option ordinal(n) of T ...`), determining tag dynamically from index `n`.
+  - `TypedVariantCheck`: Evaluates `target?tag`, returning `true` on match.
+  - `TypedVariantAssert`: Evaluates `target!tag`. On `QOption`, returns a `QTuple` with 0-based ordinal as element 0
+    followed by the payload components (e.g. `tuple 1 let x=true end`). On `QVariant`, returns the payload directly.
   - `TypedCase`: Evaluates target, matches `target.tag` against branch tags, binds payload to `binder` in child
     scope, and executes branch body. Evaluates `else_branch` if no tag matches.
 - **Functions & Recursion:**
@@ -249,17 +268,32 @@ The evaluator in `quest/interpreter.py` evaluates typed expressions and bindings
     - With payload: `Exception: <name> with <payload_str>:<payload_type>`
     - Without payload (or Ok): `Exception: <name>`
 - **Dynamic Type Reflection & `dynamic.error`:**
-  - Dynamic packaging via `dynamic(val)` creates a `QDynamicVal(value, type_val)`.
+  - Dynamic packaging via `dynamic.new(:Type val)` (or inferred `dynamic.new(val)`) creates a
+    `QDynamicVal(value, type_val)`.
+  - Type narrowing via `dynamic.be(:Type d)` dynamically validates that `d`'s packaged type is a subtype of the target
+    type, returning the unwrapped value or raising `dynamic.error` (`DYNAMIC_ERROR_EXC`) on mismatch.
   - Type inspection via `inspect dyn when Type with b then ... else ... end` checks subtyping dynamically.
   - If no `when` branch matches and no `else` branch is supplied, raises the language-level exception `dynamic.error`
     (`DYNAMIC_ERROR_EXC`).
+  - Legacy bare `dynamic(val)` syntax is removed in favor of `dynamic.new`.
 
 ### 4.11. Standard Library Modules & Import System
-- **Module Import Semantics:**
-  - Standard library modules and interfaces are not pre-bound in the root lexical environment; they must be imported
-    explicitly via top-level `import mod: Interface` or `import : Interface`.
-  - `BuiltinModuleRegistry` resolves standard interfaces (`Writer`, `Reader`, `Conv`, `Ascii`, `IntOp`, `RealOp`,
-    `StringOp`, `ArrayOp`, `Dynamic`) and provides runtime module records (`writer`, `reader`, etc.).
+- **Module Pre-linking & Import Semantics (Cardelli §11.3):**
+  - Standard library modules (`arrayOp`, `ascii`, `conv`, `dynamic`, `int`, `list`, `reader`, `real`, `string`,
+    `writer`) and their interfaces (`ArrayOp`, `Ascii`, `Conv`, `Dynamic`, `IntOp`, `List`, `Reader`, `RealOp`,
+    `StringOp`, `Writer`) are pre-linked at the top level and in the interactive REPL. They can be used directly
+    without an `import` statement outside of modules.
+  - Standalone modules (`module ... end`) are isolated from top-level pre-linked module records and must explicitly
+    import any required modules using `import mod: Interface`.
+  - `BuiltinModuleRegistry` resolves all 10 standard interfaces and runtime module records.
+- **List Operations (`list: List`):**
+  - Built-in `list` module backed by runtime `QList` values.
+  - Provides `nil`, `cons`, `null`, `head`, `tail`, `length`, `enum`, and `error`.
+- **String Substring Precedence (`StringOp.precedesSub`):**
+  - `string.precedesSub(s1, start1, size1, s2, start2, size2)` compares substrings lexicographically, raising
+    `string.error` on invalid indices.
+- **Dynamic Module (`dynamic: Dynamic`):**
+  - Provides `new`, `be`, `copy`, `extern`, `intern`, and `error`.
 - **I/O Streams & Files:**
   - `writer.output` connects to `sys.stdout`; `writer.err` connects to `sys.stderr` (language extension).
   - `writer.file(name)` and `reader.file(name)` manage real file handles, raising `writer.error` / `reader.error` on
@@ -283,7 +317,7 @@ The evaluator in `quest/interpreter.py` evaluates typed expressions and bindings
 | **3.2** | Environment & Core Eval | `RuntimeEnvironment`, scoping, operators, loops, DivideByZero | **Complete** |
 | **3.3** | Structures & Mutation | Record/tuple selection, array operations, `case` matching | **Complete** |
 | **3.4** | Exceptions & Dynamic | `try...with`, `raise`, `inspect`, dynamic type reflection | **Complete** |
-| **3.5** | Cardelli Stdlib Modules | 9 standard modules, I/O streams, files, import system | **Complete** |
+| **3.5** | Cardelli Stdlib Modules | 10 standard modules, I/O streams, pre-linking & imports | **Complete** |
 | **3.6** | Pipeline & REPL | `InterpretPhase`, `--echo`, `-i`, interactive REPL (`repl.py`) | **Complete** |
 
 ---

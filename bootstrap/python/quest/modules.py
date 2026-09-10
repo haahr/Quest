@@ -52,27 +52,40 @@ def elaborate_interface(decl: ast.InterfaceDecl, env: Environment) -> TypedInter
     for imp in decl.imports:
         source_interface_scope = env.lookup_interface(imp.interface_name)
         if source_interface_scope is None:
+            source_interface_scope = BuiltinModuleRegistry.get_interface(imp.interface_name, env)
+            if source_interface_scope is not None:
+                env.register_interface(imp.interface_name, source_interface_scope)
+        if source_interface_scope is None:
             raise QuestTypeError(
                 f"Undefined interface '{imp.interface_name}' in import of interface '{decl.name}'",
                 offset=decl.offset,
             )
-        for name in imp.names:
-            type_symbol = source_interface_scope.lookup_type_local(name)
-            if type_symbol is not None:
-                interface_scope.declare_type(type_symbol)
-                continue
-            value_symbol = source_interface_scope.lookup_value_local(name)
-            if value_symbol is not None:
-                interface_scope.declare_value(value_symbol)
-                continue
-            kind_symbol = source_interface_scope.lookup_kind_local(name)
-            if kind_symbol is not None:
-                interface_scope.declare_kind(kind_symbol)
-                continue
-            raise QuestTypeError(
-                f"Symbol '{name}' not found in imported interface '{imp.interface_name}'",
-                offset=decl.offset,
-            )
+        if not imp.names:
+            for type_name, type_sym in source_interface_scope.types.items():
+                interface_scope.declare_type(type_sym)
+            for kind_name, kind_sym in source_interface_scope.kinds.items():
+                interface_scope.declare_kind(kind_sym)
+        else:
+            for name in imp.names:
+                type_symbol = source_interface_scope.lookup_type_local(name)
+                if type_symbol is not None:
+                    interface_scope.declare_type(type_symbol)
+                    continue
+                value_symbol = source_interface_scope.lookup_value_local(name)
+                if value_symbol is not None:
+                    interface_scope.declare_value(value_symbol)
+                    continue
+                kind_symbol = source_interface_scope.lookup_kind_local(name)
+                if kind_symbol is not None:
+                    interface_scope.declare_kind(kind_symbol)
+                    continue
+                mod_type = BuiltinModuleRegistry.get_module_type(name, env)
+                if mod_type is None:
+                    mod_type = BuiltinModuleRegistry._build_record_type_from_scope(
+                        source_interface_scope
+                    )
+                env.register_module(name, source_interface_scope)
+                interface_scope.declare_value(ValueSymbol(name=name, type_val=mod_type))
 
     # 2. Elaborate signatures in a child scope of the interface
     saved_scope = env.current_scope
@@ -98,14 +111,15 @@ def elaborate_interface(decl: ast.InterfaceDecl, env: Environment) -> TypedInter
                 interface_scope.declare_type(type_symbol)
 
             elif isinstance(sig, ast.FieldSig):
-                val_type = elaborate_type(sig.type_sig, env)
-                val_symbol = ValueSymbol(
-                    name=sig.name,
-                    type_val=val_type,
-                    is_var=(sig.mode == ast.ParamMode.VAR),
-                    is_out=(sig.mode == ast.ParamMode.OUT),
-                )
-                interface_scope.declare_value(val_symbol)
+                if sig.name:
+                    val_type = elaborate_type(sig.type_sig, env)
+                    val_symbol = ValueSymbol(
+                        name=sig.name,
+                        type_val=val_type,
+                        is_var=(sig.mode == ast.ParamMode.VAR),
+                        is_out=(sig.mode == ast.ParamMode.OUT),
+                    )
+                    interface_scope.declare_value(val_symbol)
 
             elif isinstance(sig, ast.DefKindBinding):
                 kind_symbol = elaborate_kind_binding(sig, env)
@@ -130,7 +144,7 @@ def elaborate_module(
             offset=decl.offset,
         )
 
-    module_internal_scope = Scope(name=f"module_internal_{decl.name}", parent=env.current_scope)
+    module_internal_scope = Scope(name=f"module_internal_{decl.name}", parent=env.base_scope)
 
     # 1. Resolve imports into module_internal_scope
     for imp in decl.imports:
@@ -144,23 +158,32 @@ def elaborate_module(
                 f"Undefined interface '{imp.interface_name}' in import of module '{decl.name}'",
                 offset=decl.offset,
             )
-        for name in imp.names:
-            type_symbol = source_interface_scope.lookup_type_local(name)
-            if type_symbol is not None:
-                module_internal_scope.declare_type(type_symbol)
-                continue
-            value_symbol = source_interface_scope.lookup_value_local(name)
-            if value_symbol is not None:
-                module_internal_scope.declare_value(value_symbol)
-                continue
-            kind_symbol = source_interface_scope.lookup_kind_local(name)
-            if kind_symbol is not None:
-                module_internal_scope.declare_kind(kind_symbol)
-                continue
-            raise QuestTypeError(
-                f"Symbol '{name}' not found in imported interface '{imp.interface_name}'",
-                offset=decl.offset,
-            )
+        if not imp.names:
+            for type_name, type_sym in source_interface_scope.types.items():
+                module_internal_scope.declare_type(type_sym)
+            for kind_name, kind_sym in source_interface_scope.kinds.items():
+                module_internal_scope.declare_kind(kind_sym)
+        else:
+            for name in imp.names:
+                type_symbol = source_interface_scope.lookup_type_local(name)
+                if type_symbol is not None:
+                    module_internal_scope.declare_type(type_symbol)
+                    continue
+                value_symbol = source_interface_scope.lookup_value_local(name)
+                if value_symbol is not None:
+                    module_internal_scope.declare_value(value_symbol)
+                    continue
+                kind_symbol = source_interface_scope.lookup_kind_local(name)
+                if kind_symbol is not None:
+                    module_internal_scope.declare_kind(kind_symbol)
+                    continue
+                mod_type = BuiltinModuleRegistry.get_module_type(name, env)
+                if mod_type is None:
+                    mod_type = BuiltinModuleRegistry._build_record_type_from_scope(
+                        source_interface_scope
+                    )
+                env.register_module(name, source_interface_scope)
+                module_internal_scope.declare_value(ValueSymbol(name=name, type_val=mod_type))
 
     # 2. Elaborate module internal bindings
     if binding_elaborator is None:

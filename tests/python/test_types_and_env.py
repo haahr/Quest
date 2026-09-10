@@ -215,7 +215,7 @@ class TestSemanticTypesAndKinds(unittest.TestCase):
 
     def test_composite_types_str(self):
         tuple_type = QTupleType((INT_TYPE, STRING_TYPE))
-        self.assertEqual(str(tuple_type), "Tuple Int String end")
+        self.assertEqual(str(tuple_type), "Tuple :Int :String end")
 
         record_type = QRecordType((
             QRecordField("x", INT_TYPE),
@@ -317,7 +317,7 @@ class TestSemanticTypesAndKinds(unittest.TestCase):
         evaluated = app.evaluate_lazily()
         self.assertIsInstance(evaluated, QTupleType)
         self.assertEqual(evaluated.elements, (INT_TYPE, STRING_TYPE))
-        self.assertEqual(str(evaluated), "Tuple Int String end")
+        self.assertEqual(str(evaluated), "Tuple :Int :String end")
 
     def test_single_recursive_type(self):
         # List = Rec(L::TYPE) Option nil cons with Record head: Int tail: L end end

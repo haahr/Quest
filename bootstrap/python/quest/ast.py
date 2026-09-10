@@ -41,9 +41,10 @@ class TypeFormal(ASTNode):
 
 @dataclass(frozen=True)
 class Quantifier(ASTNode):
-    """Universal/existential quantifier: X <: B or X :: K"""
+    """Universal/existential quantifier: X <: B or X :: K or [var/out] x: T"""
     name: str
     bound: Kind
+    mode: ParamMode = ParamMode.VALUE
 
 
 # ============================================================================
@@ -115,8 +116,8 @@ class TypeAll(Type):
 @dataclass(frozen=True)
 class FieldSig(ASTNode):
     """Field in a tuple or auto signature: [var | out] x : T"""
-    name: str
-    type_sig: Type
+    name: Optional[str] = None
+    type_sig: Optional[Type] = None
     mode: ParamMode = ParamMode.VALUE
 
 
@@ -245,6 +246,19 @@ class Expr(ASTNode):
     pass
 
 
+@dataclass(frozen=True)
+class TypeArgument(Expr):
+    """Explicit type argument in call binding: :Type"""
+    type_val: Type
+
+
+@dataclass(frozen=True)
+class KindArgument(Expr):
+    """Explicit kind argument in call binding: ::Kind"""
+    kind_val: Kind
+
+
+
 # --- Literals ---
 
 @dataclass(frozen=True)
@@ -336,6 +350,7 @@ class ExprFun(Expr):
     params: tuple[FormalParam, ...]
     return_type: Optional[Type]
     body: Expr
+    type_params: tuple[TypeFormal, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -381,9 +396,10 @@ class ExprRecord(Expr):
 
 @dataclass(frozen=True)
 class ExprOption(Expr):
-    tag: str
-    option_type: Type
+    tag: Optional[str] = None
+    option_type: Type = None  # type: ignore[assignment]
     payload: Optional[Expr] = None
+    ordinal_expr: Optional[Expr] = None
 
 
 @dataclass(frozen=True)
@@ -397,6 +413,7 @@ class ExprVariant(Expr):
 @dataclass(frozen=True)
 class ExprArray(Expr):
     elements: tuple[Expr, ...]
+    element_type: Optional[Type] = None
 
 
 @dataclass(frozen=True)

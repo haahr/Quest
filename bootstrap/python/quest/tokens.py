@@ -98,7 +98,7 @@ class TokenKind(Enum):
     KW_FUN_TYPE = auto()    # Fun
     KW_LET_TYPE = auto()    # Let
     KW_OPTION_TYPE = auto() # Option
-    KW_OUT = auto()         # Out
+    KW_OUT_TYPE = auto()    # Out
     KW_REC_TYPE = auto()    # Rec
     KW_RECORD_TYPE = auto() # Record
     KW_TUPLE_TYPE = auto()  # Tuple
@@ -121,6 +121,7 @@ class TokenKind(Enum):
     KW_EXCEPTION = auto()   # exception
     KW_EXIT = auto()        # exit
     KW_EXPORT = auto()      # export
+    KW_EXTENT = auto()      # extent
     KW_FALSE = auto()       # false
     KW_FOR = auto()         # for
     KW_FUN = auto()         # fun
@@ -133,10 +134,13 @@ class TokenKind(Enum):
     KW_LET = auto()         # let
     KW_LOOP = auto()        # loop
     KW_MODULE = auto()      # module
+    KW_NOT = auto()         # not
     KW_OF = auto()          # of
     KW_OK = auto()          # ok
     KW_OPTION = auto()      # option
+    KW_ORDINAL = auto()     # ordinal
     KW_ORIF = auto()        # orif
+    KW_OUT = auto()         # out
     KW_RAISE = auto()       # raise
     KW_REC = auto()         # rec
     KW_RECORD = auto()      # record
@@ -194,7 +198,7 @@ KEYWORDS: dict[str, TokenKind] = {
     "Fun": TokenKind.KW_FUN_TYPE,
     "Let": TokenKind.KW_LET_TYPE,
     "Option": TokenKind.KW_OPTION_TYPE,
-    "Out": TokenKind.KW_OUT,
+    "Out": TokenKind.KW_OUT_TYPE,
     "Rec": TokenKind.KW_REC_TYPE,
     "Record": TokenKind.KW_RECORD_TYPE,
     "Tuple": TokenKind.KW_TUPLE_TYPE,
@@ -217,6 +221,7 @@ KEYWORDS: dict[str, TokenKind] = {
     "exception": TokenKind.KW_EXCEPTION,
     "exit": TokenKind.KW_EXIT,
     "export": TokenKind.KW_EXPORT,
+    "extent": TokenKind.KW_EXTENT,
     "false": TokenKind.KW_FALSE,
     "for": TokenKind.KW_FOR,
     "fun": TokenKind.KW_FUN,
@@ -229,10 +234,13 @@ KEYWORDS: dict[str, TokenKind] = {
     "let": TokenKind.KW_LET,
     "loop": TokenKind.KW_LOOP,
     "module": TokenKind.KW_MODULE,
+    "not": TokenKind.KW_NOT,
     "of": TokenKind.KW_OF,
     "ok": TokenKind.KW_OK,
     "option": TokenKind.KW_OPTION,
+    "ordinal": TokenKind.KW_ORDINAL,
     "orif": TokenKind.KW_ORIF,
+    "out": TokenKind.KW_OUT,
     "raise": TokenKind.KW_RAISE,
     "rec": TokenKind.KW_REC,
     "record": TokenKind.KW_RECORD,

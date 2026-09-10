@@ -101,16 +101,20 @@ class Phase5ExceptionsDynamicTest(unittest.TestCase):
         self.assertEqual(typed_try.type_val, INT_TYPE)
 
     def test_dynamic_polymorphic_constructor(self) -> None:
-        """dynamic(42) and dynamic("text") synthesize Dynamic via built-in function."""
+        """dynamic.new(42) and dynamic.new("text") synthesize Dynamic."""
         env = Environment()
 
-        # dynamic(42)
-        typed1 = synth_test_expr("dynamic(42)", env)
-        self.assertEqual(typed1.type_val, DYNAMIC_TYPE)
+        # dynamic.new(42)
+        typed1 = synth_test_expr("dynamic.new(42)", env)
+        self.assertEqual(typed1.type_val.evaluate_lazily(env), DYNAMIC_TYPE)
 
-        # dynamic("text")
-        typed2 = synth_test_expr('dynamic("text")', env)
-        self.assertEqual(typed2.type_val, DYNAMIC_TYPE)
+        # dynamic.new("text")
+        typed2 = synth_test_expr('dynamic.new("text")', env)
+        self.assertEqual(typed2.type_val.evaluate_lazily(env), DYNAMIC_TYPE)
+
+        # dynamic.new(:Int 42)
+        typed3 = synth_test_expr("dynamic.new(:Int 42)", env)
+        self.assertEqual(typed3.type_val.evaluate_lazily(env), DYNAMIC_TYPE)
 
     def test_inspect_dynamic(self) -> None:
         """inspect d when Int with n then n when String with s then 0 end (optional else)."""

@@ -30,6 +30,7 @@ from quest.runtime import (
     QDynamicVal,
     QExceptionVal,
     QInt,
+    QList,
     QOk,
     QOption,
     QReal,
@@ -50,6 +51,7 @@ from quest.types import (
     EXCEPTION_TYPE,
     INT_TYPE,
     OK_TYPE,
+    QOptionType,
     QTupleType,
     QTupleTypeFormal,
     QTupleTypeBinding,
@@ -100,6 +102,7 @@ from quest.typed_ast import (
     TypedReal,
     TypedRecord,
     TypedSelect,
+    TypedSelectRef,
     TypedString,
     TypedTry,
     TypedTryBranch,
@@ -175,6 +178,7 @@ class QuestRuntimeError(QuestCompilerError):
 DIVIDE_BY_ZERO_EXC = QExceptionVal("DivideByZero")
 ARRAY_OP_ERROR_EXC = QExceptionVal("arrayOp.error")
 DYNAMIC_ERROR_EXC = QExceptionVal("dynamic.error")
+LIST_ERROR_EXC = QExceptionVal("list.error")
 
 
 # ============================================================================
@@ -246,15 +250,91 @@ class RuntimeEnvironment:
         env.define("DivideByZero", DIVIDE_BY_ZERO_EXC)
         env.define("arrayOp.error", ARRAY_OP_ERROR_EXC)
         env.define("dynamic.error", DYNAMIC_ERROR_EXC)
+        env.define("list.error", LIST_ERROR_EXC)
 
-        def make_dynamic(*args: QValue) -> QDynamicVal:
-            if len(args) == 1:
-                return QDynamicVal(value=args[0], type_val=_infer_qtype(args[0]))
-            if len(args) == 2 and isinstance(args[1], QType):
-                return QDynamicVal(value=args[0], type_val=args[1])
-            raise QuestRuntimeError("dynamic expects 1 argument")
+        from quest.builtins import BuiltinModuleRegistry
+        BuiltinModuleRegistry._ensure_initialized()
+        for mod_name, mod_val in BuiltinModuleRegistry._modules.items():
+            env.define(mod_name, mod_val)
 
-        env.define("dynamic", QBuiltinFun("dynamic", fn=make_dynamic))
+        # Built-in operators as callable functions (Cardelli §4.2)
+        for op in ("+", "-", "*", "/", "mod", "%"):
+            env.define(
+                op,
+                QBuiltinFun(
+                    op,
+                    lambda a, b, op=op: QInt(
+                        _eval_int_arithmetic(op, a.value, b.value, offset=0)
+                    ),
+                ),
+            )
+        for op in ("<", "<=", ">", ">="):
+            env.define(
+                op,
+                QBuiltinFun(
+                    op,
+                    lambda a, b, op=op: (
+                        TRUE_VALUE
+                        if _eval_int_relational(op, a.value, b.value, offset=0)
+                        else FALSE_VALUE
+                    ),
+                ),
+            )
+        for op in ("++", "--", "**", "//", "^^"):
+            env.define(
+                op,
+                QBuiltinFun(
+                    op,
+                    lambda a, b, op=op: QReal(
+                        _eval_real_arithmetic(op, a.value, b.value, offset=0)
+                    ),
+                ),
+            )
+        for op in ("<<", "<<=", ">>", ">>="):
+            env.define(
+                op,
+                QBuiltinFun(
+                    op,
+                    lambda a, b, op=op: (
+                        TRUE_VALUE
+                        if _eval_real_relational(op, a.value, b.value, offset=0)
+                        else FALSE_VALUE
+                    ),
+                ),
+            )
+        env.define("<>", QBuiltinFun("<>", lambda a, b: QString(a.value + b.value)))
+        env.define(
+            "/\\",
+            QBuiltinFun("/\\", lambda a, b: TRUE_VALUE if (a.value and b.value) else FALSE_VALUE),
+        )
+        env.define(
+            "\\/",
+            QBuiltinFun("\\/", lambda a, b: TRUE_VALUE if (a.value or b.value) else FALSE_VALUE),
+        )
+
+        # Monadic Operators: not, extent, ordinal (Cardelli §4.2, §4.3, §4.5)
+        env.define(
+            "not",
+            QBuiltinFun("not", lambda b: FALSE_VALUE if b.value else TRUE_VALUE),
+        )
+        env.define(
+            "extent",
+            QBuiltinFun("extent", lambda a: QInt(len(a.elements))),
+        )
+        env.define(
+            "ordinal",
+            QBuiltinFun(
+                "ordinal",
+                lambda o: (
+                    QInt(o.ordinal)
+                    if isinstance(o, QOption)
+                    else (_ for _ in ()).throw(
+                        QuestRuntimeError(f"ordinal expects Option, got {o.type_name}")
+                    )
+                ),
+            ),
+        )
+
         return env
 
 
@@ -394,6 +474,15 @@ def eval_expr(expr: TypedExpr, env: RuntimeEnvironment) -> QValue:
             target_val = eval_expr(tgt, env)
             return target_val.deref() if isinstance(target_val, QRef) else target_val
 
+        case TypedSelectRef(target=tgt, field=fld, offset=offset):
+            rec_val = eval_expr(tgt, env)
+            if not isinstance(rec_val, QRecord):
+                raise QuestRuntimeError("Field selection target must be Record", offset=offset)
+            field_cell = rec_val.get(fld)
+            if isinstance(field_cell, QRef):
+                return field_cell
+            raise QuestRuntimeError(f"Field '{fld}' is not mutable", offset=offset)
+
         case TypedAssign(target=tgt, value=val, offset=offset):
             rhs_val = eval_expr(val, env)
             match tgt:
@@ -427,9 +516,26 @@ def eval_expr(expr: TypedExpr, env: RuntimeEnvironment) -> QValue:
 
         case TypedTypeApp(func=func, type_args=type_args):
             callee = eval_expr(func, env)
-            if isinstance(callee, QBuiltinFun) and callee.name == "dynamic" and type_args:
-                target_type = type_args[0]
-                return QBuiltinFun("dynamic", fn=lambda *args: QDynamicVal(args[0], target_type))
+            if isinstance(callee, QBuiltinFun):
+                if callee.name == "list.nil":
+                    return QList(())
+                if callee.name == "dynamic.new" and type_args:
+                    target_type = type_args[0]
+                    return QBuiltinFun(
+                        "dynamic.new",
+                        fn=lambda val: QDynamicVal(val, target_type),
+                    )
+                if callee.name == "dynamic.be" and type_args:
+                    target_type = type_args[0]
+
+                    def _be_fn(d: QValue) -> QValue:
+                        if not isinstance(d, QDynamicVal):
+                            raise QuestException(DYNAMIC_ERROR_EXC)
+                        if not is_subtype(d.type_val, target_type):
+                            raise QuestException(DYNAMIC_ERROR_EXC)
+                        return d.value
+
+                    return QBuiltinFun("dynamic.be", fn=_be_fn)
             return callee
 
         case TypedApp(func=func, args=args, offset=offset):
@@ -688,9 +794,29 @@ def eval_expr(expr: TypedExpr, env: RuntimeEnvironment) -> QValue:
             p_val = eval_expr(payload, env) if payload is not None else None
             return QVariant(tag=tag, payload=p_val)
 
-        case TypedOption(tag=tag, payload=payload):
+        case TypedOption(
+            tag=tag, payload=payload, ordinal=ordinal, ordinal_expr=ordinal_expr, type_val=type_val, offset=offset
+        ):
             p_val = eval_expr(payload, env) if payload is not None else None
-            return QOption(tag=tag, payload=p_val)
+            if ordinal_expr is not None:
+                ord_val = eval_expr(ordinal_expr, env)
+                if not isinstance(ord_val, QInt):
+                    raise QuestRuntimeError(
+                        f"Option ordinal must evaluate to Int, got {ord_val.type_name}",
+                        offset=offset,
+                    )
+                n = ord_val.value
+                opt_type = type_val.evaluate_lazily(env)
+                if not isinstance(opt_type, QOptionType):
+                    raise QuestRuntimeError(f"Expected Option type, got {opt_type}", offset=offset)
+                if n < 0 or n >= len(opt_type.options):
+                    raise QuestRuntimeError(
+                        f"Option ordinal {n} out of bounds (0 <= ordinal < {len(opt_type.options)})",
+                        offset=offset,
+                    )
+                branch_tag = opt_type.options[n].name
+                return QOption(tag=branch_tag, payload=p_val, ordinal=n)
+            return QOption(tag=tag, payload=p_val, ordinal=ordinal)
 
         case TypedVariantCheck(target=target, tag=tag, offset=offset):
             target_val = eval_expr(target, env)
@@ -713,6 +839,16 @@ def eval_expr(expr: TypedExpr, env: RuntimeEnvironment) -> QValue:
                     f"Variant tag mismatch in '!': expected '{tag}', got '{target_val.tag}'",
                     offset=offset,
                 )
+            if isinstance(target_val, QOption):
+                ord_val = QInt(target_val.ordinal)
+                if target_val.payload is None:
+                    return QTuple(elements=(ord_val,), labels=(None,))
+                if isinstance(target_val.payload, QTuple):
+                    return QTuple(
+                        elements=(ord_val, *target_val.payload.elements),
+                        labels=(None, *target_val.payload.labels),
+                    )
+                return QTuple(elements=(ord_val, target_val.payload), labels=(None, None))
             if target_val.payload is not None:
                 return target_val.payload
             return QOk()
@@ -848,9 +984,20 @@ def eval_binding(binding: TypedBinding, env: RuntimeEnvironment) -> QValue:
                 env.define(name, val)
             return val
 
-        case TypedLetType() | TypedDefKind() | TypedInterface() | TypedModule():
-            # Types, kinds, and interface/module compile-time declarations are erased at runtime
+        case TypedLetType() | TypedDefKind() | TypedInterface():
+            # Types, kinds, and interface declarations are erased at runtime
             return OK_VALUE
+
+        case TypedModule(name=mod_name, bindings=mod_bindings, scope=mod_scope):
+            mod_env = env.push_scope()
+            for b in mod_bindings:
+                eval_binding(b, mod_env)
+            exported_fields: dict[str, QValue] = {}
+            for val_name in mod_scope.values:
+                exported_fields[val_name] = mod_env.lookup(val_name)
+            rec = QRecord(exported_fields)
+            env.define(mod_name, rec)
+            return rec
 
         case TypedImport(items=items):
             from quest.builtins import BuiltinModuleRegistry
@@ -858,6 +1005,11 @@ def eval_binding(binding: TypedBinding, env: RuntimeEnvironment) -> QValue:
             for item in items:
                 for name in item.names:
                     mod_val = BuiltinModuleRegistry.get_runtime_module(name)
+                    if mod_val is None:
+                        try:
+                            mod_val = env.lookup(name)
+                        except QuestRuntimeError:
+                            mod_val = None
                     if mod_val is not None:
                         env.define(name, mod_val)
             return OK_VALUE

@@ -18,7 +18,7 @@ import math
 import sys
 from typing import Any, Callable, Optional
 
-from quest.env import Environment, Scope, TypeSymbol, ValueSymbol
+from quest.env import Environment, Scope, TypeSymbol, ValueSymbol, allocate_symbol_id
 from quest.interpreter import (
     ARRAY_OP_ERROR_EXC,
     DYNAMIC_ERROR_EXC,
@@ -37,6 +37,7 @@ from quest.runtime import (
     QDynamicVal,
     QExceptionVal,
     QInt,
+    QList,
     QOk,
     QReader,
     QReal,
@@ -52,6 +53,7 @@ from quest.types import (
     EXCEPTION_TYPE,
     INT_TYPE,
     OK_TYPE,
+    QAllKind,
     QAllType,
     QArrayType,
     QFunType,
@@ -60,6 +62,7 @@ from quest.types import (
     QRecordField,
     QRecordType,
     QType,
+    QTypeApp,
     QTypeVar,
     REAL_TYPE,
     STRING_TYPE,
@@ -155,8 +158,8 @@ class ModuleBuilder:
         result_type: QType,
         fn: Callable,
     ) -> None:
-        fn_type = _make_fn_type(params, result_type)
-        poly_type = _make_poly_fn_type(type_param_name, type_param_id, fn_type)
+        body_type: QType = _make_fn_type(params, result_type) if params else result_type
+        poly_type = _make_poly_fn_type(type_param_name, type_param_id, body_type)
         self.scope.declare_value(ValueSymbol(name=name, type_val=poly_type))
         self.record_dict[name] = QBuiltinFun(f"{self.mod_name}.{name}", fn)
 
@@ -177,6 +180,7 @@ class BuiltinModuleRegistry:
     _INT_ERROR_EXC = QExceptionVal("int.error")
     _REAL_ERROR_EXC = QExceptionVal("real.error")
     _STRING_ERROR_EXC = QExceptionVal("string.error")
+    _LIST_ERROR_EXC = QExceptionVal("list.error")
 
     # Module instances cache
     _initialized: bool = False
@@ -208,7 +212,12 @@ class BuiltinModuleRegistry:
             return
         cls._initialized = True
 
-        e = env if env is not None else Environment()
+        class _IdGen:
+            @classmethod
+            def fresh_symbol_id(cls) -> int:
+                return allocate_symbol_id()
+
+        e: Any = env if env is not None else _IdGen
 
         # --------------------------------------------------------------------
         # 1. Writer Interface & Module
@@ -619,6 +628,14 @@ class BuiltinModuleRegistry:
             sub2 = _string_get_sub(s2, st2, sz2).value
             return QBool(sub1 == sub2)
 
+        @qchecked(cls._STRING_ERROR_EXC, QString, QInt, QInt, QString, QInt, QInt)
+        def _string_precedes_sub(
+            s1: QString, st1: QInt, sz1: QInt, s2: QString, st2: QInt, sz2: QInt
+        ) -> QBool:
+            sub1 = _string_get_sub(s1, st1, sz1).value
+            sub2 = _string_get_sub(s2, st2, sz2).value
+            return QBool(sub1 <= sub2)
+
         str_b.def_fn("new", [("size", INT_TYPE), ("init", CHAR_TYPE)], STRING_TYPE, _string_new)
         str_b.def_fn("isEmpty", [("string", STRING_TYPE)], BOOL_TYPE, lambda s: QBool(len(s.value) == 0))
         str_b.def_fn("length", [("string", STRING_TYPE)], INT_TYPE, lambda s: QInt(len(s.value)))
@@ -691,6 +708,19 @@ class BuiltinModuleRegistry:
             [("s1", STRING_TYPE), ("s2", STRING_TYPE)],
             BOOL_TYPE,
             lambda s1, s2: QBool(s1.value <= s2.value),
+        )
+        str_b.def_fn(
+            "precedesSub",
+            [
+                ("s1", STRING_TYPE),
+                ("start1", INT_TYPE),
+                ("size1", INT_TYPE),
+                ("s2", STRING_TYPE),
+                ("start2", INT_TYPE),
+                ("size2", INT_TYPE),
+            ],
+            BOOL_TYPE,
+            _string_precedes_sub,
         )
         str_b.finish()
 
@@ -784,21 +814,171 @@ class BuiltinModuleRegistry:
             wr.stream.write(d.to_str())
             return OK_VALUE
 
+        @qchecked(DYNAMIC_ERROR_EXC, QReader)
+        def _dynamic_intern(rd: QReader) -> QDynamicVal:
+            if rd.is_closed:
+                raise QuestException(DYNAMIC_ERROR_EXC)
+            buf = []
+            peek = getattr(rd, "_peek_char", None)
+            if peek is not None:
+                buf.append(peek)
+                rd._peek_char = None
+            try:
+                rest = rd.stream.read()
+                if rest:
+                    buf.append(rest)
+            except OSError:
+                raise QuestException(DYNAMIC_ERROR_EXC)
+            raw = "".join(buf).strip()
+            if not raw:
+                raise QuestException(DYNAMIC_ERROR_EXC)
+            if raw.startswith("dynamic(") and raw.endswith(")"):
+                inner = raw[len("dynamic(") : -1].strip()
+                if ":" in inner:
+                    val_s, type_s = inner.rsplit(":", 1)
+                    val_s = val_s.strip()
+                    type_s = type_s.strip()
+                    if type_s == "Int":
+                        return QDynamicVal(value=QInt(int(val_s)), type_val=INT_TYPE)
+                    if type_s == "Real":
+                        return QDynamicVal(value=QReal(float(val_s)), type_val=REAL_TYPE)
+                    if type_s == "Bool":
+                        return QDynamicVal(
+                            value=TRUE_VALUE if val_s == "true" else FALSE_VALUE,
+                            type_val=BOOL_TYPE,
+                        )
+                    if (
+                        type_s == "Char"
+                        and len(val_s) >= 2
+                        and val_s[0] == "'"
+                        and val_s[-1] == "'"
+                    ):
+                        return QDynamicVal(value=QChar(val_s[1:-1]), type_val=CHAR_TYPE)
+                    if (
+                        type_s == "String"
+                        and len(val_s) >= 2
+                        and val_s[0] == '"'
+                        and val_s[-1] == '"'
+                    ):
+                        return QDynamicVal(value=QString(val_s[1:-1]), type_val=STRING_TYPE)
+                    if type_s == "Ok" and val_s == "ok":
+                        return QDynamicVal(value=OK_VALUE, type_val=OK_TYPE)
+            raise QuestException(DYNAMIC_ERROR_EXC)
+
         dyn_b.def_poly_fn("new", "A", dyn_a_id, [("a", dyn_a)], dyn_t, _dynamic_new)
         dyn_b.def_poly_fn("be", "A", dyn_a_id, [("d", dyn_t)], dyn_a, _dynamic_be)
         dyn_b.def_fn("copy", [("d", dyn_t)], dyn_t, _dynamic_copy)
-        dyn_b.def_scope_val("intern", _make_fn_type([("rd", reader_t)], dyn_t))
+        dyn_b.def_fn("intern", [("rd", reader_t)], dyn_t, _dynamic_intern)
         dyn_b.def_fn("extern", [("wr", writer_t), ("d", dyn_t)], OK_TYPE, _dynamic_extern)
         dyn_b.finish()
 
-    @classmethod
-    def _build_record_type_from_scope(cls, scope: Scope) -> QRecordType:
-        """Constructs a QRecordType matching the values exposed by an interface scope."""
-        fields = [QRecordField(name=name, type_val=sym.type_val) for name, sym in scope.values.items()]
-        return QRecordType(tuple(fields))
+        # --------------------------------------------------------------------
+        # 10. List Interface & Module
+        # --------------------------------------------------------------------
+        list_param_id = e.fresh_symbol_id()
+        list_kind = QAllKind(
+            param_name="A",
+            param_id=list_param_id,
+            param_kind=TYPE_KIND,
+            result_kind=TYPE_KIND,
+        )
+        list_t_id = e.fresh_symbol_id()
+        list_t = QTypeVar(name="List.T", symbol_id=list_t_id, bound=list_kind)
+        list_a_id = e.fresh_symbol_id()
+        list_a = QTypeVar(name="A", symbol_id=list_a_id, bound=TYPE_KIND)
+        list_t_app = QTypeApp(constructor=list_t, arguments=(list_a,))
+
+        list_b = ModuleBuilder("list", "List", cls)
+        list_b.def_type("T", list_t_id, list_kind, definition=None)
+        list_b.def_const("error", EXCEPTION_TYPE, cls._LIST_ERROR_EXC)
+
+        def _list_nil(*args: Any) -> QList:
+            return QList(())
+
+        @qchecked(cls._LIST_ERROR_EXC, QValue, QList)
+        def _list_cons(item: QValue, l: QList) -> QList:
+            return QList((item,) + l.elements)
+
+        @qchecked(cls._LIST_ERROR_EXC, QList)
+        def _list_null(l: QList) -> QBool:
+            return TRUE_VALUE if len(l.elements) == 0 else FALSE_VALUE
+
+        @qchecked(cls._LIST_ERROR_EXC, QList)
+        def _list_head(l: QList) -> QValue:
+            if not l.elements:
+                raise QuestException(cls._LIST_ERROR_EXC)
+            return l.elements[0]
+
+        @qchecked(cls._LIST_ERROR_EXC, QList)
+        def _list_tail(l: QList) -> QList:
+            if not l.elements:
+                raise QuestException(cls._LIST_ERROR_EXC)
+            return QList(l.elements[1:])
+
+        @qchecked(cls._LIST_ERROR_EXC, QList)
+        def _list_length(l: QList) -> QInt:
+            return QInt(len(l.elements))
+
+        @qchecked(cls._LIST_ERROR_EXC, QArray)
+        def _list_enum(arr: QArray) -> QList:
+            return QList(tuple(arr.elements))
+
+        list_b.def_poly_fn("nil", "A", list_a_id, [], list_t_app, _list_nil)
+        list_b.def_poly_fn(
+            "cons",
+            "A",
+            list_a_id,
+            [("item", list_a), ("list", list_t_app)],
+            list_t_app,
+            _list_cons,
+        )
+        list_b.def_poly_fn(
+            "null",
+            "A",
+            list_a_id,
+            [("list", list_t_app)],
+            BOOL_TYPE,
+            _list_null,
+        )
+        list_b.def_poly_fn(
+            "head",
+            "A",
+            list_a_id,
+            [("list", list_t_app)],
+            list_a,
+            _list_head,
+        )
+        list_b.def_poly_fn(
+            "tail",
+            "A",
+            list_a_id,
+            [("list", list_t_app)],
+            list_t_app,
+            _list_tail,
+        )
+        list_b.def_poly_fn(
+            "length",
+            "A",
+            list_a_id,
+            [("list", list_t_app)],
+            INT_TYPE,
+            _list_length,
+        )
+        list_b.def_poly_fn(
+            "enum",
+            "A",
+            list_a_id,
+            [("array", QArrayType(list_a))],
+            list_t_app,
+            _list_enum,
+        )
+        list_b.finish()
 
     @classmethod
     def _build_record_type_from_scope(cls, scope: Scope) -> QRecordType:
         """Constructs a QRecordType matching the values exposed by an interface scope."""
-        fields = [QRecordField(name=name, type_val=sym.type_val) for name, sym in scope.values.items()]
+        fields = [
+            QRecordField(name=name, type_val=sym.type_val)
+            for name, sym in scope.values.items()
+        ]
         return QRecordType(tuple(fields))

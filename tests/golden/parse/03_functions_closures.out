@@ -49,6 +49,7 @@
             :bound (KindPower
               :bound (TypePath ('Int'))
             )
+            :mode VALUE
           )
         )
         :result_type (TypePath ('Int'))
@@ -72,6 +73,7 @@
                 :bound (KindPower
                   :bound (TypePath ('Int'))
                 )
+                :mode VALUE
               )
             )
             :result_type (TypePath ('Int'))

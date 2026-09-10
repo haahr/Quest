@@ -12,9 +12,11 @@ from quest.types import (
     CHAR_TYPE,
     DYNAMIC_TYPE,
     EXCEPTION_TYPE,
+    INFIX_OPERATORS,
     INT_TYPE,
     OK_TYPE,
     QAllType,
+    QArrayType,
     QFunType,
     QKind,
     QParam,
@@ -189,12 +191,23 @@ class Scope:
 # 3. Compiler Environment
 # ============================================================================
 
+_GLOBAL_SYMBOL_COUNTER: int = 0
+
+
+def allocate_symbol_id() -> int:
+    """Allocates a globally unique positive integer symbol ID."""
+    global _GLOBAL_SYMBOL_COUNTER
+    _GLOBAL_SYMBOL_COUNTER += 1
+    return _GLOBAL_SYMBOL_COUNTER
+
+
 class Environment:
     """Manages the active lexical scope stack, built-in definitions, and module linkages."""
 
     def __init__(self):
         self._symbol_counter: int = 0
-        self.global_scope: Scope = Scope(parent=None, name="global")
+        self.base_scope: Scope = Scope(parent=None, name="base")
+        self.global_scope: Scope = Scope(parent=self.base_scope, name="global")
         self.current_scope: Scope = self.global_scope
         self._interfaces: dict[str, Scope] = {}
         self._modules: dict[str, Scope] = {}
@@ -202,8 +215,7 @@ class Environment:
 
     def fresh_symbol_id(self) -> int:
         """Allocates a unique positive integer symbol ID."""
-        self._symbol_counter += 1
-        return self._symbol_counter
+        return allocate_symbol_id()
 
     def push_scope(self, name: str = "local") -> Scope:
         """Pushes a new child scope onto the active scope stack."""
@@ -236,13 +248,27 @@ class Environment:
         return self.current_scope.lookup_type(name)
 
     def lookup_type_by_id(self, symbol_id: int) -> Optional[TypeSymbol]:
-        return self.current_scope.lookup_type_by_id(symbol_id)
+        sym = self.current_scope.lookup_type_by_id(symbol_id)
+        if sym is not None:
+            return sym
+        for iface_scope in self._interfaces.values():
+            sym = iface_scope.lookup_type_by_id_local(symbol_id)
+            if sym is not None:
+                return sym
+        return None
 
     def lookup_kind(self, name: str) -> Optional[KindSymbol]:
         return self.current_scope.lookup_kind(name)
 
     def lookup_kind_by_id(self, symbol_id: int) -> Optional[KindSymbol]:
-        return self.current_scope.lookup_kind_by_id(symbol_id)
+        sym = self.current_scope.lookup_kind_by_id(symbol_id)
+        if sym is not None:
+            return sym
+        for iface_scope in self._interfaces.values():
+            sym = iface_scope.lookup_kind_by_id_local(symbol_id)
+            if sym is not None:
+                return sym
+        return None
 
     # --- Interface and Module Registries ---
 
@@ -287,9 +313,9 @@ class Environment:
     # --- Built-in Initialization ---
 
     def _init_builtins(self) -> None:
-        """Populates the global root scope with standard Quest primitives and constants."""
+        """Populates the base scope with primitives, and global scope with pre-linked modules."""
         # Built-in Kinds
-        self.global_scope.declare_kind(
+        self.base_scope.declare_kind(
             KindSymbol(name="TYPE", symbol_id=self.fresh_symbol_id(), kind=TYPE_KIND)
         )
 
@@ -305,7 +331,7 @@ class Environment:
             ("Exception", EXCEPTION_TYPE),
         ]
         for type_name, qtype_inst in builtin_types:
-            self.global_scope.declare_type(
+            self.base_scope.declare_type(
                 TypeSymbol(
                     name=type_name,
                     symbol_id=self.fresh_symbol_id(),
@@ -315,20 +341,79 @@ class Environment:
             )
 
         # Built-in Primitive Values
-        self.global_scope.declare_value(ValueSymbol(name="true", type_val=BOOL_TYPE))
-        self.global_scope.declare_value(ValueSymbol(name="false", type_val=BOOL_TYPE))
-        self.global_scope.declare_value(ValueSymbol(name="ok", type_val=OK_TYPE))
-
-        # Built-in dynamic constructor: All(X::TYPE) (x: X) -> Dynamic
-        dyn_quant_id = self.fresh_symbol_id()
-        dyn_quant = QQuantifier(name="X", symbol_id=dyn_quant_id, bound=TYPE_KIND)
-        dyn_var = QTypeVar(name="X", symbol_id=dyn_quant_id)
-        dyn_fn_type = QAllType(
-            quantifiers=(dyn_quant,),
-            body=QFunType(params=(QParam(name="x", type_val=dyn_var),), result_type=DYNAMIC_TYPE),
-        )
-        self.global_scope.declare_value(ValueSymbol(name="dynamic", type_val=dyn_fn_type))
+        self.base_scope.declare_value(ValueSymbol(name="true", type_val=BOOL_TYPE))
+        self.base_scope.declare_value(ValueSymbol(name="false", type_val=BOOL_TYPE))
+        self.base_scope.declare_value(ValueSymbol(name="ok", type_val=OK_TYPE))
 
         # Built-in exception: DivideByZero
         # Note: Binding DivideByZero at root level is an extension to Cardelli's spec.
-        self.global_scope.declare_value(ValueSymbol(name="DivideByZero", type_val=EXCEPTION_TYPE))
+        self.base_scope.declare_value(ValueSymbol(name="DivideByZero", type_val=EXCEPTION_TYPE))
+
+        # Built-in operators as functions (Cardelli §4.2)
+        for op, (l_type, r_type, res_type) in INFIX_OPERATORS.items():
+            op_fn_type = QFunType(
+                params=(
+                    QParam(name="a", type_val=l_type),
+                    QParam(name="b", type_val=r_type),
+                ),
+                result_type=res_type,
+            )
+            self.base_scope.declare_value(ValueSymbol(name=op, type_val=op_fn_type))
+
+        # Built-in monadic operators: not, extent, ordinal (Cardelli §4.2, §4.3, §4.5)
+        self.base_scope.declare_value(
+            ValueSymbol(
+                name="not",
+                type_val=QFunType(
+                    params=(QParam(name="b", type_val=BOOL_TYPE),),
+                    result_type=BOOL_TYPE,
+                ),
+            )
+        )
+        extent_quant_id = self.fresh_symbol_id()
+        extent_quant = QQuantifier(name="A", symbol_id=extent_quant_id, bound=TYPE_KIND)
+        extent_var = QTypeVar(name="A", symbol_id=extent_quant_id)
+        extent_fn_type = QAllType(
+            quantifiers=(extent_quant,),
+            body=QFunType(
+                params=(QParam(name="a", type_val=QArrayType(element_type=extent_var)),),
+                result_type=INT_TYPE,
+            ),
+        )
+        self.base_scope.declare_value(ValueSymbol(name="extent", type_val=extent_fn_type))
+
+        ord_quant_id = self.fresh_symbol_id()
+        ord_quant = QQuantifier(name="A", symbol_id=ord_quant_id, bound=TYPE_KIND)
+        ord_var = QTypeVar(name="A", symbol_id=ord_quant_id)
+        ord_fn_type = QAllType(
+            quantifiers=(ord_quant,),
+            body=QFunType(
+                params=(QParam(name="o", type_val=ord_var),),
+                result_type=INT_TYPE,
+            ),
+        )
+        self.base_scope.declare_value(ValueSymbol(name="ordinal", type_val=ord_fn_type))
+
+        # Pre-link standard library modules at top level (Cardelli §11.3)
+        from quest.builtins import BuiltinModuleRegistry
+        BuiltinModuleRegistry._ensure_initialized(self)
+        mod_to_iface = {
+            "writer": "Writer",
+            "reader": "Reader",
+            "conv": "Conv",
+            "ascii": "Ascii",
+            "int": "IntOp",
+            "real": "RealOp",
+            "string": "StringOp",
+            "arrayOp": "ArrayOp",
+            "dynamic": "Dynamic",
+            "list": "List",
+        }
+        for iface_name, iface_scope in BuiltinModuleRegistry._interfaces.items():
+            self.register_interface(iface_name, iface_scope)
+        for mod_name, mod_type in BuiltinModuleRegistry._module_types.items():
+            self.global_scope.declare_value(ValueSymbol(name=mod_name, type_val=mod_type))
+            iface_name = mod_to_iface.get(mod_name)
+            if iface_name and iface_name in BuiltinModuleRegistry._interfaces:
+                self.register_module(mod_name, BuiltinModuleRegistry._interfaces[iface_name])
+

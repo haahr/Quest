@@ -41,20 +41,31 @@ coordinates on demand:
 
 ### 2.2. Identifiers and Keyword Rules
 1. **Alphanumeric Identifiers (`IDENT`):**
-   - Start with a letter, followed by letters, digits, and underscores (e.g. `x`, `point_2d`, `List`).
+   - Start with a letter, followed only by letters and digits: `[A-Za-z][A-Za-z0-9]*`.
+   - Underscores are NOT part of alphanumeric identifiers. The underscore `_` is a reserved punctuation symbol.
+   - Idiomatic Quest style uses camelCase (e.g. `x`, `point2D`, `addFive`, `List`), never snake_case.
    - Case-sensitive: `val`, `Val`, and `VAL` are distinct identifiers.
 2. **Keywords:**
    - Reserved keywords must be written in exact casing:
-     - Level 0/Value keywords are lowercase: `let`, `var`, `fun`, `if`, `then`, `else`, `try`, `raise`.
-     - Level 1/2 capital keywords are capitalized: `Let`, `Rec`, `All`, `Tuple`, `Record`, `TYPE`, `POWER`.
+      - Level 0/Value/Phrase keywords are lowercase: `let`, `var`, `out`, `fun`, `if`, `then`, `else`, `try`,
+        `raise`, `not`, `extent`, `ordinal`, `of`, `for`, `while`, `loop`, `exit`, `case`, `inspect`,
+        `interface`, `module`, `import`, `export`, `unsound`.
+     - Level 1/2 capital keywords are capitalized: `Let`, `Rec`, `All`, `Tuple`, `Record`, `Option`, `Variant`,
+       `Array`, `Var`, `Out`, `TYPE`, `POWER`, `DEF`, `ALL`.
+     - Note the distinction between parameter mode `out` (lowercase) and type operator `Out` (capitalized).
 3. **Symbolic Identifiers & Operators (`SYMBOLIC_INFIX`):**
    - Composed of characters from `!@#$%&*_+=-|\`:<>/?^~`.
    - Reserved symbolic punctuation includes `:=`, `::`, `<:`, `=`, `:`, `?`, `!`, `@`, `_`.
    - All non-reserved symbolic character sequences are scanned as `SYMBOLIC_INFIX` tokens (e.g. `+`, `*`, `->`, `==`).
+4. **Braced Operators:**
+   - Stand-alone operator values must be enclosed in braces: `{+}`, `{-}`, `{++}`, `{#}`.
+   - Operators can be applied in prefix notation with argument tuples: `+(1 2)`.
 
 ### 2.3. Literals and Escape Sequences
-- **Integers (`INT_LIT`):** Decimal sequences (`0`, `42`, `1000`).
+- **Integers (`INT_LIT`):** Decimal sequences (`0`, `42`, `1000`). Negative integers are prefixed with a tilde `~`
+  (e.g. `~1`, `~42`).
 - **Reals (`REAL_LIT`):** Decimal floats with fractional and/or exponential parts (`3.14`, `2.0e-5`, `1.0E+3`).
+  Negative reals are prefixed with a tilde `~` (e.g. `~3.14`, `~2.0e-5`).
 - **Strings (`STRING_LIT`):** Delimited by double quotes `"..."`. Supports escapes `\n`, `\t`, `\"`, `\\`, and
   embedded character hex codes `\xHH`.
 - **Characters (`CHAR_LIT`):** Delimited by single quotes `'a'`.
@@ -80,7 +91,7 @@ The parser is constructed using composable PEG combinators defined in `bootstrap
 - `Repeat(target, min_count)`: Evaluates target repeatedly.
 - `OptionalTarget(target)`: Matches 0 or 1 occurrences.
 
-### 3.2. Uniform Right-Associativity
+### 3.2. Uniform Right-Associativity & Non-Overloaded Operators
 In Quest, all infix operators share uniform precedence and are strictly **right-associative**:
 ```quest
 a + b * c    ==>   a + (b * c)
@@ -88,7 +99,52 @@ a + b * c    ==>   a + (b * c)
 ```
 To enforce explicit order of operations, sub-expressions must be grouped with parentheses: `(2 * x) + y`.
 
-### 3.3. Initial/Final Keyword Block Disambiguation
+Quest does not overload operators across types; distinct operators exist for different types (Cardelli §4.2):
+- **Integer arithmetic:** `+`, `-`, `*`, `/`, `%` / `mod`
+- **Integer relations:** `<`, `<=`, `>`, `>=`
+- **Real arithmetic:** `++`, `--`, `**`, `//`, `^^`
+- **Real relations:** `<<`, `<<=`, `>>`, `>>=`
+- **String concatenation:** `<>`
+- **Boolean logic:** `/\` (and), `\/` (or)
+- **Identity / Equality:** `is`, `isnot`
+
+### 3.3. Monadic Operators
+The monadic operators `not`, `extent`, and `ordinal` are keyword operators that bind tighter than dyadic infix
+operators:
+- `not b`: Boolean negation.
+- `extent a`: Array length (number of elements).
+- `ordinal opt`: Zero-based tag index of an option value.
+
+### 3.4. Actual Parameter Bindings & Call Syntax
+Function applications evaluate space-separated phrases inside argument lists `f(...)`:
+- **Value arguments:** `f(x)`
+- **Explicit type arguments:** `f(:Int x)` or `id(:Int)(42)`
+- **Out reference coercion (`@`):** `@x` or `@r.field` passes the underlying mutable location.
+- **On-the-fly out allocation (`var`):** `var(0)` creates a mutable cell on the fly.
+
+### 3.5. Listfix Postfix Syntax
+Quest supports listfix syntax for functions consuming array arguments:
+- `f of a1 ... an end` desugars to `f(array a1 ... an end)`
+- `f of(count init)` desugars to `f(array of(count init))`
+- Explicit element type: `array of :Int 1 2 3 end` records the target element type.
+- List aggregates similarly use listfix syntax with the `list` constructor (`list of 1 2 3 end`, `list of end`).
+
+### 3.6. Curried Signatures & Anonymous Tuple Fields
+- **Curried Signatures:** Functions and function types support multiple parameter lists:
+  `fun(x: Int)(y: Int): Int x + y` and `Fun(x: Int)(y: Int): Int`.
+- **Anonymous Fields:** Tuple types and signatures allow anonymous fields:
+  `Tuple :Int :Real end` or `Tuple x:Int :Var(Real) :Out(String) end`.
+
+### 3.7. Option Construction and Extraction Syntax
+Option types support both tag-based and ordinal-based operations (Cardelli §4.5):
+- **Tag Construction:** `option tag of Type [with Binding] end`
+- **Ordinal Construction:** `option ordinal(expr) of Type [with Binding] end`
+  Allowed when all branches of the target option type share the same signature.
+- **Tag Testing:** `opt?tag` returns `true` if `opt` carries tag `tag`, `false` otherwise.
+- **Payload Extraction:** `opt!tag` extracts the payload as a tuple whose first component is the 0-based integer
+  ordinal of the option (e.g. `tuple 1 let x=true end : Tuple :Int x:Bool end`).
+
+### 3.8. Initial/Final Keyword Block Disambiguation
 Complex expressions (conditionals, loops, records, tuples, options) employ explicit terminating keywords:
 - `if ... then ... else ... end`
 - `while ... do ... end`
@@ -106,12 +162,14 @@ class `ASTNode(offset: int)`:
 
 ```
 ASTNode
-  ├── Phrase                  (Top-level statements & bindings)
+  ├── Phrase                  (Top-level statements & declarations)
   │     ├── LetValueBinding   (let [var] [rec] x [: T] = e)
   │     ├── LetTypeBinding    (Let [Rec] T [:: K] = Type)
   │     ├── DefKindBinding    (DEF K = Kind)
-  │     ├── TopExpr           (Expression evaluated at top level)
-  │     └── ImportDecl        (import M1, M2)
+  │     ├── InterfaceDecl     (interface I [import ...] export ... end)
+  │     ├── ModuleDecl        (module M : I [import ...] export ... end)
+  │     ├── ImportDecl        (import M1, M2 : I)
+  │     └── TopExpr           (Expression evaluated at top level)
   ├── Expr                    (Level 0 term expressions)
   │     ├── ExprInt, ExprReal, ExprString, ExprChar, ExprBool
   │     ├── ExprIdent         (Variable lookup)
@@ -119,7 +177,16 @@ ASTNode
   │     ├── ExprApp           (Function / operator call)
   │     ├── ExprIf, ExprWhile, ExprLoop, ExprTry, ExprRaise
   │     ├── ExprRecord        (record x = 1, y = 2 end)
-  │     └── ExprTuple         (tuple 1, 2, 3 end)
+  │     ├── ExprTuple         (tuple 1, 2, 3 end)
+  │     ├── ExprArray         (array of [:T] a1 ... an end)
+  │     ├── ExprArrayRep      (array of(n init))
+  │     ├── ExprOption        (option (tag | ordinal(n)) of T [with Binding] end)
+  │     ├── ExprVariant       (variant tag of T [with Value] end)
+  │     ├── ExprVariantCheck  (target?tag)
+  │     ├── ExprVariantAssert (target!tag)
+  │     ├── ExprCase          (case target when ... else ... end)
+  │     ├── ExprDerefCell     (@target)
+  │     └── ExprVarCell       (var(e))
   ├── Type                    (Level 1 types and type operators)
   │     ├── TypePath          (Named type or projection: Int, M.T)
   │     ├── TypeTuple         (Tuple x:Int, y:Real end)

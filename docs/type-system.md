@@ -208,6 +208,18 @@ Compilation state is maintained across lexical scopes:
   - Inside an implementing module, `definition` points to concrete `QType` (transparent).
   - Outside in client scopes, `definition` is `None` (abstract, bounded by `kind`).
 
+### 5.1. Two-Tier Root Environment & Module Isolation (Cardelli §11.3)
+The typechecking environment employs a two-tier root architecture:
+- **`base_scope`:** Declares primitive language types (`Int`, `Real`, `Bool`, `Char`, `String`, `Array`), kinds
+  (`TYPE`, `POWER`), built-in operators, and exception constants.
+- **`global_scope`:** Inherits from `base_scope` and binds the 10 pre-linked standard library module records
+  (`arrayOp`, `ascii`, `conv`, `dynamic`, `int`, `list`, `reader`, `real`, `string`, `writer`) and their interfaces
+  (`ArrayOp`, `Ascii`, `Conv`, `Dynamic`, `IntOp`, `List`, `Reader`, `RealOp`, `StringOp`, `Writer`).
+- **Module Isolation:** Top-level expressions and REPL sessions execute in `global_scope`, allowing direct access to
+  standard library modules without `import`. However, standalone module declarations (`module ... end`) have their
+  internal elaboration scopes parented directly to `base_scope`. Consequently, modules cannot access pre-linked
+  standard library modules without an explicit `import` statement (Cardelli §11.3).
+
 ---
 
 ## 6. Term Elaboration and Typechecking (`elaborate_types.py` and `typechecker.py`)
@@ -229,11 +241,66 @@ x := x + 1;
 - In assignment positions (`x := e`), the target must be an explicit mutable location (`is_var=True` or `QVarType`).
 - Path-dependent types cannot be rooted at mutable locations.
 
-### 6.3. Numeric Non-Coercion
+### 6.3. Strict Non-Overloaded Operators and Numeric Non-Coercion
 Quest disallows implicit numeric coercions: `Int` and `Real` are disjoint types. Arithmetic between differing numeric
-types requires explicit conversion operations (`Real(n)`).
+types requires explicit conversion operations (`conv.real(n)`).
 
-### 6.4. Function Signatures and Recursive Bindings (`let rec`)
+Quest does not overload operators across types; distinct operators exist for each primitive type (Cardelli §4.2):
+- **Integer arithmetic:** `+`, `-`, `*`, `/`, `%`, `mod` : `Int, Int -> Int`
+- **Integer relations:** `<`, `<=`, `>`, `>=` : `Int, Int -> Bool`
+- **Real arithmetic:** `++`, `--`, `**`, `//`, `^^` : `Real, Real -> Real`
+- **Real relations:** `<<`, `<<=`, `>>`, `>>=` : `Real, Real -> Bool`
+- **String concatenation:** `<>` : `String, String -> String`
+- **Boolean logic:** `/\`, `\/` : `Bool, Bool -> Bool`
+- **Identity & Equality:** `is`, `isnot` : `All(A) A, A -> Bool`
+
+### 6.4. Explicit Polymorphic Instantiation (`TypedTypeApp`)
+Polymorphic functions can be explicitly instantiated at call sites using type arguments:
+```quest
+let id = fun(A::TYPE)(x: A): A x;
+let n = id(:Int)(42);
+```
+Type arguments prefixed with `:` (`:Type`) match leading type quantifiers in `QAllType`. The typechecker
+validates that actual type arguments satisfy their corresponding kind bounds and emits `TypedTypeApp` nodes.
+
+### 6.5. Parameter Passing Modes, Out Types, and Lvalues
+Quest supports three parameter passing modes in signatures:
+- **Value (`val`, default):** Pass-by-value.
+- **Reference (`var`):** Pass-by-reference (`Var(T)`). The type constructor `Var` is invariant.
+- **Output (`out`):** Write-only parameter passing (`Out(T)`):
+  - **Contravariance:** If $A <: B$, then $\text{Out}(B) <: \text{Out}(A)$ (Cardelli §7.7).
+  - **Relation to Var:** If $B <: A$, then $\text{Var}(A) <: \text{Out}(B)$.
+  - **Callee Semantics:** Inside the function body, `out` parameters (`sym.is_out=True`) can only be assigned to
+    (`y := expr`); evaluating an `out` parameter in a value expression is rejected.
+  - **Caller Coercion:** At call sites, arguments bound to `out` parameters must explicitly supply an lvalue reference
+    via `@loc` (e.g. `@x` or `@r.field`, translated to `TypedSelectRef`) or an on-the-fly cell via `var(expr)`.
+
+### 6.6. Monadic Operator Typing Rules
+Monadic operators are typed with high precedence:
+- `not e`: Requires $e \Leftarrow \text{Bool}$, synthesizes $\text{Bool}$.
+- `extent e`: Requires $e \Leftarrow \text{Array}(T)$, synthesizes $\text{Int}$.
+- `ordinal e`: Requires $e \Leftarrow \text{Option} \dots \text{end}$, synthesizes $\text{Int}$ representing the
+  zero-based declaration index of the injected option tag.
+
+### 6.7. Array Typing and Explicit Element Types
+Array constructors synthesize `QArrayType`:
+- `array of a1 ... an end`: If all elements are homogeneous, synthesizes `Array(T)`.
+- `array of :T a1 ... an end`: Explicitly checks each element against $T$ and synthesizes `Array(T)`.
+- `array of(cnt init)`: Checks $cnt \Leftarrow \text{Int}$, synthesizes `Array(T)` where $\text{init} \Rightarrow T$.
+
+### 6.8. Option Typing and Extraction Semantics
+Option types provide ordered sum types with ordinal reflection and extraction (Cardelli §4.5):
+- **Option Extraction (`!`):** When applied to an option `opt!tag`, the synthesized type is
+  `Tuple :Int <fields> end`, where `:Int` is the anonymous ordinal component followed by the components of the
+  branch's payload signature (e.g. `bOption!b` produces `Tuple :Int x:Bool end`). In contrast, variant extraction
+  (`v!tag`) synthesizes the bare payload type directly.
+- **Option Construction by Ordinal:** `option ordinal(e) of OptionType [with Binding] end`:
+  - Checks $e \Leftarrow \text{Int}$.
+  - Requires that all branches of `OptionType` share identical signatures (component names and types). Mismatched
+    branch signatures trigger a compile-time `TypeError`.
+  - Checks the payload binding against the common branch signature.
+
+### 6.9. Function Signatures and Recursive Bindings (`let rec`)
 - **Explicit Parameter Types:** Function parameters are syntactically signatures ($S$). In Quest, every value
   parameter in a signature must provide an explicit type annotation (`x: Int` or `: Int`); parameter types are
   not inferred from usage (Cardelli, *The Quest Language and System* §4).
@@ -253,6 +320,38 @@ types requires explicit conversion operations (`Real(n)`).
   Any recursive value binding without parameters (`let rec x: T = e`) similarly requires an explicit type
   annotation, and its right-hand side entity must syntactically be a constructor or abstraction (Cardelli,
   *Typeful Programming* §4.3).
+
+### 6.10. Dynamic Typing and Narrowing (`dynamic: Dynamic`)
+Dynamic values package a runtime value together with its static type:
+- **Creation (`dynamic.new`):**
+  - Explicit: `dynamic.new(:Type val)` packages `val` into `Dynamic.T` (erased `QDynamicType`) paired with `Type`.
+  - Inferred: `dynamic.new(val)` infers the static type of `val` and packages it into `Dynamic.T`.
+  - Legacy bare `dynamic(x)` function syntax is not supported.
+- **Narrowing (`dynamic.be`):**
+  - `dynamic.be(:TargetType d)` dynamically validates that the dynamic value `d`'s stored type is a subtype of
+    `TargetType`. On success, it returns the unwrapped value statically typed as `TargetType`. On mismatch, it
+    raises the language exception `dynamic.error`.
+- **Dynamic Inspection:**
+  - `inspect d when T1 with v then e1 else e2 end` tests membership against branches dynamically.
+
+### 6.11. List Module and Type Operator (`list: List`)
+The `list` module provides functional, immutable linked lists conforming to interface `List`:
+- **Higher-Kinded Abstract Type:** `List.T :: ALL(A::TYPE)::TYPE`.
+- **Operations:**
+  - `list.nil(:A) : list.T(A)`: Empty list.
+  - `list.cons(:A)(x: A l: list.T(A)) : list.T(A)`: Prepends element `x`.
+  - `list.null(:A)(l: list.T(A)) : Bool`: Emptiness test.
+  - `list.head(:A)(l: list.T(A)) : A`: First element; raises `list.error` if empty.
+  - `list.tail(:A)(l: list.T(A)) : list.T(A)`: Tail sublist; raises `list.error` if empty.
+  - `list.length(:A)(l: list.T(A)) : Int`: Element count.
+  - `list.enum(:A)(l: list.T(A)) : Array(A)`: Converts list to an array.
+  - `list.error : Exception`: Raised on invalid operations (e.g. `head` or `tail` on an empty list).
+
+### 6.12. String Substring Precedence (`StringOp.precedesSub`)
+The `StringOp` interface and `string` module provide substring comparison:
+- `string.precedesSub(s1: String, start1: Int, size1: Int, s2: String, start2: Int, size2: Int) : Bool`
+- Compares slices `s1[start1 : start1 + size1]` and `s2[start2 : start2 + size2]` lexicographically. Raises
+  `string.error` if any bounds are invalid.
 
 ---
 

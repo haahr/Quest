@@ -236,7 +236,7 @@ class QTupleField:
     def __str__(self) -> str:
         if self.name:
             return f"{self.name}: {self.type_val}"
-        return str(self.type_val)
+        return f":{self.type_val}"
 
 
 @dataclass(frozen=True)
@@ -1189,6 +1189,18 @@ def is_subtype(
                     return False
             return is_subtype(sub_lazy.body, sup_lazy.body.substitute(subst), env, trail)
 
+        # Type operator application (e.g. List.T(A))
+        case (
+            QTypeApp(constructor=s_c, arguments=s_args),
+            QTypeApp(constructor=t_c, arguments=t_args),
+        ):
+            if len(s_args) != len(t_args) or s_c != t_c:
+                return False
+            return all(
+                is_subtype(sa, ta, env, trail) and is_subtype(ta, sa, env, trail)
+                for sa, ta in zip(s_args, t_args)
+            )
+
         case _:
             return False
 
@@ -1794,3 +1806,42 @@ def qtype_dump(item: Union[QType, QKind], indent: int = 0) -> str:
 
         case _:
             return f"({item.__class__.__name__})"
+
+
+# ============================================================================
+# Operator Signatures (Cardelli §4.2)
+# ============================================================================
+
+# Operator signature table for non-overloaded Quest infix operators:
+# Maps operator symbol -> (expected_left_type, expected_right_type, result_type)
+INFIX_OPERATORS: dict[str, tuple[QType, QType, QType]] = {
+    # Integer arithmetic
+    "+": (INT_TYPE, INT_TYPE, INT_TYPE),
+    "-": (INT_TYPE, INT_TYPE, INT_TYPE),
+    "*": (INT_TYPE, INT_TYPE, INT_TYPE),
+    "/": (INT_TYPE, INT_TYPE, INT_TYPE),
+    "%": (INT_TYPE, INT_TYPE, INT_TYPE),
+    "mod": (INT_TYPE, INT_TYPE, INT_TYPE),
+    # Integer relational
+    "<": (INT_TYPE, INT_TYPE, BOOL_TYPE),
+    "<=": (INT_TYPE, INT_TYPE, BOOL_TYPE),
+    ">": (INT_TYPE, INT_TYPE, BOOL_TYPE),
+    ">=": (INT_TYPE, INT_TYPE, BOOL_TYPE),
+    # Real arithmetic (doubled)
+    "++": (REAL_TYPE, REAL_TYPE, REAL_TYPE),
+    "--": (REAL_TYPE, REAL_TYPE, REAL_TYPE),
+    "**": (REAL_TYPE, REAL_TYPE, REAL_TYPE),
+    "//": (REAL_TYPE, REAL_TYPE, REAL_TYPE),
+    "^^": (REAL_TYPE, REAL_TYPE, REAL_TYPE),
+    # Real relational (doubled)
+    "<<": (REAL_TYPE, REAL_TYPE, BOOL_TYPE),
+    "<<=": (REAL_TYPE, REAL_TYPE, BOOL_TYPE),
+    ">>": (REAL_TYPE, REAL_TYPE, BOOL_TYPE),
+    ">>=": (REAL_TYPE, REAL_TYPE, BOOL_TYPE),
+    # String concatenation
+    "<>": (STRING_TYPE, STRING_TYPE, STRING_TYPE),
+    # Boolean eager operations
+    "/\\": (BOOL_TYPE, BOOL_TYPE, BOOL_TYPE),
+    "\\/": (BOOL_TYPE, BOOL_TYPE, BOOL_TYPE),
+}
+

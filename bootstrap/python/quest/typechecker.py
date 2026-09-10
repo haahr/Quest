@@ -13,6 +13,7 @@ from quest.types import (
     CHAR_TYPE,
     DYNAMIC_TYPE,
     EXCEPTION_TYPE,
+    INFIX_OPERATORS,
     INT_TYPE,
     OK_TYPE,
     QAllType,
@@ -23,7 +24,9 @@ from quest.types import (
     QKind,
     QOptionField,
     QOptionType,
+    QOutType,
     QParam,
+    QPowerKind,
     QQuantifier,
     QRecordField,
     QRecordType,
@@ -116,6 +119,7 @@ from quest.typed_ast import (
     TypedRecord,
     TypedRecordField,
     TypedSelect,
+    TypedSelectRef,
     TypedString,
     TypedTry,
     TypedTryBranch,
@@ -157,38 +161,8 @@ def check_no_escaping_path_types(
 # Operator Signatures (Cardelli §4.2)
 # ============================================================================
 
-# Operator signature table for non-overloaded Quest infix operators:
-# Maps operator symbol -> (expected_left_type, expected_right_type, result_type)
-INFIX_OPERATORS: dict[str, tuple[QType, QType, QType]] = {
-    # Integer arithmetic
-    "+": (INT_TYPE, INT_TYPE, INT_TYPE),
-    "-": (INT_TYPE, INT_TYPE, INT_TYPE),
-    "*": (INT_TYPE, INT_TYPE, INT_TYPE),
-    "/": (INT_TYPE, INT_TYPE, INT_TYPE),
-    "%": (INT_TYPE, INT_TYPE, INT_TYPE),
-    "mod": (INT_TYPE, INT_TYPE, INT_TYPE),
-    # Integer relational
-    "<": (INT_TYPE, INT_TYPE, BOOL_TYPE),
-    "<=": (INT_TYPE, INT_TYPE, BOOL_TYPE),
-    ">": (INT_TYPE, INT_TYPE, BOOL_TYPE),
-    ">=": (INT_TYPE, INT_TYPE, BOOL_TYPE),
-    # Real arithmetic (doubled)
-    "++": (REAL_TYPE, REAL_TYPE, REAL_TYPE),
-    "--": (REAL_TYPE, REAL_TYPE, REAL_TYPE),
-    "**": (REAL_TYPE, REAL_TYPE, REAL_TYPE),
-    "//": (REAL_TYPE, REAL_TYPE, REAL_TYPE),
-    "^^": (REAL_TYPE, REAL_TYPE, REAL_TYPE),
-    # Real relational (doubled)
-    "<<": (REAL_TYPE, REAL_TYPE, BOOL_TYPE),
-    "<<=": (REAL_TYPE, REAL_TYPE, BOOL_TYPE),
-    ">>": (REAL_TYPE, REAL_TYPE, BOOL_TYPE),
-    ">>=": (REAL_TYPE, REAL_TYPE, BOOL_TYPE),
-    # String concatenation
-    "<>": (STRING_TYPE, STRING_TYPE, STRING_TYPE),
-    # Boolean eager operations
-    "/\\": (BOOL_TYPE, BOOL_TYPE, BOOL_TYPE),
-    "\\/": (BOOL_TYPE, BOOL_TYPE, BOOL_TYPE),
-}
+# Note: INFIX_OPERATORS is imported from quest.types above.
+
 
 
 # ============================================================================
@@ -416,7 +390,7 @@ class TypeElaborator:
                     raise TypeError(f"Undefined variable '{name}'", offset=off)
 
                 # Implicit dereferencing: mutable variables in value positions yield element type
-                if sym.is_var:
+                if sym.is_var or sym.is_out:
                     var_node = TypedVar(
                         name=sym.name,
                         symbol=sym,
@@ -571,6 +545,15 @@ class TypeElaborator:
     def _synth_fun_expr(self, expr: ast.ExprFun, env: Environment, loop_depth: int) -> TypedFun:
         """Synthesizes a function abstraction: fun(params): RetType Body."""
         with env.scoped("fun"):
+            quants: list[QQuantifier] = []
+            for tp in getattr(expr, "type_params", ()):
+                bound_kind = elaborate_kind(tp.bound, env)
+                sym_id = env.fresh_symbol_id()
+                env.current_scope.declare_type(
+                    TypeSymbol(name=tp.name, symbol_id=sym_id, kind=bound_kind)
+                )
+                quants.append(QQuantifier(name=tp.name, symbol_id=sym_id, bound=bound_kind))
+
             formal_params: list[TypedParam] = []
             q_params: list[QParam] = []
 
@@ -609,7 +592,17 @@ class TypeElaborator:
             local_symbol_ids = {sym.symbol_id for sym in env.current_scope.values.values()}
             check_no_escaping_path_types(ret_type, local_symbol_ids, "function scope", expr.offset)
 
-            fun_type = QFunType(params=tuple(q_params), result_type=ret_type)
+            if quants:
+                if q_params:
+                    fun_type: QType = QAllType(
+                        quantifiers=tuple(quants),
+                        body=QFunType(params=tuple(q_params), result_type=ret_type),
+                    )
+                else:
+                    fun_type = QAllType(quantifiers=tuple(quants), body=ret_type)
+            else:
+                fun_type = QFunType(params=tuple(q_params), result_type=ret_type)
+
             return TypedFun(
                 params=tuple(formal_params),
                 body=body_typed,
@@ -627,6 +620,35 @@ class TypeElaborator:
     ) -> TypedFun:
         """Checks a function abstraction against an expected function type."""
         expected_lazy = expected_type.evaluate_lazily(env)
+        if isinstance(expected_lazy, QAllType):
+            with env.scoped("poly_fun"):
+                meta_map: dict[int, QType] = {}
+                for q in expected_lazy.quantifiers:
+                    sym_id = env.fresh_symbol_id()
+                    env.current_scope.declare_type(
+                        TypeSymbol(name=q.name, symbol_id=sym_id, kind=q.bound)
+                    )
+                    meta_map[q.symbol_id] = QTypeVar(name=q.name, symbol_id=sym_id, bound=q.bound)
+                inner_exp = expected_lazy.body.substitute(meta_map)
+                inner_expr = (
+                    ast.ExprFun(
+                        params=expr.params,
+                        return_type=expr.return_type,
+                        body=expr.body,
+                        type_params=(),
+                        offset=expr.offset,
+                    )
+                    if getattr(expr, "type_params", ())
+                    else expr
+                )
+                inner_typed = self.check_expr(inner_expr, inner_exp, env, loop_depth)
+                return TypedFun(
+                    params=inner_typed.params if isinstance(inner_typed, TypedFun) else (),
+                    body=inner_typed.body if isinstance(inner_typed, TypedFun) else inner_typed,
+                    type_val=expected_lazy,
+                    offset=expr.offset,
+                )
+
         if not isinstance(expected_lazy, QFunType):
             typed_fun = self._synth_fun_expr(expr, env, loop_depth)
             if not is_subtype(typed_fun.type_val, expected_type, env):
@@ -687,6 +709,25 @@ class TypeElaborator:
 
     def _synth_app_expr(self, expr: ast.ExprApp, env: Environment, loop_depth: int) -> TypedExpr:
         """Synthesizes a function application, handling polymorphic type inference, var, and out params."""
+        # Special built-in monadic operator: ordinal (Cardelli §4.5)
+        if isinstance(expr.func, ast.ExprId) and expr.func.name == "ordinal":
+            if len(expr.args) != 1:
+                raise TypeError("ordinal expects 1 argument", offset=expr.offset)
+            arg_typed = self.synth_expr(expr.args[0], env, loop_depth)
+            arg_type_lazy = arg_typed.type_val.evaluate_lazily(env)
+            if not isinstance(arg_type_lazy, QOptionType):
+                raise TypeError(
+                    f"ordinal requires an Option type, got '{arg_typed.type_val}'",
+                    offset=expr.args[0].offset,
+                )
+            func_typed = self.synth_expr(expr.func, env, loop_depth)
+            return TypedApp(
+                func=func_typed,
+                args=(arg_typed,),
+                type_val=INT_TYPE,
+                offset=expr.offset,
+            )
+
         func_typed = self.synth_expr(expr.func, env, loop_depth)
         fn_type = func_typed.type_val.evaluate_lazily(env)
 
@@ -745,46 +786,120 @@ class TypeElaborator:
         is_out: bool,
     ) -> TypedExpr:
         """Validates that arg is a mutable lvalue location for var or out parameters."""
-        if isinstance(arg, ast.ExprId):
-            sym = env.lookup_value(arg.name)
-            if sym is None:
-                raise TypeError(f"Undefined variable '{arg.name}'", offset=arg.offset)
-            if not sym.is_var:
-                mode_name = "out" if is_out else "var"
-                raise TypeError(
-                    f"Argument to '{mode_name}' parameter '{arg.name}' must be a mutable variable",
-                    offset=arg.offset,
-                )
+        # Case 1: @target (Explicit reference passing, Cardelli §4.8)
+        if isinstance(arg, ast.ExprDerefCell):
+            return self._check_lvalue_target(
+                arg.target, param_type, env, loop_depth, is_out, arg.offset
+            )
 
+        # Case 2: var(initial_value) (Fresh on-the-fly mutable variable, Cardelli §4.8)
+        if isinstance(arg, ast.ExprVarCell):
+            val_typed = self.check_expr(arg.value, param_type, env, loop_depth)
+            return TypedVarCell(value=val_typed, type_val=QVarType(param_type), offset=arg.offset)
+
+        # Case 3: Bare identifier or field selection
+        return self._check_lvalue_target(arg, param_type, env, loop_depth, is_out, arg.offset)
+
+    def _check_lvalue_target(
+        self,
+        target: ast.Expr,
+        param_type: QType,
+        env: Environment,
+        loop_depth: int,
+        is_out: bool,
+        offset: int,
+    ) -> TypedExpr:
+        mode_name = "out" if is_out else "var"
+        if isinstance(target, ast.ExprId):
+            sym = env.lookup_value(target.name)
+            if sym is None:
+                raise TypeError(f"Undefined variable '{target.name}'", offset=offset)
+            if not sym.is_var and not isinstance(sym.type_val, (QVarType, QOutType)):
+                raise TypeError(
+                    f"Argument to '{mode_name}' parameter '{target.name}' must be a mutable variable",
+                    offset=offset,
+                )
+            dest_type = (
+                sym.type_val.element_type
+                if isinstance(sym.type_val, (QVarType, QOutType))
+                else sym.type_val
+            )
             if is_out:
-                if not is_subtype(param_type, sym.type_val, env):
+                if not is_subtype(param_type, dest_type, env):
                     raise TypeError(
                         f"Type mismatch on out parameter: parameter type '{param_type}' is not a subtype "
-                        f"of destination variable type '{sym.type_val}'",
-                        offset=arg.offset,
+                        f"of destination variable type '{dest_type}'",
+                        offset=offset,
                     )
             else:
                 if not (
-                    is_subtype(param_type, sym.type_val, env)
-                    and is_subtype(sym.type_val, param_type, env)
+                    is_subtype(param_type, dest_type, env)
+                    and is_subtype(dest_type, param_type, env)
                 ):
                     raise TypeError(
                         f"Type mismatch on var parameter: expected exactly '{param_type}', but got "
-                        f"variable of type '{sym.type_val}' (var parameters are invariant)",
-                        offset=arg.offset,
+                        f"variable of type '{dest_type}' (var parameters are invariant)",
+                        offset=offset,
                     )
-
             return TypedVar(
                 name=sym.name,
                 symbol=sym,
-                type_val=QVarType(sym.type_val),
-                offset=arg.offset,
+                type_val=QVarType(dest_type),
+                offset=offset,
             )
 
-        mode_name = "out" if is_out else "var"
+        if isinstance(target, ast.ExprSelect):
+            rec_typed = self.synth_expr(target.target, env, loop_depth)
+            rec_type = rec_typed.type_val.evaluate_lazily(env)
+            if not isinstance(rec_type, QRecordType):
+                raise TypeError(
+                    f"Target of field selection in '{mode_name}' argument must be a Record, "
+                    f"got '{rec_type}'",
+                    offset=offset,
+                )
+            field = rec_type.get_field(target.field)
+            if field is None:
+                raise TypeError(
+                    f"Record type '{rec_type}' has no field '{target.field}'",
+                    offset=offset,
+                )
+            if not field.is_var and not isinstance(field.type_val, (QVarType, QOutType)):
+                raise TypeError(
+                    f"Record field '{target.field}' is not mutable",
+                    offset=offset,
+                )
+            field_type = (
+                field.type_val.element_type
+                if isinstance(field.type_val, (QVarType, QOutType))
+                else field.type_val
+            )
+            if is_out:
+                if not is_subtype(param_type, field_type, env):
+                    raise TypeError(
+                        f"Type mismatch on out parameter: parameter type '{param_type}' is not a subtype "
+                        f"of destination field type '{field_type}'",
+                        offset=offset,
+                    )
+            else:
+                if not (
+                    is_subtype(param_type, field_type, env)
+                    and is_subtype(field_type, param_type, env)
+                ):
+                    raise TypeError(
+                        f"Type mismatch on var parameter: expected exactly '{param_type}', but got "
+                        f"field of type '{field_type}' (var parameters are invariant)",
+                        offset=offset,
+                    )
+            return TypedSelectRef(
+                target=rec_typed,
+                field=target.field,
+                type_val=QVarType(field_type),
+                offset=offset,
+            )
+
         raise TypeError(
-            f"Argument to '{mode_name}' parameter must be a mutable variable identifier",
-            offset=arg.offset,
+            f"Argument to '{mode_name}' parameter must be a mutable variable, field, or var(e)",
+            offset=offset,
         )
 
 
@@ -795,8 +910,86 @@ class TypeElaborator:
         all_type: QAllType,
         env: Environment,
         loop_depth: int,
-    ) -> TypedApp:
-        """Instantiates a polymorphic function using metavariable inference and emits TypedTypeApp."""
+    ) -> TypedExpr:
+        """Instantiates a polymorphic function using explicit type arguments or metavariable inference."""
+        # 1. Check for explicit type / kind arguments (e.g. f(:Int 42), id(:Int))
+        num_targs = 0
+        while num_targs < len(expr.args) and isinstance(
+            expr.args[num_targs], (ast.TypeArgument, ast.KindArgument)
+        ):
+            num_targs += 1
+
+        if num_targs > 0:
+            if num_targs > len(all_type.quantifiers):
+                raise TypeError(
+                    f"Too many type arguments: expected at most {len(all_type.quantifiers)}, "
+                    f"got {num_targs}",
+                    offset=expr.offset,
+                )
+
+            subst: dict[int, QType] = {}
+            resolved_targs: list[QType] = []
+            for i in range(num_targs):
+                q = all_type.quantifiers[i]
+                targ_ast = expr.args[i]
+                if isinstance(targ_ast, ast.TypeArgument):
+                    targ_val = elaborate_type(targ_ast.type_val, env)
+                    if isinstance(q.bound, QPowerKind):
+                        if not is_subtype(targ_val, q.bound.bound, env):
+                            raise TypeError(
+                                f"Type argument '{targ_val}' is not a subtype of bound '{q.bound.bound}'",
+                                offset=targ_ast.offset,
+                            )
+                    subst[q.symbol_id] = targ_val
+                    resolved_targs.append(targ_val)
+                elif isinstance(targ_ast, ast.KindArgument):
+                    raise TypeError(
+                        "Explicit kind arguments are not supported in runtime calls",
+                        offset=targ_ast.offset,
+                    )
+
+            if num_targs < len(all_type.quantifiers):
+                remaining_quants = tuple(
+                    q.substitute(subst) for q in all_type.quantifiers[num_targs:]
+                )
+                instantiated_type: QType = QAllType(
+                    quantifiers=remaining_quants,
+                    body=all_type.body.substitute(subst),
+                )
+            else:
+                instantiated_type = all_type.body.substitute(subst)
+
+            typed_type_app = TypedTypeApp(
+                func=func_typed,
+                type_args=tuple(resolved_targs),
+                type_val=instantiated_type,
+                offset=expr.offset,
+            )
+
+            remaining_args = expr.args[num_targs:]
+            if not remaining_args:
+                return typed_type_app
+
+            inst_lazy = instantiated_type.evaluate_lazily(env)
+            remaining_call = ast.ExprApp(
+                func=typed_type_app,
+                args=remaining_args,
+                offset=expr.offset,
+            )
+            if isinstance(inst_lazy, QAllType):
+                return self._synth_polymorphic_app(
+                    remaining_call, typed_type_app, inst_lazy, env, loop_depth
+                )
+            if isinstance(inst_lazy, QFunType):
+                return self._synth_monomorphic_app(
+                    remaining_call, typed_type_app, inst_lazy, env, loop_depth
+                )
+            raise TypeError(
+                f"Cannot invoke non-function type '{inst_lazy}'",
+                offset=expr.offset,
+            )
+
+        # 2. Metavariable inference for implicit type arguments
         fn_body = all_type.body.evaluate_lazily(env)
         if not isinstance(fn_body, QFunType):
             raise TypeError(
@@ -817,15 +1010,17 @@ class TypeElaborator:
         instantiated_fn = fn_body.substitute(meta_map)
         assert isinstance(instantiated_fn, QFunType)
 
-        typed_args: list[TypedExpr] = []
+        typed_args = []
         for arg, param in zip(expr.args, instantiated_fn.params):
             if param.is_var or param.is_out:
-                typed_arg = self._check_lvalue_arg(arg, param.type_val, env, loop_depth, is_out=param.is_out)
+                typed_arg = self._check_lvalue_arg(
+                    arg, param.type_val, env, loop_depth, is_out=param.is_out
+                )
             else:
                 typed_arg = self.check_expr(arg, param.type_val, env, loop_depth)
             typed_args.append(typed_arg)
 
-        resolved_targs: list[QType] = []
+        resolved_targs = []
         for q in all_type.quantifiers:
             meta = meta_map[q.symbol_id]
             solved = meta.prune()
@@ -1109,6 +1304,12 @@ class TypeElaborator:
         if isinstance(expr.target, ast.ExprId):
             module_scope = env.lookup_module(expr.target.name)
             if module_scope is not None:
+                mod_sym = env.lookup_value(expr.target.name)
+                if mod_sym is None:
+                    raise TypeError(
+                        f"Undefined identifier '{expr.target.name}'",
+                        offset=expr.target.offset,
+                    )
                 val_sym = module_scope.lookup_value_local(expr.field)
                 if val_sym is None:
                     raise TypeError(
@@ -1117,8 +1318,8 @@ class TypeElaborator:
                     )
                 target_typed = TypedVar(
                     name=expr.target.name,
-                    symbol=env.lookup_value(expr.target.name) or ValueSymbol(name=expr.target.name, type_val=OK_TYPE),
-                    type_val=OK_TYPE,
+                    symbol=mod_sym,
+                    type_val=mod_sym.type_val,
                     offset=expr.target.offset,
                 )
                 return TypedSelect(
@@ -1199,13 +1400,77 @@ class TypeElaborator:
                 )
 
 
+    def _are_option_signatures_compatible(
+        self, p1: Optional[QType], p2: Optional[QType], env: Environment
+    ) -> bool:
+        """Checks if two option branch payload signatures are identical."""
+        if p1 is None and p2 is None:
+            return True
+        if p1 is None or p2 is None:
+            return False
+        l1 = p1.evaluate_lazily(env)
+        l2 = p2.evaluate_lazily(env)
+        if isinstance(l1, QTupleType) and isinstance(l2, QTupleType):
+            if len(l1.fields) != len(l2.fields):
+                return False
+            for f1, f2 in zip(l1.fields, l2.fields):
+                if f1.name != f2.name:
+                    return False
+                if not is_type_equal(f1.type_val, f2.type_val, env):
+                    return False
+            return True
+        return is_type_equal(l1, l2, env)
+
+    def _check_option_payload(
+        self, payload_expr: ast.Expr, expected_type: QType, env: Environment, loop_depth: int
+    ) -> TypedExpr:
+        """Checks payload expression against expected branch signature type."""
+        expected_lazy = expected_type.evaluate_lazily(env)
+        if not isinstance(expected_lazy, QTupleType) and isinstance(payload_expr, ast.ExprTuple):
+            if len(payload_expr.fields) == 1 and isinstance(payload_expr.fields[0], ast.TupleBinding):
+                return self.check_expr(payload_expr.fields[0].value, expected_lazy, env, loop_depth)
+        return self.check_expr(payload_expr, expected_type, env, loop_depth)
+
     def _synth_option_expr(self, expr: ast.ExprOption, env: Environment, loop_depth: int) -> TypedOption:
-        """Synthesizes an option injection: option tag [with payload] of OptionType end."""
+        """Synthesizes an option injection: option (tag | ordinal(expr)) [with payload] of OptionType end."""
         opt_type = elaborate_type(expr.option_type, env)
         opt_lazy = opt_type.evaluate_lazily(env)
         if not isinstance(opt_lazy, QOptionType):
             raise TypeError(f"Expected option type in 'of' clause, got '{opt_type}'", offset=expr.offset)
 
+        if expr.ordinal_expr is not None:
+            ordinal_typed = self.check_expr(expr.ordinal_expr, INT_TYPE, env, loop_depth)
+            if not opt_lazy.options:
+                raise TypeError(f"Option type '{opt_type}' has no variants", offset=expr.offset)
+            first_payload = opt_lazy.options[0].payload_type
+            for branch in opt_lazy.options[1:]:
+                if not self._are_option_signatures_compatible(first_payload, branch.payload_type, env):
+                    raise TypeError(
+                        f"Option construction by ordinal requires all branches to have identical signatures, "
+                        f"but variant '{branch.name}' differs from '{opt_lazy.options[0].name}'",
+                        offset=expr.offset,
+                    )
+            if first_payload is not None:
+                if expr.payload is None:
+                    raise TypeError(
+                        f"Option variants require a payload of type '{first_payload}'",
+                        offset=expr.offset,
+                    )
+                payload_typed = self._check_option_payload(expr.payload, first_payload, env, loop_depth)
+            else:
+                if expr.payload is not None:
+                    raise TypeError("Option variants do not accept a payload", offset=expr.offset)
+                payload_typed = None
+            return TypedOption(
+                tag=None,
+                type_val=opt_type,
+                payload=payload_typed,
+                ordinal=0,
+                ordinal_expr=ordinal_typed,
+                offset=expr.offset,
+            )
+
+        assert expr.tag is not None
         opt_field = opt_lazy.get_option(expr.tag)
         if opt_field is None:
             raise TypeError(
@@ -1219,13 +1484,20 @@ class TypeElaborator:
                     f"Option variant '{expr.tag}' requires a payload of type '{opt_field.payload_type}'",
                     offset=expr.offset,
                 )
-            payload_typed = self.check_expr(expr.payload, opt_field.payload_type, env, loop_depth)
+            payload_typed = self._check_option_payload(expr.payload, opt_field.payload_type, env, loop_depth)
         else:
             if expr.payload is not None:
                 raise TypeError(f"Option variant '{expr.tag}' does not accept a payload", offset=expr.offset)
             payload_typed = None
-
-        return TypedOption(tag=expr.tag, type_val=opt_type, payload=payload_typed, offset=expr.offset)
+        ordinal = [f.name for f in opt_lazy.options].index(expr.tag)
+        return TypedOption(
+            tag=expr.tag,
+            type_val=opt_type,
+            payload=payload_typed,
+            ordinal=ordinal,
+            ordinal_expr=None,
+            offset=expr.offset,
+        )
 
 
     def _synth_variant_expr(self, expr: ast.ExprVariant, env: Environment, loop_depth: int) -> TypedVariant:
@@ -1308,7 +1580,16 @@ class TypeElaborator:
                     f"Tag '{expr.tag}' is not a valid option of type '{target_type}'",
                     offset=expr.offset,
                 )
-            result_type = opt.payload_type if opt.payload_type is not None else OK_TYPE
+            # Cardelli §4.5: ! extracts a tuple with 0-based integer ordinal as the first component
+            ordinal_field = QTupleField(name=None, type_val=INT_TYPE)
+            if opt.payload_type is None:
+                result_type = QTupleType((ordinal_field,))
+            else:
+                payload_lazy = opt.payload_type.evaluate_lazily(env)
+                if isinstance(payload_lazy, QTupleType):
+                    result_type = QTupleType((ordinal_field, *payload_lazy.fields))
+                else:
+                    result_type = QTupleType((ordinal_field, QTupleField(name=None, type_val=payload_lazy)))
         else:
             raise TypeError(
                 f"Variant assertion '!' requires Variant or Option target, got '{target_type}'",
@@ -1482,6 +1763,15 @@ class TypeElaborator:
 
     def _synth_array_expr(self, expr: ast.ExprArray, env: Environment, loop_depth: int) -> TypedArray:
         """Synthesizes an explicit array literal: array of e1 e2 ... end."""
+        if getattr(expr, "element_type", None) is not None:
+            elem_type = elaborate_type(expr.element_type, env)
+            elem_typeds = [self.check_expr(e, elem_type, env, loop_depth) for e in expr.elements]
+            return TypedArray(
+                elements=tuple(elem_typeds),
+                type_val=QArrayType(element_type=elem_type),
+                offset=expr.offset,
+            )
+
         if not expr.elements:
             raise TypeError(
                 "Cannot infer element type of empty array; type annotation required",
@@ -1521,10 +1811,26 @@ class TypeElaborator:
                 )
             return typed_arr
 
+        if getattr(expr, "element_type", None) is not None:
+            annot_elem_type = elaborate_type(expr.element_type, env)
+            if not is_subtype(annot_elem_type, expected_lazy.element_type, env):
+                raise TypeError(
+                    f"Array element type annotation '{annot_elem_type}' is not a subtype of "
+                    f"expected '{expected_lazy.element_type}'",
+                    offset=expr.offset,
+                )
+            target_elem_type = annot_elem_type
+        else:
+            target_elem_type = expected_lazy.element_type
+
         elem_typeds = [
-            self.check_expr(e, expected_lazy.element_type, env, loop_depth) for e in expr.elements
+            self.check_expr(e, target_elem_type, env, loop_depth) for e in expr.elements
         ]
-        return TypedArray(elements=tuple(elem_typeds), type_val=expected_lazy, offset=expr.offset)
+        return TypedArray(
+            elements=tuple(elem_typeds),
+            type_val=QArrayType(element_type=target_elem_type),
+            offset=expr.offset,
+        )
 
 
     def _synth_array_rep_expr(self, expr: ast.ExprArrayRep, env: Environment, loop_depth: int) -> TypedArrayRep:
@@ -2000,6 +2306,16 @@ class TypeElaborator:
                 offset=expr.offset,
             )
 
+        # 5. User-defined infix operators: a op b desugars to op(a, b)
+        op_sym = env.lookup_value(expr.op)
+        if op_sym is not None:
+            call_expr = ast.ExprApp(
+                func=ast.ExprId(name=expr.op, offset=expr.offset),
+                args=(expr.left, expr.right),
+                offset=expr.offset,
+            )
+            return self.synth_expr(call_expr, env, loop_depth)
+
         raise TypeError(f"Unsupported infix operator '{expr.op}'", offset=expr.offset)
 
 
@@ -2011,7 +2327,7 @@ class TypeElaborator:
                 sym = env.lookup_value(name)
                 if sym is None:
                     raise TypeError(f"Undefined variable '{name}'", offset=id_off)
-                if not sym.is_var:
+                if not sym.is_var and not sym.is_out:
                     raise TypeError(f"Cannot assign to immutable variable '{name}'", offset=id_off)
 
                 target_node = TypedVar(

@@ -374,6 +374,32 @@ class QArray(QValue):
             visited.remove(id(self))
 
 
+class QList(QValue):
+    """Immutable sequence of values representing a Cardelli List."""
+
+    def __init__(self, elements: tuple[QValue, ...] | list[QValue] = ()):
+        self.elements: tuple[QValue, ...] = tuple(elements)
+
+    @property
+    def type_name(self) -> str:
+        return "List"
+
+    def to_str(self, visited: Optional[set[int]] = None) -> str:
+        if visited is None:
+            visited = set()
+        if id(self) in visited:
+            return "list of ... end"
+        visited.add(id(self))
+
+        try:
+            if not self.elements:
+                return "list of end"
+            elems_str = " ".join(e.to_str(visited) for e in self.elements)
+            return f"list of {elems_str} end"
+        finally:
+            visited.remove(id(self))
+
+
 # ============================================================================
 # 4. Sum / Disjoint Union Values
 # ============================================================================
@@ -398,9 +424,15 @@ class QVariant(QValue):
 class QOption(QValue):
     """Ordered tagged option value with optional payload."""
 
-    def __init__(self, tag: str, payload: Optional[QValue] = None):
+    def __init__(
+        self,
+        tag: str,
+        payload: Optional[QValue] = None,
+        ordinal: int = 0,
+    ):
         self.tag = tag
         self.payload = payload
+        self.ordinal = ordinal
 
     @property
     def type_name(self) -> str:
@@ -682,6 +714,15 @@ def qvalue_structural_eq(
 
     if isinstance(v1, QArray):
         assert isinstance(v2, QArray)
+        if len(v1.elements) != len(v2.elements):
+            return False
+        for e1, e2 in zip(v1.elements, v2.elements):
+            if not qvalue_structural_eq(e1, e2, visited):
+                return False
+        return True
+
+    if isinstance(v1, QList):
+        assert isinstance(v2, QList)
         if len(v1.elements) != len(v2.elements):
             return False
         for e1, e2 in zip(v1.elements, v2.elements):
