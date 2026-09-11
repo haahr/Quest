@@ -314,22 +314,80 @@ expression), a local temporary pointer is allocated and returned.
 
 ---
 
-## 7. Host Compiler Runner (`compiler_runner.py`)
+## 7. Closures, Function Values & Lambda Lifting (Phase 4.2c)
+
+In Quest, functions are first-class values that can be passed to higher-order functions, returned from functions,
+and capture variables from enclosing lexical scopes.
+
+### 7.1. Closure Representation (`QClosure`)
+First-class function values use the uniform 16-byte `QClosure` struct defined in `runtime/quest_runtime.h`:
+```c
+typedef struct QClosure {
+    void *fn;   /* C function pointer: RetType (*)(void *env, ...) */
+    void *env;  /* Captured environment struct pointer or NULL */
+} QClosure;
+
+static_assert(sizeof(QClosure) == 16, qclosure_must_be_16_bytes);
+static_assert(offsetof(QClosure, env) == 8, qclosure_env_at_offset_8);
+```
+
+### 7.2. Direct Top-Level Calls vs. Trampoline Adapters
+1. **Direct Top-Level Calls:** Direct calls to statically known top-level functions remain zero-overhead standard C
+   function calls (`qv_f(args...)`) without passing an unused `env` pointer.
+2. **First-Class Value Passing:** When a top-level function is referenced as a value (e.g., passed to an argument
+   expecting `QFunType`), the transpiler synthesizes a static trampoline adapter and a file-scope static `QClosure`:
+   ```c
+   static QInt qv_add1_trampoline(void *env, QInt qv_x) {
+       (void)env;
+       return qv_add1(qv_x);
+   }
+   static QClosure qv_add1_closure = { (void *)qv_add1_trampoline, NULL };
+   ```
+   Passing `add1` in expression context emits `(&qv_add1_closure)` directly without heap allocation.
+
+### 7.3. Lambda Lifting & Flat Environment Frames
+Inner `TypedFun` expressions undergo free variable analysis (`_find_free_vars`):
+1. **Capturing Lambdas:**
+   - A dedicated flat environment struct `struct QEnv_<lid> { ... }` is generated containing the captured types.
+   - The lambda body is lifted to file scope as `static RetType qv_<lid>(void *_raw_env, Params...)`.
+   - At the instantiation site, the environment and a `QClosure` are allocated on the heap via `quest_alloc`:
+     ```c
+     struct QEnv_lambda_1 *_env = (struct QEnv_lambda_1 *)quest_alloc(sizeof(struct QEnv_lambda_1));
+     _env->qv_x = qv_x;
+     QClosure *_clos = (QClosure *)quest_alloc(sizeof(QClosure));
+     _clos->fn = (void *)qv_lambda_1;
+     _clos->env = (void *)_env;
+     ```
+2. **Non-Capturing Lambdas:**
+   - Lifted to file scope with `(void)_raw_env;`.
+   - Emits a static singleton closure `static QClosure qv_<lid>_closure = { (void *)qv_<lid>, NULL };` and passes
+     `&qv_<lid>_closure`, avoiding heap allocations entirely.
+
+### 7.4. Indirect Closure Invocations
+When calling an indirect target (such as a closure parameter or returned function), the call site casts `fn` to the
+expected C function pointer signature and passes `env` as the first argument:
+```c
+((QInt (*)(void *, QInt))(qv_f->fn))(qv_f->env, qv_x)
+```
+
+---
+
+## 8. Host Compiler Runner (`compiler_runner.py`)
 
 The compiler runner manages external C compiler toolchain discovery, Boehm GC flags, and native executable generation:
 
-### 7.1. Compiler Discovery
+### 8.1. Compiler Discovery
 `find_c_compiler()` searches `PATH` in order:
 1. `clang` (preferred on macOS/Linux for optimal diagnostic output and C99 statement expression support).
 2. `gcc` (fallback).
 
-### 7.2. Boehm GC Auto-Detection & `--nogc`
+### 8.2. Boehm GC Auto-Detection & `--nogc`
 `detect_gc_flags(nogc: bool)` locates the Boehm Garbage Collector:
 - Standard paths checked: `/opt/homebrew/opt/bdw-gc` (Apple Silicon), `/usr/local/opt/bdw-gc` (Intel macOS), `/usr`.
 - If found: passes `-I<prefix>/include -L<prefix>/lib -lgc`.
 - If not found or when `--nogc` flag is specified: passes `-DQUEST_NOGC`, using standard libc `calloc`/`malloc`.
 
-### 7.3. Compilation Invocation
+### 8.3. Compilation Invocation
 `compile_c_source(c_source, output_path, nogc)`:
 1. Writes emitted C source to a temporary file (`.c`).
 2. Constructs compilation command:
@@ -343,7 +401,7 @@ The compiler runner manages external C compiler toolchain discovery, Boehm GC fl
 
 ---
 
-## 8. Testing & Verification
+## 9. Testing & Verification
 
 The C code generator is verified by comprehensive unit and integration tests:
 - `tests/python/test_phase4_1_c_codegen.py`: Scalar operations, control flow, memory modes, and runtime panic tests.
@@ -351,8 +409,11 @@ The C code generator is verified by comprehensive unit and integration tests:
   curried application flattening, mutable top-level variables, and `--nogc` execution.
 - `tests/python/test_phase4_2b_aggregates.py`: Tuples, concrete records, heap allocation via `quest_alloc`,
   named/indexed field selection, mutable field assignment, and nested aggregates.
+- `tests/python/test_phase4_2c_closures.py`: First-class function values, trampolines, capturing closures,
+  multi-level nested closures, and `--nogc` execution.
 - `tests/source/01_lexer_basics.quest`: Verified end-to-end native compilation and execution of tuple operations.
 - `tests/source/02_expressions_control_flow.quest`: Verified end-to-end native compilation and execution.
+- `tests/source/03_functions_closures.quest`: Verified end-to-end native compilation and execution of closures.
 
 ---
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Any, Optional
 
 from quest.codegen.c_types import (
@@ -53,12 +54,24 @@ from quest.types import (
     OK_TYPE,
     REAL_TYPE,
     STRING_TYPE,
+    QFunType,
     QRecordField,
     QRecordType,
     QTupleField,
     QTupleType,
     QType,
 )
+
+
+@dataclass
+class LambdaInfo:
+    """Metadata for a lifted lambda closure."""
+    id: str
+    fun: TypedFun
+    free_vars: list[tuple[str, QType]]
+    env_struct_name: Optional[str]
+    c_fn_name: str
+    closure_var_name: Optional[str] = None
 
 
 def _c_string_literal(s: str) -> str:
@@ -111,9 +124,100 @@ def _qval_wrap(expr_str: str, t: QType) -> str:
         return f"((QVal){{ .i = (int64_t)({expr_str}) }})"
     if t == REAL_TYPE:
         return f"((QVal){{ .r = (double)({expr_str}) }})"
-    if t == STRING_TYPE or isinstance(t, (QTupleType, QRecordType)):
+    if t == STRING_TYPE or isinstance(t, (QTupleType, QRecordType, QFunType)):
         return f"((QVal){{ .p = (void *)({expr_str}) }})"
     return f"((QVal){{ .u = 0 }})"
+
+
+def _closure_fn_ptr_type(fun_type: QType) -> str:
+    """Constructs the C function pointer cast type for invoking a closure."""
+    if isinstance(fun_type, QFunType):
+        ret_c = "void" if fun_type.result_type == OK_TYPE else qtype_to_c_type(fun_type.result_type)
+        param_types = ["void *"]
+        for p in fun_type.params:
+            param_types.append(qtype_to_c_type(p.type_val))
+        sig = ", ".join(param_types)
+        return f"{ret_c} (*)({sig})"
+    return "void * (*)(void *, ...)"
+
+
+def _find_free_vars(fun: TypedFun, top_names: set[str]) -> list[tuple[str, QType]]:
+    """Finds all free variables captured by a lambda from enclosing non-global scopes."""
+    free_vars: list[tuple[str, QType]] = []
+    seen: set[str] = set()
+
+    def walk(node: Any, bound: set[str]) -> None:
+        if node is None:
+            return
+        match node:
+            case TypedVar(name=name, type_val=t):
+                if name not in bound and name not in top_names and name not in seen:
+                    seen.add(name)
+                    free_vars.append((name, t))
+            case TypedLetValue(name=name, value=v):
+                walk(v, bound)
+                bound.add(name)
+            case TypedFor(var_name=name, start=st, stop=sp, body=b):
+                walk(st, bound)
+                walk(sp, bound)
+                walk(b, bound | {name})
+            case TypedBlock(bindings=bindings, result=res):
+                b_bound = set(bound)
+                for b in bindings:
+                    match b:
+                        case TypedLetValue(name=name, value=v):
+                            walk(v, b_bound)
+                            b_bound.add(name)
+                        case TypedExprStmt(expr=e):
+                            walk(e, b_bound)
+                        case _:
+                            pass
+                walk(res, b_bound)
+            case TypedFun(params=params, body=b):
+                inner_bound = bound | {p.name for p in params}
+                walk(b, inner_bound)
+            case _:
+                if isinstance(node, (list, tuple)):
+                    for item in node:
+                        walk(item, bound)
+                elif hasattr(node, "__dataclass_fields__"):
+                    for field_name in node.__dataclass_fields__:
+                        walk(getattr(node, field_name), bound)
+
+    init_bound = {p.name for p in fun.params}
+    walk(fun.body, init_bound)
+    return free_vars
+
+
+def _find_val_referenced_top_funs(prog: TypedProgram, top_fun_names: set[str]) -> set[str]:
+    """Finds all top-level functions that are referenced in value positions."""
+    referenced: set[str] = set()
+
+    def scan(node: Any) -> None:
+        if node is None:
+            return
+        match node:
+            case TypedApp(func=f, args=args):
+                if isinstance(f, TypedVar) and f.name in top_fun_names:
+                    for a in args:
+                        scan(a)
+                    return
+                scan(f)
+                for a in args:
+                    scan(a)
+            case TypedVar(name=name):
+                if name in top_fun_names:
+                    referenced.add(name)
+            case _:
+                if isinstance(node, (list, tuple)):
+                    for item in node:
+                        scan(item)
+                elif hasattr(node, "__dataclass_fields__"):
+                    for field_name in node.__dataclass_fields__:
+                        scan(getattr(node, field_name))
+
+    scan(prog)
+    return referenced
 
 
 def _collect_aggregate_types(prog: TypedProgram) -> list[tuple[str, QType]]:
@@ -177,12 +281,67 @@ def _collect_aggregate_types(prog: TypedProgram) -> list[tuple[str, QType]]:
     return result
 
 
+def _collect_lambdas(
+    prog: TypedProgram, top_funs: list[tuple[str, TypedFun, Any]], top_names: set[str]
+) -> list[LambdaInfo]:
+    """Scans program to find all lambdas that need lifting and generates LambdaInfo."""
+    lambdas: list[LambdaInfo] = []
+    lambda_counter = 0
+
+    # Top-level fun objects are not lifted lambdas
+    top_fun_objs = {id(f) for _, f, _ in top_funs}
+
+    def scan(node: Any) -> None:
+        nonlocal lambda_counter
+        if node is None:
+            return
+        if isinstance(node, TypedFun):
+            if id(node) not in top_fun_objs:
+                lambda_counter += 1
+                lid = f"lambda_{lambda_counter}"
+                c_fn_name = f"qv_{lid}"
+                fvars = _find_free_vars(node, top_names)
+                env_struct = f"struct QEnv_{lid}" if fvars else None
+                closure_var = f"qv_{lid}_closure" if not fvars else None
+                lambdas.append(
+                    LambdaInfo(
+                        id=lid,
+                        fun=node,
+                        free_vars=fvars,
+                        env_struct_name=env_struct,
+                        c_fn_name=c_fn_name,
+                        closure_var_name=closure_var,
+                    )
+                )
+            # Continue scanning body for nested lambdas
+            scan(node.body)
+            return
+
+        if isinstance(node, (list, tuple)):
+            for item in node:
+                scan(item)
+            return
+
+        if hasattr(node, "__dataclass_fields__"):
+            for field_name in node.__dataclass_fields__:
+                scan(getattr(node, field_name))
+
+    scan(prog)
+    return lambdas
+
+
 class CEmitter:
     """Translates typed Quest AST nodes into standard C99 source code."""
 
     def __init__(self, echo: bool = False):
         self.echo = echo
         self._tmp_id = 0
+        self.top_fun_names: set[str] = set()
+        self.top_var_names: set[str] = set()
+        self.val_referenced_top_funs: set[str] = set()
+        self.lambda_info_by_id: dict[int, LambdaInfo] = {}
+        self.lifted_lambdas: list[LambdaInfo] = []
+        self.current_env_vars: dict[str, str] = {}
 
     def fresh_tmp(self, prefix: str = "_tmp") -> str:
         """Generates a unique temporary C identifier."""
@@ -190,15 +349,8 @@ class CEmitter:
         return f"{prefix}_{self._tmp_id}"
 
     def _collect_fun_params(self, fun: TypedFun) -> tuple[list[TypedParam], TypedExpr, QType]:
-        """Flattens nested curried TypedFun nodes into uncurried parameter list and final body."""
-        params = list(fun.params)
-        body = fun.body
-        ret_type = fun.type_val.result_type
-        while isinstance(body, TypedFun):
-            params.extend(body.params)
-            ret_type = body.type_val.result_type
-            body = body.body
-        return params, body, ret_type
+        """Extracts formal parameters, body, and return type of a function."""
+        return list(fun.params), fun.body, fun.type_val.result_type
 
     def _collect_app_args(self, app: TypedApp) -> tuple[TypedExpr, list[TypedExpr]]:
         """Flattens nested curried TypedApp nodes into target function and argument list."""
@@ -223,6 +375,14 @@ class CEmitter:
                         top_vars.append((name, val, symbol))
                 case _:
                     pass
+
+        self.top_fun_names = {name for name, _, _ in top_funs}
+        self.top_var_names = {name for name, _, _ in top_vars}
+        top_names = self.top_fun_names | self.top_var_names
+        self.val_referenced_top_funs = _find_val_referenced_top_funs(prog, self.top_fun_names)
+
+        self.lifted_lambdas = _collect_lambdas(prog, top_funs, top_names)
+        self.lambda_info_by_id = {id(l.fun): l for l in self.lifted_lambdas}
 
         lines: list[str] = [
             "/* Emitted by Quest Bootstrap C Transpiler */",
@@ -257,7 +417,19 @@ class CEmitter:
                 lines.append("};")
                 lines.append("")
 
-        # 1. Static declarations for top-level non-void variables
+        # 1. Environment struct definitions for capturing lambdas
+        capturing_lambdas = [l for l in self.lifted_lambdas if l.free_vars]
+        if capturing_lambdas:
+            lines.append("/* Environment structs for capturing closures */")
+            for l in capturing_lambdas:
+                lines.append(f"{l.env_struct_name} {{")
+                for vname, vtype in l.free_vars:
+                    c_type = qtype_to_c_type(vtype)
+                    lines.append(f"    {c_type} {mangle_ident(vname)};")
+                lines.append("};")
+                lines.append("")
+
+        # 2. Static declarations for top-level non-void variables
         if top_vars:
             for name, _val, symbol in top_vars:
                 if symbol.type_val != OK_TYPE:
@@ -266,8 +438,9 @@ class CEmitter:
                     lines.append(f"static {c_type} {c_ident};")
             lines.append("")
 
-        # 2. Forward declarations for all top-level functions
+        # 3. Forward declarations for top-level functions
         if top_funs:
+            lines.append("/* Forward declarations for top-level functions */")
             for name, fun, _sym in top_funs:
                 params, _body, ret_type = self._collect_fun_params(fun)
                 c_name = mangle_ident(name)
@@ -282,32 +455,120 @@ class CEmitter:
                 lines.append(f"static {ret_c} {c_name}({param_sig});")
             lines.append("")
 
-        # 3. Function definitions
-        for name, fun, _sym in top_funs:
-            params, body, ret_type = self._collect_fun_params(fun)
-            c_name = mangle_ident(name)
-            ret_c = "void" if ret_type == OK_TYPE else qtype_to_c_type(ret_type)
-            if not params:
-                param_sig = "void"
-            else:
-                param_sig = ", ".join(
-                    f"{qtype_to_c_type(p.type_val)} {mangle_ident(p.name)}"
-                    for p in params
-                )
-            lines.append(f"static {ret_c} {c_name}({param_sig}) {{")
-            fn_lines: list[str] = []
-            if ret_type == OK_TYPE:
-                self.emit_to(body, None, fn_lines)
-                fn_lines.append("return;")
-            else:
-                ret_val = self.emit_val(body, fn_lines)
-                fn_lines.append(f"return {ret_val};")
-            for f_line in fn_lines:
-                lines.append(f"    {f_line}" if f_line.strip() else f_line)
-            lines.append("}")
+        # 4. Forward declarations for lifted lambdas
+        if self.lifted_lambdas:
+            lines.append("/* Forward declarations for lifted lambdas */")
+            for l in self.lifted_lambdas:
+                ret_type = l.fun.type_val.result_type
+                ret_c = "void" if ret_type == OK_TYPE else qtype_to_c_type(ret_type)
+                param_sigs = ["void *_raw_env"]
+                for p in l.fun.params:
+                    param_sigs.append(f"{qtype_to_c_type(p.type_val)} {mangle_ident(p.name)}")
+                sig = ", ".join(param_sigs)
+                lines.append(f"static {ret_c} {l.c_fn_name}({sig});")
             lines.append("")
 
-        # 4. Main entrypoint
+        # 5. Static closures for non-capturing lambdas
+        non_capturing = [l for l in self.lifted_lambdas if not l.free_vars]
+        if non_capturing:
+            lines.append("/* Static closures for non-capturing lambdas */")
+            for l in non_capturing:
+                lines.append(f"static QClosure {l.closure_var_name} = {{ (void *){l.c_fn_name}, NULL }};")
+            lines.append("")
+
+        # 6. Trampolines and static closures for value-referenced top-level functions
+        top_funs_dict = {name: (fun, sym) for name, fun, sym in top_funs}
+        if self.val_referenced_top_funs:
+            lines.append("/* Trampoline functions and static closures for first-class top-level functions */")
+            for name in sorted(self.val_referenced_top_funs):
+                fun, _ = top_funs_dict[name]
+                c_name = mangle_ident(name)
+                tramp_name = f"{c_name}_trampoline"
+                ret_type = fun.type_val.result_type
+                ret_c = "void" if ret_type == OK_TYPE else qtype_to_c_type(ret_type)
+                param_sigs = ["void *env"]
+                arg_names = []
+                for p in fun.params:
+                    p_c = mangle_ident(p.name)
+                    param_sigs.append(f"{qtype_to_c_type(p.type_val)} {p_c}")
+                    arg_names.append(p_c)
+                sig = ", ".join(param_sigs)
+                args_str = ", ".join(arg_names)
+                lines.append(f"static {ret_c} {tramp_name}({sig}) {{")
+                lines.append("    (void)env;")
+                if ret_type == OK_TYPE:
+                    lines.append(f"    {c_name}({args_str});")
+                    lines.append("    return;")
+                else:
+                    lines.append(f"    return {c_name}({args_str});")
+                lines.append("}")
+                lines.append(f"static QClosure {c_name}_closure = {{ (void *){tramp_name}, NULL }};")
+                lines.append("")
+
+        # 7. Function definitions for top-level functions
+        if top_funs:
+            lines.append("/* Function definitions */")
+            for name, fun, _sym in top_funs:
+                params, body, ret_type = self._collect_fun_params(fun)
+                c_name = mangle_ident(name)
+                ret_c = "void" if ret_type == OK_TYPE else qtype_to_c_type(ret_type)
+                if not params:
+                    param_sig = "void"
+                else:
+                    param_sig = ", ".join(
+                        f"{qtype_to_c_type(p.type_val)} {mangle_ident(p.name)}"
+                        for p in params
+                    )
+                lines.append(f"static {ret_c} {c_name}({param_sig}) {{")
+                fn_lines: list[str] = []
+                if ret_type == OK_TYPE:
+                    self.emit_to(body, None, fn_lines)
+                    fn_lines.append("return;")
+                else:
+                    ret_val = self.emit_val(body, fn_lines)
+                    fn_lines.append(f"return {ret_val};")
+                for f_line in fn_lines:
+                    lines.append(f"    {f_line}" if f_line.strip() else f_line)
+                lines.append("}")
+                lines.append("")
+
+        # 8. Function definitions for lifted lambdas
+        if self.lifted_lambdas:
+            lines.append("/* Lifted lambda definitions */")
+            for l in self.lifted_lambdas:
+                ret_type = l.fun.type_val.result_type
+                ret_c = "void" if ret_type == OK_TYPE else qtype_to_c_type(ret_type)
+                param_sigs = ["void *_raw_env"]
+                for p in l.fun.params:
+                    param_sigs.append(f"{qtype_to_c_type(p.type_val)} {mangle_ident(p.name)}")
+                sig = ", ".join(param_sigs)
+                lines.append(f"static {ret_c} {l.c_fn_name}({sig}) {{")
+                fn_lines = []
+                if l.free_vars:
+                    fn_lines.append(f"{l.env_struct_name} *_env = ({l.env_struct_name} *)_raw_env;")
+                    prev_env = self.current_env_vars
+                    self.current_env_vars = {
+                        vname: f"_env->{mangle_ident(vname)}" for vname, _ in l.free_vars
+                    }
+                else:
+                    fn_lines.append("(void)_raw_env;")
+                    prev_env = self.current_env_vars
+                    self.current_env_vars = {}
+
+                if ret_type == OK_TYPE:
+                    self.emit_to(l.fun.body, None, fn_lines)
+                    fn_lines.append("return;")
+                else:
+                    ret_val = self.emit_val(l.fun.body, fn_lines)
+                    fn_lines.append(f"return {ret_val};")
+
+                self.current_env_vars = prev_env
+                for f_line in fn_lines:
+                    lines.append(f"    {f_line}" if f_line.strip() else f_line)
+                lines.append("}")
+                lines.append("")
+
+        # 9. Main entrypoint
         lines.extend([
             "int main(int argc, char **argv) {",
             "    (void)argc; (void)argv;",
@@ -411,7 +672,20 @@ class CEmitter:
                 return "((void)0)"
 
             case TypedVar(name=name):
+                if name in self.top_fun_names:
+                    return f"(&{mangle_ident(name)}_closure)"
+                if name in self.current_env_vars:
+                    return self.current_env_vars[name]
                 return mangle_ident(name)
+
+            case TypedFun():
+                linfo = self.lambda_info_by_id[id(expr)]
+                if not linfo.free_vars:
+                    return f"(&{linfo.closure_var_name})"
+                clos_tmp = self.fresh_tmp("_clos")
+                lines.append(f"QClosure *{clos_tmp};")
+                self.emit_to(expr, clos_tmp, lines)
+                return clos_tmp
 
             case TypedDerefCell(target=tgt):
                 return self.emit_val(tgt, lines)
@@ -476,16 +750,27 @@ class CEmitter:
                 c_right = self.emit_val(right, lines)
                 return self._emit_infix(c_left, op, c_right)
 
-            case TypedApp():
-                func_target, args = self._collect_app_args(expr)
-                c_func = self.emit_val(func_target, lines)
-                c_args = [self.emit_val(a, lines) for a in args]
-                args_str = ", ".join(c_args)
-                call_str = f"{c_func}({args_str})"
-                if expr.type_val == OK_TYPE:
-                    lines.append(f"{call_str};")
-                    return "((void)0)"
-                return call_str
+            case TypedApp(func=f, args=args):
+                if isinstance(f, TypedVar) and f.name in self.top_fun_names:
+                    c_func = mangle_ident(f.name)
+                    c_args = [self.emit_val(a, lines) for a in args]
+                    args_str = ", ".join(c_args)
+                    call_str = f"{c_func}({args_str})"
+                    if expr.type_val == OK_TYPE:
+                        lines.append(f"{call_str};")
+                        return "((void)0)"
+                    return call_str
+                else:
+                    fn_ptr_t = _closure_fn_ptr_type(f.type_val)
+                    clos_val = self.emit_val(f, lines)
+                    c_args = [self.emit_val(a, lines) for a in args]
+                    all_c_args = [f"{clos_val}->env"] + c_args
+                    args_str = ", ".join(all_c_args)
+                    call_str = f"(({fn_ptr_t})({clos_val}->fn))({args_str})"
+                    if expr.type_val == OK_TYPE:
+                        lines.append(f"{call_str};")
+                        return "((void)0)"
+                    return call_str
 
             case TypedExit():
                 lines.append("break;")
@@ -503,7 +788,7 @@ class CEmitter:
 
             case _:
                 raise NotImplementedError(
-                    f"C code generation for {expr.__class__.__name__} not implemented in Phase 4.2b"
+                    f"C code generation for {expr.__class__.__name__} not implemented in Phase 4.2b/c"
                 )
 
     def emit_to(self, expr: TypedExpr, dest: Optional[str], lines: list[str]) -> None:
@@ -609,6 +894,32 @@ class CEmitter:
                     lines.append(f"{target_dest} = {alloc_expr};")
                 for fld in flds:
                     self.emit_to(fld.value, f"{target_dest}->qf_{fld.name}", lines)
+
+            case TypedFun():
+                linfo = self.lambda_info_by_id[id(expr)]
+                target_dest = dest
+                if target_dest is None:
+                    target_dest = self.fresh_tmp("_clos")
+                    lines.append(f"QClosure *{target_dest};")
+
+                if not linfo.free_vars:
+                    lines.append(f"{target_dest} = &{linfo.closure_var_name};")
+                else:
+                    env_tmp = self.fresh_tmp("_env")
+                    lines.append(
+                        f"{linfo.env_struct_name} *{env_tmp} = "
+                        f"({linfo.env_struct_name} *)quest_alloc(sizeof({linfo.env_struct_name}));"
+                    )
+                    for vname, _ in linfo.free_vars:
+                        src_val = (
+                            self.current_env_vars[vname]
+                            if vname in self.current_env_vars
+                            else mangle_ident(vname)
+                        )
+                        lines.append(f"{env_tmp}->{mangle_ident(vname)} = {src_val};")
+                    lines.append(f"{target_dest} = (QClosure *)quest_alloc(sizeof(QClosure));")
+                    lines.append(f"{target_dest}->fn = (void *){linfo.c_fn_name};")
+                    lines.append(f"{target_dest}->env = (void *){env_tmp};")
 
             case _:
                 val = self.emit_val(expr, lines)

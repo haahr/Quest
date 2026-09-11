@@ -100,7 +100,8 @@ native **AArch64 (ARM64)** machine code and providing a **JIT compiler** for int
     flattening, and mutual recursion. — *Complete*
   - **Phase 4.2b (Tuples & Concrete Records):** C struct generation, typedef hoisting, heap allocation via
     `quest_alloc`, named/indexed field selection, and mutable field updates. — *Complete*
-  - **Phase 4.2c (Closures & Function Values):** First-class closures, environment capture, and indirect dispatch.
+  - **Phase 4.2c (Closures & Function Values):** First-class closures, environment capture, lambda lifting,
+    and indirect dispatch. — *Complete*
   - **Phase 4.3 (Arrays & Strings):** Fixed-size/dynamic arrays and extended string operations.
   - **Phase 4.4 (Options & Variants):** Ordered options, tagged variants, tag checks, and case discrimination.
   - **Phase 4.5 (Subtyping & Dynamic Dispatch):** Prefix tuple subtyping and evidence-passing record dictionaries.

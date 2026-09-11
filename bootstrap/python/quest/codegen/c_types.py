@@ -9,6 +9,7 @@ from quest.types import (
     OK_TYPE,
     REAL_TYPE,
     STRING_TYPE,
+    QFunType,
     QRecordField,
     QRecordType,
     QTupleField,
@@ -44,6 +45,8 @@ def type_to_c_tag(t: QType) -> str:
         sorted_fields = sorted(t.fields, key=lambda f: f.name)
         tags = [f"{f.name}_{type_to_c_tag(f.type_val)}" for f in sorted_fields]
         return "QRecord_" + ("_".join(tags) if tags else "empty")
+    if isinstance(t, QFunType):
+        return "QClosure"
     return "QVal"
 
 
@@ -75,6 +78,8 @@ def qtype_to_c_type(t: QType) -> str:
         return f"{tuple_struct_name(t)} *"
     if isinstance(t, QRecordType):
         return f"{record_struct_name(t)} *"
+    if isinstance(t, QFunType):
+        return "QClosure *"
     return "QVal"
 
 

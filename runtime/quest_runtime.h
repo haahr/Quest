@@ -46,6 +46,12 @@ typedef struct QString {
     char   *data;
 } QString;
 
+/* First-class closure representation: function pointer and environment */
+typedef struct QClosure {
+    void *fn;   /* C function pointer */
+    void *env;  /* Captured environment pointer or NULL */
+} QClosure;
+
 /* Static ABI layout assertions */
 static_assert(sizeof(QInt)     == 8, qint_must_be_8_bytes);
 static_assert(sizeof(QReal)    == 8, qreal_must_be_8_bytes);
@@ -53,6 +59,8 @@ static_assert(sizeof(void *)   == 8, ptr_must_be_8_bytes);
 static_assert(sizeof(QVal)     == 8, qval_must_be_8_bytes);
 static_assert(sizeof(uint64_t) == 8, u64_must_be_8_bytes);
 static_assert(sizeof(QString)  == 24, qstring_must_be_24_bytes);
+static_assert(sizeof(QClosure) == 16, qclosure_must_be_16_bytes);
+static_assert(offsetof(QClosure, env) == 8, qclosure_env_at_offset_8);
 
 /* Value constants */
 #define Q_OK_VAL    ((QVal){ .u = 0 })

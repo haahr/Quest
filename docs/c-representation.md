@@ -367,46 +367,51 @@ typedef struct QString {
 
 ---
 
-## 6. Closures and Calling Convention
+## 6. Closures and Calling Convention (Phase 4.2c)
 
-In Quest, functions are first-class and can capture lexical bindings:
+In Quest, functions are first-class values and can capture lexical bindings:
 
-### 6.1. Closure Representation
-Every closure is a 2-word heap structure containing a C function pointer and an environment pointer:
+### 6.1. Closure Representation (`QClosure`)
+Every closure is a uniform 16-byte structure containing a C function pointer and an environment pointer:
 ```c
 typedef struct QClosure {
-    QVal (*fn)(void *env, ...);
-    void *env;
+    void *fn;   /* C function pointer */
+    void *env;  /* Captured environment pointer or NULL */
 } QClosure;
 
 static_assert(sizeof(QClosure) == 16, qclosure_must_be_16_bytes);
+static_assert(offsetof(QClosure, env) == 8, qclosure_env_at_offset_8);
 ```
 
-### 6.2. Function Signatures and Invocation
-1. **Calling Convention:** Every compiled Quest function takes its captured environment pointer as its first
-   argument (`void *env`).
-2. **Top-Level / Non-Capturing Functions:** Use `env = NULL`.
-3. **Indirect Call Site:**
+### 6.2. Function Signatures and Calling Conventions
+1. **Direct Top-Level Functions:** Keep clean standard C signatures without an unused environment parameter:
+   `static QInt qv_square(QInt qv_x);`.
+2. **First-Class Top-Level Functions:** When a top-level function is referenced as a value, the compiler generates a
+   static trampoline adapter:
    ```c
-   /* Calling closure f(arg1, arg2) */
-   QClosure *c = (QClosure *)qv_f.p;
-   QVal result = c->fn(c->env, qv_arg1, qv_arg2);
+   static QInt qv_square_trampoline(void *env, QInt qv_x) {
+       (void)env;
+       return qv_square(qv_x);
+   }
+   static QClosure qv_square_closure = { (void *)qv_square_trampoline, NULL };
+   ```
+   Referencing `square` emits `(&qv_square_closure)`.
+3. **Lifted Lambdas:** Every non-top-level lambda is lifted to file scope with signature:
+   `static RetType qv_lambda_<id>(void *_raw_env, Params...)`.
+4. **Indirect Call Site:**
+   ```c
+   ((RetType (*)(void *, ParamTypes...))(c_func->fn))(c_func->env, args...);
    ```
 
-### 6.3. Environment Frames
-Captured variables are grouped into environment frame structs:
+### 6.3. Flat Environment Frames
+Captured variables are grouped into flat environment structs allocated via `quest_alloc`:
 ```c
-typedef struct QT_Env_fib {
-    QInt qv_limit;
-    QClosure *qv_helper;
-} QT_Env_fib;
+struct QEnv_lambda_1 {
+    QInt qv_x;
+    QReal qv_y;
+};
 ```
-If a variable is mutated (`var`), it is stored as a `QRef *` heap cell:
-```c
-typedef struct QRef {
-    QVal value;
-} QRef;
-```
+Non-capturing lambdas omit the environment struct and use file-scope static singleton closures.
 
 ---
 
