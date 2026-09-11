@@ -34,7 +34,7 @@ The compiler is built using a staged bootstrap methodology across seven distinct
 | **Step 1** | Python | Front-End: Lexer, PEG Parser, and Untyped AST | **Complete** |
 | **Step 2** | Python | Typechecker: $F_{<:}^\omega$ Subtyping, Equi-Recursion, Elaboration | **Complete** |
 | **Step 3** | Python | Tree-Walking Interpreter & Interactive REPL | **Complete** |
-| **Step 4** | Python | Bootstrap C Transpiler (emits C99 + Boehm GC) | Queued |
+| **Step 4** | Python | Bootstrap C Transpiler (emits C99 + Boehm GC) | **In Progress** (Phase 4.1 Complete) |
 | **Step 5** | Quest | Self-Hosted Front-End & C Compiler (written in Quest) | Queued |
 | **Step 6** | Quest | Self-Hosted Native AArch64 Compiler (Nanopass Pipeline) | Queued |
 | **Step 7** | Quest | Native AArch64 JIT & Dynamic Incremental Runtime | Queued |
@@ -46,19 +46,38 @@ For full architectural details on each stage, see [docs/roadmap.md](docs/roadmap
 ## Quickstart
 
 ### Prerequisites
-- Python 3.11+ (used for the initial bootstrap compiler).
+- Python 3.11+ (used for the bootstrap compiler and test runner).
+- Host C compiler (`clang` or `gcc`) for compiling generated C99 code.
+- Optional: [Boehm GC](https://github.com/ivmai/bdw-gc) (`bdw-gc` via Homebrew: `brew install bdw-gc`).
+  The compiler automatically falls back to standard libc allocations when `--nogc` is specified.
 
-### Compiling and Inspecting Quest Code
+### Running and Compiling Quest Code
 Use the unified compiler driver script `./quest`:
 
 ```bash
-# Evaluate an inline Quest expression
-./quest -c "let x: Int = 40 + 2;"
+# Evaluate an inline Quest expression via the interpreter
+./quest -c "let x: Int = 40 + 2; x"
+
+# Execute a Quest file via the tree-walking interpreter
+./quest program.quest
+
+# Compile Quest source to a native binary (using host clang/gcc)
+./quest compile program.quest
+
+# Compile to an explicit output binary
+./quest compile program.quest -o my_app
+
+# Emit generated C99 source code without invoking the host compiler
+./quest compile program.quest --emit-c
+
+# Compile without Boehm GC (using standard libc malloc/calloc)
+./quest compile program.quest --nogc -o my_app
 
 # Compile and stop after a specific phase to inspect canonical output:
-./quest --stop-after tokenize program.quest     # Dumps token stream
-./quest --stop-after parse program.quest        # Dumps untyped S-expression AST
-./quest --stop-after typecheck program.quest    # Dumps typed S-expression AST
+./quest --stop-after tokenize program.quest          # Dumps token stream
+./quest --stop-after parse program.quest             # Dumps untyped S-expression AST
+./quest --stop-after typecheck program.quest         # Dumps typed S-expression AST
+./quest compile --stop-after codegen_c program.quest # Dumps emitted C99 source
 
 # Dump intermediate representations while continuing:
 ./quest --dump-after parse --stop-after typecheck program.quest
@@ -98,8 +117,12 @@ Comprehensive documentation for the language, formal semantics, and compiler sub
 - [docs/grammar.txt](docs/grammar.txt): Canonical EBNF grammar specification.
 
 ### Compiler Architecture & Subsystems
-- [docs/pipeline.md](docs/pipeline.md): The compiler phase pipeline framework, verb naming conventions (`tokenize`,
-  `parse`, `typecheck`), and CLI driver interface.
+- [docs/pipeline.md](docs/pipeline.md): The compiler phase pipeline framework, dual-pipeline architecture (interpreter
+  vs. C compilation), and CLI driver interface.
+- [docs/codegen-c.md](docs/codegen-c.md): Bootstrap C transpiler architecture, AST lowering, statement expressions, and
+  compiler runner.
+- [docs/c-representation.md](docs/c-representation.md): C representation, uniform 64-bit `QVal` ABI, static assertions,
+  and runtime library design.
 - [docs/syntax.md](docs/syntax.md): Lexical scanning, character offset tracking, PEG parser combinators, and untyped
   AST structure.
 - [docs/type-system.md](docs/type-system.md): Higher-order type system, subkinding, equi-recursive coinductive

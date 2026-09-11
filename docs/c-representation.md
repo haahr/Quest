@@ -88,7 +88,42 @@ static_assert(sizeof(QVal)     == 8, qval_must_be_8_bytes);
 static_assert(sizeof(uint64_t) == 8, u64_must_be_8_bytes);
 ```
 
-### ABI and Calling Convention Properties
+### 3.1. Standard Constant Definitions
+Standard scalar constants are defined for `Ok` and boolean values:
+```c
+#define Q_OK_VAL    ((QVal){ .u = 0x0ULL })
+#define Q_TRUE_VAL  ((QVal){ .i = 1LL })
+#define Q_FALSE_VAL ((QVal){ .i = 0LL })
+```
+
+### 3.2. String Representation (`QString`)
+Quest strings are immutable byte sequences with explicit length and trailing null byte:
+```c
+typedef struct QString {
+    size_t length;
+    char   chars[];
+} QString;
+```
+- Strings are allocated via `quest_alloc_atomic(sizeof(QString) + length + 1)`.
+- Runtime functions `quest_string_new(const char *data, size_t len)`, `quest_string_concat(s1, s2)`, and
+  `quest_string_equal(s1, s2)` provide safe string manipulation.
+
+### 3.3. Rationale for Uniform 64-Bit Representation vs. Non-64-Bit Alternatives
+During C backend design, alternatives such as unboxed 8-bit integers/chars or unboxed heterogenous tuples were
+evaluated:
+1. **Generic Uniformity & Polymorphism:** In Quest, any polymorphic type variable `X <: Any` or higher-order quantifier
+   can be instantiated with arbitrary types. Variable-width types (e.g. 1-byte chars or 2-byte ints) would necessitate:
+   - Dynamic boxing/unboxing overhead on every generic parameter or aggregate field read.
+   - Extensive monomorphization, which cannot handle polymorphic recursion, existential types, or dynamic typing.
+   - Fat pointers or runtime layout descriptors.
+2. **Predictable Stride and Alignment:** Uniform 64-bit words guarantee that all aggregate slots are multiples of 8
+   bytes, enabling zero-cost prefix tuple subtyping and constant-stride array indexing without struct padding anomalies.
+3. **Monomorphic Scalar Optimization:** While the universal representation is 64-bit `QVal`, the C transpiler emits
+   native C scalar types (`QInt`, `QReal`, `QBool`, `QChar`, `QString*`) for statically-known local variables and
+   non-generic functions. This preserves register allocation and zero-boxing overhead where types are known at compile
+   time.
+
+### 3.4. ABI and Calling Convention Properties
 - Under **AAPCS64** (macOS and Linux AArch64), `QVal` is an 8-byte composite type containing integer/pointer members;
   it is passed in a single **64-bit general-purpose register** (`x0`–`x7`) and returned in `x0`.
 - Under **System V AMD64** (x86-64), `QVal` is classified as `INTEGER` class and passed in `rdi`, `rsi`, `rdx`, etc.,
@@ -484,21 +519,38 @@ All heap allocations route through two runtime allocator functions:
 
 ---
 
-## 10. Shared `runtime/` Directory Structure
+## 10. Shared `runtime/` Directory Structure & Implemented Functions
 
 The runtime files are located at the repository root and shared with future native code backends:
 ```
 runtime/
-├── quest_runtime.h    /* Core ABI, QVal union, aggregate structs, macros, assertions */
-├── quest_runtime.c    /* Allocator wrappers, exception machinery, Cardelli builtins */
-├── quest_io.c         /* C implementation of Writer and Reader stream modules */
-└── quest_conv.c       /* C implementation of Conv, Ascii, IntOp, RealOp, StringOp */
+├── quest_runtime.h    /* Core ABI, QVal union, layout assertions, allocator macros */
+├── quest_runtime.c    /* String primitives, math helpers, panic handlers, printing */
+├── quest_io.c         /* Future: C implementation of Writer and Reader stream modules */
+└── quest_conv.c       /* Future: C implementation of Conv, Ascii, IntOp, RealOp, StringOp */
 ```
+
+### 10.1. Implemented Runtime Functions (`runtime/quest_runtime.c`)
+- **String Primitives:**
+  - `QString *quest_string_new(const char *data, size_t len)`: Allocates `QString` with trailing null byte.
+  - `QString *quest_string_concat(const QString *s1, const QString *s2)`: Implements Quest `<>` string concatenation.
+  - `bool quest_string_equal(const QString *s1, const QString *s2)`: Compares string length and characters.
+- **Floating-Point Math:**
+  - `double quest_real_pow(double base, double exp)`: Implements Quest `^^` real exponentiation via `pow()`.
+- **Runtime Panic / Exception Handlers:**
+  - `void quest_raise_divide_by_zero(void)`: Triggered on division or modulo by zero. Prints
+    `Exception: DivideByZero\n` to `stderr` and terminates the process with exit code 1.
+- **Debug & Value Printing:**
+  - `void quest_print_val(QVal val, const char *type_name)`: Formats and prints interactive expression results
+    matching Cardelli's typescript format (e.g., `42 : Int`, `15.75 : Real`, `true : Bool`, `"hello" : String`).
 
 ---
 
 ## See Also
+- [codegen-c.md](codegen-c.md): C Code Generator architecture, AST lowering, and compiler runner.
+- [pipeline.md](pipeline.md): Compiler pipeline passes and dual-pipeline CLI driver.
 - [runtime-design.md](runtime-design.md): Evidence Passing vs. Fat Pointers and AAPCS64 register ABI.
 - [roadmap.md](roadmap.md): 7-stage compiler implementation roadmap.
 - [type-system.md](type-system.md): Quest higher-order subtyping and typing rules.
 - [step3-interpreter.md](step3-interpreter.md): Python interpreter architecture and standard library modules.
+

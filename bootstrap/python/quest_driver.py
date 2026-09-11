@@ -17,19 +17,27 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from quest.diagnostics import DiagnosticRenderer, Severity
 from quest.interpreter import format_interactive_result
-from quest.pipeline import CompilerContext, CompilerOptions, default_pipeline
+from quest.pipeline import (
+    CompilerContext,
+    CompilerOptions,
+    compile_pipeline,
+    default_pipeline,
+)
 from quest.runtime import QOk, qvalue_to_str
 from quest.tokens import SourceMap
 
 
 def run_driver(args: list[str]) -> int:
     """Executes the compiler driver with given CLI argument list."""
+    if args and args[0] == "compile":
+        return run_compile(args[1:])
+
     pipeline = default_pipeline()
     available_phases = pipeline.phase_names()
 
     arg_parser = argparse.ArgumentParser(
         prog="quest",
-        description="Quest Compiler Driver — compile, check, and inspect Quest programs.",
+        description="Quest Compiler Driver — compile, check, interpret, and inspect Quest programs.",
     )
     arg_parser.add_argument(
         "file",
@@ -165,6 +173,168 @@ def run_driver(args: list[str]) -> int:
     if parsed_args.interactive:
         from quest.repl import run_repl
         return run_repl(ctx=ctx)
+
+    return 0
+
+
+def run_compile(args: list[str]) -> int:
+    """Executes the compile subcommand: translates Quest to C and invokes host compiler."""
+    pipeline = compile_pipeline()
+    available_phases = pipeline.phase_names()
+
+    arg_parser = argparse.ArgumentParser(
+        prog="quest compile",
+        description="Quest Compiler — compile Quest source into C or native machine binary.",
+    )
+    arg_parser.add_argument(
+        "file",
+        nargs="?",
+        default=None,
+        help="Path to Quest source file (.quest), or '-' for standard input.",
+    )
+    arg_parser.add_argument(
+        "-o", "--output",
+        dest="output",
+        default=None,
+        help="Output binary file path (or C file path if --emit-c).",
+    )
+    arg_parser.add_argument(
+        "--emit-c",
+        dest="emit_c",
+        action="store_true",
+        help="Emit C source code instead of compiling to a binary executable.",
+    )
+    arg_parser.add_argument(
+        "--nogc",
+        dest="nogc",
+        action="store_true",
+        help="Compile without Boehm GC (uses standard libc malloc/free).",
+    )
+    arg_parser.add_argument(
+        "-c", "--code", "--command",
+        dest="code",
+        help="Inline Quest code string to compile.",
+    )
+    arg_parser.add_argument(
+        "--echo",
+        dest="echo",
+        action="store_true",
+        help="Echo Cardelli-format typescript for top-level phrases.",
+    )
+    arg_parser.add_argument(
+        "-I", "--include",
+        dest="include_paths",
+        action="append",
+        default=[],
+        help="Add directory to interface/module search path.",
+    )
+    arg_parser.add_argument(
+        "--stop-after", "--stop_after",
+        dest="stop_after",
+        choices=available_phases,
+        help="Stop pipeline execution after specified phase and dump its canonical output.",
+    )
+    arg_parser.add_argument(
+        "--dump-after", "--dump_after",
+        dest="dump_after",
+        action="append",
+        choices=available_phases,
+        default=[],
+        help="Dump canonical output of specified phase while continuing pipeline execution.",
+    )
+
+    parsed_args = arg_parser.parse_args(args)
+
+    # Determine input source
+    is_inline_code = parsed_args.code is not None
+    if is_inline_code:
+        source_text = parsed_args.code
+        file_name = "<string>"
+        default_out = Path("a.out")
+    elif parsed_args.file is None:
+        if sys.stdin.isatty():
+            arg_parser.print_help(sys.stderr)
+            return 1
+        source_text = sys.stdin.read()
+        file_name = "<stdin>"
+        default_out = Path("a.out")
+    elif parsed_args.file == "-":
+        source_text = sys.stdin.read()
+        file_name = "<stdin>"
+        default_out = Path("a.out")
+    else:
+        file_path = Path(parsed_args.file)
+        if not file_path.exists():
+            sys.stderr.write(f"quest compile: error: file not found: '{file_path}'\n")
+            return 1
+        try:
+            source_text = file_path.read_text(encoding="utf-8")
+            file_name = str(file_path)
+            if file_path.suffix == ".quest":
+                default_out = file_path.with_suffix("")
+            else:
+                default_out = file_path.with_name(file_path.name + ".bin")
+        except OSError as error:
+            sys.stderr.write(f"quest compile: error reading '{file_path}': {error}\n")
+            return 1
+
+    output_path = Path(parsed_args.output) if parsed_args.output else default_out
+
+    options = CompilerOptions(
+        stop_after=parsed_args.stop_after,
+        dump_after=set(parsed_args.dump_after),
+        include_paths=[Path(p) for p in parsed_args.include_paths],
+        echo=parsed_args.echo,
+        emit_c=parsed_args.emit_c,
+        output_path=output_path,
+        nogc=parsed_args.nogc,
+    )
+
+    ctx = CompilerContext.create(source_text, file_name, options=options)
+    result = pipeline.execute(source_text, file_name, options=options, ctx=ctx)
+
+    for phase_name in available_phases:
+        if phase_name in result.dump_outputs:
+            out_str = result.dump_outputs[phase_name]
+            if out_str:
+                sys.stdout.write(out_str + "\n")
+
+    if result.diagnostics:
+        source_map = SourceMap(source_text, file_name)
+        for diag in result.diagnostics:
+            rendered = DiagnosticRenderer.render_diagnostic(diag, source_map=source_map)
+            sys.stderr.write(rendered + "\n")
+
+    if any(d.severity == Severity.FATAL for d in result.diagnostics):
+        return 70
+
+    if not result.success:
+        return 1
+
+    if parsed_args.stop_after and parsed_args.stop_after != "codegen_c":
+        return 0
+
+    c_code = result.artifacts.get("codegen_c")
+    if c_code is None:
+        return 1
+
+    if parsed_args.emit_c:
+        if parsed_args.output:
+            try:
+                output_path.write_text(c_code, encoding="utf-8")
+            except OSError as error:
+                sys.stderr.write(f"quest compile: error writing '{output_path}': {error}\n")
+                return 1
+        else:
+            sys.stdout.write(c_code)
+        return 0
+
+    from quest.codegen import compile_c_source
+    try:
+        compile_c_source(c_code, output_path=output_path, nogc=parsed_args.nogc)
+    except Exception as error:
+        sys.stderr.write(f"quest compile: error: {error}\n")
+        return 1
 
     return 0
 

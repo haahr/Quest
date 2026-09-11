@@ -56,6 +56,9 @@ class CompilerOptions:
     show_offsets: bool = False
     show_values: bool = False
     target: Optional[Any] = None
+    emit_c: bool = False
+    output_path: Optional[Path] = None
+    nogc: bool = False
 
 
 @dataclass
@@ -286,6 +289,33 @@ class InterpretPhase(Phase):
         return qvalue_to_str(val)
 
 
+class CodegenCPhase(Phase):
+    """C code generation phase: translates typed AST into C99 source code."""
+    name = "codegen_c"
+    description = "Translate typed AST into C99 source code"
+    artifact_name = "c_source"
+
+    def run(self, input_data: Any, ctx: CompilerContext) -> Optional[str]:
+        from quest.codegen.c_emitter import CEmitter
+
+        try:
+            emitter = CEmitter(echo=ctx.options.echo)
+            match input_data:
+                case TypedProgram():
+                    return emitter.emit_program(input_data)
+                case TypedExpr() | TypedBinding():
+                    prog = TypedProgram(phrases=(input_data,))
+                    return emitter.emit_program(prog)
+                case _:
+                    return None
+        except Exception as error:
+            ctx.sink.emit(Diagnostic.make_error(str(error), 0))
+            return None
+
+    def dump(self, output_data: Any, ctx: CompilerContext) -> str:
+        return str(output_data) if output_data is not None else ""
+
+
 class PhasePipeline:
     """Manages sequential execution of registered compiler phases."""
 
@@ -400,3 +430,14 @@ def default_pipeline() -> PhasePipeline:
     pipeline.register(TypecheckPhase())
     pipeline.register(InterpretPhase())
     return pipeline
+
+
+def compile_pipeline() -> PhasePipeline:
+    """Returns the C compilation pipeline (Tokenize -> Parse -> Typecheck -> CodegenC)."""
+    pipeline = PhasePipeline()
+    pipeline.register(TokenizePhase())
+    pipeline.register(ParsePhase())
+    pipeline.register(TypecheckPhase())
+    pipeline.register(CodegenCPhase())
+    return pipeline
+

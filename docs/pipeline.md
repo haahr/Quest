@@ -27,13 +27,25 @@ The compiler processes Quest programs through a linear sequence of modular passe
                        |
                        v
                 [ Phase: typecheck ] ===> (typed AST)
-                       |
-                       v
-                [ Phase: interpret ] ===> (runtime value / output)
-                       |
-                       v
-                [ Phase: codegen ]   ===> (AArch64 machine code / C)
+                    /        \
+                   v          v
+   [ Phase: interpret ]    [ Phase: codegen_c ]
+            |                       |
+            v                       v
+    (runtime value)           (C99 source)
+            |                       |
+      Interactive/REPL         Host Compiler (clang/gcc)
+                                    |
+                                    v
+                              (Native Binary)
 ```
+
+### 1.1. Dual Pipeline Modes
+The compiler driver exposes two distinct execution pipelines:
+- **Default Pipeline (`default_pipeline()`):** `tokenize` $\to$ `parse` $\to$ `typecheck` $\to$ `interpret`.
+  Used by default for `quest <file>`, `quest -c "<code>"`, and interactive REPL sessions.
+- **Compilation Pipeline (`compile_pipeline()`):** `tokenize` $\to$ `parse` $\to$ `typecheck` $\to$ `codegen_c`.
+  Used by `quest compile <file>`, translating typed AST into C99 source and building native binaries.
 
 ---
 
@@ -46,7 +58,7 @@ All compiler phases are named by their **Verb / Action Form**:
 - `interpret`: Direct evaluation of typed AST via tree-walking interpreter (Step 3). Returns final phrase
   `QValue`. Output is silent if `ok` (`QOk`), formatted if non-ok. Runtime I/O operations execute as direct
   side effects.
-- `codegen`: Code generation to C or native AArch64 machine code.
+- `codegen_c`: C code generation (Step 4), translating typed AST into portable C99 source.
 
 ### Uniform Enforcement Across Interfaces
 1. **CLI Milestones:** `quest --stop-after <phase>` and `quest --dump-after <phase>`.
@@ -66,6 +78,9 @@ Encapsulates runtime configuration:
 - `echo: bool`: When true, echoes top-level binding signatures and evaluated values in batch mode.
 - `show_offsets: bool`: Controls rendering of source offsets in AST dumps.
 - `show_values: bool`: Controls rendering of parsed literal values in token dumps.
+- `emit_c: bool`: When true, outputs C source code without invoking the host C compiler.
+- `output_path: Optional[Path]`: Output path for binary executable or emitted C source.
+- `nogc: bool`: Forces compilation with `-DQUEST_NOGC`, disabling Boehm GC linkage.
 
 ### 3.2. `CompilerContext`
 Maintains shared state across phases:
@@ -77,9 +92,9 @@ Maintains shared state across phases:
 ### 3.3. `Phase` Abstract Base Class
 ```python
 class Phase(ABC):
-    name: str              # Canonical verb name (e.g. "typecheck")
+    name: str              # Canonical verb name (e.g. "typecheck", "codegen_c")
     description: str       # Short summary
-    artifact_name: str     # Data structure name (e.g. "typed_ast")
+    artifact_name: str     # Data structure name (e.g. "typed_ast", "c_source")
 
     @abstractmethod
     def run(self, input_data: Any, ctx: CompilerContext) -> Optional[Any]:
@@ -92,23 +107,22 @@ class Phase(ABC):
         pass
 ```
 
-### 3.4. `PhasePipeline`
-Manages the sequence of passes and provides two primary entry points:
-- **`compile_file(path: Path, options, ctx) -> PipelineResult`:** Batch compilation mode.
-- **`compile_phrase(phrase_text: str, options, ctx) -> PipelineResult`:** Incremental mode for the interactive REPL,
-  preserving `ctx.env` across phrases.
+### 3.4. Pipeline Construction Factories
+- **`default_pipeline() -> PhasePipeline`:** Registers `tokenize` $\to$ `parse` $\to$ `typecheck` $\to$ `interpret`.
+- **`compile_pipeline() -> PhasePipeline`:** Registers `tokenize` $\to$ `parse` $\to$ `typecheck` $\to$ `codegen_c`.
 
 ---
 
 ## 4. Command-Line Interface (`quest` / `quest_driver.py`)
 
-The unified driver accepts files, standard input, inline code, or enters the interactive REPL:
+The compiler driver provides two primary subcommands: interpreter mode (the default) and native C compilation.
 
+### 4.1. Default Mode: Interpretation & REPL (`quest`)
 ```bash
 # Start interactive REPL directly:
 quest
 
-# Execute through default target (interpret/run) silently:
+# Execute Quest file silently via interpreter:
 quest file.quest
 
 # Echo top-level bindings and expression results in batch execution:
@@ -126,26 +140,52 @@ quest --stop-after interpret file.quest
 # Dump intermediate outputs while continuing:
 quest --dump-after parse --stop-after typecheck file.quest
 
-# Inline code:
-quest -c "let x = 1;" --stop-after typecheck
+# Execute inline code string:
+quest -c "let x = 10 + 20; x"
 
 # Add search paths for imports:
 quest -I ./lib -I ./interfaces main.quest
 ```
 
-Accepts both dashed (`--stop-after`) and underscored (`--stop_after`) flag formats.
+### 4.2. Compilation Mode: Native Executable & C Emitter (`quest compile`)
+```bash
+# Compile Quest source to native binary (defaults to ./file):
+quest compile file.quest
+
+# Compile with explicit output binary name:
+quest compile file.quest -o my_app
+
+# Emit C source code to stdout without invoking host compiler:
+quest compile file.quest --emit-c
+
+# Emit C source code to an explicit .c file:
+quest compile file.quest --emit-c -o out.c
+
+# Compile without Boehm GC (uses standard libc malloc/calloc):
+quest compile file.quest --nogc -o my_app
+
+# Compile inline code string to native binary:
+quest compile -c "let x = 42; x" -o test_bin
+
+# Stop after intermediate compilation phase:
+quest compile --stop-after typecheck file.quest
+quest compile --dump-after typecheck --stop-after codegen_c file.quest
+```
 
 ### Exit Codes
 - `0`: Successful compilation / execution (or successful early dump).
-- `1`: User code error (diagnostic rendered via `DiagnosticRenderer`).
+- `1`: User code error or host compilation error (diagnostic rendered via `DiagnosticRenderer`).
 - `70` (`EX_SOFTWARE`): Internal compiler error / fatal diagnostic.
 
 ---
 
 ## See Also
+- [codegen-c.md](codegen-c.md): C Code Generator architecture, AST lowering, and compiler runner.
+- [c-representation.md](c-representation.md): C representation, `QVal` union, and runtime ABI design.
 - [README.md](../README.md): Project overview and quickstart.
 - [roadmap.md](roadmap.md): 7-stage implementation roadmap.
 - [syntax.md](syntax.md): Lexer, parser, and AST specification.
 - [type-system.md](type-system.md): Type system, subtyping, and elaboration.
 - [testing.md](testing.md): Testing framework and test runner conventions.
 - [diagnostics.md](diagnostics.md): Diagnostic reporting architecture.
+
