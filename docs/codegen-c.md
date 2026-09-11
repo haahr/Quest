@@ -218,22 +218,54 @@ Quest provides both ascending (`upto`) and descending (`downto`) loops:
 
 ---
 
-## 5. Host Compiler Runner (`compiler_runner.py`)
+---
+
+## 5. Functions & Direct Calling Conventions (Phase 4.2a)
+
+### 5.1. Function Declaration Hoisting & Static Scope
+Top-level function definitions (`let f(...) = ...`, `let rec f(...) = ...`) are hoisted out of `main()` to C file scope:
+- **Top-Level Variable Hoisting:** Non-function top-level variables (`let x = 10;`) are declared as file-scope static C
+  variables (`static QInt qv_x;`) and initialized inside `main()` in program order, ensuring top-level functions can
+  read and mutate them.
+- **Prototypes & Forward Declarations:** Before emitting function definitions, the transpiler generates static forward
+  declarations for all top-level functions:
+  ```c
+  static QInt qv_factorial(QInt qv_n);
+  ```
+  This allows recursive and mutually referenced functions to compile without order dependency.
+
+### 5.2. Direct Calling Convention & Currying Flattening
+- **Uncurried Signatures:** Functions defined with multi-parameter or curried syntax are flattened into direct,
+  zero-overhead uncurried C function signatures:
+  ```c
+  /* let add(x: Int y: Int): Int = x + y; */
+  static QInt qv_add(QInt qv_x, QInt qv_y) {
+      return ((qv_x) + (qv_y));
+  }
+  ```
+- **Application Flattening:** Fully applied call sites (`add(10 20)` or `add(10)(20)`) are flattened into direct
+  C invocations `qv_add(10LL, 20LL)`.
+- **`Ok` Return Types:** Functions returning `Ok` emit `void` return types and clean `return;` statements. At expression
+  call sites, calls returning `Ok` are wrapped in statement expressions `({ qv_proc(...); ((void)0); })`.
+
+---
+
+## 6. Host Compiler Runner (`compiler_runner.py`)
 
 The compiler runner manages external C compiler toolchain discovery, Boehm GC flags, and native executable generation:
 
-### 5.1. Compiler Discovery
+### 6.1. Compiler Discovery
 `find_c_compiler()` searches `PATH` in order:
 1. `clang` (preferred on macOS/Linux for optimal diagnostic output and C99 statement expression support).
 2. `gcc` (fallback).
 
-### 5.2. Boehm GC Auto-Detection & `--nogc`
+### 6.2. Boehm GC Auto-Detection & `--nogc`
 `detect_gc_flags(nogc: bool)` locates the Boehm Garbage Collector:
 - Standard paths checked: `/opt/homebrew/opt/bdw-gc` (Apple Silicon), `/usr/local/opt/bdw-gc` (Intel macOS), `/usr`.
 - If found: passes `-I<prefix>/include -L<prefix>/lib -lgc`.
 - If not found or when `--nogc` flag is specified: passes `-DQUEST_NOGC`, using standard libc `calloc`/`malloc`.
 
-### 5.3. Compilation Invocation
+### 6.3. Compilation Invocation
 `compile_c_source(c_source, output_path, nogc)`:
 1. Writes emitted C source to a temporary file (`.c`).
 2. Constructs compilation command:
@@ -247,15 +279,13 @@ The compiler runner manages external C compiler toolchain discovery, Boehm GC fl
 
 ---
 
-## 6. Testing & Verification
+## 7. Testing & Verification
 
-The C code generator is verified by comprehensive unit and integration tests in
-`tests/python/test_phase4_1_c_codegen.py`:
-- **Scalar operations:** Integer, Real, Bool, Char, String operations and relations.
-- **Control flow:** Statement expressions, nested `if`, `while`, `loop` with `exit`, `for ... upto/downto`, blocks.
-- **Memory modes:** Verification of both Boehm GC and `--nogc` binary execution.
-- **Runtime panics:** Verification that runtime divide-by-zero exits with code 1 and prints `Exception: DivideByZero`.
-- **Driver CLI:** End-to-end testing of `quest compile` and native binary execution.
+The C code generator is verified by comprehensive unit and integration tests:
+- `tests/python/test_phase4_1_c_codegen.py`: Scalar operations, control flow, memory modes, and runtime panic tests.
+- `tests/python/test_phase4_2a_functions.py`: Top-level and recursive functions, direct C calling conventions,
+  curried application flattening, mutable top-level variables, and `--nogc` execution.
+- `tests/source/02_expressions_control_flow.quest`: Verified end-to-end native compilation and execution.
 
 ---
 

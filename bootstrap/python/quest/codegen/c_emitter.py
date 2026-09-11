@@ -6,6 +6,7 @@ from typing import Optional
 
 from quest.codegen.c_types import mangle_ident, qtype_to_c_type, qtype_to_name_str
 from quest.typed_ast import (
+    TypedApp,
     TypedAssign,
     TypedBinding,
     TypedBlock,
@@ -16,6 +17,7 @@ from quest.typed_ast import (
     TypedExpr,
     TypedExprStmt,
     TypedFor,
+    TypedFun,
     TypedIf,
     TypedInfix,
     TypedInt,
@@ -23,6 +25,7 @@ from quest.typed_ast import (
     TypedLoop,
     TypedNode,
     TypedOk,
+    TypedParam,
     TypedProgram,
     TypedReal,
     TypedString,
@@ -102,17 +105,101 @@ class CEmitter:
         self._tmp_id += 1
         return f"{prefix}_{self._tmp_id}"
 
+    def _collect_fun_params(self, fun: TypedFun) -> tuple[list[TypedParam], TypedExpr, QType]:
+        """Flattens nested curried TypedFun nodes into uncurried parameter list and final body."""
+        params = list(fun.params)
+        body = fun.body
+        ret_type = fun.type_val.result_type
+        while isinstance(body, TypedFun):
+            params.extend(body.params)
+            ret_type = body.type_val.result_type
+            body = body.body
+        return params, body, ret_type
+
+    def _collect_app_args(self, app: TypedApp) -> tuple[TypedExpr, list[TypedExpr]]:
+        """Flattens nested curried TypedApp nodes into target function and argument list."""
+        args = list(app.args)
+        curr = app.func
+        while isinstance(curr, TypedApp):
+            args = list(curr.args) + args
+            curr = curr.func
+        return curr, args
+
     def emit_program(self, prog: TypedProgram) -> str:
         """Translates a TypedProgram into a full C99 source file string."""
+        top_funs: list[tuple[str, TypedFun, Any]] = []
+        top_vars: list[tuple[str, TypedExpr, Any]] = []
+
+        for phrase in prog.phrases:
+            match phrase:
+                case TypedLetValue(name=name, value=val, symbol=symbol):
+                    if isinstance(val, TypedFun):
+                        top_funs.append((name, val, symbol))
+                    else:
+                        top_vars.append((name, val, symbol))
+                case _:
+                    pass
+
         lines: list[str] = [
             "/* Emitted by Quest Bootstrap C Transpiler */",
             "#include \"quest_runtime.h\"",
             "",
+        ]
+
+        # 1. Static declarations for top-level non-void variables
+        if top_vars:
+            for name, _val, symbol in top_vars:
+                if symbol.type_val != OK_TYPE:
+                    c_type = qtype_to_c_type(symbol.type_val)
+                    c_ident = mangle_ident(name)
+                    lines.append(f"static {c_type} {c_ident};")
+            lines.append("")
+
+        # 2. Forward declarations for all top-level functions
+        if top_funs:
+            for name, fun, _sym in top_funs:
+                params, _body, ret_type = self._collect_fun_params(fun)
+                c_name = mangle_ident(name)
+                ret_c = "void" if ret_type == OK_TYPE else qtype_to_c_type(ret_type)
+                if not params:
+                    param_sig = "void"
+                else:
+                    param_sig = ", ".join(
+                        f"{qtype_to_c_type(p.type_val)} {mangle_ident(p.name)}"
+                        for p in params
+                    )
+                lines.append(f"static {ret_c} {c_name}({param_sig});")
+            lines.append("")
+
+        # 3. Function definitions
+        for name, fun, _sym in top_funs:
+            params, body, ret_type = self._collect_fun_params(fun)
+            c_name = mangle_ident(name)
+            ret_c = "void" if ret_type == OK_TYPE else qtype_to_c_type(ret_type)
+            if not params:
+                param_sig = "void"
+            else:
+                param_sig = ", ".join(
+                    f"{qtype_to_c_type(p.type_val)} {mangle_ident(p.name)}"
+                    for p in params
+                )
+            c_body = self.emit_expr(body)
+            lines.append(f"static {ret_c} {c_name}({param_sig}) {{")
+            if ret_type == OK_TYPE:
+                lines.append(f"    {c_body};")
+                lines.append("    return;")
+            else:
+                lines.append(f"    return {c_body};")
+            lines.append("}")
+            lines.append("")
+
+        # 4. Main entrypoint
+        lines.extend([
             "int main(int argc, char **argv) {",
             "    (void)argc; (void)argv;",
             "    quest_gc_init();",
             "",
-        ]
+        ])
 
         total_phrases = len(prog.phrases)
         for i, phrase in enumerate(prog.phrases):
@@ -131,10 +218,18 @@ class CEmitter:
         """Translates a top-level binding or expression phrase."""
         match phrase:
             case TypedLetValue(name=name, value=val, symbol=symbol):
-                c_type = qtype_to_c_type(symbol.type_val)
+                if isinstance(val, TypedFun):
+                    if self.echo:
+                        type_str = _c_string_literal(qtype_to_name_str(symbol.type_val))
+                        lines.append(f"    quest_print_val(((QVal){{ .u = 0 }}), {type_str});")
+                    return
+
                 c_ident = mangle_ident(name)
                 val_c = self.emit_expr(val)
-                lines.append(f"    {c_type} {c_ident} = {val_c};")
+                if symbol.type_val == OK_TYPE:
+                    lines.append(f"    {val_c};")
+                else:
+                    lines.append(f"    {c_ident} = {val_c};")
                 if self.echo:
                     wrap = _qval_wrap(c_ident, symbol.type_val)
                     type_str = _c_string_literal(qtype_to_name_str(symbol.type_val))
@@ -254,9 +349,19 @@ class CEmitter:
             case TypedExit():
                 return "break"
 
+            case TypedApp():
+                func_target, args = self._collect_app_args(expr)
+                c_func = self.emit_expr(func_target)
+                c_args = [self.emit_expr(a) for a in args]
+                args_str = ", ".join(c_args)
+                call_str = f"{c_func}({args_str})"
+                if expr.type_val == OK_TYPE:
+                    return f"({{ {call_str}; ((void)0); }})"
+                return call_str
+
             case _:
                 raise NotImplementedError(
-                    f"C code generation for {expr.__class__.__name__} not implemented in Phase 4.1"
+                    f"C code generation for {expr.__class__.__name__} not implemented in Phase 4.2a"
                 )
 
     def _emit_infix(self, left: TypedExpr, op: str, right: TypedExpr) -> str:
