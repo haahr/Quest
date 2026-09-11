@@ -117,20 +117,22 @@ int main(int argc, char **argv) {
 In Quest, operators are strictly non-overloaded (§4.2). The transpiler emits direct C99 expressions:
 
 - **Integer Arithmetic:** `+`, `-`, `*` map to C `+`, `-`, `*`.
-- **Integer Division & Modulo:** `/` and `%` emit runtime zero-divisor checks:
+- **Integer Division & Modulo:** `/` and `%` call inline runtime functions with zero-divisor checks:
   ```c
   /* 42 / x */
-  ({ QInt _l = 42LL; QInt _r = qv_x; if (_r == 0) quest_raise_divide_by_zero(); _l / _r; })
+  quest_int_div(42LL, qv_x)
+  /* 42 % x */
+  quest_int_mod(42LL, qv_x)
   ```
 - **Real Arithmetic (Doubled Symbols):**
-  - `++` $ightarrow$ `(l) + (r)`
-  - `--` $ightarrow$ `(l) - (r)`
-  - `**` $ightarrow$ `(l) * (r)`
-  - `//` $ightarrow$ `(l) / (r)`
-  - `^^` (exponentiation) $ightarrow$ `quest_real_pow((l), (r))`
+  - `++` $\rightarrow$ `(l) + (r)`
+  - `--` $\rightarrow$ `(l) - (r)`
+  - `**` $\rightarrow$ `(l) * (r)`
+  - `//` $\rightarrow$ `(l) / (r)`
+  - `^^` (exponentiation) $\rightarrow$ `quest_real_pow((l), (r))`
 - **Relational Comparisons:**
   - Integer: `<`, `<=`, `>`, `>=`
-  - Real: `<<` $ightarrow$ `<`, `<<=` $ightarrow$ `<=`, `>>` $ightarrow$ `>`, `>>=` $ightarrow$ `>=`
+  - Real: `<<` $\rightarrow$ `<`, `<<=` $\rightarrow$ `<=`, `>>` $\rightarrow$ `>`, `>>=` $\rightarrow$ `>=`
 - **Identity and Equality:**
   - `is` and `==` map to C `==` (for scalars) or `quest_string_equal` (for strings).
   - `isnot` maps to C `!=` (or `!quest_string_equal`).
@@ -139,81 +141,84 @@ In Quest, operators are strictly non-overloaded (§4.2). The transpiler emits di
 
 ---
 
-## 4. Control Flow and Statement Expressions
+## 4. Control Flow and Standard C99 Lowering
 
 Because Quest is an expression-oriented language, constructs like `if`, `begin ... end`, and loops can appear in
 arbitrary expression positions (e.g. `let x = if c then 1 else 2 end;`).
 
-To lower these seamlessly to C99 without restructuring the entire AST into control-flow graphs (CFG) or Basic Blocks,
-the emitter uses **GCC/Clang statement expressions**: `({ ... })`. A statement expression executes statements
-sequentially and evaluates to the value of its final expression.
+To lower these into strict, portable **standard ISO C99** without relying on non-standard GCC/Clang statement
+expressions (`({ ... })`), the transpiler employs destination-passing statement lowering:
+- Expressions evaluating in statement context (e.g. bindings, returns, or phrase sequences) emit directly into their
+  destination.
+- Control constructs (`if`, loops, blocks) decompose into standard C99 statements and blocks (`{ ... }`).
+- When a complex expression appears as a sub-expression (e.g. inside an arithmetic operation), temporary variables
+  are hoisted and emitted as preparation statements immediately preceding the consumer.
 
 ### 4.1. Conditionals (`TypedIf`)
 - **Value-Producing If Expression:**
   ```c
   /* let x = if a > 0 then 10 else 20 end; */
-  QInt qv_x = ({
-      QInt _if_res_1;
-      if ((qv_a) > (0LL)) {
-          _if_res_1 = (10LL);
-      } else {
-          _if_res_1 = (20LL);
-      }
-      _if_res_1;
-  });
+  if ((qv_a) > (0LL)) {
+      qv_x = 10LL;
+  } else {
+      qv_x = 20LL;
+  }
   ```
 - **Statement / Ok-typed If:**
   ```c
-  ({ if (cond) { then_body; } else { else_body; } ((void)0); })
+  if (cond) {
+      then_body;
+  } else {
+      else_body;
+  }
   ```
 
 ### 4.2. Sequential Blocks (`TypedBlock`)
-A block scopes variable declarations and evaluates to its final result expression:
+A block scopes local variable declarations and evaluates to its destination inside standard C braces:
 ```c
 /* begin let a = 5; let b = 6; a * b end */
-({
-    QInt qv_a = (5LL);
-    QInt qv_b = (6LL);
-    (qv_a) * (qv_b);
-})
+{
+    QInt qv_a;
+    qv_a = 5LL;
+    QInt qv_b;
+    qv_b = 6LL;
+    dest = ((qv_a) * (qv_b));
+}
 ```
 
 ### 4.3. While and Infinite Loops (`TypedWhile`, `TypedLoop`, `TypedExit`)
 - **`while <cond> do <body> end`:**
+  Emitted as standard C `while (1)` with condition checking and early break:
   ```c
-  ({ while (cond) { body; } ((void)0); })
+  while (1) {
+      if (!(cond)) break;
+      body;
+  }
   ```
 - **`loop <body> end`:**
   ```c
-  ({ while (1) { body; } ((void)0); })
+  while (1) {
+      body;
+  }
   ```
 - **`exit`:**
-  Emitted directly as `break;`. Statement expressions cleanly isolate loops, ensuring `exit` breaks out of the
-  innermost loop construct.
+  Emitted directly as `break;`.
 
 ### 4.4. For Loops (`TypedFor`)
-Quest provides both ascending (`upto`) and descending (`downto`) loops:
+Quest provides both ascending (`upto`) and descending (`downto`) loops, emitted as standard C99 `for` loops:
 - **`for i = 1 upto 5 do <body> end`:**
   ```c
-  ({
-      QInt _start_1 = 1LL;
-      QInt _stop_2 = 5LL;
-      for (QInt qv_i = _start_1; qv_i <= _stop_2; qv_i++) {
-          body;
-      }
-      ((void)0);
-  })
+  QInt _stop_1 = 5LL;
+  for (QInt qv_i = 1LL; qv_i <= _stop_1; qv_i++) {
+      body;
+  }
   ```
 - **`for i = 5 downto 1 do <body> end`:**
   ```c
-  ({
-      QInt _start_1 = 5LL;
-      QInt _stop_2 = 1LL;
-      for (QInt qv_i = _start_1; qv_i >= _stop_2; qv_i--) {
-          body;
-      }
-      ((void)0);
-  })
+  QInt _stop_1 = 1LL;
+  for (QInt qv_i = 5LL; qv_i >= _stop_1; qv_i--) {
+      body;
+  }
   ```
 
 ---
@@ -245,8 +250,8 @@ Top-level function definitions (`let f(...) = ...`, `let rec f(...) = ...`) are 
   ```
 - **Application Flattening:** Fully applied call sites (`add(10 20)` or `add(10)(20)`) are flattened into direct
   C invocations `qv_add(10LL, 20LL)`.
-- **`Ok` Return Types:** Functions returning `Ok` emit `void` return types and clean `return;` statements. At expression
-  call sites, calls returning `Ok` are wrapped in statement expressions `({ qv_proc(...); ((void)0); })`.
+- **`Ok` Return Types:** Functions returning `Ok` emit `void` return types and clean `return;` statements. At statement
+  call sites, calls returning `Ok` are emitted directly as statement calls: `qv_proc(...);`.
 
 ---
 

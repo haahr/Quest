@@ -79,4 +79,18 @@ double   quest_real_pow(double base, double exp);
 void     quest_raise_divide_by_zero(void);
 void     quest_print_val(QVal val, const char *type_name);
 
+static inline QInt quest_int_div(QInt a, QInt b) {
+    if (b == 0) {
+        quest_raise_divide_by_zero();
+    }
+    return a / b;
+}
+
+static inline QInt quest_int_mod(QInt a, QInt b) {
+    if (b == 0) {
+        quest_raise_divide_by_zero();
+    }
+    return a % b;
+}
+
 #endif /* QUEST_RUNTIME_H */

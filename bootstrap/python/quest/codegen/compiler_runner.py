@@ -79,6 +79,7 @@ def compile_c_source(
         cmd = [
             compiler,
             "-std=c99",
+            "-pedantic-errors",
             "-Wall",
             "-Wextra",
             "-O2",
