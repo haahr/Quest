@@ -223,8 +223,6 @@ Quest provides both ascending (`upto`) and descending (`downto`) loops, emitted 
 
 ---
 
----
-
 ## 5. Functions & Direct Calling Conventions (Phase 4.2a)
 
 ### 5.1. Function Declaration Hoisting & Static Scope
@@ -255,22 +253,83 @@ Top-level function definitions (`let f(...) = ...`, `let rec f(...) = ...`) are 
 
 ---
 
-## 6. Host Compiler Runner (`compiler_runner.py`)
+## 6. Tuples & Concrete Records (Phase 4.2b)
+
+Phase 4.2b introduces standard C99 code generation for tuples and concrete records with heap allocation, uniform 64-bit
+slot layout, and direct pointer-based field access.
+
+### 6.1. C Struct Layout & Tag Generation
+- **Positional Tuple Structs:** Tuple types map to positional members `_0`, `_1`, ... based on their component value
+  fields (`t.value_fields`). Struct names are deterministic and reflect component types:
+  ```c
+  /* Tuple x: Int y: Real end */
+  typedef struct QTuple_Int_Real QTuple_Int_Real;
+
+  struct QTuple_Int_Real {
+      QInt _0;
+      QReal _1;
+  };
+  ```
+- **Canonical Alphabetized Record Structs:** Records are unordered product types with structural equivalence. To ensure
+  structurally identical record types share the same C struct definition, record struct members are sorted
+  alphabetically by field name, prefixed with `qf_` (to avoid C keyword collisions):
+  ```c
+  /* record x = 10, y = 20.0 end */
+  typedef struct QRecord_x_Int_y_Real QRecord_x_Int_y_Real;
+
+  struct QRecord_x_Int_y_Real {
+      QInt qf_x;
+      QReal qf_y;
+  };
+  ```
+- **Forward Typedef Hoisting:** The transpiler recursively discovers all `QTupleType` and `QRecordType` instances
+  across the AST and emits forward declarations (`typedef struct Tag Tag;`) before any struct bodies, static variables,
+  or function prototypes. This guarantees that mutually referencing or nested aggregate types compile cleanly without
+  ordering dependencies.
+
+### 6.2. Heap Allocation & Member Initialization
+Tuples and records are heap-allocated via `quest_alloc(sizeof(StructTag))` (managed by Boehm GC or standard `calloc`
+in `--nogc` mode):
+```c
+/* origin = tuple let x = 0 let y = 0.0 end */
+qv_origin = (QTuple_Int_Real *)quest_alloc(sizeof(QTuple_Int_Real));
+qv_origin->_0 = 0LL;
+qv_origin->_1 = 0.0;
+```
+When an aggregate expression appears in a value context (e.g. passed directly to a function call or returned from an
+expression), a local temporary pointer is allocated and returned.
+
+### 6.3. Field Selection & Mutable Field Assignment
+- **Selection (`TypedSelect`):**
+  - For tuples: Named fields are mapped to their 0-based value component index at compile-time (`p.x` -> `qv_p->_0`).
+    Unnamed fields accessed by index also map directly (`t._0` -> `qv_t->_0`).
+  - For records: Field accesses map directly to the mangled field name (`r.x` -> `qv_r->qf_x`).
+- **Mutable Assignment (`TypedAssign`):**
+  - When the target of `TypedAssign` is a `TypedSelect` expression on a mutable record field (`var y = ...`), the
+    target expression is evaluated as an lvalue pointer dereference, storing the value directly into the heap struct:
+  ```c
+  /* r.y := 42; */
+  qv_r->qf_y = 42LL;
+  ```
+
+---
+
+## 7. Host Compiler Runner (`compiler_runner.py`)
 
 The compiler runner manages external C compiler toolchain discovery, Boehm GC flags, and native executable generation:
 
-### 6.1. Compiler Discovery
+### 7.1. Compiler Discovery
 `find_c_compiler()` searches `PATH` in order:
 1. `clang` (preferred on macOS/Linux for optimal diagnostic output and C99 statement expression support).
 2. `gcc` (fallback).
 
-### 6.2. Boehm GC Auto-Detection & `--nogc`
+### 7.2. Boehm GC Auto-Detection & `--nogc`
 `detect_gc_flags(nogc: bool)` locates the Boehm Garbage Collector:
 - Standard paths checked: `/opt/homebrew/opt/bdw-gc` (Apple Silicon), `/usr/local/opt/bdw-gc` (Intel macOS), `/usr`.
 - If found: passes `-I<prefix>/include -L<prefix>/lib -lgc`.
 - If not found or when `--nogc` flag is specified: passes `-DQUEST_NOGC`, using standard libc `calloc`/`malloc`.
 
-### 6.3. Compilation Invocation
+### 7.3. Compilation Invocation
 `compile_c_source(c_source, output_path, nogc)`:
 1. Writes emitted C source to a temporary file (`.c`).
 2. Constructs compilation command:
@@ -284,12 +343,15 @@ The compiler runner manages external C compiler toolchain discovery, Boehm GC fl
 
 ---
 
-## 7. Testing & Verification
+## 8. Testing & Verification
 
 The C code generator is verified by comprehensive unit and integration tests:
 - `tests/python/test_phase4_1_c_codegen.py`: Scalar operations, control flow, memory modes, and runtime panic tests.
 - `tests/python/test_phase4_2a_functions.py`: Top-level and recursive functions, direct C calling conventions,
   curried application flattening, mutable top-level variables, and `--nogc` execution.
+- `tests/python/test_phase4_2b_aggregates.py`: Tuples, concrete records, heap allocation via `quest_alloc`,
+  named/indexed field selection, mutable field assignment, and nested aggregates.
+- `tests/source/01_lexer_basics.quest`: Verified end-to-end native compilation and execution of tuple operations.
 - `tests/source/02_expressions_control_flow.quest`: Verified end-to-end native compilation and execution.
 
 ---

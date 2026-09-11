@@ -182,15 +182,15 @@ Tuples are ordered collections of 64-bit values. In Quest, tuple components can 
 (`Tuple a:Int b:Real end`) or be positional (`Tuple Int Real end`), or a mix of both.
 
 - **Field Naming Conventions:**
-  - **Named components** use the standard `qv_` value prefix: `qv_<name>`.
-  - **Unnamed positional components** use 0-indexed numerical tags: `_<index>` (`_0`, `_1`, etc.).
+  - **Tuple components** use 0-indexed numerical tags: `_<index>` (`_0`, `_1`, etc.).
+  - Named components (e.g. `p.x`) are resolved at compile time to their corresponding positional slot (`p->_0`).
   ```c
   /* Quest: Tuple x:Int y:Real String end */
-  typedef struct QT_Tuple_x_Int_y_Real_String {
-      QInt     qv_x;  /* Named component: qv_x */
-      QReal    qv_y;  /* Named component: qv_y */
-      QString *_2;    /* Positional component: _2 */
-  } QT_Tuple_x_Int_y_Real_String;
+  typedef struct QTuple_Int_Real_String {
+      QInt     _0;  /* Component 0 (named x in signature) */
+      QReal    _1;  /* Component 1 (named y in signature) */
+      QString *_2;  /* Component 2 */
+  } QTuple_Int_Real_String;
   ```
 
 - **Generic View:**
@@ -206,18 +206,18 @@ Tuples are ordered collections of 64-bit values. In Quest, tuple components can 
   physically identical in its first 16 bytes to its prefix tuple (2 components). Passing an extended tuple to a
   function expecting a prefix requires only a pointer cast in C:
   ```c
-  QT_Tuple_x_Int_y_Real *sub = (QT_Tuple_x_Int_y_Real *)tuple_3;
+  QTuple_Int_Real *sub = (QTuple_Int_Real *)tuple_3;
   ```
   To guarantee that compiler layout and alignment assumptions hold true, the transpiler **memoizes every tuple
   coercion pair** `(SourceTuple, TargetTuple)` encountered during translation. For each unique pair, the transpiler
   emits compile-time `static_assert` statements verifying that the byte offset of each prefix field in `SourceTuple`
   exactly matches the corresponding field in `TargetTuple`:
   ```c
-  /* Memoized Tuple Coercion Assertions for (QT_Tuple_x_y_z -> QT_Tuple_x_y) */
-  static_assert(offsetof(QT_Tuple_x_y_z, qv_x) == offsetof(QT_Tuple_x_y, qv_x),
-                tuple_cast_offset_match_qv_x);
-  static_assert(offsetof(QT_Tuple_x_y_z, qv_y) == offsetof(QT_Tuple_x_y, qv_y),
-                tuple_cast_offset_match_qv_y);
+  /* Memoized Tuple Coercion Assertions for (QTuple_Int_Real_String -> QTuple_Int_Real) */
+  static_assert(offsetof(QTuple_Int_Real_String, _0) == offsetof(QTuple_Int_Real, _0),
+                tuple_cast_offset_match_0);
+  static_assert(offsetof(QTuple_Int_Real_String, _1) == offsetof(QTuple_Int_Real, _1),
+                tuple_cast_offset_match_1);
   ```
   If field padding or struct alignment ever differs between the two types, compilation fails immediately.
 
@@ -226,13 +226,15 @@ Under Cardelli's structural subtyping with multiple inheritance, field offsets c
 As established in `docs/runtime-design.md`, Quest uses the **Evidence Passing** model:
 
 1. **Concrete Record Payload:**
-   A flat heap-allocated block of 64-bit words containing all fields in declaration order:
+   A flat heap-allocated block of 64-bit words with fields sorted alphabetically by field name and prefixed with
+   `qf_` (ensuring structurally equivalent records share the exact same C struct definition):
    ```c
-   typedef struct QT_Record_x_y_z {
-       QInt  qv_x;
-       QReal qv_y;
-       QBool qv_z;
-   } QT_Record_x_y_z;
+   /* Quest: Record x:Int y:Real z:Bool end */
+   typedef struct QRecord_x_Int_y_Real_z_Bool {
+       QInt  qf_x;
+       QReal qf_y;
+       QBool qf_z;
+   } QRecord_x_Int_y_Real_z_Bool;
    ```
 2. **Evidence Dictionary (`QEvidenceDict`):**
    A static table in `.rodata` containing byte offsets for fields expected by a signature:

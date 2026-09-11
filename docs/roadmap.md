@@ -93,13 +93,21 @@ native **AArch64 (ARM64)** machine code and providing a **JIT compiler** for int
   plan in [step3-interpreter.md](step3-interpreter.md).
 
 ### Step 4: Bootstrap C Transpiler (Python)
-- Multi-pass translation pipeline:
-  1. *Desugaring*: Expand listfix forms, while/for loops, `andif`/`orif`.
-  2. *Closure Conversion*: Explicit environments and function pointers.
-  3. *Data Representation Lowering*: Untagged 64-bit integers, uniform pointer representations, static dictionaries.
-  4. *C99 Code Generation*: Standalone C output linked with Boehm GC (`libgc`).
-  5. *Exception Handling*: Exception lowering for compiled C execution.
-  6. *Module System*: Multi-file include path lookup and separate compilation linking.
+- Multi-pass translation pipeline emitting standard ISO C99 linked with Boehm GC (`libgc`) or libc (`--nogc`):
+  - **Phase 4.1 (Runtime ABI & Core Pipeline):** 64-bit `QVal` representation, `runtime/quest_runtime.h`,
+    `compiler_runner.py` toolchain discovery, and `codegen_c` pipeline integration. — *Complete*
+  - **Phase 4.2a (Top-Level & Recursive Functions):** Direct C calling convention, static hoisting, uncurrying
+    flattening, and mutual recursion. — *Complete*
+  - **Phase 4.2b (Tuples & Concrete Records):** C struct generation, typedef hoisting, heap allocation via
+    `quest_alloc`, named/indexed field selection, and mutable field updates. — *Complete*
+  - **Phase 4.2c (Closures & Function Values):** First-class closures, environment capture, and indirect dispatch.
+  - **Phase 4.3 (Arrays & Strings):** Fixed-size/dynamic arrays and extended string operations.
+  - **Phase 4.4 (Options & Variants):** Ordered options, tagged variants, tag checks, and case discrimination.
+  - **Phase 4.5 (Subtyping & Dynamic Dispatch):** Prefix tuple subtyping and evidence-passing record dictionaries.
+  - **Phase 4.6 (Dynamic Types & Exceptions):** Dynamic type tags, try-except blocks, and panic unwinding.
+  - **Phase 4.7 (Modules & Interfaces):** Multi-file compilation, include paths, and linking.
+- C transpiler architecture in [codegen-c.md](codegen-c.md);
+  C ABI specification in [c-representation.md](c-representation.md).
 
 ### Step 5: Self-Hosted Compiler & Interpreter (Written in Quest)
 - Port the Python implementations of Steps 1–4 into idiomatic Quest.
