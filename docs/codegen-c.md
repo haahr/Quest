@@ -372,22 +372,61 @@ expected C function pointer signature and passes `env` as the first argument:
 
 ---
 
-## 8. Host Compiler Runner (`compiler_runner.py`)
+## 8. Arrays and Strings (Phase 4.3)
+
+### 8.1. Array Representation (`QArray`)
+Arrays are mutable buffers of 64-bit `QVal` words with an explicit length prefix:
+```c
+typedef struct QArray {
+    int64_t length;
+    QVal    data[];
+} QArray;
+
+static_assert(offsetof(QArray, data) == 8, qarray_data_at_offset_8);
+```
+
+### 8.2. Allocation and Construction
+- **Explicit Element Lists (`TypedArray`):**
+  Allocates the structure and populates each element wrapped as a `QVal`:
+  ```c
+  QArray *qv_arr = (QArray *)quest_alloc(sizeof(QArray) + (size_t)(4LL) * sizeof(QVal));
+  qv_arr->length = 4LL;
+  qv_arr->data[0LL] = ((QVal){ .i = (int64_t)(10LL) });
+  ...
+  ```
+- **Repetition (`TypedArrayRep`):**
+  Invokes `quest_array_new(length, init_val)` which verifies $N \ge 0$ and initializes all elements.
+
+### 8.3. Indexing and Mutation
+Array indexing (`a[i]`) and mutation (`a[i] := v`) emit inline bounds checking followed by direct access into `data[]`:
+```c
+quest_check_array_bounds(qv_arr, qv_i);
+QInt elem = qv_arr->data[qv_i].i;
+
+quest_check_array_bounds(qv_arr, qv_i);
+qv_arr->data[qv_i] = ((QVal){ .i = (int64_t)(99LL) });
+```
+Out-of-bounds indices and negative sizes trigger `quest_raise_array_error()`, printing `Exception: arrayOp.error\n`
+and terminating with exit code 1.
+
+---
+
+## 9. Host Compiler Runner (`compiler_runner.py`)
 
 The compiler runner manages external C compiler toolchain discovery, Boehm GC flags, and native executable generation:
 
-### 8.1. Compiler Discovery
+### 9.1. Compiler Discovery
 `find_c_compiler()` searches `PATH` in order:
 1. `clang` (preferred on macOS/Linux for optimal diagnostic output and C99 statement expression support).
 2. `gcc` (fallback).
 
-### 8.2. Boehm GC Auto-Detection & `--nogc`
+### 9.2. Boehm GC Auto-Detection & `--nogc`
 `detect_gc_flags(nogc: bool)` locates the Boehm Garbage Collector:
 - Standard paths checked: `/opt/homebrew/opt/bdw-gc` (Apple Silicon), `/usr/local/opt/bdw-gc` (Intel macOS), `/usr`.
 - If found: passes `-I<prefix>/include -L<prefix>/lib -lgc`.
 - If not found or when `--nogc` flag is specified: passes `-DQUEST_NOGC`, using standard libc `calloc`/`malloc`.
 
-### 8.3. Compilation Invocation
+### 9.3. Compilation Invocation
 `compile_c_source(c_source, output_path, nogc)`:
 1. Writes emitted C source to a temporary file (`.c`).
 2. Constructs compilation command:
@@ -401,7 +440,7 @@ The compiler runner manages external C compiler toolchain discovery, Boehm GC fl
 
 ---
 
-## 9. Testing & Verification
+## 10. Testing & Verification
 
 The C code generator is verified by comprehensive unit and integration tests:
 - `tests/python/test_phase4_1_c_codegen.py`: Scalar operations, control flow, memory modes, and runtime panic tests.
@@ -411,6 +450,8 @@ The C code generator is verified by comprehensive unit and integration tests:
   named/indexed field selection, mutable field assignment, and nested aggregates.
 - `tests/python/test_phase4_2c_closures.py`: First-class function values, trampolines, capturing closures,
   multi-level nested closures, and `--nogc` execution.
+- `tests/python/test_phase4_3_arrays.py`: Mutable arrays, repetition, indexing, element mutation, Real/String elements,
+  out-of-bounds error handling, and `--nogc` execution.
 - `tests/source/01_lexer_basics.quest`: Verified end-to-end native compilation and execution of tuple operations.
 - `tests/source/02_expressions_control_flow.quest`: Verified end-to-end native compilation and execution.
 - `tests/source/03_functions_closures.quest`: Verified end-to-end native compilation and execution of closures.

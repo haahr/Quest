@@ -542,11 +542,22 @@ runtime/
   - `QString *quest_string_new(const char *data, size_t len)`: Allocates `QString` with trailing null byte.
   - `QString *quest_string_concat(const QString *s1, const QString *s2)`: Implements Quest `<>` string concatenation.
   - `bool quest_string_equal(const QString *s1, const QString *s2)`: Compares string length and characters.
+  - `QChar quest_string_get_char(const QString *s, int64_t idx)`: Retrieves character at 0-based index.
+  - `void quest_string_set_char(QString *s, int64_t idx, QChar ch)`: Mutates character at 0-based index.
+  - `QString *quest_string_get_sub(const QString *s, int64_t start, int64_t len)`: Extracts substring slice.
+  - `void quest_string_set_sub(QString *dest, int64_t d_start, const QString *src, int64_t s_start, int64_t len)`: Overwrites slice.
+- **Array Primitives:**
+  - `QArray *quest_array_new(int64_t len, QVal init_val)`: Allocates length-prefixed array with initial element values.
+  - `void quest_check_array_bounds(const QArray *a, int64_t idx)`: Inline guard checking `idx >= 0 && idx < a->length`.
 - **Floating-Point Math:**
   - `double quest_real_pow(double base, double exp)`: Implements Quest `^^` real exponentiation via `pow()`.
 - **Runtime Panic / Exception Handlers:**
   - `void quest_raise_divide_by_zero(void)`: Triggered on division or modulo by zero. Prints
     `Exception: DivideByZero\n` to `stderr` and terminates the process with exit code 1.
+  - `void quest_raise_array_error(void)`: Triggered on out-of-bounds array access or negative array sizes. Prints
+    `Exception: arrayOp.error\n` to `stderr` and terminates the process with exit code 1.
+  - `void quest_raise_string_error(void)`: Triggered on out-of-bounds string index or slice bounds. Prints
+    `Exception: string.error\n` to `stderr` and terminates the process with exit code 1.
 - **Debug & Value Printing:**
   - `void quest_print_val(QVal val, const char *type_name)`: Formats and prints interactive expression results
     matching Cardelli's typescript format (e.g., `42 : Int`, `15.75 : Real`, `true : Bool`, `"hello" : String`).

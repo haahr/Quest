@@ -47,6 +47,50 @@ bool quest_string_equal(const QString *s1, const QString *s2) {
     return memcmp(s1->data, s2->data, (size_t)s1->length) == 0;
 }
 
+QChar quest_string_get_char(const QString *s, int64_t idx) {
+    if (s == NULL || idx < 0 || idx >= s->length) {
+        quest_raise_string_error();
+    }
+    return s->data[idx];
+}
+
+void quest_string_set_char(QString *s, int64_t idx, QChar ch) {
+    if (s == NULL || idx < 0 || idx >= s->length) {
+        quest_raise_string_error();
+    }
+    s->data[idx] = ch;
+}
+
+QString *quest_string_get_sub(const QString *s, int64_t start, int64_t len) {
+    if (s == NULL || start < 0 || len < 0 || start + len > s->length) {
+        quest_raise_string_error();
+    }
+    return quest_string_new(s->data + start, len);
+}
+
+void quest_string_set_sub(QString *dest, int64_t dest_start, const QString *src, int64_t src_start, int64_t len) {
+    if (dest == NULL || src == NULL || len < 0 ||
+        dest_start < 0 || dest_start + len > dest->length ||
+        src_start < 0 || src_start + len > src->length) {
+        quest_raise_string_error();
+    }
+    if (len > 0) {
+        memmove(dest->data + dest_start, src->data + src_start, (size_t)len);
+    }
+}
+
+QArray *quest_array_new(int64_t len, QVal init_val) {
+    if (len < 0) {
+        quest_raise_array_error();
+    }
+    QArray *arr = (QArray *)quest_alloc(sizeof(QArray) + (size_t)len * sizeof(QVal));
+    arr->length = len;
+    for (int64_t i = 0; i < len; ++i) {
+        arr->data[i] = init_val;
+    }
+    return arr;
+}
+
 double quest_real_pow(double base, double exp) {
     if (base == 0.0 && exp <= 0.0) {
         quest_raise_divide_by_zero();
@@ -56,6 +100,16 @@ double quest_real_pow(double base, double exp) {
 
 void quest_raise_divide_by_zero(void) {
     fprintf(stderr, "Exception: DivideByZero\n");
+    exit(1);
+}
+
+void quest_raise_array_error(void) {
+    fprintf(stderr, "Exception: arrayOp.error\n");
+    exit(1);
+}
+
+void quest_raise_string_error(void) {
+    fprintf(stderr, "Exception: string.error\n");
     exit(1);
 }
 

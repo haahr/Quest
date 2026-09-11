@@ -9,6 +9,7 @@ from quest.types import (
     OK_TYPE,
     REAL_TYPE,
     STRING_TYPE,
+    QArrayType,
     QFunType,
     QRecordField,
     QRecordType,
@@ -47,6 +48,8 @@ def type_to_c_tag(t: QType) -> str:
         return "QRecord_" + ("_".join(tags) if tags else "empty")
     if isinstance(t, QFunType):
         return "QClosure"
+    if isinstance(t, QArrayType):
+        return "QArray"
     return "QVal"
 
 
@@ -80,6 +83,8 @@ def qtype_to_c_type(t: QType) -> str:
         return f"{record_struct_name(t)} *"
     if isinstance(t, QFunType):
         return "QClosure *"
+    if isinstance(t, QArrayType):
+        return "QArray *"
     return "QVal"
 
 

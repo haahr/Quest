@@ -14,6 +14,8 @@ from quest.codegen.c_types import (
 )
 from quest.typed_ast import (
     TypedApp,
+    TypedArray,
+    TypedArrayRep,
     TypedAssign,
     TypedBinding,
     TypedBlock,
@@ -26,6 +28,8 @@ from quest.typed_ast import (
     TypedFor,
     TypedFun,
     TypedIf,
+    TypedIndex,
+    TypedIndexAssign,
     TypedInfix,
     TypedInt,
     TypedLetType,
@@ -54,6 +58,7 @@ from quest.types import (
     OK_TYPE,
     REAL_TYPE,
     STRING_TYPE,
+    QArrayType,
     QFunType,
     QRecordField,
     QRecordType,
@@ -124,7 +129,7 @@ def _qval_wrap(expr_str: str, t: QType) -> str:
         return f"((QVal){{ .i = (int64_t)({expr_str}) }})"
     if t == REAL_TYPE:
         return f"((QVal){{ .r = (double)({expr_str}) }})"
-    if t == STRING_TYPE or isinstance(t, (QTupleType, QRecordType, QFunType)):
+    if t == STRING_TYPE or isinstance(t, (QTupleType, QRecordType, QFunType, QArrayType)):
         return f"((QVal){{ .p = (void *)({expr_str}) }})"
     return f"((QVal){{ .u = 0 }})"
 
@@ -772,6 +777,37 @@ class CEmitter:
                         return "((void)0)"
                     return call_str
 
+            case TypedArray() | TypedArrayRep():
+                tmp = self.fresh_tmp("_arr")
+                c_type = qtype_to_c_type(expr.type_val)
+                lines.append(f"{c_type} {tmp};")
+                self.emit_to(expr, tmp, lines)
+                return tmp
+
+            case TypedIndex(target=tgt, index=idx):
+                c_tgt = self.emit_val(tgt, lines)
+                c_idx = self.emit_val(idx, lines)
+                lines.append(f"quest_check_array_bounds({c_tgt}, {c_idx});")
+                elem_t = expr.type_val
+                if elem_t == INT_TYPE or elem_t == BOOL_TYPE or elem_t == CHAR_TYPE:
+                    return f"({c_tgt}->data[{c_idx}].i)"
+                elif elem_t == REAL_TYPE:
+                    return f"({c_tgt}->data[{c_idx}].r)"
+                elif elem_t == STRING_TYPE or isinstance(elem_t, (QTupleType, QRecordType, QFunType, QArrayType)):
+                    c_elem_t = qtype_to_c_type(elem_t)
+                    return f"(({c_elem_t})({c_tgt}->data[{c_idx}].p))"
+                else:
+                    return f"({c_tgt}->data[{c_idx}])"
+
+            case TypedIndexAssign(target=tgt, index=idx, value=val):
+                c_tgt = self.emit_val(tgt, lines)
+                c_idx = self.emit_val(idx, lines)
+                lines.append(f"quest_check_array_bounds({c_tgt}, {c_idx});")
+                c_val = self.emit_val(val, lines)
+                wrap = _qval_wrap(c_val, val.type_val)
+                lines.append(f"{c_tgt}->data[{c_idx}] = {wrap};")
+                return "((void)0)"
+
             case TypedExit():
                 lines.append("break;")
                 return "((void)0)"
@@ -788,7 +824,7 @@ class CEmitter:
 
             case _:
                 raise NotImplementedError(
-                    f"C code generation for {expr.__class__.__name__} not implemented in Phase 4.2b/c"
+                    f"C code generation for {expr.__class__.__name__} not implemented in Phase 4.3"
                 )
 
     def emit_to(self, expr: TypedExpr, dest: Optional[str], lines: list[str]) -> None:
@@ -920,6 +956,31 @@ class CEmitter:
                     lines.append(f"{target_dest} = (QClosure *)quest_alloc(sizeof(QClosure));")
                     lines.append(f"{target_dest}->fn = (void *){linfo.c_fn_name};")
                     lines.append(f"{target_dest}->env = (void *){env_tmp};")
+
+            case TypedArray(elements=elems, type_val=t):
+                target_dest = dest
+                if target_dest is None:
+                    target_dest = self.fresh_tmp("_arr")
+                    lines.append(f"QArray *{target_dest};")
+                n = len(elems)
+                lines.append(
+                    f"{target_dest} = (QArray *)quest_alloc(sizeof(QArray) + (size_t)({n}LL) * sizeof(QVal));"
+                )
+                lines.append(f"{target_dest}->length = {n}LL;")
+                for i, elem in enumerate(elems):
+                    c_elem = self.emit_val(elem, lines)
+                    wrap = _qval_wrap(c_elem, elem.type_val)
+                    lines.append(f"{target_dest}->data[{i}LL] = {wrap};")
+
+            case TypedArrayRep(count=cnt, init_val=init_v, type_val=t):
+                c_cnt = self.emit_val(cnt, lines)
+                c_init = self.emit_val(init_v, lines)
+                wrap = _qval_wrap(c_init, init_v.type_val)
+                target_dest = dest
+                if target_dest is None:
+                    target_dest = self.fresh_tmp("_arr")
+                    lines.append(f"QArray *{target_dest};")
+                lines.append(f"{target_dest} = quest_array_new({c_cnt}, {wrap});")
 
             case _:
                 val = self.emit_val(expr, lines)

@@ -52,6 +52,12 @@ typedef struct QClosure {
     void *env;  /* Captured environment pointer or NULL */
 } QClosure;
 
+/* Array representation: length-prefixed buffer of 64-bit QVal words */
+typedef struct QArray {
+    int64_t length;
+    QVal    data[];
+} QArray;
+
 /* Static ABI layout assertions */
 static_assert(sizeof(QInt)     == 8, qint_must_be_8_bytes);
 static_assert(sizeof(QReal)    == 8, qreal_must_be_8_bytes);
@@ -61,6 +67,7 @@ static_assert(sizeof(uint64_t) == 8, u64_must_be_8_bytes);
 static_assert(sizeof(QString)  == 24, qstring_must_be_24_bytes);
 static_assert(sizeof(QClosure) == 16, qclosure_must_be_16_bytes);
 static_assert(offsetof(QClosure, env) == 8, qclosure_env_at_offset_8);
+static_assert(offsetof(QArray, data)  == 8, qarray_data_at_offset_8);
 
 /* Value constants */
 #define Q_OK_VAL    ((QVal){ .u = 0 })
@@ -83,9 +90,23 @@ static inline void  quest_gc_init(void)           { GC_INIT(); }
 QString *quest_string_new(const char *src, int64_t len);
 QString *quest_string_concat(const QString *s1, const QString *s2);
 bool     quest_string_equal(const QString *s1, const QString *s2);
+QChar    quest_string_get_char(const QString *s, int64_t idx);
+void     quest_string_set_char(QString *s, int64_t idx, QChar ch);
+QString *quest_string_get_sub(const QString *s, int64_t start, int64_t len);
+void     quest_string_set_sub(QString *dest, int64_t dest_start, const QString *src, int64_t src_start, int64_t len);
+
+QArray  *quest_array_new(int64_t len, QVal init_val);
 double   quest_real_pow(double base, double exp);
 void     quest_raise_divide_by_zero(void);
+void     quest_raise_array_error(void);
+void     quest_raise_string_error(void);
 void     quest_print_val(QVal val, const char *type_name);
+
+static inline void quest_check_array_bounds(const QArray *a, int64_t idx) {
+    if (a == NULL || idx < 0 || idx >= a->length) {
+        quest_raise_array_error();
+    }
+}
 
 static inline QInt quest_int_div(QInt a, QInt b) {
     if (b == 0) {
