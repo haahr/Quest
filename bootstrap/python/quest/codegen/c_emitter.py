@@ -82,6 +82,12 @@ def _c_char_literal(ch: str) -> str:
     return f"'\\x{ord(ch):02x}'"
 
 
+def _indent(text: str, spaces: int = 4) -> str:
+    """Indents non-empty lines of text by the given number of spaces."""
+    pad = " " * spaces
+    return "\n".join(pad + line if line.strip() else line for line in text.split("\n"))
+
+
 def _qval_wrap(expr_str: str, t: QType) -> str:
     """Wraps a scalar expression into a QVal union initializer."""
     if t == INT_TYPE or t == BOOL_TYPE or t == CHAR_TYPE:
@@ -186,10 +192,12 @@ class CEmitter:
             c_body = self.emit_expr(body)
             lines.append(f"static {ret_c} {c_name}({param_sig}) {{")
             if ret_type == OK_TYPE:
-                lines.append(f"    {c_body};")
+                for b_line in f"{c_body};".split("\n"):
+                    lines.append(f"    {b_line}" if b_line.strip() else b_line)
                 lines.append("    return;")
             else:
-                lines.append(f"    return {c_body};")
+                for b_line in f"return {c_body};".split("\n"):
+                    lines.append(f"    {b_line}" if b_line.strip() else b_line)
             lines.append("}")
             lines.append("")
 
@@ -227,9 +235,11 @@ class CEmitter:
                 c_ident = mangle_ident(name)
                 val_c = self.emit_expr(val)
                 if symbol.type_val == OK_TYPE:
-                    lines.append(f"    {val_c};")
+                    stmt = f"{val_c};"
                 else:
-                    lines.append(f"    {c_ident} = {val_c};")
+                    stmt = f"{c_ident} = {val_c};"
+                for s_line in stmt.split("\n"):
+                    lines.append(f"    {s_line}" if s_line.strip() else s_line)
                 if self.echo:
                     wrap = _qval_wrap(c_ident, symbol.type_val)
                     type_str = _c_string_literal(qtype_to_name_str(symbol.type_val))
@@ -249,12 +259,14 @@ class CEmitter:
         expr_c = self.emit_expr(expr)
         expr_type = expr.type_val
         if expr_type == OK_TYPE:
-            lines.append(f"    {expr_c};")
+            for s_line in f"{expr_c};".split("\n"):
+                lines.append(f"    {s_line}" if s_line.strip() else s_line)
             return
 
         c_type = qtype_to_c_type(expr_type)
         tmp = self.fresh_tmp("_res")
-        lines.append(f"    {c_type} {tmp} = {expr_c};")
+        for s_line in f"{c_type} {tmp} = {expr_c};".split("\n"):
+            lines.append(f"    {s_line}" if s_line.strip() else s_line)
         if self.echo or is_last:
             wrap = _qval_wrap(tmp, expr_type)
             type_str = _c_string_literal(qtype_to_name_str(expr_type))
@@ -308,16 +320,36 @@ class CEmitter:
                 if t == OK_TYPE:
                     if else_b is not None:
                         c_else = self.emit_expr(else_b)
-                        return f"({{ if ({c_cond}) {{ {c_then}; }} else {{ {c_else}; }} ((void)0); }})"
-                    return f"({{ if ({c_cond}) {{ {c_then}; }} ((void)0); }})"
+                        inner = (
+                            f"if ({c_cond}) {{\n"
+                            f"{_indent(c_then + ';')}\n"
+                            f"}} else {{\n"
+                            f"{_indent(c_else + ';')}\n"
+                            f"}}\n"
+                            f"((void)0);"
+                        )
+                    else:
+                        inner = (
+                            f"if ({c_cond}) {{\n"
+                            f"{_indent(c_then + ';')}\n"
+                            f"}}\n"
+                            f"((void)0);"
+                        )
+                    return f"({{\n{_indent(inner)}\n}})"
                 else:
                     c_else = self.emit_expr(else_b)
                     tmp = self.fresh_tmp("_if_res")
                     c_type = qtype_to_c_type(t)
-                    return (
-                        f"({{ {c_type} {tmp}; if ({c_cond}) {{ {tmp} = {c_then}; }} "
-                        f"else {{ {tmp} = {c_else}; }} {tmp}; }})"
+                    inner = (
+                        f"{c_type} {tmp};\n"
+                        f"if ({c_cond}) {{\n"
+                        f"{_indent(f'{tmp} = {c_then};')}\n"
+                        f"}} else {{\n"
+                        f"{_indent(f'{tmp} = {c_else};')}\n"
+                        f"}}\n"
+                        f"{tmp};"
                     )
+                    return f"({{\n{_indent(inner)}\n}})"
 
             case TypedBlock(bindings=bindings, result=result):
                 return self._emit_block(bindings, result)
@@ -325,11 +357,23 @@ class CEmitter:
             case TypedWhile(cond=cond, body=body):
                 c_cond = self.emit_expr(cond)
                 c_body = self.emit_expr(body)
-                return f"({{ while ({c_cond}) {{ {c_body}; }} ((void)0); }})"
+                inner = (
+                    f"while ({c_cond}) {{\n"
+                    f"{_indent(c_body + ';')}\n"
+                    f"}}\n"
+                    f"((void)0);"
+                )
+                return f"({{\n{_indent(inner)}\n}})"
 
             case TypedLoop(body=body):
                 c_body = self.emit_expr(body)
-                return f"({{ while (1) {{ {c_body}; }} ((void)0); }})"
+                inner = (
+                    f"while (1) {{\n"
+                    f"{_indent(c_body + ';')}\n"
+                    f"}}\n"
+                    f"((void)0);"
+                )
+                return f"({{\n{_indent(inner)}\n}})"
 
             case TypedFor(start=start, stop=stop, body=body, is_downto=is_downto, var_name=var_name):
                 c_start = self.emit_expr(start)
@@ -339,12 +383,14 @@ class CEmitter:
                 stop_tmp = self.fresh_tmp("_stop")
                 cmp_op = ">=" if is_downto else "<="
                 step_op = "--" if is_downto else "++"
-                return (
-                    f"({{ QInt {stop_tmp} = {c_stop}; "
-                    f"for (QInt {v} = {c_start}; {v} {cmp_op} {stop_tmp}; {v}{step_op}) {{ "
-                    f"{c_body}; "
-                    f"}} ((void)0); }})"
+                inner = (
+                    f"QInt {stop_tmp} = {c_stop};\n"
+                    f"for (QInt {v} = {c_start}; {v} {cmp_op} {stop_tmp}; {v}{step_op}) {{\n"
+                    f"{_indent(c_body + ';')}\n"
+                    f"}}\n"
+                    f"((void)0);"
                 )
+                return f"({{\n{_indent(inner)}\n}})"
 
             case TypedExit():
                 return "break"
@@ -417,5 +463,5 @@ class CEmitter:
                     pass
         res_c = self.emit_expr(result)
         stmts.append(res_c + ";")
-        body = " ".join(stmts)
-        return f"({{ {body} }})"
+        inner = "\n".join(stmts)
+        return f"({{\n{_indent(inner)}\n}})"
