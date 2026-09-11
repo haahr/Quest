@@ -235,6 +235,7 @@ class CEmitter:
                 c_ident = mangle_ident(name)
                 val_c = self.emit_expr(val)
                 if symbol.type_val == OK_TYPE:
+                    lines.append(f"    // inlined {name}")
                     stmt = f"{val_c};"
                 else:
                     stmt = f"{c_ident} = {val_c};"
