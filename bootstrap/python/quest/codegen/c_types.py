@@ -11,11 +11,15 @@ from quest.types import (
     STRING_TYPE,
     QArrayType,
     QFunType,
+    QOptionField,
+    QOptionType,
     QRecordField,
     QRecordType,
     QTupleField,
     QTupleType,
     QType,
+    QVariantField,
+    QVariantType,
 )
 
 
@@ -50,6 +54,16 @@ def type_to_c_tag(t: QType) -> str:
         return "QClosure"
     if isinstance(t, QArrayType):
         return "QArray"
+    if isinstance(t, QVariantType):
+        return "QVariant"
+    if isinstance(t, QOptionType):
+        tags = []
+        for o in t.options:
+            if o.payload_type:
+                tags.append(f"{o.name}_{type_to_c_tag(o.payload_type)}")
+            else:
+                tags.append(o.name)
+        return "QOption_" + ("_".join(tags) if tags else "empty")
     return "QVal"
 
 
@@ -60,6 +74,11 @@ def tuple_struct_name(t: QTupleType) -> str:
 
 def record_struct_name(t: QRecordType) -> str:
     """Returns the C struct tag name for a given QRecordType."""
+    return type_to_c_tag(t)
+
+
+def option_struct_name(t: QOptionType) -> str:
+    """Returns the C struct tag name for a given QOptionType."""
     return type_to_c_tag(t)
 
 
@@ -85,6 +104,10 @@ def qtype_to_c_type(t: QType) -> str:
         return "QClosure *"
     if isinstance(t, QArrayType):
         return "QArray *"
+    if isinstance(t, QVariantType):
+        return "QVariant *"
+    if isinstance(t, QOptionType):
+        return f"{option_struct_name(t)} *"
     return "QVal"
 
 

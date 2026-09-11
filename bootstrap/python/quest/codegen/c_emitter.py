@@ -7,6 +7,7 @@ from typing import Any, Optional
 
 from quest.codegen.c_types import (
     mangle_ident,
+    option_struct_name,
     qtype_to_c_type,
     qtype_to_name_str,
     record_struct_name,
@@ -20,6 +21,8 @@ from quest.typed_ast import (
     TypedBinding,
     TypedBlock,
     TypedBool,
+    TypedCase,
+    TypedCaseBranch,
     TypedChar,
     TypedDerefCell,
     TypedExit,
@@ -37,6 +40,7 @@ from quest.typed_ast import (
     TypedLoop,
     TypedNode,
     TypedOk,
+    TypedOption,
     TypedParam,
     TypedProgram,
     TypedReal,
@@ -49,6 +53,9 @@ from quest.typed_ast import (
     TypedTypeWitness,
     TypedVar,
     TypedVarCell,
+    TypedVariant,
+    TypedVariantAssert,
+    TypedVariantCheck,
     TypedWhile,
 )
 from quest.types import (
@@ -60,11 +67,13 @@ from quest.types import (
     STRING_TYPE,
     QArrayType,
     QFunType,
+    QOptionType,
     QRecordField,
     QRecordType,
     QTupleField,
     QTupleType,
     QType,
+    QVariantType,
 )
 
 
@@ -129,7 +138,7 @@ def _qval_wrap(expr_str: str, t: QType) -> str:
         return f"((QVal){{ .i = (int64_t)({expr_str}) }})"
     if t == REAL_TYPE:
         return f"((QVal){{ .r = (double)({expr_str}) }})"
-    if t == STRING_TYPE or isinstance(t, (QTupleType, QRecordType, QFunType, QArrayType)):
+    if t == STRING_TYPE or isinstance(t, (QTupleType, QRecordType, QFunType, QArrayType, QVariantType, QOptionType)):
         return f"((QVal){{ .p = (void *)({expr_str}) }})"
     return f"((QVal){{ .u = 0 }})"
 
@@ -244,6 +253,14 @@ def _collect_aggregate_types(prog: TypedProgram) -> list[tuple[str, QType]]:
             for f in t.fields:
                 visit_type(f.type_val)
             name = record_struct_name(t)
+            if name not in visited_names:
+                visited_names.add(name)
+                result.append((name, t))
+        elif isinstance(t, QOptionType):
+            for o in t.options:
+                if o.payload_type:
+                    visit_type(o.payload_type)
+            name = option_struct_name(t)
             if name not in visited_names:
                 visited_names.add(name)
                 result.append((name, t))
@@ -419,6 +436,30 @@ class CEmitter:
                         for f in sorted(t.fields, key=lambda fld: fld.name):
                             c_type = qtype_to_c_type(f.type_val)
                             lines.append(f"    {c_type} qf_{f.name};")
+                elif isinstance(t, QOptionType):
+                    lines.append("    int64_t tag;")
+                    payload_branches = [o for o in t.options if o.payload_type is not None]
+                    if payload_branches:
+                        lines.append("    union {")
+                        for o in payload_branches:
+                            pt = o.payload_type
+                            if isinstance(pt, QTupleType):
+                                lines.append(f"        struct {tag_name}_{o.name}_payload {{")
+                                for i, f in enumerate(pt.value_fields):
+                                    c_f_type = qtype_to_c_type(f.type_val)
+                                    f_ident = f"_{i}" if not f.name else f"_{i}"
+                                    lines.append(f"            {c_f_type} {f_ident};")
+                                lines.append(f"        }} {o.name};")
+                            elif isinstance(pt, QRecordType):
+                                lines.append(f"        struct {tag_name}_{o.name}_payload {{")
+                                for f in sorted(pt.fields, key=lambda fld: fld.name):
+                                    c_f_type = qtype_to_c_type(f.type_val)
+                                    lines.append(f"            {c_f_type} qf_{f.name};")
+                                lines.append(f"        }} {o.name};")
+                            else:
+                                c_pt = qtype_to_c_type(pt)
+                                lines.append(f"        struct {{ {c_pt} val; }} {o.name};")
+                        lines.append("    } u;")
                 lines.append("};")
                 lines.append("")
 
@@ -703,8 +744,87 @@ class CEmitter:
                 self.emit_to(val, c_tgt, lines)
                 return "((void)0)"
 
-            case TypedTuple() | TypedRecord():
+            case TypedTuple() | TypedRecord() | TypedVariant() | TypedOption():
                 tmp = self.fresh_tmp("_alloc")
+                c_type = qtype_to_c_type(expr.type_val)
+                lines.append(f"{c_type} {tmp};")
+                self.emit_to(expr, tmp, lines)
+                return tmp
+
+            case TypedVariantCheck(target=tgt, tag=tag):
+                c_tgt = self.emit_val(tgt, lines)
+                if isinstance(tgt.type_val, QOptionType):
+                    tag_idx = 0
+                    for i, opt in enumerate(tgt.type_val.options):
+                        if opt.name == tag:
+                            tag_idx = i
+                            break
+                    return f"({c_tgt}->tag == {tag_idx}LL)"
+                elif isinstance(tgt.type_val, QVariantType):
+                    tag_idx = 0
+                    for i, v in enumerate(tgt.type_val.variants):
+                        if v.name == tag:
+                            tag_idx = i
+                            break
+                    return f"({c_tgt}->tag == {tag_idx}LL)"
+                else:
+                    return f"({c_tgt}->tag == 0LL)"
+
+            case TypedVariantAssert(target=tgt, tag=tag):
+                c_tgt = self.emit_val(tgt, lines)
+                if isinstance(tgt.type_val, QOptionType):
+                    tag_idx = 0
+                    opt_field = None
+                    for i, opt in enumerate(tgt.type_val.options):
+                        if opt.name == tag:
+                            tag_idx = i
+                            opt_field = opt
+                            break
+                    lines.append(f"if ({c_tgt}->tag != {tag_idx}LL) quest_raise_variant_error();")
+                    tup_type = expr.type_val
+                    tup_struct = tuple_struct_name(tup_type)
+                    res_tmp = self.fresh_tmp("_unpacked_opt")
+                    lines.append(f"{tup_struct} *{res_tmp} = ({tup_struct} *)quest_alloc(sizeof({tup_struct}));")
+                    lines.append(f"{res_tmp}->_0 = {c_tgt}->tag;")
+                    if opt_field and opt_field.payload_type:
+                        pt = opt_field.payload_type
+                        if isinstance(pt, QTupleType):
+                            for i, f in enumerate(pt.value_fields):
+                                lines.append(f"{res_tmp}->_{i + 1} = {c_tgt}->u.{tag}._{i};")
+                        elif isinstance(pt, QRecordType):
+                            for i, f in enumerate(sorted(pt.fields, key=lambda fld: fld.name)):
+                                lines.append(f"{res_tmp}->_{i + 1} = {c_tgt}->u.{tag}.qf_{f.name};")
+                        else:
+                            lines.append(f"{res_tmp}->_1 = {c_tgt}->u.{tag}.val;")
+                    return res_tmp
+                elif isinstance(tgt.type_val, QVariantType):
+                    tag_idx = 0
+                    for i, v in enumerate(tgt.type_val.variants):
+                        if v.name == tag:
+                            tag_idx = i
+                            break
+                    lines.append(f"if ({c_tgt}->tag != {tag_idx}LL) quest_raise_variant_error();")
+                    elem_t = expr.type_val
+                    if elem_t == INT_TYPE or elem_t == BOOL_TYPE or elem_t == CHAR_TYPE:
+                        return f"({c_tgt}->payload.i)"
+                    elif elem_t == REAL_TYPE:
+                        return f"({c_tgt}->payload.r)"
+                    elif elem_t == STRING_TYPE or isinstance(elem_t, (QTupleType, QRecordType, QFunType, QArrayType, QVariantType, QOptionType)):
+                        c_elem_t = qtype_to_c_type(elem_t)
+                        return f"(({c_elem_t})({c_tgt}->payload.p))"
+                    elif elem_t == OK_TYPE:
+                        return "((void)0)"
+                    else:
+                        return f"({c_tgt}->payload)"
+                else:
+                    lines.append(f"quest_raise_variant_error();")
+                    return "((void)0)"
+
+            case TypedCase():
+                if expr.type_val == OK_TYPE:
+                    self.emit_to(expr, None, lines)
+                    return "((void)0)"
+                tmp = self.fresh_tmp("_case_res")
                 c_type = qtype_to_c_type(expr.type_val)
                 lines.append(f"{c_type} {tmp};")
                 self.emit_to(expr, tmp, lines)
@@ -981,6 +1101,131 @@ class CEmitter:
                     target_dest = self.fresh_tmp("_arr")
                     lines.append(f"QArray *{target_dest};")
                 lines.append(f"{target_dest} = quest_array_new({c_cnt}, {wrap});")
+
+            case TypedVariant(tag=tag, payload=payload, type_val=t):
+                target_dest = dest
+                if target_dest is None:
+                    target_dest = self.fresh_tmp("_var")
+                    lines.append(f"QVariant *{target_dest};")
+                lines.append(f"{target_dest} = (QVariant *)quest_alloc(sizeof(QVariant));")
+                tag_idx = 0
+                for i, v in enumerate(t.variants):
+                    if v.name == tag:
+                        tag_idx = i
+                        break
+                lines.append(f"{target_dest}->tag = {tag_idx}LL;")
+                if payload is not None:
+                    c_payload = self.emit_val(payload, lines)
+                    wrap = _qval_wrap(c_payload, payload.type_val)
+                    lines.append(f"{target_dest}->payload = {wrap};")
+                else:
+                    lines.append(f"{target_dest}->payload = Q_OK_VAL;")
+
+            case TypedOption(tag=tag, payload=payload, ordinal=ordinal, ordinal_expr=ordinal_expr, type_val=t):
+                target_dest = dest
+                s_name = option_struct_name(t)
+                if target_dest is None:
+                    target_dest = self.fresh_tmp("_opt")
+                    lines.append(f"{s_name} *{target_dest};")
+                lines.append(f"{target_dest} = ({s_name} *)quest_alloc(sizeof({s_name}));")
+                if ordinal_expr is not None:
+                    c_ord = self.emit_val(ordinal_expr, lines)
+                    lines.append(f"{target_dest}->tag = {c_ord};")
+                else:
+                    tag_idx = 0
+                    if tag is not None:
+                        for i, opt in enumerate(t.options):
+                            if opt.name == tag:
+                                tag_idx = i
+                                break
+                    else:
+                        tag_idx = ordinal
+                    lines.append(f"{target_dest}->tag = {tag_idx}LL;")
+
+                if payload is not None and tag is not None:
+                    opt_field = t.get_option(tag)
+                    if opt_field and opt_field.payload_type:
+                        pt = opt_field.payload_type
+                        if isinstance(pt, QTupleType) and isinstance(payload, TypedTuple):
+                            for i, elem in enumerate(payload.elements):
+                                c_elem = self.emit_val(elem, lines)
+                                lines.append(f"{target_dest}->u.{tag}._{i} = {c_elem};")
+                        elif isinstance(pt, QRecordType) and isinstance(payload, TypedRecord):
+                            for f in payload.fields:
+                                c_f = self.emit_val(f.value, lines)
+                                lines.append(f"{target_dest}->u.{tag}.qf_{f.name} = {c_f};")
+                        else:
+                            c_p = self.emit_val(payload, lines)
+                            lines.append(f"{target_dest}->u.{tag}.val = {c_p};")
+
+            case TypedCase(target=tgt, branches=branches, else_branch=else_b, type_val=t):
+                c_tgt = self.emit_val(tgt, lines)
+                target_type = tgt.type_val
+                lines.append(f"switch ({c_tgt}->tag) {{")
+                for branch in branches:
+                    for tag in branch.tags:
+                        tag_idx = 0
+                        opt_or_var_field = None
+                        if isinstance(target_type, QOptionType):
+                            for i, opt in enumerate(target_type.options):
+                                if opt.name == tag:
+                                    tag_idx = i
+                                    opt_or_var_field = opt
+                                    break
+                        elif isinstance(target_type, QVariantType):
+                            for i, v in enumerate(target_type.variants):
+                                if v.name == tag:
+                                    tag_idx = i
+                                    opt_or_var_field = v
+                                    break
+                        lines.append(f"    case {tag_idx}LL:")
+                    lines.append("    {")
+                    branch_lines: list[str] = []
+                    if branch.binder is not None:
+                        b_name = mangle_ident(branch.binder.name)
+                        b_type = branch.binder.type_val
+                        c_b_type = qtype_to_c_type(b_type)
+                        branch_lines.append(f"{c_b_type} {b_name};")
+                        if isinstance(target_type, QOptionType):
+                            if isinstance(b_type, QTupleType):
+                                s_tup = tuple_struct_name(b_type)
+                                branch_lines.append(f"{b_name} = ({s_tup} *)quest_alloc(sizeof({s_tup}));")
+                                for i, f in enumerate(b_type.value_fields):
+                                    branch_lines.append(f"{b_name}->_{i} = {c_tgt}->u.{branch.tags[0]}._{i};")
+                            elif isinstance(b_type, QRecordType):
+                                s_rec = record_struct_name(b_type)
+                                branch_lines.append(f"{b_name} = ({s_rec} *)quest_alloc(sizeof({s_rec}));")
+                                for f in sorted(b_type.fields, key=lambda fld: fld.name):
+                                    branch_lines.append(f"{b_name}->qf_{f.name} = {c_tgt}->u.{branch.tags[0]}.qf_{f.name};")
+                            else:
+                                branch_lines.append(f"{b_name} = {c_tgt}->u.{branch.tags[0]}.val;")
+                        elif isinstance(target_type, QVariantType):
+                            if b_type == INT_TYPE or b_type == BOOL_TYPE or b_type == CHAR_TYPE:
+                                branch_lines.append(f"{b_name} = {c_tgt}->payload.i;")
+                            elif b_type == REAL_TYPE:
+                                branch_lines.append(f"{b_name} = {c_tgt}->payload.r;")
+                            elif b_type == STRING_TYPE or isinstance(b_type, (QTupleType, QRecordType, QFunType, QArrayType, QVariantType, QOptionType)):
+                                branch_lines.append(f"{b_name} = ({c_b_type})({c_tgt}->payload.p);")
+                            else:
+                                branch_lines.append(f"{b_name} = {c_tgt}->payload;")
+
+                    self.emit_to(branch.body, dest, branch_lines)
+                    for bline in branch_lines:
+                        lines.append(f"        {bline}" if bline.strip() else bline)
+                    lines.append("        break;")
+                    lines.append("    }")
+
+                lines.append("    default: {")
+                default_lines: list[str] = []
+                if else_b is not None:
+                    self.emit_to(else_b, dest, default_lines)
+                else:
+                    default_lines.append("quest_raise_variant_error();")
+                for dline in default_lines:
+                    lines.append(f"        {dline}" if dline.strip() else dline)
+                lines.append("        break;")
+                lines.append("    }")
+                lines.append("}")
 
             case _:
                 val = self.emit_val(expr, lines)

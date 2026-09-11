@@ -411,22 +411,59 @@ and terminating with exit code 1.
 
 ---
 
-## 9. Host Compiler Runner (`compiler_runner.py`)
+## 9. Options and Variants (Sums) (Phase 4.4)
+
+### 9.1. Option Types
+Option types are ordered sums with inline union payloads. Each unique `QOptionType` synthesizes:
+- A tag enumeration: `QTAG_<Option>_<branch> = <index>`.
+- A C struct containing `int64_t tag` and an inline union of branch structs for branches carrying components:
+  ```c
+  typedef struct QOption_... {
+      int64_t tag;
+      union {
+          struct { QInt _0; } branch1;
+          ...
+      } u;
+  } QOption_...;
+  ```
+
+### 9.2. Variant Types
+Variant types are unordered sums with a single 64-bit payload word:
+```c
+typedef struct QVariant {
+    int64_t tag;
+    QVal    payload;
+} QVariant;
+
+static_assert(sizeof(QVariant) == 16, qvariant_must_be_16_bytes);
+```
+
+### 9.3. Injections, Tag Queries, Extractions, and Pattern Matching
+- **Injection:** `option b of T with payload end` allocates and populates the union branch; `variant b of T with v end`
+  allocates `QVariant` and populates `payload` via `_qval_wrap`.
+- **Tag Query (`target?tag`):** Checks `target->tag == EXPECTED_TAG`.
+- **Tag Assertion (`target!tag`):** Asserts `target->tag == EXPECTED_TAG` (panics with `Exception: variant.tagMismatch\n`
+  on failure). Returns `payload` for variants, or a `QTuple` prepending the ordinal for options.
+- **Pattern Matching (`case`):** Lowers to standard C `switch (target->tag)` with branch payload binders.
+
+---
+
+## 10. Host Compiler Runner (`compiler_runner.py`)
 
 The compiler runner manages external C compiler toolchain discovery, Boehm GC flags, and native executable generation:
 
-### 9.1. Compiler Discovery
+### 10.1. Compiler Discovery
 `find_c_compiler()` searches `PATH` in order:
 1. `clang` (preferred on macOS/Linux for optimal diagnostic output and C99 statement expression support).
 2. `gcc` (fallback).
 
-### 9.2. Boehm GC Auto-Detection & `--nogc`
+### 10.2. Boehm GC Auto-Detection & `--nogc`
 `detect_gc_flags(nogc: bool)` locates the Boehm Garbage Collector:
 - Standard paths checked: `/opt/homebrew/opt/bdw-gc` (Apple Silicon), `/usr/local/opt/bdw-gc` (Intel macOS), `/usr`.
 - If found: passes `-I<prefix>/include -L<prefix>/lib -lgc`.
 - If not found or when `--nogc` flag is specified: passes `-DQUEST_NOGC`, using standard libc `calloc`/`malloc`.
 
-### 9.3. Compilation Invocation
+### 10.3. Compilation Invocation
 `compile_c_source(c_source, output_path, nogc)`:
 1. Writes emitted C source to a temporary file (`.c`).
 2. Constructs compilation command:
@@ -440,7 +477,24 @@ The compiler runner manages external C compiler toolchain discovery, Boehm GC fl
 
 ---
 
-## 10. Testing & Verification
+## 11. Testing & Verification
+
+The C code generator is verified by comprehensive unit and integration tests:
+- `tests/python/test_phase4_1_c_codegen.py`: Scalar operations, control flow, memory modes, and runtime panic tests.
+- `tests/python/test_phase4_2a_functions.py`: Top-level and recursive functions, direct C calling conventions,
+  curried application flattening, mutable top-level variables, and `--nogc` execution.
+- `tests/python/test_phase4_2b_aggregates.py`: Tuples, concrete records, heap allocation via `quest_alloc`,
+  named/indexed field selection, mutable field assignment, and nested aggregates.
+- `tests/python/test_phase4_2c_closures.py`: First-class function values, trampolines, capturing closures,
+  multi-level nested closures, and `--nogc` execution.
+- `tests/python/test_phase4_3_arrays.py`: Mutable arrays, repetition, indexing, element mutation, Real/String elements,
+  out-of-bounds error handling, and `--nogc` execution.
+- `tests/python/test_phase4_4_options_variants.py`: Ordered options, tagged variants, tag checks (`?`), tag extractions (`!`),
+  case discrimination, and `--nogc` execution.
+- `tests/source/01_lexer_basics.quest`: Verified end-to-end native compilation and execution of tuple operations.
+- `tests/source/02_expressions_control_flow.quest`: Verified end-to-end native compilation and execution.
+- `tests/source/03_functions_closures.quest`: Verified end-to-end native compilation and execution of closures.
+- `tests/source/04_records_variants_options.quest`: Verified end-to-end native compilation and execution.
 
 The C code generator is verified by comprehensive unit and integration tests:
 - `tests/python/test_phase4_1_c_codegen.py`: Scalar operations, control flow, memory modes, and runtime panic tests.

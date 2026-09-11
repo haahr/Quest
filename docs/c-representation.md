@@ -559,6 +559,8 @@ runtime/
   - `void quest_raise_string_error(void)`: Triggered on out-of-bounds string index or slice bounds. Prints
     `Exception: string.error\n` to `stderr` and terminates the process with exit code 1.
 - **Debug & Value Printing:**
+  - `void quest_raise_variant_error(void)`: Triggered on failed variant tag assertions (`!tag`). Prints
+    `Exception: variant.tagMismatch\n` to `stderr` and terminates the process with exit code 1.
   - `void quest_print_val(QVal val, const char *type_name)`: Formats and prints interactive expression results
     matching Cardelli's typescript format (e.g., `42 : Int`, `15.75 : Real`, `true : Bool`, `"hello" : String`).
 

@@ -58,6 +58,18 @@ typedef struct QArray {
     QVal    data[];
 } QArray;
 
+/* Variant representation: tag and single 64-bit value word */
+typedef struct QVariant {
+    int64_t tag;
+    QVal    payload;
+} QVariant;
+
+/* Generic Option header for inspections */
+typedef struct QOptionHeader {
+    int64_t tag;
+    QVal    fields[];
+} QOptionHeader;
+
 /* Static ABI layout assertions */
 static_assert(sizeof(QInt)     == 8, qint_must_be_8_bytes);
 static_assert(sizeof(QReal)    == 8, qreal_must_be_8_bytes);
@@ -66,8 +78,11 @@ static_assert(sizeof(QVal)     == 8, qval_must_be_8_bytes);
 static_assert(sizeof(uint64_t) == 8, u64_must_be_8_bytes);
 static_assert(sizeof(QString)  == 24, qstring_must_be_24_bytes);
 static_assert(sizeof(QClosure) == 16, qclosure_must_be_16_bytes);
+static_assert(sizeof(QVariant) == 16, qvariant_must_be_16_bytes);
 static_assert(offsetof(QClosure, env) == 8, qclosure_env_at_offset_8);
 static_assert(offsetof(QArray, data)  == 8, qarray_data_at_offset_8);
+static_assert(offsetof(QVariant, payload) == 8, qvariant_payload_at_offset_8);
+static_assert(offsetof(QOptionHeader, fields) == 8, qoptionheader_fields_at_offset_8);
 
 /* Value constants */
 #define Q_OK_VAL    ((QVal){ .u = 0 })
@@ -100,6 +115,7 @@ double   quest_real_pow(double base, double exp);
 void     quest_raise_divide_by_zero(void);
 void     quest_raise_array_error(void);
 void     quest_raise_string_error(void);
+void     quest_raise_variant_error(void);
 void     quest_print_val(QVal val, const char *type_name);
 
 static inline void quest_check_array_bounds(const QArray *a, int64_t idx) {

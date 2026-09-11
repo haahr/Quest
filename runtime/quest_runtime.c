@@ -113,6 +113,11 @@ void quest_raise_string_error(void) {
     exit(1);
 }
 
+void quest_raise_variant_error(void) {
+    fprintf(stderr, "Exception: variant.tagMismatch\n");
+    exit(1);
+}
+
 void quest_print_val(QVal val, const char *type_name) {
     if (type_name == NULL) return;
     if (strcmp(type_name, "Ok") == 0) {
