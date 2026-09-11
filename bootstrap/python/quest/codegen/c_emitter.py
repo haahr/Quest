@@ -4,7 +4,13 @@ from __future__ import annotations
 
 from typing import Any, Optional
 
-from quest.codegen.c_types import mangle_ident, qtype_to_c_type, qtype_to_name_str
+from quest.codegen.c_types import (
+    mangle_ident,
+    qtype_to_c_type,
+    qtype_to_name_str,
+    record_struct_name,
+    tuple_struct_name,
+)
 from quest.typed_ast import (
     TypedApp,
     TypedAssign,
@@ -21,6 +27,7 @@ from quest.typed_ast import (
     TypedIf,
     TypedInfix,
     TypedInt,
+    TypedLetType,
     TypedLetValue,
     TypedLoop,
     TypedNode,
@@ -28,7 +35,13 @@ from quest.typed_ast import (
     TypedParam,
     TypedProgram,
     TypedReal,
+    TypedRecord,
+    TypedRecordField,
+    TypedSelect,
+    TypedSelectRef,
     TypedString,
+    TypedTuple,
+    TypedTypeWitness,
     TypedVar,
     TypedVarCell,
     TypedWhile,
@@ -40,6 +53,10 @@ from quest.types import (
     OK_TYPE,
     REAL_TYPE,
     STRING_TYPE,
+    QRecordField,
+    QRecordType,
+    QTupleField,
+    QTupleType,
     QType,
 )
 
@@ -89,14 +106,75 @@ def _indent(text: str, spaces: int = 4) -> str:
 
 
 def _qval_wrap(expr_str: str, t: QType) -> str:
-    """Wraps a scalar expression into a QVal union initializer."""
+    """Wraps a scalar or pointer expression into a QVal union initializer."""
     if t == INT_TYPE or t == BOOL_TYPE or t == CHAR_TYPE:
         return f"((QVal){{ .i = (int64_t)({expr_str}) }})"
     if t == REAL_TYPE:
         return f"((QVal){{ .r = (double)({expr_str}) }})"
-    if t == STRING_TYPE:
+    if t == STRING_TYPE or isinstance(t, (QTupleType, QRecordType)):
         return f"((QVal){{ .p = (void *)({expr_str}) }})"
     return f"((QVal){{ .u = 0 }})"
+
+
+def _collect_aggregate_types(prog: TypedProgram) -> list[tuple[str, QType]]:
+    """Traverses the program to find all unique QTupleType and QRecordType definitions."""
+    visited_names: set[str] = set()
+    result: list[tuple[str, QType]] = []
+
+    def visit_type(t: Optional[QType]) -> None:
+        if t is None:
+            return
+        if isinstance(t, QTupleType):
+            for f in t.value_fields:
+                visit_type(f.type_val)
+            name = tuple_struct_name(t)
+            if name not in visited_names:
+                visited_names.add(name)
+                result.append((name, t))
+        elif isinstance(t, QRecordType):
+            for f in t.fields:
+                visit_type(f.type_val)
+            name = record_struct_name(t)
+            if name not in visited_names:
+                visited_names.add(name)
+                result.append((name, t))
+        elif hasattr(t, "params") and hasattr(t, "result_type"):
+            for p in getattr(t, "params", ()):
+                visit_type(getattr(p, "type_val", None))
+            visit_type(getattr(t, "result_type", None))
+        elif hasattr(t, "element_type"):
+            visit_type(getattr(t, "element_type", None))
+        elif hasattr(t, "inner_type"):
+            visit_type(getattr(t, "inner_type", None))
+        elif hasattr(t, "variants"):
+            for v in getattr(t, "variants", ()):
+                visit_type(getattr(v, "type_val", None))
+
+    def visit_node(node: Any) -> None:
+        if node is None:
+            return
+        if hasattr(node, "type_val") and isinstance(getattr(node, "type_val"), QType):
+            visit_type(getattr(node, "type_val"))
+        if hasattr(node, "symbol"):
+            sym = getattr(node, "symbol")
+            if hasattr(sym, "type_val") and isinstance(getattr(sym, "type_val"), QType):
+                visit_type(getattr(sym, "type_val"))
+            if hasattr(sym, "definition") and isinstance(getattr(sym, "definition"), QType):
+                visit_type(getattr(sym, "definition"))
+        if hasattr(node, "definition") and isinstance(getattr(node, "definition"), QType):
+            visit_type(getattr(node, "definition"))
+
+        if isinstance(node, (list, tuple)):
+            for item in node:
+                visit_node(item)
+            return
+
+        if hasattr(node, "__dataclass_fields__"):
+            for field_name in node.__dataclass_fields__:
+                visit_node(getattr(node, field_name))
+
+    visit_node(prog)
+    return result
 
 
 class CEmitter:
@@ -151,6 +229,33 @@ class CEmitter:
             "#include \"quest_runtime.h\"",
             "",
         ]
+
+        # 0. Aggregate types (forward declarations and struct definitions)
+        agg_types = _collect_aggregate_types(prog)
+        if agg_types:
+            lines.append("/* Forward declarations for aggregate types */")
+            for tag_name, _ in agg_types:
+                lines.append(f"typedef struct {tag_name} {tag_name};")
+            lines.append("")
+            lines.append("/* Aggregate struct definitions */")
+            for tag_name, t in agg_types:
+                lines.append(f"struct {tag_name} {{")
+                if isinstance(t, QTupleType):
+                    if not t.value_fields:
+                        lines.append("    char _unused;")
+                    else:
+                        for i, f in enumerate(t.value_fields):
+                            c_type = qtype_to_c_type(f.type_val)
+                            lines.append(f"    {c_type} _{i};")
+                elif isinstance(t, QRecordType):
+                    if not t.fields:
+                        lines.append("    char _unused;")
+                    else:
+                        for f in sorted(t.fields, key=lambda fld: fld.name):
+                            c_type = qtype_to_c_type(f.type_val)
+                            lines.append(f"    {c_type} qf_{f.name};")
+                lines.append("};")
+                lines.append("")
 
         # 1. Static declarations for top-level non-void variables
         if top_vars:
@@ -316,9 +421,55 @@ class CEmitter:
 
             case TypedAssign(target=tgt, value=val):
                 c_tgt = self.emit_val(tgt, lines)
-                c_val = self.emit_val(val, lines)
-                lines.append(f"{c_tgt} = {c_val};")
+                self.emit_to(val, c_tgt, lines)
                 return "((void)0)"
+
+            case TypedTuple() | TypedRecord():
+                tmp = self.fresh_tmp("_alloc")
+                c_type = qtype_to_c_type(expr.type_val)
+                lines.append(f"{c_type} {tmp};")
+                self.emit_to(expr, tmp, lines)
+                return tmp
+
+            case TypedSelect(target=tgt, field=fld):
+                c_tgt = self.emit_val(tgt, lines)
+                if isinstance(tgt.type_val, QTupleType):
+                    val_idx = None
+                    for i, vf in enumerate(tgt.type_val.value_fields):
+                        if vf.name == fld:
+                            val_idx = i
+                            break
+                    if val_idx is None:
+                        if fld.startswith("_"):
+                            val_idx = int(fld[1:])
+                        elif fld.isdigit():
+                            val_idx = int(fld)
+                        else:
+                            raise ValueError(f"Cannot resolve tuple field '{fld}' in {tgt.type_val}")
+                    return f"{c_tgt}->_{val_idx}"
+                elif isinstance(tgt.type_val, QRecordType):
+                    return f"{c_tgt}->qf_{fld}"
+                else:
+                    return f"{c_tgt}->qf_{fld}"
+
+            case TypedSelectRef(target=tgt, field=fld):
+                c_tgt = self.emit_val(tgt, lines)
+                if isinstance(tgt.type_val, QTupleType):
+                    val_idx = None
+                    for i, vf in enumerate(tgt.type_val.value_fields):
+                        if vf.name == fld:
+                            val_idx = i
+                            break
+                    if val_idx is None:
+                        if fld.startswith("_"):
+                            val_idx = int(fld[1:])
+                        elif fld.isdigit():
+                            val_idx = int(fld)
+                        else:
+                            raise ValueError(f"Cannot resolve tuple field '{fld}' in {tgt.type_val}")
+                    return f"(&({c_tgt}->_{val_idx}))"
+                else:
+                    return f"(&({c_tgt}->qf_{fld}))"
 
             case TypedInfix(left=left, op=op, right=right):
                 c_left = self.emit_val(left, lines)
@@ -352,7 +503,7 @@ class CEmitter:
 
             case _:
                 raise NotImplementedError(
-                    f"C code generation for {expr.__class__.__name__} not implemented in Phase 4.2a"
+                    f"C code generation for {expr.__class__.__name__} not implemented in Phase 4.2b"
                 )
 
     def emit_to(self, expr: TypedExpr, dest: Optional[str], lines: list[str]) -> None:
@@ -430,6 +581,34 @@ class CEmitter:
 
             case TypedExit():
                 lines.append("break;")
+
+            case TypedTuple(elements=elems, type_val=t):
+                struct_name = tuple_struct_name(t)
+                alloc_expr = f"({struct_name} *)quest_alloc(sizeof({struct_name}))"
+                target_dest = dest
+                if target_dest is None:
+                    target_dest = self.fresh_tmp("_tuple")
+                    lines.append(f"{struct_name} *{target_dest} = {alloc_expr};")
+                else:
+                    lines.append(f"{target_dest} = {alloc_expr};")
+                val_idx = 0
+                for elem in elems:
+                    if isinstance(elem, TypedTypeWitness):
+                        continue
+                    self.emit_to(elem, f"{target_dest}->_{val_idx}", lines)
+                    val_idx += 1
+
+            case TypedRecord(fields=flds, type_val=t):
+                struct_name = record_struct_name(t)
+                alloc_expr = f"({struct_name} *)quest_alloc(sizeof({struct_name}))"
+                target_dest = dest
+                if target_dest is None:
+                    target_dest = self.fresh_tmp("_record")
+                    lines.append(f"{struct_name} *{target_dest} = {alloc_expr};")
+                else:
+                    lines.append(f"{target_dest} = {alloc_expr};")
+                for fld in flds:
+                    self.emit_to(fld.value, f"{target_dest}->qf_{fld.name}", lines)
 
             case _:
                 val = self.emit_val(expr, lines)
