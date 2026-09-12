@@ -448,22 +448,58 @@ static_assert(sizeof(QVariant) == 16, qvariant_must_be_16_bytes);
 
 ---
 
-## 10. Host Compiler Runner (`compiler_runner.py`)
+## 10. Structural Subtyping & Dynamic Dispatch (Phase 4.5)
+
+Phase 4.5 implements Cardelli's structural subtyping across tuples, records, and variants:
+
+### 10.1. Prefix Tuple Subtyping
+- **Direct Pointer Coercion:** A wider tuple pointer `QT_Triple *` is cast directly to a prefix tuple `(QT_Pair *)`.
+- **Memoized Compile-Time Layout Verification:**
+  ```c
+  static_assert(offsetof(QT_Triple, _0) == offsetof(QT_Pair, _0), tuple_subtyping_offset_match_0);
+  static_assert(offsetof(QT_Triple, _1) == offsetof(QT_Pair, _1), tuple_subtyping_offset_match_1);
+  ```
+
+### 10.2. Evidence-Passing Record Subtyping
+- **Object Header:** Every concrete record structure begins with `QRecordHeader header;` at offset 0 (`header.descriptor = NULL;`).
+- **Evidence Dictionaries:** Functions and closures taking record parameters receive companion evidence dictionary pointers:
+  ```c
+  static QInt qv_sum(void *qv_pt, const OffsetDict_Point2D *_dict_qv_pt);
+  ```
+- **Dictionary Naming:** Uses alias name when available (`OffsetDict_<Alias>`), or sequential per-module identifier `OffsetDict_<Module>_record<N>` / `OffsetDict_record<N>`.
+- **Field Selection:** Dynamic dispatch reads fields via byte offsets from active companion dictionaries:
+  ```c
+  (*((QInt *)((char *)qv_pt + _dict_qv_pt->offset_x)))
+  ```
+- **Record Returns:** Functions returning records return `QRecordResult_<Target> { void *val; const OffsetDict_<Target> *dict; }`.
+- **Aggregate Storage Guard:** Storing a subtyped record or variant into an array or tuple produces a diagnostic:
+  `"Subtyped record or variant storage in aggregates requires runtime descriptors"`.
+
+### 10.3. Variant Subtyping & Static Tag Remapping
+- **Object Header:** `QVariant` has `const void *descriptor;` at offset 0 (24 bytes total, payload at offset 16).
+- **Static Tag Tables:** Static lookup tables in `.rodata` translate source tags to target tags:
+  ```c
+  static const int64_t tagmap_Large_Small[] = { 2LL, 1LL };
+  ```
+
+---
+
+## 11. Host Compiler Runner (`compiler_runner.py`)
 
 The compiler runner manages external C compiler toolchain discovery, Boehm GC flags, and native executable generation:
 
-### 10.1. Compiler Discovery
+### 11.1. Compiler Discovery
 `find_c_compiler()` searches `PATH` in order:
 1. `clang` (preferred on macOS/Linux for optimal diagnostic output and C99 statement expression support).
 2. `gcc` (fallback).
 
-### 10.2. Boehm GC Auto-Detection & `--nogc`
+### 11.2. Boehm GC Auto-Detection & `--nogc`
 `detect_gc_flags(nogc: bool)` locates the Boehm Garbage Collector:
 - Standard paths checked: `/opt/homebrew/opt/bdw-gc` (Apple Silicon), `/usr/local/opt/bdw-gc` (Intel macOS), `/usr`.
 - If found: passes `-I<prefix>/include -L<prefix>/lib -lgc`.
 - If not found or when `--nogc` flag is specified: passes `-DQUEST_NOGC`, using standard libc `calloc`/`malloc`.
 
-### 10.3. Compilation Invocation
+### 11.3. Compilation Invocation
 `compile_c_source(c_source, output_path, nogc)`:
 1. Writes emitted C source to a temporary file (`.c`).
 2. Constructs compilation command:
@@ -477,7 +513,7 @@ The compiler runner manages external C compiler toolchain discovery, Boehm GC fl
 
 ---
 
-## 11. Testing & Verification
+## 12. Testing & Verification
 
 The C code generator is verified by comprehensive unit and integration tests:
 - `tests/python/test_phase4_1_c_codegen.py`: Scalar operations, control flow, memory modes, and runtime panic tests.
@@ -491,24 +527,12 @@ The C code generator is verified by comprehensive unit and integration tests:
   out-of-bounds error handling, and `--nogc` execution.
 - `tests/python/test_phase4_4_options_variants.py`: Ordered options, tagged variants, tag checks (`?`), tag extractions (`!`),
   case discrimination, and `--nogc` execution.
+- `tests/python/test_phase4_5_subtyping.py`: Prefix tuple subtyping with static assertions, record width/permutation subtyping,
+  evidence dictionary passing through closures, record returns via `QRecordResult`, and static variant tag remapping.
 - `tests/source/01_lexer_basics.quest`: Verified end-to-end native compilation and execution of tuple operations.
 - `tests/source/02_expressions_control_flow.quest`: Verified end-to-end native compilation and execution.
 - `tests/source/03_functions_closures.quest`: Verified end-to-end native compilation and execution of closures.
 - `tests/source/04_records_variants_options.quest`: Verified end-to-end native compilation and execution.
-
-The C code generator is verified by comprehensive unit and integration tests:
-- `tests/python/test_phase4_1_c_codegen.py`: Scalar operations, control flow, memory modes, and runtime panic tests.
-- `tests/python/test_phase4_2a_functions.py`: Top-level and recursive functions, direct C calling conventions,
-  curried application flattening, mutable top-level variables, and `--nogc` execution.
-- `tests/python/test_phase4_2b_aggregates.py`: Tuples, concrete records, heap allocation via `quest_alloc`,
-  named/indexed field selection, mutable field assignment, and nested aggregates.
-- `tests/python/test_phase4_2c_closures.py`: First-class function values, trampolines, capturing closures,
-  multi-level nested closures, and `--nogc` execution.
-- `tests/python/test_phase4_3_arrays.py`: Mutable arrays, repetition, indexing, element mutation, Real/String elements,
-  out-of-bounds error handling, and `--nogc` execution.
-- `tests/source/01_lexer_basics.quest`: Verified end-to-end native compilation and execution of tuple operations.
-- `tests/source/02_expressions_control_flow.quest`: Verified end-to-end native compilation and execution.
-- `tests/source/03_functions_closures.quest`: Verified end-to-end native compilation and execution of closures.
 
 ---
 

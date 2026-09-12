@@ -225,27 +225,47 @@ Tuples are ordered collections of 64-bit values. In Quest, tuple components can 
 Under Cardelli's structural subtyping with multiple inheritance, field offsets cannot be assigned globally.
 As established in `docs/runtime-design.md`, Quest uses the **Evidence Passing** model:
 
-1. **Concrete Record Payload:**
-   A flat heap-allocated block of 64-bit words with fields sorted alphabetically by field name and prefixed with
-   `qf_` (ensuring structurally equivalent records share the exact same C struct definition):
+1. **Concrete Record Payload & Object Header:**
+   A heap-allocated block of 64-bit words beginning with an 8-byte object header (`QRecordHeader`), followed by
+   fields sorted alphabetically by field name and prefixed with `qf_` (named `QT_<Alias>` or sequential `QT_record<N>`):
    ```c
-   /* Quest: Record x:Int y:Real z:Bool end */
-   typedef struct QRecord_x_Int_y_Real_z_Bool {
-       QInt  qf_x;
-       QReal qf_y;
-       QBool qf_z;
-   } QRecord_x_Int_y_Real_z_Bool;
+   /* Quest: Let Point = Record x: Int y: Real end */
+   typedef struct QT_Point {
+       QRecordHeader header;  /* { const void *descriptor; } (8 bytes, descriptor = NULL) */
+       QInt          qf_x;
+       QReal         qf_y;
+   } QT_Point;
    ```
-2. **Evidence Dictionary (`QEvidenceDict`):**
-   A static table in `.rodata` containing byte offsets for fields expected by a signature:
+2. **Evidence Dictionary (`OffsetDict_<Name>`):**
+   A concrete C struct whose members are `size_t offset_<field>` corresponding to the expected fields of the target record type.
+   Static instances in `.rodata` (`offsetdict_<Target>_<Source>`) initialize these offsets using `<stddef.h>`'s `offsetof`:
    ```c
-   typedef struct QEvidenceDict {
-       int32_t field_offsets[];
-   } QEvidenceDict;
+   typedef struct OffsetDict_Point {
+       size_t offset_x;
+       size_t offset_y;
+   } OffsetDict_Point;
+
+   static const OffsetDict_Point offsetdict_Point_Point3D = {
+       offsetof(QT_Point3D, qf_x),
+       offsetof(QT_Point3D, qf_y)
+   };
    ```
-3. **Field Access:**
-   - *Direct (concrete type statically known):* `r->qv_x` (direct load at fixed offset).
-   - *Subtyped (polymorphic/subsumed parameter):* `*(QVal *)((char *)r + dict->field_offsets[FIELD_IDX])`.
+3. **Function Parameters & Record Returns:**
+   - Record parameters in functions and closures receive companion dictionary pointers:
+     `(void *qv_p, const OffsetDict_Point *_dict_qv_p)`.
+   - Functions returning records return a fat result structure:
+     ```c
+     typedef struct QRecordResult_Point {
+         void *val;
+         const OffsetDict_Point *dict;
+     } QRecordResult_Point;
+     ```
+4. **Field Access:**
+   - *Direct (exact concrete type statically known):* `r->qf_x` (direct load at fixed struct offset).
+   - *Subtyped (via companion dictionary):* `(*((QInt *)((char *)r + dict->offset_x)))`.
+5. **Storage in Aggregates:**
+   - Storing subtyped records into an aggregate (such as `QTuple` or `QArray`) produces a compile-time diagnostic
+     requiring runtime descriptors: `"Subtyped record or variant storage in aggregates requires runtime descriptors"`.
 
 ### 5.3. Options and Variants (Sums)
 
@@ -326,21 +346,21 @@ If a branch requires no payload value, it uses the unit type `Ok` (`Variant mon,
 payload is always **exactly one 64-bit word** (`QVal`):
 ```c
 typedef struct QVariant {
-    int64_t tag;     /* Local dense tag index (0, 1, ...) */
-    QVal    payload; /* Exactly one 64-bit word */
+    const void *descriptor; /* Object header / runtime type descriptor (8 bytes, descriptor = NULL) */
+    int64_t     tag;        /* Local dense tag index (0, 1, ...) */
+    QVal        payload;    /* Exactly one 64-bit word */
 } QVariant;
 
-static_assert(sizeof(QVariant) == 16, qvariant_must_be_16_bytes);
-static_assert(offsetof(QVariant, payload) == 8, qvariant_payload_at_offset_8);
+static_assert(sizeof(QVariant) == 24, qvariant_must_be_24_bytes);
+static_assert(offsetof(QVariant, payload) == 16, qvariant_payload_at_offset_16);
 ```
 - **Static Tag Remapping Dictionaries (`.rodata`):** When a variant is upcast across an unordered subtyping boundary,
-  the compiler passes a static `const int32_t tag_map[]`:
+  the compiler emits a static lookup table `static const int64_t tagmap_<Target>_<Source>[]`:
   ```c
-  int64_t tag = tag_map ? tag_map[v->tag] : v->tag;
-  switch (tag) {
-      case 0: /* ... */ break;
-      case 1: /* ... */ break;
-  }
+  QVariant *tmp = (QVariant *)quest_alloc(sizeof(QVariant));
+  tmp->descriptor = NULL;
+  tmp->tag = tagmap_Large_Small[src->tag];
+  tmp->payload = src->payload;
   ```
 - **Specialization:** Eliminated entirely when the variant type is statically known.
 
