@@ -15,6 +15,7 @@ Implements Phase 3.2 of the Quest compiler:
 from __future__ import annotations
 
 import math
+from pathlib import Path
 from typing import Any, Optional
 
 from quest.diagnostics import Diagnostic, DiagnosticLabel, QuestCompilerError, Severity
@@ -191,6 +192,16 @@ class RuntimeEnvironment:
     def __init__(self, parent: Optional[RuntimeEnvironment] = None):
         self.parent = parent
         self.bindings: dict[str, QValue] = {}
+        if parent is not None:
+            self.evaluated_modules: dict[str, Any] = parent.evaluated_modules
+            self.include_paths: list[Path] = parent.include_paths
+            self.current_dir: Optional[Path] = parent.current_dir
+            self.loaded_modules_ast: dict[str, Any] = parent.loaded_modules_ast
+        else:
+            self.evaluated_modules: dict[str, Any] = {}
+            self.include_paths: list[Path] = []
+            self.current_dir: Optional[Path] = None
+            self.loaded_modules_ast: dict[str, Any] = {}
 
     def push_scope(self) -> RuntimeEnvironment:
         """Pushes a new child scope inheriting from this environment."""
@@ -989,6 +1000,10 @@ def eval_binding(binding: TypedBinding, env: RuntimeEnvironment) -> QValue:
             return OK_VALUE
 
         case TypedModule(name=mod_name, bindings=mod_bindings, scope=mod_scope):
+            if mod_name in env.evaluated_modules:
+                rec = env.evaluated_modules[mod_name]
+                env.define(mod_name, rec)
+                return rec
             mod_env = env.push_scope()
             for b in mod_bindings:
                 eval_binding(b, mod_env)
@@ -996,6 +1011,7 @@ def eval_binding(binding: TypedBinding, env: RuntimeEnvironment) -> QValue:
             for val_name in mod_scope.values:
                 exported_fields[val_name] = mod_env.lookup(val_name)
             rec = QRecord(exported_fields)
+            env.evaluated_modules[mod_name] = rec
             env.define(mod_name, rec)
             return rec
 
@@ -1004,12 +1020,31 @@ def eval_binding(binding: TypedBinding, env: RuntimeEnvironment) -> QValue:
 
             for item in items:
                 for name in item.names:
-                    mod_val = BuiltinModuleRegistry.get_runtime_module(name)
-                    if mod_val is None:
-                        try:
-                            mod_val = env.lookup(name)
-                        except QuestRuntimeError:
-                            mod_val = None
+                    if name in env.evaluated_modules:
+                        mod_val = env.evaluated_modules[name]
+                    else:
+                        mod_val = BuiltinModuleRegistry.get_runtime_module(name)
+                        if mod_val is None:
+                            try:
+                                mod_val = env.lookup(name)
+                            except QuestRuntimeError:
+                                mod_val = None
+                        if mod_val is None:
+                            if name in env.loaded_modules_ast:
+                                typed_mod = env.loaded_modules_ast[name]
+                                mod_env = env.push_scope()
+                                for b in typed_mod.bindings:
+                                    eval_binding(b, mod_env)
+                                exported_fields = {}
+                                for val_name in typed_mod.scope.values:
+                                    exported_fields[val_name] = mod_env.lookup(val_name)
+                                mod_val = QRecord(exported_fields)
+                                env.evaluated_modules[name] = mod_val
+                            else:
+                                from quest.module_loader import load_module_for_interpreter
+                                mod_val = load_module_for_interpreter(name, item.interface_name, env)
+                                if mod_val is not None:
+                                    env.evaluated_modules[name] = mod_val
                     if mod_val is not None:
                         env.define(name, mod_val)
             return OK_VALUE

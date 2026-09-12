@@ -183,6 +183,7 @@ quest compile --dump-after typecheck --stop-after codegen_c file.quest
 - [codegen-c.md](codegen-c.md): C Code Generator architecture, AST lowering, and compiler runner.
 - [c-representation.md](c-representation.md): C representation, `QVal` union, and runtime ABI design.
 - [README.md](../README.md): Project overview and quickstart.
+- [modules.md](modules.md): Module system, interfaces, information hiding, and file loader.
 - [roadmap.md](roadmap.md): 7-stage implementation roadmap.
 - [syntax.md](syntax.md): Lexer, parser, and AST specification.
 - [type-system.md](type-system.md): Type system, subtyping, and elaboration.

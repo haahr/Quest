@@ -56,10 +56,8 @@ def elaborate_interface(decl: ast.InterfaceDecl, env: Environment) -> TypedInter
             if source_interface_scope is not None:
                 env.register_interface(imp.interface_name, source_interface_scope)
         if source_interface_scope is None:
-            raise QuestTypeError(
-                f"Undefined interface '{imp.interface_name}' in import of interface '{decl.name}'",
-                offset=decl.offset,
-            )
+            from quest.module_loader import load_interface
+            source_interface_scope = load_interface(imp.interface_name, env)
         if not imp.names:
             for type_name, type_sym in source_interface_scope.types.items():
                 interface_scope.declare_type(type_sym)
@@ -139,10 +137,12 @@ def elaborate_module(
     """Elaborates and typechecks a module against its interface, enforcing information hiding."""
     target_interface_scope = env.lookup_interface(decl.interface_name)
     if target_interface_scope is None:
-        raise QuestTypeError(
-            f"Undefined interface '{decl.interface_name}' for module '{decl.name}'",
-            offset=decl.offset,
-        )
+        target_interface_scope = BuiltinModuleRegistry.get_interface(decl.interface_name, env)
+        if target_interface_scope is not None:
+            env.register_interface(decl.interface_name, target_interface_scope)
+    if target_interface_scope is None:
+        from quest.module_loader import load_interface
+        target_interface_scope = load_interface(decl.interface_name, env)
 
     module_internal_scope = Scope(name=f"module_internal_{decl.name}", parent=env.base_scope)
 
@@ -154,10 +154,8 @@ def elaborate_module(
             if source_interface_scope is not None:
                 env.register_interface(imp.interface_name, source_interface_scope)
         if source_interface_scope is None:
-            raise QuestTypeError(
-                f"Undefined interface '{imp.interface_name}' in import of module '{decl.name}'",
-                offset=decl.offset,
-            )
+            from quest.module_loader import load_interface
+            source_interface_scope = load_interface(imp.interface_name, env)
         if not imp.names:
             for type_name, type_sym in source_interface_scope.types.items():
                 module_internal_scope.declare_type(type_sym)
@@ -178,11 +176,20 @@ def elaborate_module(
                     module_internal_scope.declare_kind(kind_symbol)
                     continue
                 mod_type = BuiltinModuleRegistry.get_module_type(name, env)
+                mod_scope = env.lookup_module(name)
                 if mod_type is None:
-                    mod_type = BuiltinModuleRegistry._build_record_type_from_scope(
-                        source_interface_scope
-                    )
-                env.register_module(name, source_interface_scope)
+                    if name not in env.loaded_modules_ast:
+                        from quest.module_loader import load_module
+                        load_module(name, imp.interface_name, env)
+                    mod_scope = env.lookup_module(name)
+                    if mod_scope is not None:
+                        mod_type = BuiltinModuleRegistry._build_record_type_from_scope(mod_scope)
+                    else:
+                        mod_type = BuiltinModuleRegistry._build_record_type_from_scope(
+                            source_interface_scope
+                        )
+                registered_scope = mod_scope if mod_scope is not None else source_interface_scope
+                env.register_module(name, registered_scope)
                 module_internal_scope.declare_value(ValueSymbol(name=name, type_val=mod_type))
 
     # 2. Elaborate module internal bindings
@@ -193,6 +200,13 @@ def elaborate_module(
     saved_scope = env.current_scope
     env.current_scope = module_internal_scope
     typed_bindings: list[TypedBinding] = []
+    if decl.imports:
+        from quest.typed_ast import TypedImportItem
+        typed_items = tuple(
+            TypedImportItem(names=imp.names, interface_name=imp.interface_name)
+            for imp in decl.imports
+        )
+        typed_bindings.append(TypedImport(items=typed_items, offset=decl.offset))
     try:
         for b in decl.bindings:
             typed_b = binding_elaborator(b, env, 0)
@@ -312,7 +326,7 @@ def elaborate_module(
 
 
 def elaborate_import(phrase: ast.ImportPhrase, env: Environment) -> TypedImport:
-    """Elaborates a top-level import statement, loading interfaces/modules from BuiltinModuleRegistry."""
+    """Elaborates a top-level import statement, loading interfaces/modules from BuiltinModuleRegistry or files."""
     typed_items: list[TypedImportItem] = []
     for item in phrase.items:
         iface_name = item.interface_name
@@ -323,10 +337,8 @@ def elaborate_import(phrase: ast.ImportPhrase, env: Environment) -> TypedImport:
                 env.register_interface(iface_name, iface_scope)
 
         if iface_scope is None:
-            raise QuestTypeError(
-                f"Undefined interface '{iface_name}' in import",
-                offset=getattr(item, "offset", phrase.offset),
-            )
+            from quest.module_loader import load_interface
+            iface_scope = load_interface(iface_name, env)
 
         if not item.names:
             # import : Interface
@@ -340,9 +352,18 @@ def elaborate_import(phrase: ast.ImportPhrase, env: Environment) -> TypedImport:
             # import mod1, mod2: Interface
             for mod_name in item.names:
                 mod_type = BuiltinModuleRegistry.get_module_type(mod_name, env)
+                mod_scope = env.lookup_module(mod_name)
                 if mod_type is None:
-                    mod_type = BuiltinModuleRegistry._build_record_type_from_scope(iface_scope)
-                env.register_module(mod_name, iface_scope)
+                    if mod_name not in env.loaded_modules_ast:
+                        from quest.module_loader import load_module
+                        load_module(mod_name, iface_name, env)
+                    mod_scope = env.lookup_module(mod_name)
+                    if mod_scope is not None:
+                        mod_type = BuiltinModuleRegistry._build_record_type_from_scope(mod_scope)
+                    else:
+                        mod_type = BuiltinModuleRegistry._build_record_type_from_scope(iface_scope)
+                registered_scope = mod_scope if mod_scope is not None else iface_scope
+                env.register_module(mod_name, registered_scope)
                 env.current_scope.declare_value(ValueSymbol(name=mod_name, type_val=mod_type))
             typed_items.append(TypedImportItem(names=item.names, interface_name=iface_name))
 

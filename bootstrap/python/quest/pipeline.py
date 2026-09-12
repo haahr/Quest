@@ -85,6 +85,25 @@ class CompilerContext:
         opts = options or CompilerOptions()
         environment = env if env is not None else Environment()
         r_env = runtime_env if runtime_env is not None else RuntimeEnvironment.create_root_env()
+
+        # Wire include_paths and current_dir
+        environment.include_paths = list(opts.include_paths)
+        r_env.include_paths = list(opts.include_paths)
+        r_env.loaded_modules_ast = environment.loaded_modules_ast
+
+        if file_name and not file_name.startswith("<"):
+            try:
+                p = Path(file_name).resolve()
+                current_dir = p.parent
+                environment.current_dir = current_dir
+                r_env.current_dir = current_dir
+            except Exception:
+                pass
+        elif environment.current_dir is None:
+            cwd = Path.cwd()
+            environment.current_dir = cwd
+            r_env.current_dir = cwd
+
         source_map = SourceMap(source_text, file_name)
         return cls(
             source_text=source_text,

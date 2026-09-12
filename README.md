@@ -129,6 +129,8 @@ Comprehensive documentation for the language, formal semantics, and compiler sub
   subtyping, recursive contractiveness ($C \succ X$), and bidirectional term typing.
 - [docs/interpreter.md](docs/interpreter.md): Bootstrap tree-walking interpreter, runtime value hierarchy, scoped
   environment, Cardelli identity semantics, and operational evaluation engine.
+- [docs/modules.md](docs/modules.md): Cardelli module system, interfaces, information hiding, file-based loading
+  conventions (.int.quest / .mod.quest), and singleton evaluation semantics.
 - [docs/diagnostics.md](docs/diagnostics.md): Structured diagnostic error reporting, severity levels, and caret
   rendering.
 - [docs/runtime-design.md](docs/runtime-design.md): Compiled runtime architecture, evidence passing vs. fat pointers,

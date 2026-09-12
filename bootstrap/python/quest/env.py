@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any, ClassVar, Optional
 
 from quest.types import (
@@ -211,6 +212,11 @@ class Environment:
         self.current_scope: Scope = self.global_scope
         self._interfaces: dict[str, Scope] = {}
         self._modules: dict[str, Scope] = {}
+        self.include_paths: list[Path] = []
+        self.current_dir: Optional[Path] = None
+        self.loaded_modules_ast: dict[str, Any] = {}
+        self._loading_interfaces: list[str] = []
+        self._loading_modules: list[str] = []
         self._init_builtins()
 
     def fresh_symbol_id(self) -> int:
@@ -290,6 +296,7 @@ class Environment:
             "symbol_counter": self._symbol_counter,
             "interfaces": dict(self._interfaces),
             "modules": dict(self._modules),
+            "loaded_modules_ast": dict(self.loaded_modules_ast),
             "scope_declarations": list(self.current_scope._declarations),
             "scope_values": dict(self.current_scope._values),
             "scope_types": dict(self.current_scope._types),
@@ -303,6 +310,8 @@ class Environment:
         self._symbol_counter = snap["symbol_counter"]
         self._interfaces = dict(snap["interfaces"])
         self._modules = dict(snap["modules"])
+        if "loaded_modules_ast" in snap:
+            self.loaded_modules_ast = dict(snap["loaded_modules_ast"])
         self.current_scope._declarations = list(snap["scope_declarations"])
         self.current_scope._values = dict(snap["scope_values"])
         self.current_scope._types = dict(snap["scope_types"])
