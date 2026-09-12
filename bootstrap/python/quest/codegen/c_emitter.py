@@ -27,6 +27,7 @@ from quest.typed_ast import (
     TypedCaseBranch,
     TypedChar,
     TypedDerefCell,
+    TypedException,
     TypedExit,
     TypedExpr,
     TypedExprStmt,
@@ -45,6 +46,7 @@ from quest.typed_ast import (
     TypedOption,
     TypedParam,
     TypedProgram,
+    TypedRaise,
     TypedReal,
     TypedRecord,
     TypedRecordField,
@@ -52,6 +54,8 @@ from quest.typed_ast import (
     TypedSelectRef,
     TypedString,
     TypedTuple,
+    TypedTry,
+    TypedTryBranch,
     TypedTypeWitness,
     TypedVar,
     TypedVarCell,
@@ -68,6 +72,7 @@ from quest.types import (
     REAL_TYPE,
     STRING_TYPE,
     QArrayType,
+    QExceptionType,
     QFunType,
     QOptionType,
     QRecordField,
@@ -140,7 +145,7 @@ def _qval_wrap(expr_str: str, t: QType) -> str:
         return f"((QVal){{ .i = (int64_t)({expr_str}) }})"
     if t == REAL_TYPE:
         return f"((QVal){{ .r = (double)({expr_str}) }})"
-    if t == STRING_TYPE or isinstance(t, (QTupleType, QRecordType, QFunType, QArrayType, QVariantType, QOptionType)):
+    if t == STRING_TYPE or isinstance(t, (QTupleType, QRecordType, QFunType, QArrayType, QVariantType, QOptionType, QExceptionType)):
         return f"((QVal){{ .p = (void *)({expr_str}) }})"
     return f"((QVal){{ .u = 0 }})"
 
@@ -233,6 +238,14 @@ def _find_free_vars(fun: TypedFun, top_names: set[str]) -> list[tuple[str, QType
             case TypedFun(params=params, body=b):
                 inner_bound = bound | {p.name for p in params}
                 walk(b, inner_bound)
+            case TypedTry(body=b, branches=branches, else_branch=else_b):
+                walk(b, bound)
+                for br in branches:
+                    walk(br.exc_pattern, bound)
+                    br_bound = bound | ({br.binder.name} if br.binder else set())
+                    walk(br.body, br_bound)
+                if else_b:
+                    walk(else_b, bound)
             case _:
                 if isinstance(node, (list, tuple)):
                     for item in node:
@@ -514,6 +527,12 @@ class CEmitter:
                         top_funs.append((name, val, symbol))
                     else:
                         top_vars.append((name, val, symbol))
+                case TypedException(name=name, type_val=t) as exc_node:
+                    if name:
+                        top_vars.append((name, exc_node, type("Symbol", (), {"type_val": t})()))
+                case TypedExprStmt(expr=TypedException(name=name, type_val=t) as exc_node):
+                    if name:
+                        top_vars.append((name, exc_node, type("Symbol", (), {"type_val": t})()))
                 case _:
                     pass
 
@@ -978,8 +997,25 @@ class CEmitter:
                     type_str = _c_string_literal(qtype_to_name_str(symbol.type_val))
                     lines.append(f"    quest_print_val({wrap}, {type_str});")
 
+            case TypedException(name=name) as exc_node:
+                if name:
+                    c_ident = mangle_ident(name)
+                    phrase_lines = []
+                    self.emit_to(exc_node, c_ident, phrase_lines)
+                    for s in phrase_lines:
+                        lines.append(f"    {s}" if s.strip() else s)
+                    if self.echo:
+                        wrap = _qval_wrap(c_ident, exc_node.type_val)
+                        type_str = _c_string_literal(qtype_to_name_str(exc_node.type_val))
+                        lines.append(f"    quest_print_val({wrap}, {type_str});")
+                else:
+                    self._emit_expr_phrase(phrase, lines, is_last=is_last)
+
             case TypedExprStmt(expr=inner):
-                self._emit_expr_phrase(inner, lines, is_last=is_last)
+                if isinstance(inner, TypedException) and inner.name:
+                    self._emit_phrase(inner, lines, is_last=is_last)
+                else:
+                    self._emit_expr_phrase(inner, lines, is_last=is_last)
 
             case TypedExpr():
                 self._emit_expr_phrase(phrase, lines, is_last=is_last)
@@ -1034,6 +1070,8 @@ class CEmitter:
                 return "((void)0)"
 
             case TypedVar(name=name):
+                if name == "DivideByZero":
+                    return "(&quest_exc_DivideByZero)"
                 if name in self.top_fun_names:
                     return f"(&{mangle_ident(name)}_closure)"
                 if name in self.current_env_vars:
@@ -1155,6 +1193,10 @@ class CEmitter:
                 return tmp
 
             case TypedSelect(target=tgt, field=fld):
+                if isinstance(tgt, TypedVar) and tgt.name == "arrayOp" and fld == "error":
+                    return "(&quest_exc_arrayOp_error)"
+                if isinstance(tgt, TypedVar) and tgt.name == "string" and fld == "error":
+                    return "(&quest_exc_string_error)"
                 c_tgt = self.emit_val(tgt, lines)
                 if isinstance(tgt.type_val, QTupleType):
                     val_idx = None
@@ -1354,7 +1396,15 @@ class CEmitter:
                 lines.append("break;")
                 return "((void)0)"
 
-            case TypedIf() | TypedBlock() | TypedWhile() | TypedLoop() | TypedFor():
+            case TypedException(name=name):
+                c_name = _c_string_literal(name) if name else '""'
+                return f"quest_alloc_exception({c_name})"
+
+            case TypedRaise():
+                self.emit_to(expr, None, lines)
+                return "((void)0)"
+
+            case TypedIf() | TypedBlock() | TypedWhile() | TypedLoop() | TypedFor() | TypedTry():
                 if expr.type_val == OK_TYPE:
                     self.emit_to(expr, None, lines)
                     return "((void)0)"
@@ -1440,6 +1490,20 @@ class CEmitter:
                                 c_type = self.c_type(symbol.type_val)
                                 block_lines.append(f"{c_type} {c_ident};")
                                 self.emit_to(val, c_ident, block_lines)
+                        case TypedExprStmt(expr=TypedException(name=name) as exc_node):
+                            if name:
+                                c_ident = mangle_ident(name)
+                                block_lines.append(f"const QException *{c_ident};")
+                                self.emit_to(exc_node, c_ident, block_lines)
+                            else:
+                                self.emit_to(exc_node, None, block_lines)
+                        case TypedException(name=name) as exc_node:
+                            if name:
+                                c_ident = mangle_ident(name)
+                                block_lines.append(f"const QException *{c_ident};")
+                                self.emit_to(exc_node, c_ident, block_lines)
+                            else:
+                                self.emit_to(exc_node, None, block_lines)
                         case TypedExprStmt(expr=inner):
                             self.emit_to(inner, None, block_lines)
                         case _:
@@ -1716,6 +1780,77 @@ class CEmitter:
                 for dline in default_lines:
                     lines.append(f"        {dline}" if dline.strip() else dline)
                 lines.append("        break;")
+                lines.append("    }")
+                lines.append("}")
+
+            case TypedException(name=name):
+                c_name = _c_string_literal(name) if name else '""'
+                if dest is not None:
+                    lines.append(f"{dest} = quest_alloc_exception({c_name});")
+                else:
+                    lines.append(f"quest_alloc_exception({c_name});")
+
+            case TypedRaise(exc=exc, payload=payload):
+                c_exc = self.emit_val(exc, lines)
+                if payload is not None:
+                    c_payload_val = self.emit_val(payload, lines)
+                    c_payload = _qval_wrap(c_payload_val, payload.type_val)
+                else:
+                    c_payload = "Q_OK_VAL"
+                lines.append(f"quest_raise({c_exc}, {c_payload});")
+
+            case TypedTry(body=body, branches=branches, else_branch=else_b, type_val=t):
+                h_name = self.fresh_tmp("_qh")
+                caught_name = self.fresh_tmp("_caught")
+                lines.append("{")
+                lines.append(f"    QExceptionHandler {h_name};")
+                lines.append(f"    {h_name}.prev = quest_current_exception_handler;")
+                lines.append(f"    quest_current_exception_handler = &{h_name};")
+                lines.append(f"    if (setjmp({h_name}.env_jmp) == 0) {{")
+                body_lines: list[str] = []
+                self.emit_to(body, dest, body_lines)
+                for bl in body_lines:
+                    lines.append(f"        {bl}" if bl.strip() else bl)
+                lines.append(f"        quest_current_exception_handler = {h_name}.prev;")
+                lines.append("    } else {")
+                lines.append(f"        quest_current_exception_handler = {h_name}.prev;")
+                lines.append(f"        QExceptionState {caught_name} = quest_current_exception;")
+                first_branch = True
+                for branch in branches:
+                    cond_prefix = "if" if first_branch else "else if"
+                    first_branch = False
+                    br_eval_lines: list[str] = []
+                    pat_val = self.emit_val(branch.exc_pattern, br_eval_lines)
+                    for el in br_eval_lines:
+                        lines.append(f"        {el}" if el.strip() else el)
+                    lines.append(f"        {cond_prefix} ({caught_name}.exc == {pat_val}) {{")
+                    branch_lines: list[str] = []
+                    if branch.binder is not None:
+                        b_name = mangle_ident(branch.binder.name)
+                        b_type = branch.binder.type_val
+                        c_b_type = self.c_type(b_type)
+                        branch_lines.append(f"{c_b_type} {b_name};")
+                        if b_type == INT_TYPE or b_type == BOOL_TYPE or b_type == CHAR_TYPE:
+                            branch_lines.append(f"{b_name} = ({c_b_type})({caught_name}.payload.i);")
+                        elif b_type == REAL_TYPE:
+                            branch_lines.append(f"{b_name} = {caught_name}.payload.r;")
+                        elif b_type == STRING_TYPE or isinstance(b_type, (QTupleType, QRecordType, QFunType, QArrayType, QVariantType, QOptionType, QExceptionType)):
+                            branch_lines.append(f"{b_name} = ({c_b_type})({caught_name}.payload.p);")
+                        else:
+                            branch_lines.append(f"{b_name} = {caught_name}.payload;")
+                    self.emit_to(branch.body, dest, branch_lines)
+                    for bl in branch_lines:
+                        lines.append(f"            {bl}" if bl.strip() else bl)
+                    lines.append("        }")
+                lines.append("        else {")
+                default_lines: list[str] = []
+                if else_b is not None:
+                    self.emit_to(else_b, dest, default_lines)
+                else:
+                    default_lines.append(f"quest_raise({caught_name}.exc, {caught_name}.payload);")
+                for dl in default_lines:
+                    lines.append(f"            {dl}" if dl.strip() else dl)
+                lines.append("        }")
                 lines.append("    }")
                 lines.append("}")
 

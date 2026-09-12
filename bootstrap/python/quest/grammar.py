@@ -683,6 +683,10 @@ def build_quest_grammar() -> None:
         lambda ident_token: ast.TypePath(path=(ident_token.lexeme,), offset=ident_token.offset),
     )
     PRIMARY_TYPE.add_rule(
+        (T(TK.KW_EXCEPTION_TYPE),),
+        lambda exc_token: ast.TypePath(path=("Exception",), offset=exc_token.offset),
+    )
+    PRIMARY_TYPE.add_rule(
         (T(TK.LBRACE), T(TK.SYMBOLIC_INFIX), T(TK.RBRACE)),
         lambda left_brace, token, right_brace: ast.TypePath(
             path=(token.lexeme,), offset=token.offset

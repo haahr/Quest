@@ -13,6 +13,17 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include <setjmp.h>
+
+#if defined(_MSC_VER)
+#  define Q_THREAD_LOCAL __declspec(thread)
+#elif defined(__STDC_VERSION__) && __STDC_VERSION__ >= 201112L && !defined(__STDC_NO_THREADS__)
+#  define Q_THREAD_LOCAL _Thread_local
+#elif defined(__GNUC__) || defined(__clang__)
+#  define Q_THREAD_LOCAL __thread
+#else
+#  define Q_THREAD_LOCAL
+#endif
 
 /* Compile-time portable layout assertions */
 #define Q_ASSERT_CONCAT_(a, b) a##b
@@ -76,6 +87,32 @@ typedef struct QOptionHeader {
     QVal    fields[];
 } QOptionHeader;
 
+/* First-class generative exception descriptor */
+typedef struct QException {
+    const char *name;
+} QException;
+
+/* Thread-local active exception state */
+typedef struct QExceptionState {
+    const QException *exc;
+    QVal              payload;
+} QExceptionState;
+
+/* Linked node in thread-local exception handler stack */
+typedef struct QExceptionHandler {
+    jmp_buf                    env_jmp;
+    struct QExceptionHandler  *prev;
+} QExceptionHandler;
+
+extern Q_THREAD_LOCAL QExceptionHandler *quest_current_exception_handler;
+extern Q_THREAD_LOCAL QExceptionState    quest_current_exception;
+
+/* Built-in singleton exception descriptors */
+extern const QException quest_exc_DivideByZero;
+extern const QException quest_exc_arrayOp_error;
+extern const QException quest_exc_string_error;
+extern const QException quest_exc_variant_error;
+
 /* Static ABI layout assertions */
 static_assert(sizeof(QInt)          == 8, qint_must_be_8_bytes);
 static_assert(sizeof(QReal)         == 8, qreal_must_be_8_bytes);
@@ -86,11 +123,14 @@ static_assert(sizeof(QString)       == 24, qstring_must_be_24_bytes);
 static_assert(sizeof(QClosure)      == 16, qclosure_must_be_16_bytes);
 static_assert(sizeof(QRecordHeader) == 8, qrecord_header_must_be_8_bytes);
 static_assert(sizeof(QVariant)      == 24, qvariant_must_be_24_bytes);
+static_assert(sizeof(QException)    == 8, qexception_must_be_8_bytes);
+static_assert(sizeof(QExceptionState) == 16, qexception_state_must_be_16_bytes);
 static_assert(offsetof(QClosure, env) == 8, qclosure_env_at_offset_8);
 static_assert(offsetof(QArray, data)  == 8, qarray_data_at_offset_8);
 static_assert(offsetof(QVariant, tag)     == 8, qvariant_tag_at_offset_8);
 static_assert(offsetof(QVariant, payload) == 16, qvariant_payload_at_offset_16);
 static_assert(offsetof(QOptionHeader, fields) == 8, qoptionheader_fields_at_offset_8);
+static_assert(offsetof(QExceptionState, payload) == 8, qexception_state_payload_at_offset_8);
 
 /* Value constants */
 #define Q_OK_VAL    ((QVal){ .u = 0 })
@@ -120,6 +160,8 @@ void     quest_string_set_sub(QString *dest, int64_t dest_start, const QString *
 
 QArray  *quest_array_new(int64_t len, QVal init_val);
 double   quest_real_pow(double base, double exp);
+const QException *quest_alloc_exception(const char *name);
+void     quest_raise(const QException *exc, QVal payload);
 void     quest_raise_divide_by_zero(void);
 void     quest_raise_array_error(void);
 void     quest_raise_string_error(void);

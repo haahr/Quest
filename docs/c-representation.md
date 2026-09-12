@@ -442,55 +442,77 @@ Quest's `try...when...else` and `raise` are lowered using a thread-local excepti
 ```c
 #include <setjmp.h>
 
-typedef struct QExceptionVal {
+typedef struct QException {
     const char *name;
-    QVal        payload;
-} QExceptionVal;
+} QException;
+
+typedef struct QExceptionState {
+    const QException *exc;
+    QVal              payload;
+} QExceptionState;
 
 typedef struct QExceptionHandler {
     jmp_buf                     env_jmp;
     struct QExceptionHandler   *prev;
 } QExceptionHandler;
 
-/* Thread-local or global handler chain */
-extern _Thread_local QExceptionHandler *quest_current_exception_handler;
-extern _Thread_local QExceptionVal      quest_current_exception;
+/* Thread-local exception handler chain */
+#if defined(_MSC_VER)
+#  define Q_THREAD_LOCAL __declspec(thread)
+#else
+#  define Q_THREAD_LOCAL _Thread_local
+#endif
+
+extern Q_THREAD_LOCAL QExceptionHandler *quest_current_exception_handler;
+extern Q_THREAD_LOCAL QExceptionState    quest_current_exception;
 ```
 
-### 7.1. Raising an Exception (`raise E with payload end`)
+### 7.1. Generative Exception Values
+Cardelli's Quest specification (§4.9) states:
+> *"The `exception` construct generates a new unique exception value whenever it is evaluated..."*
+
+Evaluating `exception name [: Type] end` invokes `quest_alloc_exception("name")`, returning a heap-allocated pointer `const QException *`. Because each allocation produces a distinct memory address, **pointer equality (`==`)** directly provides unique generative identity without requiring an integer exception ID.
+
+Built-in exceptions (e.g. `quest_exc_DivideByZero`, `quest_exc_arrayOp_error`, `quest_exc_string_error`, `quest_exc_variant_error`) are pre-allocated global `QException` singletons whose static addresses provide their immutable identity.
+
+### 7.2. Raising an Exception (`raise E [with payload] end`)
 ```c
-void quest_raise(const char *name, QVal payload) {
+void quest_raise(const QException *exc, QVal payload) {
     if (!quest_current_exception_handler) {
         /* Uncaught exception diagnostic */
-        quest_fatal_uncaught_exception(name, payload);
+        const char *name = (exc && exc->name) ? exc->name : "<unknown>";
+        fprintf(stderr, "Exception: %s\n", name);
+        exit(1);
     }
-    quest_current_exception.name = name;
+    quest_current_exception.exc = exc;
     quest_current_exception.payload = payload;
     longjmp(quest_current_exception_handler->env_jmp, 1);
 }
 ```
 
-### 7.2. Try-Handler Block (`try ... when ... else ... end`)
+### 7.3. Try-Handler Block (`try ... when ... else ... end`)
 ```c
 QExceptionHandler q_handler;
 q_handler.prev = quest_current_exception_handler;
 quest_current_exception_handler = &q_handler;
 
 if (setjmp(q_handler.env_jmp) == 0) {
-    /* Protected body */
+    /* Protected body evaluated into destination */
     ...
     quest_current_exception_handler = q_handler.prev; /* Pop handler on normal completion */
 } else {
-    /* Pop handler before executing catch block */
+    /* Pop handler before executing catch block so nested raises propagate outwards */
     quest_current_exception_handler = q_handler.prev;
+    QExceptionState q_caught = quest_current_exception;
     
-    if (quest_current_exception.name == qv_ExcTag1) {
-        /* Handle ExcTag1 */
-    } else if (quest_current_exception.name == qv_ExcTag2) {
-        /* Handle ExcTag2 */
+    if (q_caught.exc == qv_Exc1) {
+        /* If branch has binder: bind q_caught.payload */
+        /* Evaluate branch body into destination */
+    } else if (q_caught.exc == qv_Exc2) {
+        /* Handle branch 2 */
     } else {
         /* Else clause, or re-raise if no matching when */
-        quest_raise(quest_current_exception.name, quest_current_exception.payload);
+        quest_raise(q_caught.exc, q_caught.payload);
     }
 }
 ```

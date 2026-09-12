@@ -98,24 +98,47 @@ double quest_real_pow(double base, double exp) {
     return pow(base, exp);
 }
 
+/* Exception handling globals */
+Q_THREAD_LOCAL QExceptionHandler *quest_current_exception_handler = NULL;
+Q_THREAD_LOCAL QExceptionState    quest_current_exception = { NULL, { .u = 0 } };
+
+/* Built-in singleton exception descriptors */
+const QException quest_exc_DivideByZero  = { "DivideByZero" };
+const QException quest_exc_arrayOp_error = { "arrayOp.error" };
+const QException quest_exc_string_error  = { "string.error" };
+const QException quest_exc_variant_error = { "variant.tagMismatch" };
+
+const QException *quest_alloc_exception(const char *name) {
+    QException *exc = (QException *)quest_alloc(sizeof(QException));
+    exc->name = name ? name : "Exception";
+    return exc;
+}
+
+void quest_raise(const QException *exc, QVal payload) {
+    if (quest_current_exception_handler == NULL) {
+        const char *name = (exc != NULL && exc->name != NULL) ? exc->name : "<unknown>";
+        fprintf(stderr, "Exception: %s\n", name);
+        exit(1);
+    }
+    quest_current_exception.exc = exc;
+    quest_current_exception.payload = payload;
+    longjmp(quest_current_exception_handler->env_jmp, 1);
+}
+
 void quest_raise_divide_by_zero(void) {
-    fprintf(stderr, "Exception: DivideByZero\n");
-    exit(1);
+    quest_raise(&quest_exc_DivideByZero, Q_OK_VAL);
 }
 
 void quest_raise_array_error(void) {
-    fprintf(stderr, "Exception: arrayOp.error\n");
-    exit(1);
+    quest_raise(&quest_exc_arrayOp_error, Q_OK_VAL);
 }
 
 void quest_raise_string_error(void) {
-    fprintf(stderr, "Exception: string.error\n");
-    exit(1);
+    quest_raise(&quest_exc_string_error, Q_OK_VAL);
 }
 
 void quest_raise_variant_error(void) {
-    fprintf(stderr, "Exception: variant.tagMismatch\n");
-    exit(1);
+    quest_raise(&quest_exc_variant_error, Q_OK_VAL);
 }
 
 void quest_print_val(QVal val, const char *type_name) {

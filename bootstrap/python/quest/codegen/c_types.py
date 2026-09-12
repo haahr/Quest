@@ -10,6 +10,7 @@ from quest.types import (
     REAL_TYPE,
     STRING_TYPE,
     QArrayType,
+    QExceptionType,
     QFunType,
     QOptionField,
     QOptionType,
@@ -56,6 +57,8 @@ def type_to_c_tag(t: QType) -> str:
         return "QArray"
     if isinstance(t, QVariantType):
         return "QVariant"
+    if isinstance(t, QExceptionType):
+        return "QException"
     if isinstance(t, QOptionType):
         tags = []
         for o in t.options:
@@ -153,6 +156,8 @@ def qtype_to_c_type(t: QType, ctx: Optional[RecordNamingContext] = None) -> str:
         return "QArray *"
     if isinstance(t, QVariantType):
         return "QVariant *"
+    if isinstance(t, QExceptionType):
+        return "const QException *"
     if isinstance(t, QOptionType):
         return f"{option_struct_name(t)} *"
     return "QVal"
