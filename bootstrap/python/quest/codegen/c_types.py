@@ -30,6 +30,13 @@ def mangle_ident(name: str) -> str:
     return f"qv_{clean}"
 
 
+def mangle_module_ident(module_name: str, name: str) -> str:
+    """Mangles a module-scoped Quest identifier into a C-safe identifier prefixed with qv_<mod>_."""
+    clean_mod = module_name.replace(".", "_")
+    clean_name = name.replace(".", "_")
+    return f"qv_{clean_mod}_{clean_name}"
+
+
 def type_to_c_tag(t: QType) -> str:
     """Produces a deterministic, valid C identifier component for a QType."""
     if t == INT_TYPE:

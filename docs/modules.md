@@ -172,8 +172,54 @@ quest compile -I ./lib main.quest -o main_app
 
 ---
 
+## 7. Compilation Architecture & Implementation Roadmap
+
+The Quest C compiler's module support is designed in two complementary stages:
+
+### Stage 1: Whole-Program Compilation (Initial Implementation)
+In Stage 1, the compiler starts from a root source file, processes all explicit and implicit `import` declarations recursively, and builds a complete in-memory typed AST model of the program (`Environment.loaded_modules_ast`). When all imports have been resolved, typechecked, and verified, the compiler emits a single self-contained C translation unit (`.c` file) that compiles directly with standard C99:
+
+1. **Acyclic Dependency Enforcement (Cardelli §7.1):**
+   - As Cardelli explicitly specifies (*Typeful Programming* §7.1, p. 55): *"The import dependencies of both modules and interfaces must form a directed acyclic graph; that is, mutually recursive imports are not allowed to guarantee that the linking process is deterministic."*
+   - Neither interfaces nor modules may form cycles. Topological sort order is guaranteed to be unambiguous and deterministic.
+2. **Module Export Representation (Option A - First-Class Records):**
+   - Each module `m : I` compiles to a top-level C record pointer `static QT_I *qv_m;`.
+   - The interface `I` specifies the record struct shape `QT_I` containing function pointers, closures, and values.
+   - Accessing `m.f(x)` emits `qv_m->qf_f(x)` (or dictionary-based offset lookup if subtyping applies).
+3. **Abstract Type Erasure to `QVal`:**
+   - In interface records, abstract types (`T::TYPE`) cannot have known concrete scalar representations across compilation boundaries. Function signatures in the interface record use uniform 64-bit words (`QVal` / `void *`), and concrete implementations adapt/cast as necessary.
+4. **Manifest Type Erasure:**
+   - Interface records (`QT_<Interface>`) only store value components (`FieldSig`); manifest types (`Def T = ...`) and kinds are erased at runtime and do not generate struct fields.
+5. **Topological Module Initialization (`_init`):**
+   - Each module emits an initialization function `static void qv_mod_<name>_init(void)` protected by an idempotent boolean flag `static bool qv_mod_<name>_initialized;`.
+   - The initializer recursively calls the initializers of all its dependencies in topological order, allocates `qv_m`, executes the module's internal statements and `let var` bindings, and writes the exported members into `qv_m`.
+   - `main()` invokes the initializers of all top-level imported modules before executing the main script phrases. This guarantees singleton semantics across diamond dependency graphs.
+6. **Identifier Mangling:**
+   - Internal module variables, lifted lambdas, and closures are prefixed with their module name (`qv_<module>_<name>`), preventing name collisions in the single translation unit.
+7. **C Record Wrappers for Built-in Modules:**
+   - Core built-in modules (`arrayOp`, `string`, etc.) generate C record instances and initializers wrapping the native runtime primitives (`quest_array_new`, `quest_string_new`, etc.), allowing built-ins to be invoked and passed using the exact same record mechanics as user modules.
+
+### Stage 2: Separate Compilation (Future Roadmap)
+Stage 2 introduces incremental, on-demand compilation of individual modules and interfaces into reusable disk artifacts without reprocessing the original Quest source files:
+
+1. **Interface Artifacts (`.qi` & `.h`):**
+   - Compiling an interface `I.int.quest` produces:
+     - `I.h`: A C header declaring the C struct shape `QT_I`, function signatures, and exported constants.
+     - `I.qi`: A compiled Quest interface metadata file containing the elaborated type signatures, subtyping bounds, and kinds required by the Quest compiler when typechecking downstream modules without re-reading `I.int.quest`.
+2. **Module Artifacts (`.qm`, `.c`, `.o`):**
+   - Compiling `m.mod.quest` produces:
+     - `m.c` / `m.o`: Native object files defining `qv_mod_m_init()` and the module implementation.
+     - `m.qm`: A compiled Quest module metadata file verifying implementation conformance against `I.qi`.
+3. **Linking and ABI:**
+   - The Quest driver coordinates linking required `.o` files with `clang` or producing static/dynamic libraries.
+   - Record subtyping evidence dictionaries and shape descriptors adopt stable, deterministic external linkage across object boundaries.
+
+---
+
 ## See Also
 - [pipeline.md](pipeline.md): Compiler pipeline framework and CLI driver options.
+- [c-representation.md](c-representation.md): C runtime ABI, record representation, and function calling conventions.
 - [type-system.md](type-system.md): Type system, subtyping, and signature elaboration.
 - [interpreter.md](interpreter.md): Tree-walking interpreter and runtime environment.
 - [syntax.md](syntax.md): Concrete syntax and grammar rules.
+

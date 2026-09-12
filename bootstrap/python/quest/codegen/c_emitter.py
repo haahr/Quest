@@ -8,6 +8,7 @@ from typing import Any, Optional
 from quest.codegen.c_types import (
     RecordNamingContext,
     mangle_ident,
+    mangle_module_ident,
     option_struct_name,
     qtype_to_c_type,
     qtype_to_name_str,
@@ -34,6 +35,7 @@ from quest.typed_ast import (
     TypedFor,
     TypedFun,
     TypedIf,
+    TypedImport,
     TypedIndex,
     TypedIndexAssign,
     TypedInfix,
@@ -41,6 +43,7 @@ from quest.typed_ast import (
     TypedLetType,
     TypedLetValue,
     TypedLoop,
+    TypedModule,
     TypedNode,
     TypedOk,
     TypedOption,
@@ -56,6 +59,7 @@ from quest.typed_ast import (
     TypedTuple,
     TypedTry,
     TypedTryBranch,
+    TypedTypeApp,
     TypedTypeWitness,
     TypedVar,
     TypedVarCell,
@@ -420,11 +424,35 @@ def _collect_lambdas(
     return lambdas
 
 
+def topological_sort_modules(modules: list[TypedModule]) -> list[TypedModule]:
+    """Sorts modules in dependency order (callees before callers)."""
+    by_name = {m.name: m for m in modules}
+    visited: set[str] = set()
+    order: list[TypedModule] = []
+
+    def visit(m: TypedModule):
+        if m.name in visited:
+            return
+        visited.add(m.name)
+        for b in m.bindings:
+            if isinstance(b, TypedImport):
+                for item in b.items:
+                    for name in item.names:
+                        if name in by_name:
+                            visit(by_name[name])
+        order.append(m)
+
+    for m in modules:
+        visit(m)
+    return order
+
+
 class CEmitter:
     """Translates typed Quest AST nodes into standard C99 source code."""
 
-    def __init__(self, echo: bool = False):
+    def __init__(self, echo: bool = False, module_prefix: Optional[str] = None):
         self.echo = echo
+        self.module_prefix = module_prefix
         self._tmp_id = 0
         self.top_fun_names: set[str] = set()
         self.top_var_names: set[str] = set()
@@ -457,11 +485,17 @@ class CEmitter:
                 return False
         return True
 
+    def mangle_ident(self, name: str) -> str:
+        """Mangles an identifier using module_prefix if set."""
+        if self.module_prefix:
+            return mangle_module_ident(self.module_prefix, name)
+        return mangle_ident(name)
+
     def _param_signatures(self, params: list[TypedParam]) -> tuple[list[str], list[str]]:
         decls: list[str] = []
         forward_args: list[str] = []
         for p in params:
-            p_c = mangle_ident(p.name)
+            p_c = self.mangle_ident(p.name)
             if isinstance(p.type_val, QRecordType):
                 dict_t = self.record_ctx.offset_dict_struct_name(p.type_val)
                 dict_param = f"_dict_{p_c}"
@@ -492,10 +526,42 @@ class CEmitter:
             curr = curr.func
         return curr, args
 
-    def emit_program(self, prog: TypedProgram) -> str:
+    def emit_program(
+        self,
+        prog: TypedProgram,
+        loaded_modules: Optional[dict[str, TypedModule]] = None,
+    ) -> str:
         """Translates a TypedProgram into a full standard C99 source file string."""
+        from quest.builtins import BuiltinModuleRegistry
+
+        # Collect modules from both loaded_modules and prog.phrases
+        all_module_map: dict[str, TypedModule] = {}
+        if loaded_modules:
+            for mod in loaded_modules.values():
+                if isinstance(mod, TypedModule):
+                    all_module_map[mod.name] = mod
+        for phrase in prog.phrases:
+            if isinstance(phrase, TypedModule):
+                all_module_map[phrase.name] = phrase
+
+        sorted_modules = topological_sort_modules(list(all_module_map.values()))
         # 0. Aggregate and variant types collection
         agg_types, variant_types = _collect_aggregate_types(prog, self.record_ctx)
+
+        # Collect aggregate types from module bindings and module interface records
+        for mod in sorted_modules:
+            for b in mod.bindings:
+                b_agg, b_var = _collect_aggregate_types(b, self.record_ctx)
+                for item in b_agg:
+                    if item not in agg_types:
+                        agg_types.append(item)
+                for v in b_var:
+                    if v not in variant_types:
+                        variant_types.append(v)
+            mod_rec_t = BuiltinModuleRegistry._build_record_type_from_scope(mod.scope)
+            rec_tag = record_struct_name(mod_rec_t, self.record_ctx)
+            if not any(tag == rec_tag for tag, _ in agg_types):
+                agg_types.append((rec_tag, mod_rec_t))
 
         all_records = [t for _, t in agg_types if isinstance(t, QRecordType)]
         all_tuples = [t for _, t in agg_types if isinstance(t, QTupleType)]
@@ -517,11 +583,14 @@ class CEmitter:
                 if s != t and is_variant_subtype(s, t):
                     self.variant_coercions.add((t, s))
 
+        # Top-level phrases in prog (excluding TypedModule which are emitted separately)
         top_funs: list[tuple[str, TypedFun, Any]] = []
         top_vars: list[tuple[str, TypedExpr, Any]] = []
 
         for phrase in prog.phrases:
             match phrase:
+                case TypedModule():
+                    pass
                 case TypedLetValue(name=name, value=val, symbol=symbol):
                     if isinstance(val, TypedFun):
                         top_funs.append((name, val, symbol))
@@ -555,6 +624,19 @@ class CEmitter:
             for tag_name, _ in agg_types:
                 lines.append(f"typedef struct {tag_name} {tag_name};")
             lines.append("")
+
+        if sorted_modules:
+            lines.append("/* Forward declarations and state for compiled modules */")
+            for mod in sorted_modules:
+                mod_rec_t = BuiltinModuleRegistry._build_record_type_from_scope(mod.scope)
+                rec_struct = self.record_struct_name(mod_rec_t)
+                clean_mod = mod.name.replace(".", "_")
+                lines.append(f"static {rec_struct} *qv_{clean_mod};")
+                lines.append(f"static bool qv_mod_{clean_mod}_initialized = false;")
+                lines.append(f"static void qv_mod_{clean_mod}_init(void);")
+            lines.append("")
+
+        if agg_types:
             lines.append("/* Aggregate struct definitions */")
             for tag_name, t in agg_types:
                 lines.append(f"struct {tag_name} {{")
@@ -905,6 +987,149 @@ class CEmitter:
                 lines.append("}")
                 lines.append("")
 
+        # 8b. Emit module functions and initializers
+        if sorted_modules:
+            lines.append("/* Compiled module definitions and initializers */")
+            for mod in sorted_modules:
+                clean_mod = mod.name.replace(".", "_")
+                # Collect top-level functions and variables in this module
+                mod_funs: list[tuple[str, TypedFun, Any]] = []
+                mod_vars: list[tuple[str, TypedExpr, Any]] = []
+                mod_imported_mods: list[str] = []
+                for b in mod.bindings:
+                    match b:
+                        case TypedLetValue(name=b_name, value=b_val, symbol=b_sym):
+                            if isinstance(b_val, TypedFun):
+                                mod_funs.append((b_name, b_val, b_sym))
+                            else:
+                                mod_vars.append((b_name, b_val, b_sym))
+                        case TypedImport(items=items):
+                            for it in items:
+                                for iname in it.names:
+                                    if iname in all_module_map:
+                                        mod_imported_mods.append(iname)
+                        case TypedException(name=b_name, type_val=b_t) as exc_n:
+                            if b_name:
+                                mod_vars.append((b_name, exc_n, type("Symbol", (), {"type_val": b_t})()))
+                        case _:
+                            pass
+
+                # Static variables for module internal let values
+                for vname, vval, vsym in mod_vars:
+                    if vsym.type_val != OK_TYPE:
+                        m_ident = mangle_module_ident(clean_mod, vname)
+                        lines.append(f"static {self.c_type(vsym.type_val)} {m_ident};")
+
+                # Forward declarations and definitions for module functions
+                for fname, ffun, fsym in mod_funs:
+                    m_ident = mangle_module_ident(clean_mod, fname)
+                    params, _, ret_type = self._collect_fun_params(ffun)
+                    ret_c = "void" if ret_type == OK_TYPE else self.c_type(ret_type)
+                    param_decls = [f"{self.c_type(p.type_val)} {mangle_module_ident(clean_mod, p.name)}" for p in params]
+                    sig = "void" if not param_decls else ", ".join(param_decls)
+                    lines.append(f"static {ret_c} {m_ident}({sig});")
+
+                # Trampolines for module functions so they can be wrapped in QClosure for exported record
+                for fname, ffun, fsym in mod_funs:
+                    m_ident = mangle_module_ident(clean_mod, fname)
+                    tramp_name = f"{m_ident}_trampoline"
+                    params, _, ret_type = self._collect_fun_params(ffun)
+                    ret_c = "void" if ret_type == OK_TYPE else self.c_type(ret_type)
+                    param_decls = [f"{self.c_type(p.type_val)} {mangle_module_ident(clean_mod, p.name)}" for p in params]
+                    param_sigs = ["void *env"] + param_decls
+                    sig = ", ".join(param_sigs)
+                    f_args = [mangle_module_ident(clean_mod, p.name) for p in params]
+                    args_str = ", ".join(f_args)
+                    lines.append(f"static {ret_c} {tramp_name}({sig}) {{")
+                    lines.append("    (void)env;")
+                    if ret_type == OK_TYPE:
+                        lines.append(f"    {m_ident}({args_str});")
+                        lines.append("    return;")
+                    else:
+                        lines.append(f"    return {m_ident}({args_str});")
+                    lines.append("}")
+
+                # Function definitions for module functions using module-scoped emitter
+                mod_emitter = CEmitter(echo=False, module_prefix=clean_mod)
+                mod_emitter.top_fun_names = {fname for fname, _, _ in mod_funs}
+                mod_emitter.top_funs_dict = {fname: (ffun, fsym) for fname, ffun, fsym in mod_funs}
+                mod_emitter.record_ctx = self.record_ctx
+
+                for fname, ffun, fsym in mod_funs:
+                    m_ident = mangle_module_ident(clean_mod, fname)
+                    params, body, ret_type = self._collect_fun_params(ffun)
+                    ret_c = "void" if ret_type == OK_TYPE else self.c_type(ret_type)
+                    param_decls = [f"{self.c_type(p.type_val)} {mangle_module_ident(clean_mod, p.name)}" for p in params]
+                    sig = "void" if not param_decls else ", ".join(param_decls)
+                    lines.append(f"static {ret_c} {m_ident}({sig}) {{")
+                    fn_lines: list[str] = []
+                    # Map param names in current_env_vars so they resolve to mangled names
+                    prev_env = mod_emitter.current_env_vars
+                    mod_emitter.current_env_vars = {p.name: mangle_module_ident(clean_mod, p.name) for p in params}
+                    for vname, _, _ in mod_vars:
+                        mod_emitter.current_env_vars[vname] = mangle_module_ident(clean_mod, vname)
+                    if ret_type == OK_TYPE:
+                        mod_emitter.emit_to(body, None, fn_lines)
+                        fn_lines.append("return;")
+                    else:
+                        ret_val = mod_emitter.emit_val(body, fn_lines)
+                        fn_lines.append(f"return {ret_val};")
+                    mod_emitter.current_env_vars = prev_env
+                    for fl in fn_lines:
+                        lines.append(f"    {fl}" if fl.strip() else fl)
+                    lines.append("}")
+                    lines.append("")
+
+                # Module initializer function
+                lines.append(f"static void qv_mod_{clean_mod}_init(void) {{")
+                lines.append(f"    if (qv_mod_{clean_mod}_initialized) return;")
+                lines.append(f"    qv_mod_{clean_mod}_initialized = true;")
+                # Initialize dependencies first
+                for dep in mod_imported_mods:
+                    dep_clean = dep.replace(".", "_")
+                    lines.append(f"    qv_mod_{dep_clean}_init();")
+                # Evaluate module let values
+                init_lines: list[str] = []
+                mod_emitter.current_env_vars = {vname: mangle_module_ident(clean_mod, vname) for vname, _, _ in mod_vars}
+                for b in mod.bindings:
+                    match b:
+                        case TypedLetValue(name=vname, value=vval, symbol=vsym):
+                            if not isinstance(vval, TypedFun):
+                                m_ident = mangle_module_ident(clean_mod, vname)
+                                if vsym.type_val == OK_TYPE:
+                                    mod_emitter.emit_to(vval, None, init_lines)
+                                else:
+                                    mod_emitter.emit_to(vval, m_ident, init_lines)
+                        case TypedException(name=ename) as exc_n:
+                            if ename:
+                                m_ident = mangle_module_ident(clean_mod, ename)
+                                mod_emitter.emit_to(exc_n, m_ident, init_lines)
+                        case _:
+                            pass
+                for il in init_lines:
+                    lines.append(f"    {il}" if il.strip() else il)
+
+                # Allocate and populate module record
+                mod_rec_t = BuiltinModuleRegistry._build_record_type_from_scope(mod.scope)
+                rec_struct = self.record_struct_name(mod_rec_t)
+                lines.append(f"    qv_{clean_mod} = ({rec_struct} *)quest_alloc(sizeof({rec_struct}));")
+                lines.append(f"    qv_{clean_mod}->header.descriptor = NULL;")
+                for fld in sorted(mod_rec_t.fields, key=lambda f: f.name):
+                    # Check if exported field is a function
+                    matching_fun = next((ff for fn, ff, _ in mod_funs if fn == fld.name), None)
+                    if matching_fun is not None:
+                        tramp_name = f"{mangle_module_ident(clean_mod, fld.name)}_trampoline"
+                        clos_tmp = self.fresh_tmp(f"_{clean_mod}_{fld.name}_clos")
+                        lines.append(f"    QClosure *{clos_tmp} = (QClosure *)quest_alloc(sizeof(QClosure));")
+                        lines.append(f"    {clos_tmp}->fn = (void *){tramp_name};")
+                        lines.append(f"    {clos_tmp}->env = NULL;")
+                        lines.append(f"    qv_{clean_mod}->qf_{fld.name} = {clos_tmp};")
+                    else:
+                        m_ident = mangle_module_ident(clean_mod, fld.name)
+                        lines.append(f"    qv_{clean_mod}->qf_{fld.name} = {m_ident};")
+                lines.append("}")
+                lines.append("")
+
         # 9. Main entrypoint
         lines.extend([
             "int main(int argc, char **argv) {",
@@ -912,6 +1137,13 @@ class CEmitter:
             "    quest_gc_init();",
             "",
         ])
+
+        # Initialize all compiled modules topologically
+        if sorted_modules:
+            for mod in sorted_modules:
+                clean_mod = mod.name.replace(".", "_")
+                lines.append(f"    qv_mod_{clean_mod}_init();")
+            lines.append("")
 
         total_phrases = len(prog.phrases)
         for i, phrase in enumerate(prog.phrases):
@@ -1260,6 +1492,47 @@ class CEmitter:
                 return self._emit_infix(c_left, op, c_right)
 
             case TypedApp(func=f, args=args):
+                # Check for unwrapped type applications
+                effective_func = f
+                while isinstance(effective_func, TypedTypeApp):
+                    effective_func = effective_func.func
+
+                # Direct lowering for built-in arrayOp calls
+                if isinstance(effective_func, TypedSelect) and isinstance(effective_func.target, TypedVar):
+                    mod_name = effective_func.target.name
+                    fld = effective_func.field
+                    if mod_name == "arrayOp":
+                        if fld == "new" and len(args) == 2:
+                            c_sz = self.emit_val(args[0], lines)
+                            c_init = self.emit_val(args[1], lines)
+                            wrap = _qval_wrap(c_init, args[1].type_val)
+                            return f"quest_array_new({c_sz}, {wrap})"
+                        elif fld == "size" and len(args) == 1:
+                            c_arr = self.emit_val(args[0], lines)
+                            return f"({c_arr}->length)"
+                        elif fld == "get" and len(args) == 2:
+                            c_arr = self.emit_val(args[0], lines)
+                            c_idx = self.emit_val(args[1], lines)
+                            lines.append(f"quest_check_array_bounds({c_arr}, {c_idx});")
+                            elem_t = expr.type_val
+                            if elem_t in (INT_TYPE, BOOL_TYPE, CHAR_TYPE):
+                                return f"({c_arr}->data[{c_idx}].i)"
+                            elif elem_t == REAL_TYPE:
+                                return f"({c_arr}->data[{c_idx}].r)"
+                            elif elem_t == STRING_TYPE or isinstance(elem_t, (QTupleType, QRecordType, QFunType, QArrayType)):
+                                c_elem_t = self.c_type(elem_t)
+                                return f"(({c_elem_t})({c_arr}->data[{c_idx}].p))"
+                            else:
+                                return f"({c_arr}->data[{c_idx}])"
+                        elif fld == "set" and len(args) == 3:
+                            c_arr = self.emit_val(args[0], lines)
+                            c_idx = self.emit_val(args[1], lines)
+                            c_item = self.emit_val(args[2], lines)
+                            lines.append(f"quest_check_array_bounds({c_arr}, {c_idx});")
+                            wrap = _qval_wrap(c_item, args[2].type_val)
+                            lines.append(f"{c_arr}->data[{c_idx}] = {wrap};")
+                            return "((void)0)"
+
                 if isinstance(f, TypedVar) and f.name in self.top_fun_names:
                     c_func = mangle_ident(f.name)
                     c_args = []
@@ -1413,6 +1686,9 @@ class CEmitter:
                 lines.append(f"{c_type} {tmp};")
                 self.emit_to(expr, tmp, lines)
                 return tmp
+
+            case TypedTypeApp(func=func):
+                return self.emit_val(func, lines)
 
             case _:
                 raise NotImplementedError(

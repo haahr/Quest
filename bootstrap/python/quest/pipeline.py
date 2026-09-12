@@ -319,12 +319,13 @@ class CodegenCPhase(Phase):
 
         try:
             emitter = CEmitter(echo=ctx.options.echo)
+            loaded_mods = ctx.env.loaded_modules_ast if ctx.env else None
             match input_data:
                 case TypedProgram():
-                    return emitter.emit_program(input_data)
+                    return emitter.emit_program(input_data, loaded_modules=loaded_mods)
                 case TypedExpr() | TypedBinding():
                     prog = TypedProgram(phrases=(input_data,))
-                    return emitter.emit_program(prog)
+                    return emitter.emit_program(prog, loaded_modules=loaded_mods)
                 case _:
                     return None
         except Exception as error:
