@@ -105,8 +105,17 @@ native **AArch64 (ARM64)** machine code and providing a **JIT compiler** for int
   - **Phase 4.3 (Arrays & Strings):** Fixed-size/dynamic arrays and extended string operations. — *Complete*
   - **Phase 4.4 (Options & Variants):** Ordered options, tagged variants, tag checks, and case discrimination. — *Complete*
   - **Phase 4.5 (Subtyping & Dynamic Dispatch):** Prefix tuple subtyping, evidence-passing record dictionaries, object headers, and static variant tag remapping. — *Complete*
-  - **Phase 4.6 (Dynamic Types & Exceptions):** Dynamic type tags, try-except blocks, and panic unwinding.
-  - **Phase 4.7 (Modules & Interfaces):** Multi-file compilation, include paths, and linking.
+  - **Phase 4.6 (Exceptions & Panics):** Exception values, try-when exception handling, and stack unwinding. — *Complete*
+  - **Phase 4.7 (Whole-Program Modules & Interfaces):** Multi-file compilation, interface checking, module records, and linking. — *Complete*
+  - **Phase 4.8 (Runtime Type Descriptors & Dynamic Module):**
+    - *4.8a:* Runtime `QTypeDescriptor` structures, base descriptors, interning table, and `QDynamic`. — *Complete*
+    - *4.8b:* Compiler quantifier calling convention and call-site descriptor synthesis. — *Complete*
+    - *4.8c:* `dynamic` module lowering (`dynamic.new`, `dynamic.be`, `dynamic.copy`, `dynamic.error`) and generic wrappers. — *Complete*
+- **Bootstrap Compiler Completion Prerequisites:**
+  - *Dynamic Subtyping & Compound Type Descriptors:* Structural subtyping in `quest_dynamic_be` (`is_subtype(sub, super)`) across records, variants, and compound types.
+  - *Separate Compilation & Object Linking:* Compiling modules independently to `.o` files with header/interface exports and linking.
+  - *Fat Pointers & Aggregate Subtyping:* Storing subtyped records (pointer + evidence dict) and variants in aggregates (`Array`, `Tuple`), breaking the single 64-bit value constraint where needed.
+  - *Standard Library Builtins Completeness:* C runtime implementations for remaining Cardelli builtins (`ascii`, `conv`, etc.) and deferred `dynamic.extern`/`intern` text serialization.
 - C transpiler architecture in [codegen-c.md](codegen-c.md);
   C ABI specification in [c-representation.md](c-representation.md).
 

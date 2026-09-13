@@ -334,6 +334,17 @@ Dynamic values package a runtime value together with its static type:
 - **Dynamic Inspection:**
   - `inspect d when T1 with v then e1 else e2 end` tests membership against branches dynamically.
 
+#### 6.10.1. Intensional Type Analysis vs. Pure Type Erasure
+In a pure type erasure model (such as standard System $F_{<:}$ or ML), type parameters are discarded at compile time, leaving runtime code to operate exclusively on untyped representations. However, `Dynamic` requires **Intensional Type Analysis (ITA)** (Harper & Morrisett 1995), because `dynamic.new` and `dynamic.be` inspect types at runtime:
+- **Why Erasure Breaks Generic Wrappers:**
+  Consider a polymorphic wrapper:
+  ```quest
+  let dynamicWrapper(A::TYPE a:A): dynamic.T = dynamic.new(:A a);
+  ```
+  If `A` were erased, `dynamicWrapper` would have no runtime knowledge of `A` and could not package `a` with its type descriptor.
+- **Comparison with Java RTTI vs. Erasure:**
+  In Java, generic methods are implemented via erasure (`<T> void foo(T x)` erases `T` to `Object`). Java's dynamic operations (`instanceof`, reflection, `getClass()`) do not inspect erased generic parameters; they rely on reified class metadata (`java.lang.Class<T>`) stored in every object's heap header. When Java code needs dynamic operations on an abstract type parameter, it cannot write `new T()` or `x instanceof T`; it forces the programmer to pass an explicit runtime type token (`Class<T> typeToken`). In Quest, `dynamic.new(A::TYPE a:A)` specifies `A` as a formal type parameter, so the compiler automatically passes runtime type descriptors (`const QTypeDescriptor *descriptor_A`) to all quantified functions.
+
 ### 6.11. List Module and Type Operator (`list: List`)
 The `list` module provides functional, immutable linked lists conforming to interface `List`:
 - **Higher-Kinded Abstract Type:** `List.T :: ALL(A::TYPE)::TYPE`.

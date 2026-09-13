@@ -71,19 +71,24 @@ from quest.typed_ast import (
 from quest.types import (
     BOOL_TYPE,
     CHAR_TYPE,
+    DYNAMIC_TYPE,
     INT_TYPE,
     OK_TYPE,
     REAL_TYPE,
     STRING_TYPE,
+    QAbstractType,
+    QAllType,
     QArrayType,
     QExceptionType,
     QFunType,
     QOptionType,
+    QQuantifier,
     QRecordField,
     QRecordType,
     QTupleField,
     QTupleType,
     QType,
+    QTypeVar,
     QVariantType,
 )
 
@@ -145,13 +150,35 @@ def _indent(text: str, spaces: int = 4) -> str:
 
 def _qval_wrap(expr_str: str, t: QType) -> str:
     """Wraps a scalar or pointer expression into a QVal union initializer."""
+    if t == DYNAMIC_TYPE or (isinstance(t, QTypeVar) and t.name == "Dynamic.T"):
+        return f"((QVal){{ .p = (void *)({expr_str}) }})"
+    if isinstance(t, QTypeVar):
+        return expr_str
     if t == INT_TYPE or t == BOOL_TYPE or t == CHAR_TYPE:
         return f"((QVal){{ .i = (int64_t)({expr_str}) }})"
     if t == REAL_TYPE:
         return f"((QVal){{ .r = (double)({expr_str}) }})"
-    if t == STRING_TYPE or isinstance(t, (QTupleType, QRecordType, QFunType, QArrayType, QVariantType, QOptionType, QExceptionType)):
+    if t == STRING_TYPE or isinstance(t, (QTupleType, QRecordType, QFunType, QAllType, QArrayType, QVariantType, QOptionType, QExceptionType)):
         return f"((QVal){{ .p = (void *)({expr_str}) }})"
     return f"((QVal){{ .u = 0 }})"
+
+
+def _qval_unwrap(qval_expr: str, t: QType, emitter: Optional[Any] = None) -> str:
+    """Extracts the underlying concrete scalar or pointer from a QVal expression."""
+    if t == DYNAMIC_TYPE or (isinstance(t, QTypeVar) and t.name == "Dynamic.T"):
+        return f"((QDynamic *)({qval_expr}.p))"
+    if isinstance(t, QTypeVar):
+        return qval_expr
+    if t in (INT_TYPE, BOOL_TYPE, CHAR_TYPE):
+        return f"({qval_expr}.i)"
+    if t == REAL_TYPE:
+        return f"({qval_expr}.r)"
+    if t == OK_TYPE:
+        return "((void)0)"
+    if emitter is not None:
+        c_t = emitter.c_type(t)
+        return f"(({c_t})({qval_expr}.p))"
+    return f"({qval_expr}.p)"
 
 
 def is_record_subtype(s: QType, t: QType) -> bool:
@@ -187,15 +214,24 @@ def is_variant_subtype(s: QType, t: QType) -> bool:
 
 def _closure_fn_ptr_type(fun_type: QType, ctx: Optional[RecordNamingContext] = None) -> str:
     """Constructs the C function pointer cast type for invoking a closure."""
-    if isinstance(fun_type, QFunType):
-        if fun_type.result_type == OK_TYPE:
+    quantifiers: tuple[QQuantifier, ...] = ()
+    cur_type = fun_type
+    while isinstance(cur_type, QAllType):
+        quantifiers = quantifiers + cur_type.quantifiers
+        cur_type = cur_type.body
+
+    if isinstance(cur_type, QFunType):
+        if cur_type.result_type == OK_TYPE:
             ret_c = "void"
-        elif isinstance(fun_type.result_type, QRecordType) and ctx is not None:
-            ret_c = f"QRecordResult_{ctx.get_or_create_name(fun_type.result_type)}"
+        elif isinstance(cur_type.result_type, QRecordType) and ctx is not None:
+            ret_c = f"QRecordResult_{ctx.get_or_create_name(cur_type.result_type)}"
         else:
-            ret_c = qtype_to_c_type(fun_type.result_type, ctx)
+            ret_c = qtype_to_c_type(cur_type.result_type, ctx)
         param_types = ["void *"]
-        for p in fun_type.params:
+        # Quantifier descriptors appear immediately after env
+        for _ in quantifiers:
+            param_types.append("const QTypeDescriptor *")
+        for p in cur_type.params:
             if isinstance(p.type_val, QRecordType):
                 param_types.append("void *")
                 d_name = ctx.offset_dict_struct_name(p.type_val) if ctx else "void"
@@ -467,9 +503,39 @@ class CEmitter:
         self.param_dict_names: dict[str, str] = {}
         self.var_dict_names: dict[str, str] = {}
         self.top_funs_dict: dict[str, tuple[TypedFun, Any]] = {}
+        self.in_scope_type_descriptors: dict[str, str] = {}
 
     def c_type(self, t: QType) -> str:
         return qtype_to_c_type(t, self.record_ctx)
+
+    def c_type_descriptor(self, t: QType) -> str:
+        """Returns the C expression evaluating to `const QTypeDescriptor *` for type `t`."""
+        if t == INT_TYPE:
+            return "&quest_type_Int"
+        if t == REAL_TYPE:
+            return "&quest_type_Real"
+        if t == BOOL_TYPE:
+            return "&quest_type_Bool"
+        if t == CHAR_TYPE:
+            return "&quest_type_Char"
+        if t == STRING_TYPE:
+            return "&quest_type_String"
+        if t == OK_TYPE:
+            return "&quest_type_Ok"
+        if t == DYNAMIC_TYPE or (isinstance(t, QTypeVar) and t.name == "Dynamic.T"):
+            return "&quest_type_Dynamic"
+        if isinstance(t, QTupleType) and not t.fields:
+            return "&quest_type_EmptyTuple"
+        if isinstance(t, QTypeVar):
+            return self.in_scope_type_descriptors.get(t.name, f"descriptor_{t.name}")
+        if isinstance(t, QAbstractType):
+            if t.name in self.in_scope_type_descriptors:
+                return self.in_scope_type_descriptors[t.name]
+            return f"qv_qt_{t.name}"
+        if isinstance(t, QArrayType):
+            elem_desc = self.c_type_descriptor(t.element_type)
+            return f"quest_make_array_descriptor({elem_desc})"
+        return "&quest_type_EmptyTuple"
 
     def record_struct_name(self, t: QRecordType) -> str:
         return record_struct_name(t, self.record_ctx)
@@ -491,9 +557,30 @@ class CEmitter:
             return mangle_module_ident(self.module_prefix, name)
         return mangle_ident(name)
 
-    def _param_signatures(self, params: list[TypedParam]) -> tuple[list[str], list[str]]:
+    def _collect_fun_quantifiers(self, fun_type: QType) -> tuple[tuple[QQuantifier, ...], QType]:
+        """Extracts any universal quantifiers wrapping a function type."""
+        quants: tuple[QQuantifier, ...] = ()
+        curr = fun_type
+        while isinstance(curr, QAllType):
+            quants = quants + curr.quantifiers
+            curr = curr.body
+        return quants, curr
+
+    def _param_signatures(
+        self,
+        params: list[TypedParam],
+        quantifiers: tuple[QQuantifier, ...] = (),
+    ) -> tuple[list[str], list[str]]:
         decls: list[str] = []
         forward_args: list[str] = []
+
+        # 1. Preceding quantifier type descriptors
+        for q in quantifiers:
+            q_param = f"descriptor_{q.name}"
+            decls.append(f"const QTypeDescriptor *{q_param}")
+            forward_args.append(q_param)
+
+        # 2. Value parameters
         for p in params:
             p_c = self.mangle_ident(p.name)
             if isinstance(p.type_val, QRecordType):
@@ -513,9 +600,13 @@ class CEmitter:
         self._tmp_id += 1
         return f"{prefix}_{self._tmp_id}"
 
-    def _collect_fun_params(self, fun: TypedFun) -> tuple[list[TypedParam], TypedExpr, QType]:
-        """Extracts formal parameters, body, and return type of a function."""
-        return list(fun.params), fun.body, fun.type_val.result_type
+    def _collect_fun_params(
+        self, fun: TypedFun
+    ) -> tuple[tuple[QQuantifier, ...], list[TypedParam], TypedExpr, QType]:
+        """Extracts quantifiers, formal parameters, body, and return type of a function."""
+        quants, inner_type = self._collect_fun_quantifiers(fun.type_val)
+        ret_type = inner_type.result_type if isinstance(inner_type, QFunType) else inner_type
+        return quants, list(fun.params), fun.body, ret_type
 
     def _collect_app_args(self, app: TypedApp) -> tuple[TypedExpr, list[TypedExpr]]:
         """Flattens nested curried TypedApp nodes into target function and argument list."""
@@ -787,14 +878,14 @@ class CEmitter:
         if top_funs:
             lines.append("/* Forward declarations for top-level functions */")
             for name, fun, _sym in top_funs:
-                params, _body, ret_type = self._collect_fun_params(fun)
+                quants, params, _body, ret_type = self._collect_fun_params(fun)
                 c_name = mangle_ident(name)
                 ret_c = "void" if ret_type == OK_TYPE else (
                     f"QRecordResult_{self.record_ctx.get_or_create_name(ret_type)}"
                     if isinstance(ret_type, QRecordType)
                     else self.c_type(ret_type)
                 )
-                decls, _ = self._param_signatures(params)
+                decls, _ = self._param_signatures(params, quants)
                 param_sig = "void" if not decls else ", ".join(decls)
                 lines.append(f"static {ret_c} {c_name}({param_sig});")
             lines.append("")
@@ -803,13 +894,17 @@ class CEmitter:
         if self.lifted_lambdas:
             lines.append("/* Forward declarations for lifted lambdas */")
             for l in self.lifted_lambdas:
-                ret_type = l.fun.type_val.result_type
+                quants, _ = self._collect_fun_quantifiers(l.fun.type_val)
+                ret_type = l.fun.type_val.result_type if isinstance(l.fun.type_val, QFunType) else l.fun.type_val
+                if isinstance(ret_type, QAllType):
+                    _, inner = self._collect_fun_quantifiers(ret_type)
+                    ret_type = inner.result_type if isinstance(inner, QFunType) else inner
                 ret_c = "void" if ret_type == OK_TYPE else (
                     f"QRecordResult_{self.record_ctx.get_or_create_name(ret_type)}"
                     if isinstance(ret_type, QRecordType)
                     else self.c_type(ret_type)
                 )
-                decls, _ = self._param_signatures(l.fun.params)
+                decls, _ = self._param_signatures(l.fun.params, quants)
                 param_sigs = ["void *_raw_env"] + decls
                 sig = ", ".join(param_sigs)
                 lines.append(f"static {ret_c} {l.c_fn_name}({sig});")
@@ -832,13 +927,13 @@ class CEmitter:
                 fun, _ = top_funs_dict[name]
                 c_name = mangle_ident(name)
                 tramp_name = f"{c_name}_trampoline"
-                ret_type = fun.type_val.result_type
+                quants, params, _, ret_type = self._collect_fun_params(fun)
                 ret_c = "void" if ret_type == OK_TYPE else (
                     f"QRecordResult_{self.record_ctx.get_or_create_name(ret_type)}"
                     if isinstance(ret_type, QRecordType)
                     else self.c_type(ret_type)
                 )
-                decls, forward_args = self._param_signatures(fun.params)
+                decls, forward_args = self._param_signatures(params, quants)
                 param_sigs = ["void *env"] + decls
                 sig = ", ".join(param_sigs)
                 args_str = ", ".join(forward_args)
@@ -857,21 +952,27 @@ class CEmitter:
         if top_funs:
             lines.append("/* Function definitions */")
             for name, fun, _sym in top_funs:
-                params, body, ret_type = self._collect_fun_params(fun)
+                quants, params, body, ret_type = self._collect_fun_params(fun)
                 c_name = mangle_ident(name)
                 ret_c = "void" if ret_type == OK_TYPE else (
                     f"QRecordResult_{self.record_ctx.get_or_create_name(ret_type)}"
                     if isinstance(ret_type, QRecordType)
                     else self.c_type(ret_type)
                 )
-                decls, _ = self._param_signatures(params)
+                decls, _ = self._param_signatures(params, quants)
                 param_sig = "void" if not decls else ", ".join(decls)
                 lines.append(f"static {ret_c} {c_name}({param_sig}) {{")
+                saved_descriptors = dict(self.in_scope_type_descriptors)
+                for q in quants:
+                    self.in_scope_type_descriptors[q.name] = f"descriptor_{q.name}"
                 saved_param_dicts = dict(self.param_dict_names)
                 for p in params:
                     if isinstance(p.type_val, QRecordType):
                         self.param_dict_names[p.name] = f"_dict_{mangle_ident(p.name)}"
                 fn_lines: list[str] = []
+                # Silence unused descriptor warnings
+                for q in quants:
+                    fn_lines.append(f"(void)descriptor_{q.name};")
                 if ret_type == OK_TYPE:
                     self.emit_to(body, None, fn_lines)
                     fn_lines.append("return;")
@@ -908,6 +1009,7 @@ class CEmitter:
                     ret_val = self.emit_val(body, fn_lines)
                     fn_lines.append(f"return {ret_val};")
                 self.param_dict_names = saved_param_dicts
+                self.in_scope_type_descriptors = saved_descriptors
                 for f_line in fn_lines:
                     lines.append(f"    {f_line}" if f_line.strip() else f_line)
                 lines.append("}")
@@ -917,13 +1019,14 @@ class CEmitter:
         if self.lifted_lambdas:
             lines.append("/* Lifted lambda definitions */")
             for l in self.lifted_lambdas:
-                ret_type = l.fun.type_val.result_type
+                quants, inner_t = self._collect_fun_quantifiers(l.fun.type_val)
+                ret_type = inner_t.result_type if isinstance(inner_t, QFunType) else inner_t
                 ret_c = "void" if ret_type == OK_TYPE else (
                     f"QRecordResult_{self.record_ctx.get_or_create_name(ret_type)}"
                     if isinstance(ret_type, QRecordType)
                     else self.c_type(ret_type)
                 )
-                decls, _ = self._param_signatures(l.fun.params)
+                decls, _ = self._param_signatures(l.fun.params, quants)
                 param_sigs = ["void *_raw_env"] + decls
                 sig = ", ".join(param_sigs)
                 lines.append(f"static {ret_c} {l.c_fn_name}({sig}) {{")
@@ -938,6 +1041,11 @@ class CEmitter:
                     fn_lines.append("(void)_raw_env;")
                     prev_env = self.current_env_vars
                     self.current_env_vars = {}
+
+                saved_descriptors = dict(self.in_scope_type_descriptors)
+                for q in quants:
+                    self.in_scope_type_descriptors[q.name] = f"descriptor_{q.name}"
+                    fn_lines.append(f"(void)descriptor_{q.name};")
 
                 saved_param_dicts = dict(self.param_dict_names)
                 for p in l.fun.params:
@@ -981,6 +1089,7 @@ class CEmitter:
                     fn_lines.append(f"return {ret_val};")
 
                 self.param_dict_names = saved_param_dicts
+                self.in_scope_type_descriptors = saved_descriptors
                 self.current_env_vars = prev_env
                 for f_line in fn_lines:
                     lines.append(f"    {f_line}" if f_line.strip() else f_line)
@@ -1023,9 +1132,10 @@ class CEmitter:
                 # Forward declarations and definitions for module functions
                 for fname, ffun, fsym in mod_funs:
                     m_ident = mangle_module_ident(clean_mod, fname)
-                    params, _, ret_type = self._collect_fun_params(ffun)
+                    quants, params, _, ret_type = self._collect_fun_params(ffun)
                     ret_c = "void" if ret_type == OK_TYPE else self.c_type(ret_type)
-                    param_decls = [f"{self.c_type(p.type_val)} {mangle_module_ident(clean_mod, p.name)}" for p in params]
+                    quant_decls = [f"const QTypeDescriptor *descriptor_{q.name}" for q in quants]
+                    param_decls = quant_decls + [f"{self.c_type(p.type_val)} {mangle_module_ident(clean_mod, p.name)}" for p in params]
                     sig = "void" if not param_decls else ", ".join(param_decls)
                     lines.append(f"static {ret_c} {m_ident}({sig});")
 
@@ -1033,12 +1143,13 @@ class CEmitter:
                 for fname, ffun, fsym in mod_funs:
                     m_ident = mangle_module_ident(clean_mod, fname)
                     tramp_name = f"{m_ident}_trampoline"
-                    params, _, ret_type = self._collect_fun_params(ffun)
+                    quants, params, _, ret_type = self._collect_fun_params(ffun)
                     ret_c = "void" if ret_type == OK_TYPE else self.c_type(ret_type)
-                    param_decls = [f"{self.c_type(p.type_val)} {mangle_module_ident(clean_mod, p.name)}" for p in params]
+                    quant_decls = [f"const QTypeDescriptor *descriptor_{q.name}" for q in quants]
+                    param_decls = quant_decls + [f"{self.c_type(p.type_val)} {mangle_module_ident(clean_mod, p.name)}" for p in params]
                     param_sigs = ["void *env"] + param_decls
                     sig = ", ".join(param_sigs)
-                    f_args = [mangle_module_ident(clean_mod, p.name) for p in params]
+                    f_args = [f"descriptor_{q.name}" for q in quants] + [mangle_module_ident(clean_mod, p.name) for p in params]
                     args_str = ", ".join(f_args)
                     lines.append(f"static {ret_c} {tramp_name}({sig}) {{")
                     lines.append("    (void)env;")
@@ -1057,12 +1168,16 @@ class CEmitter:
 
                 for fname, ffun, fsym in mod_funs:
                     m_ident = mangle_module_ident(clean_mod, fname)
-                    params, body, ret_type = self._collect_fun_params(ffun)
+                    quants, params, body, ret_type = self._collect_fun_params(ffun)
                     ret_c = "void" if ret_type == OK_TYPE else self.c_type(ret_type)
-                    param_decls = [f"{self.c_type(p.type_val)} {mangle_module_ident(clean_mod, p.name)}" for p in params]
+                    quant_decls = [f"const QTypeDescriptor *descriptor_{q.name}" for q in quants]
+                    param_decls = quant_decls + [f"{self.c_type(p.type_val)} {mangle_module_ident(clean_mod, p.name)}" for p in params]
                     sig = "void" if not param_decls else ", ".join(param_decls)
                     lines.append(f"static {ret_c} {m_ident}({sig}) {{")
                     fn_lines: list[str] = []
+                    for q in quants:
+                        mod_emitter.in_scope_type_descriptors[q.name] = f"descriptor_{q.name}"
+                        fn_lines.append(f"(void)descriptor_{q.name};")
                     # Map param names in current_env_vars so they resolve to mangled names
                     prev_env = mod_emitter.current_env_vars
                     mod_emitter.current_env_vars = {p.name: mangle_module_ident(clean_mod, p.name) for p in params}
@@ -1429,6 +1544,8 @@ class CEmitter:
                     return "(&quest_exc_arrayOp_error)"
                 if isinstance(tgt, TypedVar) and tgt.name == "string" and fld == "error":
                     return "(&quest_exc_string_error)"
+                if isinstance(tgt, TypedVar) and tgt.name == "dynamic" and fld == "error":
+                    return "(&quest_exc_dynamic_error)"
                 c_tgt = self.emit_val(tgt, lines)
                 if isinstance(tgt.type_val, QTupleType):
                     val_idx = None
@@ -1492,9 +1609,11 @@ class CEmitter:
                 return self._emit_infix(c_left, op, c_right)
 
             case TypedApp(func=f, args=args):
-                # Check for unwrapped type applications
+                # Check for unwrapped type applications and collect type arguments
                 effective_func = f
+                type_args: list[QType] = []
                 while isinstance(effective_func, TypedTypeApp):
+                    type_args = list(effective_func.type_args) + type_args
                     effective_func = effective_func.func
 
                 # Direct lowering for built-in arrayOp calls
@@ -1519,7 +1638,7 @@ class CEmitter:
                                 return f"({c_arr}->data[{c_idx}].i)"
                             elif elem_t == REAL_TYPE:
                                 return f"({c_arr}->data[{c_idx}].r)"
-                            elif elem_t == STRING_TYPE or isinstance(elem_t, (QTupleType, QRecordType, QFunType, QArrayType)):
+                            elif elem_t == STRING_TYPE or elem_t == DYNAMIC_TYPE or (isinstance(elem_t, QTypeVar) and elem_t.name == "Dynamic.T") or isinstance(elem_t, (QTupleType, QRecordType, QFunType, QAllType, QArrayType, QVariantType, QOptionType, QExceptionType)):
                                 c_elem_t = self.c_type(elem_t)
                                 return f"(({c_elem_t})({c_arr}->data[{c_idx}].p))"
                             else:
@@ -1532,12 +1651,29 @@ class CEmitter:
                             wrap = _qval_wrap(c_item, args[2].type_val)
                             lines.append(f"{c_arr}->data[{c_idx}] = {wrap};")
                             return "((void)0)"
+                    elif mod_name == "dynamic":
+                        if fld == "new" and len(args) == 1 and len(type_args) == 1:
+                            desc = self.c_type_descriptor(type_args[0])
+                            c_val = self.emit_val(args[0], lines)
+                            wrap = _qval_wrap(c_val, args[0].type_val)
+                            return f"quest_dynamic_new({desc}, {wrap})"
+                        elif fld == "be" and len(args) == 1 and len(type_args) == 1:
+                            desc = self.c_type_descriptor(type_args[0])
+                            c_dyn = self.emit_val(args[0], lines)
+                            call_str = f"quest_dynamic_be({desc}, {c_dyn})"
+                            return _qval_unwrap(call_str, type_args[0], self)
+                        elif fld == "copy" and len(args) == 1:
+                            c_dyn = self.emit_val(args[0], lines)
+                            return f"quest_dynamic_new({c_dyn}->type_desc, {c_dyn}->payload)"
 
-                if isinstance(f, TypedVar) and f.name in self.top_fun_names:
-                    c_func = mangle_ident(f.name)
-                    c_args = []
-                    fun, _ = self.top_funs_dict[f.name]
-                    formal_params, _, _ = self._collect_fun_params(fun)
+                # Preceding descriptor arguments from type_args
+                descriptor_args = [self.c_type_descriptor(targ) for targ in type_args]
+
+                if isinstance(effective_func, TypedVar) and effective_func.name in self.top_fun_names:
+                    c_func = mangle_ident(effective_func.name)
+                    c_args = list(descriptor_args)
+                    fun, _ = self.top_funs_dict[effective_func.name]
+                    _, formal_params, _, ret_type = self._collect_fun_params(fun)
                     for formal_p, actual_a in zip(formal_params, args):
                         pt = formal_p.type_val
                         c_a = self.emit_val(actual_a, lines)
@@ -1567,10 +1703,14 @@ class CEmitter:
                             lines.append(f"{tmp_v}->tag = {tagmap_name}[{c_a}->tag];")
                             lines.append(f"{tmp_v}->payload = {c_a}->payload;")
                             c_args.append(tmp_v)
+                        elif isinstance(pt, QTypeVar):
+                            c_args.append(_qval_wrap(c_a, actual_a.type_val))
                         else:
                             c_args.append(c_a)
                     args_str = ", ".join(c_args)
                     call_str = f"{c_func}({args_str})"
+                    if isinstance(ret_type, QTypeVar) and expr.type_val != ret_type:
+                        call_str = _qval_unwrap(call_str, expr.type_val, self)
                     if expr.type_val == OK_TYPE:
                         lines.append(f"{call_str};")
                         return "((void)0)"
@@ -1584,10 +1724,11 @@ class CEmitter:
                         return tmp_val
                     return call_str
                 else:
-                    fn_ptr_t = _closure_fn_ptr_type(f.type_val, self.record_ctx)
-                    clos_val = self.emit_val(f, lines)
-                    formal_types = [p.type_val for p in f.type_val.params] if isinstance(f.type_val, QFunType) else [a.type_val for a in args]
-                    c_args = []
+                    fn_ptr_t = _closure_fn_ptr_type(effective_func.type_val, self.record_ctx)
+                    clos_val = self.emit_val(effective_func, lines)
+                    _, inner_formal = self._collect_fun_quantifiers(effective_func.type_val)
+                    formal_types = [p.type_val for p in inner_formal.params] if isinstance(inner_formal, QFunType) else [a.type_val for a in args]
+                    c_args = list(descriptor_args)
                     for pt, actual_a in zip(formal_types, args):
                         c_a = self.emit_val(actual_a, lines)
                         if isinstance(pt, QRecordType):
@@ -1616,11 +1757,16 @@ class CEmitter:
                             lines.append(f"{tmp_v}->tag = {tagmap_name}[{c_a}->tag];")
                             lines.append(f"{tmp_v}->payload = {c_a}->payload;")
                             c_args.append(tmp_v)
+                        elif isinstance(pt, QTypeVar):
+                            c_args.append(_qval_wrap(c_a, actual_a.type_val))
                         else:
                             c_args.append(c_a)
                     all_c_args = [f"{clos_val}->env"] + c_args
                     args_str = ", ".join(all_c_args)
                     call_str = f"(({fn_ptr_t})({clos_val}->fn))({args_str})"
+                    formal_ret = inner_formal.result_type if isinstance(inner_formal, QFunType) else None
+                    if isinstance(formal_ret, QTypeVar) and expr.type_val != formal_ret:
+                        call_str = _qval_unwrap(call_str, expr.type_val, self)
                     if expr.type_val == OK_TYPE:
                         lines.append(f"{call_str};")
                         return "((void)0)"
@@ -1646,11 +1792,11 @@ class CEmitter:
                 c_idx = self.emit_val(idx, lines)
                 lines.append(f"quest_check_array_bounds({c_tgt}, {c_idx});")
                 elem_t = expr.type_val
-                if elem_t == INT_TYPE or elem_t == BOOL_TYPE or elem_t == CHAR_TYPE:
+                if elem_t in (INT_TYPE, BOOL_TYPE, CHAR_TYPE):
                     return f"({c_tgt}->data[{c_idx}].i)"
                 elif elem_t == REAL_TYPE:
                     return f"({c_tgt}->data[{c_idx}].r)"
-                elif elem_t == STRING_TYPE or isinstance(elem_t, (QTupleType, QRecordType, QFunType, QArrayType)):
+                elif elem_t == STRING_TYPE or elem_t == DYNAMIC_TYPE or (isinstance(elem_t, QTypeVar) and elem_t.name == "Dynamic.T") or isinstance(elem_t, (QTupleType, QRecordType, QFunType, QAllType, QArrayType, QVariantType, QOptionType, QExceptionType)):
                     c_elem_t = self.c_type(elem_t)
                     return f"(({c_elem_t})({c_tgt}->data[{c_idx}].p))"
                 else:

@@ -92,6 +92,59 @@ typedef struct QException {
     const char *name;
 } QException;
 
+/* Runtime Type Descriptors (Intensional Type Analysis) */
+typedef enum QTypeKind {
+    QTYPE_KIND_INT,
+    QTYPE_KIND_REAL,
+    QTYPE_KIND_BOOL,
+    QTYPE_KIND_CHAR,
+    QTYPE_KIND_STRING,
+    QTYPE_KIND_OK,
+    QTYPE_KIND_TUPLE,
+    QTYPE_KIND_RECORD,
+    QTYPE_KIND_VARIANT,
+    QTYPE_KIND_OPTION,
+    QTYPE_KIND_ARRAY,
+    QTYPE_KIND_FUN,
+    QTYPE_KIND_DYNAMIC,
+    QTYPE_KIND_EXCEPTION,
+    QTYPE_KIND_OPAQUE
+} QTypeKind;
+
+typedef struct QTypeDescriptor QTypeDescriptor;
+
+struct QTypeDescriptor {
+    QTypeKind   kind;
+    const char *name;
+    size_t      size;
+    size_t      alignment;
+    bool      (*is_subtype)(const QTypeDescriptor *sub, const QTypeDescriptor *super_type);
+    const void *extra;
+};
+
+/* Compound descriptor metadata */
+typedef struct QArrayTypeDescriptor {
+    const QTypeDescriptor *element_type;
+} QArrayTypeDescriptor;
+
+typedef struct QRecordFieldDescriptor {
+    const char            *name;
+    const QTypeDescriptor *type;
+    size_t                 offset;
+    bool                   is_var;
+} QRecordFieldDescriptor;
+
+typedef struct QRecordTypeDescriptor {
+    size_t                       field_count;
+    const QRecordFieldDescriptor fields[];
+} QRecordTypeDescriptor;
+
+/* First-class Dynamic object: type descriptor paired with 64-bit value */
+typedef struct QDynamic {
+    const QTypeDescriptor *type_desc;
+    QVal                   payload;
+} QDynamic;
+
 /* Thread-local active exception state */
 typedef struct QExceptionState {
     const QException *exc;
@@ -112,6 +165,17 @@ extern const QException quest_exc_DivideByZero;
 extern const QException quest_exc_arrayOp_error;
 extern const QException quest_exc_string_error;
 extern const QException quest_exc_variant_error;
+extern const QException quest_exc_dynamic_error;
+
+/* Pre-allocated static type descriptors for base types */
+extern const QTypeDescriptor quest_type_Int;
+extern const QTypeDescriptor quest_type_Real;
+extern const QTypeDescriptor quest_type_Bool;
+extern const QTypeDescriptor quest_type_Char;
+extern const QTypeDescriptor quest_type_String;
+extern const QTypeDescriptor quest_type_Ok;
+extern const QTypeDescriptor quest_type_Dynamic;
+extern const QTypeDescriptor quest_type_EmptyTuple;
 
 /* Static ABI layout assertions */
 static_assert(sizeof(QInt)          == 8, qint_must_be_8_bytes);
@@ -166,7 +230,15 @@ void     quest_raise_divide_by_zero(void);
 void     quest_raise_array_error(void);
 void     quest_raise_string_error(void);
 void     quest_raise_variant_error(void);
+void     quest_raise_dynamic_error(void);
 void     quest_print_val(QVal val, const char *type_name);
+
+/* Type descriptor interning and dynamic operations */
+const QTypeDescriptor *quest_intern_type_descriptor(const QTypeDescriptor *desc);
+const QTypeDescriptor *quest_make_array_descriptor(const QTypeDescriptor *element_desc);
+const QTypeDescriptor *quest_make_opaque_descriptor(const char *name);
+QDynamic              *quest_dynamic_new(const QTypeDescriptor *type_desc, QVal val);
+QVal                   quest_dynamic_be(const QTypeDescriptor *target_type_desc, const QDynamic *d);
 
 static inline void quest_check_array_bounds(const QArray *a, int64_t idx) {
     if (a == NULL || idx < 0 || idx >= a->length) {

@@ -433,6 +433,76 @@ struct QEnv_lambda_1 {
 ```
 Non-capturing lambdas omit the environment struct and use file-scope static singleton closures.
 
+### 6.4. Polymorphic Functions and Runtime Type Descriptors (`QTypeDescriptor`)
+While monomorphic functions pass values directly, polymorphic functions (`All(A::K) ...`) require **Intensional Type Analysis (ITA)** (see `docs/type-system.md` §6.10.1) to support Cardelli's `Dynamic` operations (`dynamic.new`, `dynamic.be`) and first-class abstraction barriers without restricting generic wrappers.
+
+#### 1. The Uniform Quantifier Rule
+> **Rule:** Every universal type quantifier `(A::K)` in a function or method signature compiles to a preceding `const QTypeDescriptor *descriptor_<A>` parameter in C.
+
+- Direct polymorphic function:
+  ```quest
+  let id(A::TYPE x:A): A = x;
+  ```
+  Compiles to C:
+  ```c
+  static QVal qv_id(const QTypeDescriptor *descriptor_A, QVal qv_x) {
+      (void)descriptor_A;
+      return qv_x;
+  }
+  ```
+- Polymorphic closure signature:
+  ```c
+  RetType (*fn)(void *env, const QTypeDescriptor *descriptor_A, ..., ParamTypes...);
+  ```
+- Higher-Order Quantifier Subtyping:
+  Because every quantifier corresponds to exactly one pointer parameter `const QTypeDescriptor *` in C regardless of its subkinding bound (`TYPE` vs `POWER(Point)`), a general polymorphic function $\text{All}(A::\text{TYPE}) (A \to \text{Ok})$ has the exact same C signature and calling convention as a bounded function $\text{All}(A <: \text{Point}) (A \to \text{Ok})$, requiring zero adaptation thunks.
+- Existential Packages (Weak Sums):
+  In runtime tuples (`struct QTuple`), each existential type formal `X::K` occupies a pointer-sized slot storing `const QTypeDescriptor *descriptor_X`.
+
+#### 2. Types of Polymorphic Instantiation Call Sites
+In Cardelli's formal terminology (*Typeful Programming* §3 & §5), applying a polymorphic value to a type argument is **polymorphic instantiation** (or **type application**):
+1. **Closed / Ground Type Instantiation** (*static monomorphic instantiation* in C++/Rust):
+   The type argument is a closed ground type (`Int`, `String`). The compiler passes the static global descriptor directly:
+   `qv_id(&quest_type_Int, (QVal){.i = 42LL});`.
+2. **Type Variable Instantiation / Forwarding** (*generic call forwarding* in modern generic languages):
+   Inside a polymorphic function with a bound type variable in scope, the type parameter is forwarded as the runtime descriptor:
+   Inside `foo(X::TYPE x:X)` calling `id(:X x)`: `qv_id(descriptor_X, qv_x);`.
+3. **Compound Type Operator Instantiation:**
+   When the type argument is formed by applying a type operator (`Array(Int)` or `Array(X)`):
+   - Ground compounds emit a memoized, statically initialized compound descriptor `&quest_type_Array_Int`.
+   - Open compounds involving type variables emit a call to an allocator helper `quest_make_array_descriptor(descriptor_X)`.
+
+#### 3. Optimization via Inlining and Partial Evaluation (Specialization)
+While the uniform quantifier rule guarantees modular separate compilation, it does not mandate runtime overhead when optimizations are enabled:
+- **Inlining:** When a polymorphic call site is inlined into the caller, the concrete type descriptor becomes statically known. If the inlined body does not perform dynamic inspection or packaging, the unused descriptor parameter is eliminated via dead-code elimination.
+- **Partial Evaluation with Respect to Types (Specialization):** Statically monomorphic call sites can be specialized for their concrete type arguments. Under partial evaluation, `id(:Int 42)` specializes to an unquantified function `id_Int(42)` where all descriptor references are resolved at compile time, generating unboxed, zero-overhead native code.
+
+#### 4. Descriptor Structure and Memory Management
+Every type descriptor is an instance of `QTypeDescriptor`:
+```c
+typedef enum QTypeKind {
+    QTYPE_KIND_INT, QTYPE_KIND_REAL, QTYPE_KIND_BOOL, QTYPE_KIND_CHAR,
+    QTYPE_KIND_STRING, QTYPE_KIND_OK, QTYPE_KIND_TUPLE, QTYPE_KIND_RECORD,
+    QTYPE_KIND_VARIANT, QTYPE_KIND_OPTION, QTYPE_KIND_ARRAY, QTYPE_KIND_FUN,
+    QTYPE_KIND_DYNAMIC, QTYPE_KIND_EXCEPTION,
+    QTYPE_KIND_OPAQUE  /* Nominal abstract types and existential package witnesses */
+} QTypeKind;
+
+struct QTypeDescriptor {
+    QTypeKind   kind;
+    const char *name;
+    size_t      size;
+    size_t      alignment;
+    bool      (*is_subtype)(const QTypeDescriptor *sub, const QTypeDescriptor *super_type);
+    const void *extra;
+};
+```
+- **Base types** (`Int`, `Real`, `String`, etc.) are pre-allocated `static const` structs in `.rodata`.
+- **Opaque types (`QTYPE_KIND_OPAQUE`)** represent nominal abstract types (`T::TYPE` in an interface or existential package). They possess unique pointer identity to ensure that `dynamic.be` respects module abstraction barriers.
+- **Manifest types (`Def T = ...`)** are pure compile-time aliases, completely erased at runtime with no separate descriptors or module record fields.
+- **Memoization Cache:** Dynamically constructed compound descriptors are interned in a runtime table (`quest_intern_type_descriptor`) to ensure canonical pointer equality ($T_1 \equiv T_2 \iff \text{desc}_1 == \text{desc}_2$). *(Note: this is an intentional unbounded cache since types in loaded code are bounded).*
+- **Future Value Representation:** With `QTypeDescriptor` carrying `size` and `alignment`, the runtime establishes the foundation to evolve beyond the 64-bit `QVal` restriction, supporting 128-bit fat pointers for subtyped records (`{ void *ptr, const QRecordFieldDict *dict }`) and unboxed polymorphic flat arrays.
+
 ---
 
 ## 7. Exception Handling with `setjmp` and `longjmp`
@@ -523,20 +593,17 @@ if (setjmp(q_handler.env_jmp) == 0) {
 
 The `Dynamic` type encapsulates a value and its runtime type representation:
 ```c
-typedef struct QTypeDesc {
-    uint32_t    type_id;
-    const char *name;
-    /* Subtyping descriptor / structural descriptor */
-} QTypeDesc;
-
 typedef struct QDynamic {
-    QVal              value;
-    const QTypeDesc  *type_desc;
+    const QTypeDescriptor *type_desc;
+    QVal                   payload;
 } QDynamic;
 
 static_assert(sizeof(QDynamic) == 16, qdynamic_must_be_16_bytes);
 ```
-`inspect d when T with x then ... end` checks `d->type_desc == &QT_Desc_T` (or subtyping against `QT_Desc_T`).
+- `dynamic.new(:A x)` compiles to `quest_dynamic_new(descriptor_A, _qval_wrap(x, A))`.
+- `dynamic.be(:A d)` compiles to `_qval_unwrap(quest_dynamic_be(descriptor_A, d), A)` and checks `is_subtype(d->type_desc, descriptor_A)`, raising `dynamic.error` on mismatch.
+- `dynamic.copy(d)` compiles to `quest_dynamic_new(d->type_desc, d->payload)`.
+- `dynamic.error` lowers to `(&quest_exc_dynamic_error)`.
 
 ---
 

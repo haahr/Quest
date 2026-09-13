@@ -5,10 +5,12 @@ from __future__ import annotations
 from quest.types import (
     BOOL_TYPE,
     CHAR_TYPE,
+    DYNAMIC_TYPE,
     INT_TYPE,
     OK_TYPE,
     REAL_TYPE,
     STRING_TYPE,
+    QAllType,
     QArrayType,
     QExceptionType,
     QFunType,
@@ -19,6 +21,7 @@ from quest.types import (
     QTupleField,
     QTupleType,
     QType,
+    QTypeVar,
     QVariantField,
     QVariantType,
 )
@@ -51,6 +54,8 @@ def type_to_c_tag(t: QType) -> str:
         return "String"
     if t == OK_TYPE:
         return "Ok"
+    if t == DYNAMIC_TYPE or (isinstance(t, QTypeVar) and t.name == "Dynamic.T"):
+        return "Dynamic"
     if isinstance(t, QTupleType):
         tags = [type_to_c_tag(f.type_val) for f in t.value_fields]
         return "QTuple_" + ("_".join(tags) if tags else "empty")
@@ -58,8 +63,10 @@ def type_to_c_tag(t: QType) -> str:
         sorted_fields = sorted(t.fields, key=lambda f: f.name)
         tags = [f"{f.name}_{type_to_c_tag(f.type_val)}" for f in sorted_fields]
         return "QRecord_" + ("_".join(tags) if tags else "empty")
-    if isinstance(t, QFunType):
+    if isinstance(t, (QFunType, QAllType)):
         return "QClosure"
+    if isinstance(t, QTypeVar):
+        return "QVal"
     if isinstance(t, QArrayType):
         return "QArray"
     if isinstance(t, QVariantType):
@@ -153,11 +160,13 @@ def qtype_to_c_type(t: QType, ctx: Optional[RecordNamingContext] = None) -> str:
         return "QString *"
     if t == OK_TYPE:
         return "void"
+    if t == DYNAMIC_TYPE or (isinstance(t, QTypeVar) and t.name == "Dynamic.T"):
+        return "QDynamic *"
     if isinstance(t, QTupleType):
         return f"{tuple_struct_name(t)} *"
     if isinstance(t, QRecordType):
         return f"{record_struct_name(t, ctx)} *"
-    if isinstance(t, QFunType):
+    if isinstance(t, (QFunType, QAllType)):
         return "QClosure *"
     if isinstance(t, QArrayType):
         return "QArray *"
@@ -167,6 +176,8 @@ def qtype_to_c_type(t: QType, ctx: Optional[RecordNamingContext] = None) -> str:
         return "const QException *"
     if isinstance(t, QOptionType):
         return f"{option_struct_name(t)} *"
+    if isinstance(t, QTypeVar):
+        return "QVal"
     return "QVal"
 
 
