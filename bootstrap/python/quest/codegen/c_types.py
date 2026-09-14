@@ -196,3 +196,134 @@ def qtype_to_name_str(t: QType) -> str:
     if t == OK_TYPE:
         return "Ok"
     return str(t)
+
+
+def c_string_literal(s: str) -> str:
+    """Escapes a Python string into a safe C string literal."""
+    parts = []
+    for ch in s:
+        if ch == "\"":
+            parts.append("\\\"")
+        elif ch == "\\":
+            parts.append("\\\\")
+        elif ch == "\n":
+            parts.append("\\n")
+        elif ch == "\t":
+            parts.append("\\t")
+        elif ch == "\r":
+            parts.append("\\r")
+        elif 32 <= ord(ch) < 127:
+            parts.append(ch)
+        else:
+            parts.append(f"\\x{ord(ch):02x}")
+    return "\"" + "".join(parts) + "\""
+
+
+def c_char_literal(ch: str) -> str:
+    """Escapes a single character into a safe C character literal."""
+    if ch == "'":
+        return "'\\''"
+    if ch == "\\":
+        return "'\\\\'"
+    if ch == "\n":
+        return "'\\n'"
+    if ch == "\t":
+        return "'\\t'"
+    if ch == "\r":
+        return "'\\r'"
+    if 32 <= ord(ch) < 127:
+        return f"'{ch}'"
+    return f"'\\x{ord(ch):02x}'"
+
+
+def qval_wrap(expr_str: str, t: QType) -> str:
+    """Wraps a scalar or pointer expression into a QVal union initializer."""
+    if t == DYNAMIC_TYPE or (isinstance(t, QTypeVar) and t.name == "Dynamic.T"):
+        return f"((QVal){{ .p = (void *)({expr_str}) }})"
+    if isinstance(t, QTypeVar):
+        return expr_str
+    if t == INT_TYPE or t == BOOL_TYPE or t == CHAR_TYPE:
+        return f"((QVal){{ .i = (int64_t)({expr_str}) }})"
+    if t == REAL_TYPE:
+        return f"((QVal){{ .r = (double)({expr_str}) }})"
+    if t == STRING_TYPE or isinstance(t, (QTupleType, QRecordType, QFunType, QAllType, QArrayType, QVariantType, QOptionType, QExceptionType)):
+        return f"((QVal){{ .p = (void *)({expr_str}) }})"
+    return f"((QVal){{ .u = 0 }})"
+
+
+def qval_unwrap(qval_expr: str, t: QType, ctx: Optional[RecordNamingContext] = None) -> str:
+    """Extracts the underlying concrete scalar or pointer from a QVal expression."""
+    if t == DYNAMIC_TYPE or (isinstance(t, QTypeVar) and t.name == "Dynamic.T"):
+        return f"((QDynamic *)({qval_expr}.p))"
+    if isinstance(t, QTypeVar):
+        return qval_expr
+    if t in (INT_TYPE, BOOL_TYPE, CHAR_TYPE):
+        return f"({qval_expr}.i)"
+    if t == REAL_TYPE:
+        return f"({qval_expr}.r)"
+    if t == OK_TYPE:
+        return "((void)0)"
+    c_t = qtype_to_c_type(t, ctx)
+    return f"(({c_t})({qval_expr}.p))"
+
+
+def closure_fn_ptr_type(fun_type: QType, ctx: Optional[RecordNamingContext] = None) -> str:
+    """Constructs the C function pointer cast type for invoking a closure."""
+    quantifiers: tuple[Any, ...] = ()
+    cur_type = fun_type
+    while isinstance(cur_type, QAllType):
+        quantifiers = quantifiers + cur_type.quantifiers
+        cur_type = cur_type.body
+
+    if isinstance(cur_type, QFunType):
+        if cur_type.result_type == OK_TYPE:
+            ret_c = "void"
+        elif isinstance(cur_type.result_type, QRecordType) and ctx is not None:
+            ret_c = f"QRecordResult_{ctx.get_or_create_name(cur_type.result_type)}"
+        else:
+            ret_c = qtype_to_c_type(cur_type.result_type, ctx)
+        param_types = ["void *"]
+        # Quantifier descriptors appear immediately after env
+        for _ in quantifiers:
+            param_types.append("const QTypeDescriptor *")
+        for p in cur_type.params:
+            if isinstance(p.type_val, QRecordType):
+                param_types.append("void *")
+                d_name = ctx.offset_dict_struct_name(p.type_val) if ctx else "void"
+                param_types.append(f"const {d_name} *")
+            else:
+                param_types.append(qtype_to_c_type(p.type_val, ctx))
+        sig = ", ".join(param_types)
+        return f"{ret_c} (*)({sig})"
+    return "void * (*)(void *, ...)"
+
+
+def is_record_subtype(s: QType, t: QType) -> bool:
+    if not isinstance(s, QRecordType) or not isinstance(t, QRecordType):
+        return False
+    s_fields = {f.name: f.type_val for f in s.fields}
+    for f in t.fields:
+        if f.name not in s_fields or s_fields[f.name] != f.type_val:
+            return False
+    return True
+
+
+def is_tuple_subtype(s: QType, t: QType) -> bool:
+    if not isinstance(s, QTupleType) or not isinstance(t, QTupleType):
+        return False
+    if len(s.value_fields) < len(t.value_fields):
+        return False
+    for i in range(len(t.value_fields)):
+        if s.value_fields[i].type_val != t.value_fields[i].type_val:
+            return False
+    return True
+
+
+def is_variant_subtype(s: QType, t: QType) -> bool:
+    if not isinstance(s, QVariantType) or not isinstance(t, QVariantType):
+        return False
+    t_map = {v.name: v.type_val for v in t.variants}
+    for v in s.variants:
+        if v.name not in t_map or v.type_val != t_map[v.name]:
+            return False
+    return True

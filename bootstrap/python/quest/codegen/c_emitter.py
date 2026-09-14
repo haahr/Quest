@@ -5,13 +5,29 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Optional
 
+from quest.builtins import BuiltinModuleRegistry
+from quest.codegen.c_analysis import (
+    CLambdaInfo,
+    CProgramAnalysis,
+    analyze_program_for_c,
+    topological_sort_modules,
+)
+from quest.codegen.c_declarations import CDeclarationEmitter
 from quest.codegen.c_types import (
     RecordNamingContext,
+    c_char_literal,
+    c_string_literal,
+    closure_fn_ptr_type,
+    is_record_subtype,
+    is_tuple_subtype,
+    is_variant_subtype,
     mangle_ident,
     mangle_module_ident,
     option_struct_name,
     qtype_to_c_type,
     qtype_to_name_str,
+    qval_unwrap,
+    qval_wrap,
     record_struct_name,
     tuple_struct_name,
     type_to_c_tag,
@@ -93,394 +109,25 @@ from quest.types import (
 )
 
 
-@dataclass
-class LambdaInfo:
-    """Metadata for a lifted lambda closure."""
-    id: str
-    fun: TypedFun
-    free_vars: list[tuple[str, QType]]
-    env_struct_name: Optional[str]
-    c_fn_name: str
-    closure_var_name: Optional[str] = None
+# Backward-compatibility alias
+LambdaInfo = CLambdaInfo
+
+# Aliases for functions moved to c_types
+_c_string_literal = c_string_literal
+_c_char_literal = c_char_literal
+_qval_wrap = qval_wrap
+_closure_fn_ptr_type = closure_fn_ptr_type
 
 
-def _c_string_literal(s: str) -> str:
-    """Escapes a Python string into a safe C string literal."""
-    parts = []
-    for ch in s:
-        if ch == "\"":
-            parts.append("\\\"")
-        elif ch == "\\":
-            parts.append("\\\\")
-        elif ch == "\n":
-            parts.append("\\n")
-        elif ch == "\t":
-            parts.append("\\t")
-        elif ch == "\r":
-            parts.append("\\r")
-        elif 32 <= ord(ch) < 127:
-            parts.append(ch)
-        else:
-            parts.append(f"\\x{ord(ch):02x}")
-    return "\"" + "".join(parts) + "\""
-
-
-def _c_char_literal(ch: str) -> str:
-    """Escapes a single character into a safe C character literal."""
-    if ch == "'":
-        return "'\\''"
-    if ch == "\\":
-        return "'\\\\'"
-    if ch == "\n":
-        return "'\\n'"
-    if ch == "\t":
-        return "'\\t'"
-    if ch == "\r":
-        return "'\\r'"
-    if 32 <= ord(ch) < 127:
-        return f"'{ch}'"
-    return f"'\\x{ord(ch):02x}'"
+def _qval_unwrap(qval_expr: str, t: QType, emitter: Optional[Any] = None) -> str:
+    ctx = emitter.record_ctx if emitter is not None else None
+    return qval_unwrap(qval_expr, t, ctx)
 
 
 def _indent(text: str, spaces: int = 4) -> str:
     """Indents non-empty lines of text by the given number of spaces."""
     pad = " " * spaces
     return "\n".join(pad + line if line.strip() else line for line in text.split("\n"))
-
-
-def _qval_wrap(expr_str: str, t: QType) -> str:
-    """Wraps a scalar or pointer expression into a QVal union initializer."""
-    if t == DYNAMIC_TYPE or (isinstance(t, QTypeVar) and t.name == "Dynamic.T"):
-        return f"((QVal){{ .p = (void *)({expr_str}) }})"
-    if isinstance(t, QTypeVar):
-        return expr_str
-    if t == INT_TYPE or t == BOOL_TYPE or t == CHAR_TYPE:
-        return f"((QVal){{ .i = (int64_t)({expr_str}) }})"
-    if t == REAL_TYPE:
-        return f"((QVal){{ .r = (double)({expr_str}) }})"
-    if t == STRING_TYPE or isinstance(t, (QTupleType, QRecordType, QFunType, QAllType, QArrayType, QVariantType, QOptionType, QExceptionType)):
-        return f"((QVal){{ .p = (void *)({expr_str}) }})"
-    return f"((QVal){{ .u = 0 }})"
-
-
-def _qval_unwrap(qval_expr: str, t: QType, emitter: Optional[Any] = None) -> str:
-    """Extracts the underlying concrete scalar or pointer from a QVal expression."""
-    if t == DYNAMIC_TYPE or (isinstance(t, QTypeVar) and t.name == "Dynamic.T"):
-        return f"((QDynamic *)({qval_expr}.p))"
-    if isinstance(t, QTypeVar):
-        return qval_expr
-    if t in (INT_TYPE, BOOL_TYPE, CHAR_TYPE):
-        return f"({qval_expr}.i)"
-    if t == REAL_TYPE:
-        return f"({qval_expr}.r)"
-    if t == OK_TYPE:
-        return "((void)0)"
-    if emitter is not None:
-        c_t = emitter.c_type(t)
-        return f"(({c_t})({qval_expr}.p))"
-    return f"({qval_expr}.p)"
-
-
-def is_record_subtype(s: QType, t: QType) -> bool:
-    if not isinstance(s, QRecordType) or not isinstance(t, QRecordType):
-        return False
-    s_fields = {f.name: f.type_val for f in s.fields}
-    for f in t.fields:
-        if f.name not in s_fields or s_fields[f.name] != f.type_val:
-            return False
-    return True
-
-
-def is_tuple_subtype(s: QType, t: QType) -> bool:
-    if not isinstance(s, QTupleType) or not isinstance(t, QTupleType):
-        return False
-    if len(s.value_fields) < len(t.value_fields):
-        return False
-    for i in range(len(t.value_fields)):
-        if s.value_fields[i].type_val != t.value_fields[i].type_val:
-            return False
-    return True
-
-
-def is_variant_subtype(s: QType, t: QType) -> bool:
-    if not isinstance(s, QVariantType) or not isinstance(t, QVariantType):
-        return False
-    t_map = {v.name: v.type_val for v in t.variants}
-    for v in s.variants:
-        if v.name not in t_map or v.type_val != t_map[v.name]:
-            return False
-    return True
-
-
-def _closure_fn_ptr_type(fun_type: QType, ctx: Optional[RecordNamingContext] = None) -> str:
-    """Constructs the C function pointer cast type for invoking a closure."""
-    quantifiers: tuple[QQuantifier, ...] = ()
-    cur_type = fun_type
-    while isinstance(cur_type, QAllType):
-        quantifiers = quantifiers + cur_type.quantifiers
-        cur_type = cur_type.body
-
-    if isinstance(cur_type, QFunType):
-        if cur_type.result_type == OK_TYPE:
-            ret_c = "void"
-        elif isinstance(cur_type.result_type, QRecordType) and ctx is not None:
-            ret_c = f"QRecordResult_{ctx.get_or_create_name(cur_type.result_type)}"
-        else:
-            ret_c = qtype_to_c_type(cur_type.result_type, ctx)
-        param_types = ["void *"]
-        # Quantifier descriptors appear immediately after env
-        for _ in quantifiers:
-            param_types.append("const QTypeDescriptor *")
-        for p in cur_type.params:
-            if isinstance(p.type_val, QRecordType):
-                param_types.append("void *")
-                d_name = ctx.offset_dict_struct_name(p.type_val) if ctx else "void"
-                param_types.append(f"const {d_name} *")
-            else:
-                param_types.append(qtype_to_c_type(p.type_val, ctx))
-        sig = ", ".join(param_types)
-        return f"{ret_c} (*)({sig})"
-    return "void * (*)(void *, ...)"
-
-
-def _find_free_vars(fun: TypedFun, top_names: set[str]) -> list[tuple[str, QType]]:
-    """Finds all free variables captured by a lambda from enclosing non-global scopes."""
-    free_vars: list[tuple[str, QType]] = []
-    seen: set[str] = set()
-
-    def walk(node: Any, bound: set[str]) -> None:
-        if node is None:
-            return
-        match node:
-            case TypedVar(name=name, type_val=t):
-                if name not in bound and name not in top_names and name not in seen:
-                    seen.add(name)
-                    free_vars.append((name, t))
-            case TypedLetValue(name=name, value=v):
-                walk(v, bound)
-                bound.add(name)
-            case TypedFor(var_name=name, start=st, stop=sp, body=b):
-                walk(st, bound)
-                walk(sp, bound)
-                walk(b, bound | {name})
-            case TypedBlock(bindings=bindings, result=res):
-                b_bound = set(bound)
-                for b in bindings:
-                    match b:
-                        case TypedLetValue(name=name, value=v):
-                            walk(v, b_bound)
-                            b_bound.add(name)
-                        case TypedExprStmt(expr=e):
-                            walk(e, b_bound)
-                        case _:
-                            pass
-                walk(res, b_bound)
-            case TypedFun(params=params, body=b):
-                inner_bound = bound | {p.name for p in params}
-                walk(b, inner_bound)
-            case TypedTry(body=b, branches=branches, else_branch=else_b):
-                walk(b, bound)
-                for br in branches:
-                    walk(br.exc_pattern, bound)
-                    br_bound = bound | ({br.binder.name} if br.binder else set())
-                    walk(br.body, br_bound)
-                if else_b:
-                    walk(else_b, bound)
-            case _:
-                if isinstance(node, (list, tuple)):
-                    for item in node:
-                        walk(item, bound)
-                elif hasattr(node, "__dataclass_fields__"):
-                    for field_name in node.__dataclass_fields__:
-                        walk(getattr(node, field_name), bound)
-
-    init_bound = {p.name for p in fun.params}
-    walk(fun.body, init_bound)
-    return free_vars
-
-
-def _find_val_referenced_top_funs(prog: TypedProgram, top_fun_names: set[str]) -> set[str]:
-    """Finds all top-level functions that are referenced in value positions."""
-    referenced: set[str] = set()
-
-    def scan(node: Any) -> None:
-        if node is None:
-            return
-        match node:
-            case TypedApp(func=f, args=args):
-                if isinstance(f, TypedVar) and f.name in top_fun_names:
-                    for a in args:
-                        scan(a)
-                    return
-                scan(f)
-                for a in args:
-                    scan(a)
-            case TypedVar(name=name):
-                if name in top_fun_names:
-                    referenced.add(name)
-            case _:
-                if isinstance(node, (list, tuple)):
-                    for item in node:
-                        scan(item)
-                elif hasattr(node, "__dataclass_fields__"):
-                    for field_name in node.__dataclass_fields__:
-                        scan(getattr(node, field_name))
-
-    scan(prog)
-    return referenced
-
-
-def _collect_aggregate_types(
-    prog: TypedProgram, ctx: RecordNamingContext
-) -> tuple[list[tuple[str, QType]], list[QVariantType]]:
-    """Traverses the program to find all unique aggregate types (tuples, records, options, variants)."""
-    visited_names: set[str] = set()
-    result: list[tuple[str, QType]] = []
-    variant_types: list[QVariantType] = []
-
-    def visit_type(t: Optional[QType]) -> None:
-        if t is None:
-            return
-        if isinstance(t, QTupleType):
-            for f in t.value_fields:
-                visit_type(f.type_val)
-            name = tuple_struct_name(t)
-            if name not in visited_names:
-                visited_names.add(name)
-                result.append((name, t))
-        elif isinstance(t, QRecordType):
-            for f in t.fields:
-                visit_type(f.type_val)
-            name = record_struct_name(t, ctx)
-            if name not in visited_names:
-                visited_names.add(name)
-                result.append((name, t))
-        elif isinstance(t, QOptionType):
-            for o in t.options:
-                if o.payload_type:
-                    visit_type(o.payload_type)
-            name = option_struct_name(t)
-            if name not in visited_names:
-                visited_names.add(name)
-                result.append((name, t))
-        elif isinstance(t, QVariantType):
-            if t not in variant_types:
-                variant_types.append(t)
-            for v in t.variants:
-                if getattr(v, "type_val", None):
-                    visit_type(v.type_val)
-        elif hasattr(t, "params") and hasattr(t, "result_type"):
-            for p in getattr(t, "params", ()):
-                visit_type(getattr(p, "type_val", None))
-            visit_type(getattr(t, "result_type", None))
-        elif hasattr(t, "element_type"):
-            visit_type(getattr(t, "element_type", None))
-        elif hasattr(t, "inner_type"):
-            visit_type(getattr(t, "inner_type", None))
-
-    def visit_node(node: Any) -> None:
-        if node is None:
-            return
-        if isinstance(node, TypedLetType) and node.symbol.definition is not None:
-            if isinstance(node.symbol.definition, QRecordType):
-                ctx.register_alias(node.name, node.symbol.definition)
-        if isinstance(node, TypedRecord):
-            concrete_t = QRecordType(fields=tuple(QRecordField(name=fld.name, type_val=fld.value.type_val, is_var=fld.is_var) for fld in node.fields))
-            visit_type(concrete_t)
-        if hasattr(node, "type_val") and isinstance(getattr(node, "type_val"), QType):
-            visit_type(getattr(node, "type_val"))
-        if hasattr(node, "symbol"):
-            sym = getattr(node, "symbol")
-            if hasattr(sym, "type_val") and isinstance(getattr(sym, "type_val"), QType):
-                visit_type(getattr(sym, "type_val"))
-            if hasattr(sym, "definition") and isinstance(getattr(sym, "definition"), QType):
-                visit_type(getattr(sym, "definition"))
-        if hasattr(node, "definition") and isinstance(getattr(node, "definition"), QType):
-            visit_type(getattr(node, "definition"))
-
-        if isinstance(node, (list, tuple)):
-            for item in node:
-                visit_node(item)
-            return
-
-        if hasattr(node, "__dataclass_fields__"):
-            for field_name in node.__dataclass_fields__:
-                visit_node(getattr(node, field_name))
-
-    visit_node(prog)
-    return result, variant_types
-
-
-def _collect_lambdas(
-    prog: TypedProgram, top_funs: list[tuple[str, TypedFun, Any]], top_names: set[str]
-) -> list[LambdaInfo]:
-    """Scans program to find all lambdas that need lifting and generates LambdaInfo."""
-    lambdas: list[LambdaInfo] = []
-    lambda_counter = 0
-
-    # Top-level fun objects are not lifted lambdas
-    top_fun_objs = {id(f) for _, f, _ in top_funs}
-
-    def scan(node: Any) -> None:
-        nonlocal lambda_counter
-        if node is None:
-            return
-        if isinstance(node, TypedFun):
-            if id(node) not in top_fun_objs:
-                lambda_counter += 1
-                lid = f"lambda_{lambda_counter}"
-                c_fn_name = f"qv_{lid}"
-                fvars = _find_free_vars(node, top_names)
-                env_struct = f"struct QEnv_{lid}" if fvars else None
-                closure_var = f"qv_{lid}_closure" if not fvars else None
-                lambdas.append(
-                    LambdaInfo(
-                        id=lid,
-                        fun=node,
-                        free_vars=fvars,
-                        env_struct_name=env_struct,
-                        c_fn_name=c_fn_name,
-                        closure_var_name=closure_var,
-                    )
-                )
-            # Continue scanning body for nested lambdas
-            scan(node.body)
-            return
-
-        if isinstance(node, (list, tuple)):
-            for item in node:
-                scan(item)
-            return
-
-        if hasattr(node, "__dataclass_fields__"):
-            for field_name in node.__dataclass_fields__:
-                scan(getattr(node, field_name))
-
-    scan(prog)
-    return lambdas
-
-
-def topological_sort_modules(modules: list[TypedModule]) -> list[TypedModule]:
-    """Sorts modules in dependency order (callees before callers)."""
-    by_name = {m.name: m for m in modules}
-    visited: set[str] = set()
-    order: list[TypedModule] = []
-
-    def visit(m: TypedModule):
-        if m.name in visited:
-            return
-        visited.add(m.name)
-        for b in m.bindings:
-            if isinstance(b, TypedImport):
-                for item in b.items:
-                    for name in item.names:
-                        if name in by_name:
-                            visit(by_name[name])
-        order.append(m)
-
-    for m in modules:
-        visit(m)
-    return order
 
 
 class CEmitter:
@@ -623,9 +270,50 @@ class CEmitter:
         loaded_modules: Optional[dict[str, TypedModule]] = None,
     ) -> str:
         """Translates a TypedProgram into a full standard C99 source file string."""
-        from quest.builtins import BuiltinModuleRegistry
+        analysis = analyze_program_for_c(prog, self.record_ctx, loaded_modules)
 
-        # Collect modules from both loaded_modules and prog.phrases
+        self.needed_dicts = analysis.needed_dicts
+        self.tuple_coercions = analysis.tuple_coercions
+        self.variant_coercions = analysis.variant_coercions
+        self.top_fun_names = analysis.top_fun_names
+        self.top_var_names = analysis.top_var_names
+        self.val_referenced_top_funs = analysis.val_referenced_top_funs
+        self.lifted_lambdas = analysis.lifted_lambdas
+        self.lambda_info_by_id = analysis.lambda_info_by_id
+        self.top_funs_dict = analysis.top_funs_dict
+
+        decl_emitter = CDeclarationEmitter(
+            record_ctx=self.record_ctx,
+            c_type_fn=self.c_type,
+            param_sigs_fn=self._param_signatures,
+            collect_quants_fn=self._collect_fun_quantifiers,
+            is_exact_record_literal_fn=self._is_exact_record_literal,
+        )
+
+        lines: list[str] = [
+            "/* Emitted by Quest Bootstrap C Transpiler */",
+            "#include \"quest_runtime.h\"",
+            "",
+        ]
+
+        lines.extend(decl_emitter.emit_forward_typedefs(analysis.agg_types))
+        lines.extend(decl_emitter.emit_module_declarations(analysis))
+        lines.extend(decl_emitter.emit_aggregate_structs(analysis.agg_types))
+        lines.extend(decl_emitter.emit_evidence_dictionaries(analysis.agg_types, self.needed_dicts))
+        lines.extend(decl_emitter.emit_coercion_tables(self.tuple_coercions, self.variant_coercions))
+        lines.extend(decl_emitter.emit_environment_structs(self.lifted_lambdas))
+        lines.extend(decl_emitter.emit_top_vars_declarations(analysis.top_vars, self.var_dict_names))
+        lines.extend(decl_emitter.emit_forward_declarations_and_trampolines(
+            analysis.top_funs,
+            self.lifted_lambdas,
+            self.val_referenced_top_funs,
+            self.top_funs_dict,
+        ))
+
+        top_funs = analysis.top_funs
+        top_vars = analysis.top_vars
+        sorted_modules = analysis.sorted_modules
+
         all_module_map: dict[str, TypedModule] = {}
         if loaded_modules:
             for mod in loaded_modules.values():
@@ -634,320 +322,6 @@ class CEmitter:
         for phrase in prog.phrases:
             if isinstance(phrase, TypedModule):
                 all_module_map[phrase.name] = phrase
-
-        sorted_modules = topological_sort_modules(list(all_module_map.values()))
-        # 0. Aggregate and variant types collection
-        agg_types, variant_types = _collect_aggregate_types(prog, self.record_ctx)
-
-        # Collect aggregate types from module bindings and module interface records
-        for mod in sorted_modules:
-            for b in mod.bindings:
-                b_agg, b_var = _collect_aggregate_types(b, self.record_ctx)
-                for item in b_agg:
-                    if item not in agg_types:
-                        agg_types.append(item)
-                for v in b_var:
-                    if v not in variant_types:
-                        variant_types.append(v)
-            mod_rec_t = BuiltinModuleRegistry._build_record_type_from_scope(mod.scope)
-            rec_tag = record_struct_name(mod_rec_t, self.record_ctx)
-            if not any(tag == rec_tag for tag, _ in agg_types):
-                agg_types.append((rec_tag, mod_rec_t))
-
-        all_records = [t for _, t in agg_types if isinstance(t, QRecordType)]
-        all_tuples = [t for _, t in agg_types if isinstance(t, QTupleType)]
-
-        # Pre-populate all subtyping coercions present among types
-        for t in all_records:
-            self.needed_dicts.add((t, t))
-            for s in all_records:
-                if s != t and is_record_subtype(s, t):
-                    self.needed_dicts.add((t, s))
-
-        for t in all_tuples:
-            for s in all_tuples:
-                if s != t and is_tuple_subtype(s, t):
-                    self.tuple_coercions.add((t, s))
-
-        for t in variant_types:
-            for s in variant_types:
-                if s != t and is_variant_subtype(s, t):
-                    self.variant_coercions.add((t, s))
-
-        # Top-level phrases in prog (excluding TypedModule which are emitted separately)
-        top_funs: list[tuple[str, TypedFun, Any]] = []
-        top_vars: list[tuple[str, TypedExpr, Any]] = []
-
-        for phrase in prog.phrases:
-            match phrase:
-                case TypedModule():
-                    pass
-                case TypedLetValue(name=name, value=val, symbol=symbol):
-                    if isinstance(val, TypedFun):
-                        top_funs.append((name, val, symbol))
-                    else:
-                        top_vars.append((name, val, symbol))
-                case TypedException(name=name, type_val=t) as exc_node:
-                    if name:
-                        top_vars.append((name, exc_node, type("Symbol", (), {"type_val": t})()))
-                case TypedExprStmt(expr=TypedException(name=name, type_val=t) as exc_node):
-                    if name:
-                        top_vars.append((name, exc_node, type("Symbol", (), {"type_val": t})()))
-                case _:
-                    pass
-
-        self.top_fun_names = {name for name, _, _ in top_funs}
-        self.top_var_names = {name for name, _, _ in top_vars}
-        top_names = self.top_fun_names | self.top_var_names
-        self.val_referenced_top_funs = _find_val_referenced_top_funs(prog, self.top_fun_names)
-
-        self.lifted_lambdas = _collect_lambdas(prog, top_funs, top_names)
-        self.lambda_info_by_id = {id(l.fun): l for l in self.lifted_lambdas}
-
-        lines: list[str] = [
-            "/* Emitted by Quest Bootstrap C Transpiler */",
-            "#include \"quest_runtime.h\"",
-            "",
-        ]
-
-        if agg_types:
-            lines.append("/* Forward declarations for aggregate types */")
-            for tag_name, _ in agg_types:
-                lines.append(f"typedef struct {tag_name} {tag_name};")
-            lines.append("")
-
-        if sorted_modules:
-            lines.append("/* Forward declarations and state for compiled modules */")
-            for mod in sorted_modules:
-                mod_rec_t = BuiltinModuleRegistry._build_record_type_from_scope(mod.scope)
-                rec_struct = self.record_struct_name(mod_rec_t)
-                clean_mod = mod.name.replace(".", "_")
-                lines.append(f"static {rec_struct} *qv_{clean_mod};")
-                lines.append(f"static bool qv_mod_{clean_mod}_initialized = false;")
-                lines.append(f"static void qv_mod_{clean_mod}_init(void);")
-            lines.append("")
-
-        if agg_types:
-            lines.append("/* Aggregate struct definitions */")
-            for tag_name, t in agg_types:
-                lines.append(f"struct {tag_name} {{")
-                if isinstance(t, QTupleType):
-                    if not t.value_fields:
-                        lines.append("    char _unused;")
-                    else:
-                        for i, f in enumerate(t.value_fields):
-                            c_type = self.c_type(f.type_val)
-                            lines.append(f"    {c_type} _{i};")
-                elif isinstance(t, QRecordType):
-                    lines.append("    QRecordHeader header;")
-                    if not t.fields:
-                        lines.append("    char _unused;")
-                    else:
-                        for f in sorted(t.fields, key=lambda fld: fld.name):
-                            c_type = self.c_type(f.type_val)
-                            lines.append(f"    {c_type} qf_{f.name};")
-                elif isinstance(t, QOptionType):
-                    lines.append("    int64_t tag;")
-                    payload_branches = [o for o in t.options if o.payload_type is not None]
-                    if payload_branches:
-                        lines.append("    union {")
-                        for o in payload_branches:
-                            pt = o.payload_type
-                            if isinstance(pt, QTupleType):
-                                lines.append(f"        struct {tag_name}_{o.name}_payload {{")
-                                for i, f in enumerate(pt.value_fields):
-                                    c_f_type = self.c_type(f.type_val)
-                                    f_ident = f"_{i}" if not f.name else f"_{i}"
-                                    lines.append(f"            {c_f_type} {f_ident};")
-                                lines.append(f"        }} {o.name};")
-                            elif isinstance(pt, QRecordType):
-                                lines.append(f"        struct {tag_name}_{o.name}_payload {{")
-                                for f in sorted(pt.fields, key=lambda fld: fld.name):
-                                    c_f_type = self.c_type(f.type_val)
-                                    lines.append(f"            {c_f_type} qf_{f.name};")
-                                lines.append(f"        }} {o.name};")
-                            else:
-                                c_pt = self.c_type(pt)
-                                lines.append(f"        struct {{ {c_pt} val; }} {o.name};")
-                        lines.append("    } u;")
-                lines.append("};")
-                lines.append("")
-
-        if all_records:
-            lines.append("/* Evidence dictionary struct definitions */")
-            for t in all_records:
-                dict_t = self.record_ctx.offset_dict_struct_name(t)
-                rec_name = self.record_ctx.get_or_create_name(t)
-                lines.append(f"typedef struct {dict_t} {dict_t};")
-                lines.append(f"struct {dict_t} {{")
-                if not t.fields:
-                    lines.append("    size_t _unused;")
-                else:
-                    for f in sorted(t.fields, key=lambda fld: fld.name):
-                        lines.append(f"    size_t offset_{f.name};")
-                lines.append("};")
-                lines.append(f"typedef struct QRecordResult_{rec_name} {{")
-                lines.append("    void *val;")
-                lines.append(f"    const {dict_t} *dict;")
-                lines.append(f"}} QRecordResult_{rec_name};")
-            lines.append("")
-
-        if self.needed_dicts:
-            lines.append("/* Static evidence dictionaries for record subtyping */")
-            for tgt, src in sorted(
-                self.needed_dicts,
-                key=lambda p: (
-                    self.record_ctx.get_or_create_name(p[0]),
-                    self.record_ctx.get_or_create_name(p[1]),
-                ),
-            ):
-                inst_name = self.record_ctx.offset_dict_instance_name(tgt, src)
-                dict_t = self.record_ctx.offset_dict_struct_name(tgt)
-                src_sname = self.record_struct_name(src)
-                if not tgt.fields:
-                    lines.append(f"static const {dict_t} {inst_name} = {{ 0 }};")
-                else:
-                    entries = [
-                        f"offsetof({src_sname}, qf_{f.name})"
-                        for f in sorted(tgt.fields, key=lambda fld: fld.name)
-                    ]
-                    lines.append(f"static const {dict_t} {inst_name} = {{ {', '.join(entries)} }};")
-            lines.append("")
-
-        if self.tuple_coercions:
-            lines.append("/* Compile-time static assertions for tuple subtyping */")
-            for tgt, src in sorted(
-                self.tuple_coercions,
-                key=lambda p: (tuple_struct_name(p[0]), tuple_struct_name(p[1])),
-            ):
-                tgt_name = tuple_struct_name(tgt)
-                src_name = tuple_struct_name(src)
-                for i in range(len(tgt.value_fields)):
-                    lines.append(
-                        f"static_assert(offsetof({src_name}, _{i}) == offsetof({tgt_name}, _{i}), "
-                        f"tuple_coercion_{tgt_name}_{src_name}_{i});"
-                    )
-            lines.append("")
-
-        if self.variant_coercions:
-            lines.append("/* Static tag remapping tables for variant subtyping */")
-            for tgt, src in sorted(
-                self.variant_coercions,
-                key=lambda p: (type_to_c_tag(p[0]), type_to_c_tag(p[1])),
-            ):
-                tgt_tag = type_to_c_tag(tgt)
-                src_tag = type_to_c_tag(src)
-                entries = [
-                    str(next(j for j, tv in enumerate(tgt.variants) if tv.name == sv.name))
-                    for sv in src.variants
-                ]
-                lines.append(
-                    f"static const int64_t tagmap_{tgt_tag}_{src_tag}[{len(src.variants)}] = "
-                    f"{{ {', '.join(entries)} }};"
-                )
-            lines.append("")
-
-        # 1. Environment struct definitions for capturing lambdas
-        capturing_lambdas = [l for l in self.lifted_lambdas if l.free_vars]
-        if capturing_lambdas:
-            lines.append("/* Environment structs for capturing closures */")
-            for l in capturing_lambdas:
-                lines.append(f"{l.env_struct_name} {{")
-                for vname, vtype in l.free_vars:
-                    c_type = self.c_type(vtype)
-                    lines.append(f"    {c_type} {mangle_ident(vname)};")
-                lines.append("};")
-                lines.append("")
-
-        # 2. Static declarations for top-level non-void variables
-        if top_vars:
-            for name, val, symbol in top_vars:
-                if symbol.type_val != OK_TYPE:
-                    c_ident = mangle_ident(name)
-                    if isinstance(symbol.type_val, QRecordType) and not self._is_exact_record_literal(symbol.type_val, val):
-                        dict_t = self.record_ctx.offset_dict_struct_name(symbol.type_val)
-                        lines.append(f"static void *{c_ident};")
-                        lines.append(f"static const {dict_t} *_dict_{c_ident};")
-                        self.var_dict_names[name] = f"_dict_{c_ident}"
-                    else:
-                        c_type = self.c_type(symbol.type_val)
-                        lines.append(f"static {c_type} {c_ident};")
-            lines.append("")
-
-        # 3. Forward declarations for top-level functions
-        if top_funs:
-            lines.append("/* Forward declarations for top-level functions */")
-            for name, fun, _sym in top_funs:
-                quants, params, _body, ret_type = self._collect_fun_params(fun)
-                c_name = mangle_ident(name)
-                ret_c = "void" if ret_type == OK_TYPE else (
-                    f"QRecordResult_{self.record_ctx.get_or_create_name(ret_type)}"
-                    if isinstance(ret_type, QRecordType)
-                    else self.c_type(ret_type)
-                )
-                decls, _ = self._param_signatures(params, quants)
-                param_sig = "void" if not decls else ", ".join(decls)
-                lines.append(f"static {ret_c} {c_name}({param_sig});")
-            lines.append("")
-
-        # 4. Forward declarations for lifted lambdas
-        if self.lifted_lambdas:
-            lines.append("/* Forward declarations for lifted lambdas */")
-            for l in self.lifted_lambdas:
-                quants, _ = self._collect_fun_quantifiers(l.fun.type_val)
-                ret_type = l.fun.type_val.result_type if isinstance(l.fun.type_val, QFunType) else l.fun.type_val
-                if isinstance(ret_type, QAllType):
-                    _, inner = self._collect_fun_quantifiers(ret_type)
-                    ret_type = inner.result_type if isinstance(inner, QFunType) else inner
-                ret_c = "void" if ret_type == OK_TYPE else (
-                    f"QRecordResult_{self.record_ctx.get_or_create_name(ret_type)}"
-                    if isinstance(ret_type, QRecordType)
-                    else self.c_type(ret_type)
-                )
-                decls, _ = self._param_signatures(l.fun.params, quants)
-                param_sigs = ["void *_raw_env"] + decls
-                sig = ", ".join(param_sigs)
-                lines.append(f"static {ret_c} {l.c_fn_name}({sig});")
-            lines.append("")
-
-        # 5. Static closures for non-capturing lambdas
-        non_capturing = [l for l in self.lifted_lambdas if not l.free_vars]
-        if non_capturing:
-            lines.append("/* Static closures for non-capturing lambdas */")
-            for l in non_capturing:
-                lines.append(f"static QClosure {l.closure_var_name} = {{ (void *){l.c_fn_name}, NULL }};")
-            lines.append("")
-
-        # 6. Trampolines and static closures for value-referenced top-level functions
-        self.top_funs_dict = {name: (fun, sym) for name, fun, sym in top_funs}
-        top_funs_dict = self.top_funs_dict
-        if self.val_referenced_top_funs:
-            lines.append("/* Trampoline functions and static closures for first-class top-level functions */")
-            for name in sorted(self.val_referenced_top_funs):
-                fun, _ = top_funs_dict[name]
-                c_name = mangle_ident(name)
-                tramp_name = f"{c_name}_trampoline"
-                quants, params, _, ret_type = self._collect_fun_params(fun)
-                ret_c = "void" if ret_type == OK_TYPE else (
-                    f"QRecordResult_{self.record_ctx.get_or_create_name(ret_type)}"
-                    if isinstance(ret_type, QRecordType)
-                    else self.c_type(ret_type)
-                )
-                decls, forward_args = self._param_signatures(params, quants)
-                param_sigs = ["void *env"] + decls
-                sig = ", ".join(param_sigs)
-                args_str = ", ".join(forward_args)
-                lines.append(f"static {ret_c} {tramp_name}({sig}) {{")
-                lines.append("    (void)env;")
-                if ret_type == OK_TYPE:
-                    lines.append(f"    {c_name}({args_str});")
-                    lines.append("    return;")
-                else:
-                    lines.append(f"    return {c_name}({args_str});")
-                lines.append("}")
-                lines.append(f"static QClosure {c_name}_closure = {{ (void *){tramp_name}, NULL }};")
-                lines.append("")
-
         # 7. Function definitions for top-level functions
         if top_funs:
             lines.append("/* Function definitions */")
