@@ -181,7 +181,7 @@ class TestPhase45Subtyping(unittest.TestCase):
         pt.x + pt.y
         """
         c_code = self.get_c_code(code)
-        self.assertIn("QRecordResult_", c_code)
+        self.assertIn("QRecordVal", c_code)
 
         proc = self.compile_quest(code)
         self.assertEqual(proc.returncode, 0)
@@ -219,8 +219,8 @@ class TestPhase45Subtyping(unittest.TestCase):
         self.assertEqual(proc.returncode, 0)
         self.assertIn("123 : Int", proc.stdout)
 
-    def test_record_storage_in_tuple_rejected(self):
-        """Verifies that storing subtyped records in aggregates produces a diagnostic."""
+    def test_record_storage_in_tuple(self):
+        """Verifies that storing subtyped records in tuples works via QRecordVal fat pointer."""
         code = """
         Let Base = Record
             x: Int
@@ -240,11 +240,37 @@ class TestPhase45Subtyping(unittest.TestCase):
         end;
         p.item.x
         """
+        proc = self.compile_quest(code)
+        self.assertEqual(proc.returncode, 0)
+        self.assertIn("10 : Int", proc.stdout)
+
+    def test_variant_storage_in_tuple_rejected(self):
+        """Verifies that storing subtyped variants in aggregates produces a diagnostic."""
+        code = """
+        Let Small = Variant
+            a: Int
+        end;
+        Let Large = Variant
+            a: Int
+            b: Real
+        end;
+        Let Cont = Tuple
+            v: Large
+        end;
+        let s = variant a of Small with 1 end;
+        let c: Cont = tuple
+            let v = s
+        end;
+        1
+        """
         pipeline = compile_pipeline()
         res = pipeline.execute(code, "<test>")
         self.assertFalse(res.success)
         self.assertTrue(
-            any("Subtyped record or variant storage in aggregates requires runtime descriptors" in d.message for d in res.diagnostics),
+            any(
+                "Subtyped variant storage in aggregates requires runtime descriptors" in d.message
+                for d in res.diagnostics
+            ),
             f"Expected error diagnostic not found in {res.diagnostics}"
         )
 

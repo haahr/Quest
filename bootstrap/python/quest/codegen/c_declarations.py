@@ -61,7 +61,7 @@ class CDeclarationEmitter:
                 mod_rec_t = BuiltinModuleRegistry._build_record_type_from_scope(mod.scope)
                 rec_struct = record_struct_name(mod_rec_t, self.record_ctx)
                 clean_mod = mod.name.replace(".", "_")
-                lines.append(f"static {rec_struct} *qv_{clean_mod};")
+                lines.append(f"static QRecordVal qv_{clean_mod};")
                 lines.append(f"static bool qv_mod_{clean_mod}_initialized = false;")
                 lines.append(f"static void qv_mod_{clean_mod}_init(void);")
             lines.append("")
@@ -138,10 +138,7 @@ class CDeclarationEmitter:
                     for f in sorted(t.fields, key=lambda fld: fld.name):
                         lines.append(f"    size_t offset_{f.name};")
                 lines.append("};")
-                lines.append(f"typedef struct QRecordResult_{rec_name} {{")
-                lines.append("    void *val;")
-                lines.append(f"    const {dict_t} *dict;")
-                lines.append(f"}} QRecordResult_{rec_name};")
+
             lines.append("")
 
         if needed_dicts:
@@ -224,18 +221,15 @@ class CDeclarationEmitter:
     def emit_top_vars_declarations(
         self,
         top_vars: list[tuple[str, TypedExpr, Any]],
-        var_dict_names: dict[str, str],
+        var_dict_names: Optional[dict[str, str]] = None,
     ) -> list[str]:
         lines: list[str] = []
         if top_vars:
             for name, val, symbol in top_vars:
                 if symbol.type_val != OK_TYPE:
                     c_ident = mangle_ident(name)
-                    if isinstance(symbol.type_val, QRecordType) and not self.is_exact_record_literal(symbol.type_val, val):
-                        dict_t = self.record_ctx.offset_dict_struct_name(symbol.type_val)
-                        lines.append(f"static void *{c_ident};")
-                        lines.append(f"static const {dict_t} *_dict_{c_ident};")
-                        var_dict_names[name] = f"_dict_{c_ident}"
+                    if isinstance(symbol.type_val, QRecordType):
+                        lines.append(f"static QRecordVal {c_ident};")
                     else:
                         c_type = self.c_type(symbol.type_val)
                         lines.append(f"static {c_type} {c_ident};")
@@ -258,7 +252,7 @@ class CDeclarationEmitter:
                 ret_type = inner.result_type if isinstance(inner, QFunType) else inner
                 c_name = mangle_ident(name)
                 ret_c = "void" if ret_type == OK_TYPE else (
-                    f"QRecordResult_{self.record_ctx.get_or_create_name(ret_type)}"
+                    "QRecordVal"
                     if isinstance(ret_type, QRecordType)
                     else self.c_type(ret_type)
                 )
@@ -276,7 +270,7 @@ class CDeclarationEmitter:
                     _, inner = self.collect_fun_quantifiers(ret_type)
                     ret_type = inner.result_type if isinstance(inner, QFunType) else inner
                 ret_c = "void" if ret_type == OK_TYPE else (
-                    f"QRecordResult_{self.record_ctx.get_or_create_name(ret_type)}"
+                    "QRecordVal"
                     if isinstance(ret_type, QRecordType)
                     else self.c_type(ret_type)
                 )
@@ -302,7 +296,7 @@ class CDeclarationEmitter:
                 quants, inner = self.collect_fun_quantifiers(fun.type_val)
                 ret_type = inner.result_type if isinstance(inner, QFunType) else inner
                 ret_c = "void" if ret_type == OK_TYPE else (
-                    f"QRecordResult_{self.record_ctx.get_or_create_name(ret_type)}"
+                    "QRecordVal"
                     if isinstance(ret_type, QRecordType)
                     else self.c_type(ret_type)
                 )

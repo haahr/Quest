@@ -165,7 +165,7 @@ def qtype_to_c_type(t: QType, ctx: Optional[RecordNamingContext] = None) -> str:
     if isinstance(t, QTupleType):
         return f"{tuple_struct_name(t)} *"
     if isinstance(t, QRecordType):
-        return f"{record_struct_name(t, ctx)} *"
+        return "QRecordVal"
     if isinstance(t, (QFunType, QAllType)):
         return "QClosure *"
     if isinstance(t, QArrayType):
@@ -246,7 +246,11 @@ def qval_wrap(expr_str: str, t: QType) -> str:
         return f"((QVal){{ .i = (int64_t)({expr_str}) }})"
     if t == REAL_TYPE:
         return f"((QVal){{ .r = (double)({expr_str}) }})"
-    if t == STRING_TYPE or isinstance(t, (QTupleType, QRecordType, QFunType, QAllType, QArrayType, QVariantType, QOptionType, QExceptionType)):
+    if isinstance(t, QRecordType):
+        return f"((QVal){{ .p = (void *)quest_record_box({expr_str}) }})"
+    if t == STRING_TYPE or isinstance(
+        t, (QTupleType, QFunType, QAllType, QArrayType, QVariantType, QOptionType, QExceptionType)
+    ):
         return f"((QVal){{ .p = (void *)({expr_str}) }})"
     return f"((QVal){{ .u = 0 }})"
 
@@ -263,6 +267,8 @@ def qval_unwrap(qval_expr: str, t: QType, ctx: Optional[RecordNamingContext] = N
         return f"({qval_expr}.r)"
     if t == OK_TYPE:
         return "((void)0)"
+    if isinstance(t, QRecordType):
+        return f"(*((QRecordVal *)({qval_expr}.p)))"
     c_t = qtype_to_c_type(t, ctx)
     return f"(({c_t})({qval_expr}.p))"
 
@@ -278,8 +284,8 @@ def closure_fn_ptr_type(fun_type: QType, ctx: Optional[RecordNamingContext] = No
     if isinstance(cur_type, QFunType):
         if cur_type.result_type == OK_TYPE:
             ret_c = "void"
-        elif isinstance(cur_type.result_type, QRecordType) and ctx is not None:
-            ret_c = f"QRecordResult_{ctx.get_or_create_name(cur_type.result_type)}"
+        elif isinstance(cur_type.result_type, QRecordType):
+            ret_c = "QRecordVal"
         else:
             ret_c = qtype_to_c_type(cur_type.result_type, ctx)
         param_types = ["void *"]
@@ -287,12 +293,7 @@ def closure_fn_ptr_type(fun_type: QType, ctx: Optional[RecordNamingContext] = No
         for _ in quantifiers:
             param_types.append("const QTypeDescriptor *")
         for p in cur_type.params:
-            if isinstance(p.type_val, QRecordType):
-                param_types.append("void *")
-                d_name = ctx.offset_dict_struct_name(p.type_val) if ctx else "void"
-                param_types.append(f"const {d_name} *")
-            else:
-                param_types.append(qtype_to_c_type(p.type_val, ctx))
+            param_types.append(qtype_to_c_type(p.type_val, ctx))
         sig = ", ".join(param_types)
         return f"{ret_c} (*)({sig})"
     return "void * (*)(void *, ...)"

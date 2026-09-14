@@ -15,43 +15,41 @@ let p: Record x:Int end = r;  (* Subsumption: dropping y and z *)
 Under single inheritance, fields share fixed offsets across subtypes. Under multiple inheritance and structural
 subtyping, field offsets cannot be assigned globally without conflict.
 
-### Two Competing Approaches
+### Uniform Fat Pointer Representation (`QRecordVal`)
 
 ```
 +-----------------------------------------------------------------------------------------+
-| APPROACH A: Evidence Passing (Plan of Record)                                           |
+| Uniform Fat Pointer Representation (Plan of Record)                                     |
 |                                                                                         |
-|  Caller: Passes object pointer (x0) + static dictionary pointer (x1)                     |
+|  Caller & Callee: Passes and returns 16-byte struct { void *val; const void *dict; }    |
+|  Under AAPCS64: Mapped directly to register pair (x0, x1) without stack or heap alloc.  |
 |                                                                                         |
-|    Value Pointer (1 word)          Static Dictionary (ROData)      Heap Record Payload  |
+|    QRecordVal (16 bytes: 2 words)   Static Dictionary (ROData)      Heap Record Payload |
 |    +--------------------+          +-----------------------+       +-------------------+|
-|    | Ptr to Record Data |--------->| offset of 'x' = 0     |       | field 0: x = 1    ||
-|    +--------------------+          | offset of 'y' = 8     |       | field 1: y = 2.0  ||
-|                                    +-----------------------+       | field 2: z = true ||
-|                                                                    +-------------------+|
-|  • Upcasting cost: Zero heap allocation (passes pointer to a static constant dictionary) |
-|  • Value size: Exactly 1 word (uint64_t) everywhere                                     |
-+-----------------------------------------------------------------------------------------+
-| APPROACH B: Fat Pointers / Coercions (Considered Alternative)                           |
+|    | val: void*         |--------->|                       |       | field 0: x = 1    ||
+|    | dict: const void*  |--------->| offset of 'x' = 0     |       | field 1: y = 2.0  ||
+|    +--------------------+          | offset of 'y' = 8     |       | field 2: z = true ||
+|                                    +-----------------------+       +-------------------+|
 |                                                                                         |
-|  Values are 2-word structs: struct FatPtr { void* data; void* dict; };                  |
-|  • Upcasting cost: Allocates a 2-word struct on stack, or a heap box when stored in     |
-|    generic structures like Array(T).                                                    |
+|  • Upcasting cost: Zero heap allocation (attaches pointer to static constant dict)     |
+|  • Register ABI: 2 registers (x0, x1) under AAPCS64 for parameters and returns          |
+|  • Tuples: Inlined 16-byte fields                                                       |
+|  • Arrays: Boxed into 8-byte heap pointer (QRecordVal *) for uniform 1-word QVal slots  |
 +-----------------------------------------------------------------------------------------+
 ```
 
 ---
 
-## 2. Comparison Matrix
+## 2. Architecture & Design Tradeoffs
 
-| Dimension | Evidence Passing (Plan of Record) | Fat Pointers / Coercions |
+| Dimension | `QRecordVal` Fat Pointer | Raw Pointers + Side-Channel Dicts |
 | :--- | :--- | :--- |
-| **Values** | **Uniform 1 word (`uint64_t`)**; raw pointers | 2 words `(data, dict)` or heap boxes |
-| **Collections** | **Trivial & Uniform:** 1-word elements | Requires heap boxing for generic array slots |
-| **Subsumption** | **Zero Allocation:** Passes static dictionary | Allocates stack/heap struct on upcast |
-| **Garbage Collection** | **Zero GC Overhead:** Dictionaries are static | Traces boxed fat-pointer nodes |
-| **Coercions** | Object headers and adapter thunks when needed | Supported directly via attached dictionary |
-| **Registers & ABI** | Standard AAPCS64; extra dictionary in register | Passes 2-word structs in register pairs |
+| **Record Values** | **Uniform 2 words (`val, dict`)** | Fragmented: 1 word in some places, 2 in others |
+| **Function ABI** | Clean 1-to-1 parameter mapping (AAPCS64 `x0, x1`) | Companion synthetic dict parameters |
+| **Collections** | Boxed in `QRecordVal *` for arrays; inline in tuples | Subtyped records in aggregates disallowed |
+| **Subsumption** | **Zero Allocation:** Pairs data with static dict | Requires synthetic variables or thunks |
+| **Garbage Collection** | `dict` points to `.rodata`; `val` traced | Traced as normal pointer |
+| **Coercions** | Supported directly via attached dictionary | Fragile side-channel dictionary propagation |
 
 ---
 
@@ -74,28 +72,28 @@ In *Typeful Programming* (Section 6.3), Luca Cardelli proposed:
 
 ## 4. Register Conventions and AAPCS64 ABI (Step 6)
 
-For native AArch64 code generation, functions accepting subtyped record arguments receive the dictionary pointer in an
-explicit argument register:
+For native AArch64 code generation, 16-byte structs like `QRecordVal` are passed and returned in consecutive argument
+registers per AAPCS64:
 
 ```
-AAPCS64 Register Assignment:
-  x0: Object data pointer (heap record payload)
-  x1: Evidence dictionary pointer (static .rodata table)
+AAPCS64 Register Assignment for Record Values:
+  x0: Record payload pointer (void *val)
+  x1: Evidence dictionary pointer (const void *dict -> static .rodata table)
   x2-x7: Subsequent parameters
   x19-x28: Callee-saved registers
   x29 (FP) / x30 (LR): Frame pointer and link register
 ```
 
-When a record's concrete type is statically known (e.g. within a module or private function where no subsumption
-occurred), the dictionary parameter is completely eliminated by the compiler via interprocedural specialization.
+Record return values are returned in `x0` and `x1` without stack-spill or hidden return buffer.
 
 ---
 
 ## 5. Memory Management and Garbage Collection
 
 - **Boehm GC (`libgc`):** Used across Step 4 (C transpiler) and Step 6 (native AArch64).
-- **Uniform Pointer Tracing:** Because all values in variables, arrays, and tuples are 1 word (`uint64_t`), the GC
-  scans frames and heap allocations without needing runtime tag discrimination for primitive words vs. pointers.
+- **Uniform 1-Word `QVal`:** Primitive words, pointers, closures, and boxed aggregates (`QRecordVal *`) fit into 8-byte
+  slots, allowing simple GC scanning.
+- **Tuples & Records:** Inlined multi-word slots in stack frames and aggregate structs are directly traversed.
 - **Static Dictionaries:** Evidence dictionaries reside in read-only data sections (`.rodata`) and are never traced or
   collected by the GC.
 

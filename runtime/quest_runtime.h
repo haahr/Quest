@@ -74,6 +74,12 @@ typedef struct QRecordHeader {
     const void *descriptor;
 } QRecordHeader;
 
+/* First-class 16-byte record value: payload pointer and evidence dictionary */
+typedef struct QRecordVal {
+    void       *val;
+    const void *dict;
+} QRecordVal;
+
 /* Variant representation: descriptor, tag and single 64-bit value word */
 typedef struct QVariant {
     const void *descriptor;
@@ -186,6 +192,8 @@ static_assert(sizeof(uint64_t)      == 8, u64_must_be_8_bytes);
 static_assert(sizeof(QString)       == 24, qstring_must_be_24_bytes);
 static_assert(sizeof(QClosure)      == 16, qclosure_must_be_16_bytes);
 static_assert(sizeof(QRecordHeader) == 8, qrecord_header_must_be_8_bytes);
+static_assert(sizeof(QRecordVal)    == 16, qrecordval_must_be_16_bytes);
+static_assert(offsetof(QRecordVal, dict) == 8, qrecordval_dict_at_offset_8);
 static_assert(sizeof(QVariant)      == 24, qvariant_must_be_24_bytes);
 static_assert(sizeof(QException)    == 8, qexception_must_be_8_bytes);
 static_assert(sizeof(QExceptionState) == 16, qexception_state_must_be_16_bytes);
@@ -239,6 +247,12 @@ const QTypeDescriptor *quest_make_array_descriptor(const QTypeDescriptor *elemen
 const QTypeDescriptor *quest_make_opaque_descriptor(const char *name);
 QDynamic              *quest_dynamic_new(const QTypeDescriptor *type_desc, QVal val);
 QVal                   quest_dynamic_be(const QTypeDescriptor *target_type_desc, const QDynamic *d);
+
+static inline QRecordVal *quest_record_box(QRecordVal rec) {
+    QRecordVal *box = (QRecordVal *)quest_alloc(sizeof(QRecordVal));
+    *box = rec;
+    return box;
+}
 
 static inline void quest_check_array_bounds(const QArray *a, int64_t idx) {
     if (a == NULL || idx < 0 || idx >= a->length) {

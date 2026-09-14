@@ -250,22 +250,33 @@ As established in `docs/runtime-design.md`, Quest uses the **Evidence Passing** 
        offsetof(QT_Point3D, qf_y)
    };
    ```
-3. **Function Parameters & Record Returns:**
-   - Record parameters in functions and closures receive companion dictionary pointers:
-     `(void *qv_p, const OffsetDict_Point *_dict_qv_p)`.
-   - Functions returning records return a fat result structure:
+3. **First-Class Uniform Record Value (`QRecordVal`):**
+   - Every record value in variables, function parameters, and returns is represented as a first-class 16-byte struct:
      ```c
-     typedef struct QRecordResult_Point {
-         void *val;
-         const OffsetDict_Point *dict;
-     } QRecordResult_Point;
+     typedef struct QRecordVal {
+         void       *val;   /* Pointer to heap-allocated QT_<Record> payload */
+         const void *dict;  /* Pointer to static OffsetDict_<Record> */
+     } QRecordVal;
      ```
+   - On AAPCS64, `QRecordVal` is passed and returned directly in register pairs (`x0, x1`) without heap allocation.
 4. **Field Access:**
-   - *Direct (exact concrete type statically known):* `r->qf_x` (direct load at fixed struct offset).
-   - *Subtyped (via companion dictionary):* `(*((QInt *)((char *)r + dict->offset_x)))`.
+   - Evaluates dynamic offset from the embedded evidence dictionary:
+     ```c
+     (*((QFieldType *)((char *)r.val + ((const OffsetDict_Target *)r.dict)->offset_x)))
+     ```
 5. **Storage in Aggregates:**
-   - Storing subtyped records into an aggregate (such as `QTuple` or `QArray`) produces a compile-time diagnostic
-     requiring runtime descriptors: `"Subtyped record or variant storage in aggregates requires runtime descriptors"`.
+   - **Tuples:** Tuple fields of record type store `QRecordVal` inline (16 bytes).
+   - **Arrays:** In `QArray` (where slots are uniform 8-byte `QVal` words), `QRecordVal` is boxed into an 8-byte heap
+     pointer (`QRecordVal *`) via `quest_record_box`:
+     ```c
+     static inline QRecordVal *quest_record_box(QRecordVal rec) {
+         QRecordVal *box = (QRecordVal *)GC_MALLOC(sizeof(QRecordVal));
+         *box = rec;
+         return box;
+     }
+     ```
+     Array indexing unwraps `(*((QRecordVal *)arr->data[idx].p))` transparently back into `QRecordVal`.
+   - Storing subtyped variants in aggregates produces a compile-time diagnostic requiring runtime descriptors.
 
 ### 5.3. Options and Variants (Sums)
 

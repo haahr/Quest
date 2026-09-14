@@ -462,18 +462,25 @@ Phase 4.5 implements Cardelli's structural subtyping across tuples, records, and
 
 ### 10.2. Evidence-Passing Record Subtyping
 - **Object Header:** Every concrete record structure begins with `QRecordHeader header;` at offset 0 (`header.descriptor = NULL;`).
-- **Evidence Dictionaries:** Functions and closures taking record parameters receive companion evidence dictionary pointers:
+- **First-Class Fat Pointers (`QRecordVal`):** All records are represented uniformly as a 16-byte struct:
   ```c
-  static QInt qv_sum(void *qv_pt, const OffsetDict_Point2D *_dict_qv_pt);
+  typedef struct QRecordVal {
+      void       *val;   /* Pointer to heap-allocated QT_<Record> payload */
+      const void *dict;  /* Pointer to static OffsetDict_<Record> */
+  } QRecordVal;
   ```
-- **Dictionary Naming:** Uses alias name when available (`OffsetDict_<Alias>`), or sequential per-module identifier `OffsetDict_<Module>_record<N>` / `OffsetDict_record<N>`.
-- **Field Selection:** Dynamic dispatch reads fields via byte offsets from active companion dictionaries:
+- **Function Parameters & Returns:** Functions take `QRecordVal` directly and return `QRecordVal` directly
+  (passed in `x0, x1` under AAPCS64), eliminating companion dictionary arguments.
+- **Dictionary Naming:** Uses alias name when available (`OffsetDict_<Alias>`), or sequential per-module identifier
+  `OffsetDict_<Module>_record<N>` / `OffsetDict_record<N>`.
+- **Field Selection:** Dynamic dispatch reads fields via byte offsets from embedded dictionaries:
   ```c
-  (*((QInt *)((char *)qv_pt + _dict_qv_pt->offset_x)))
+  (*((QInt *)((char *)qv_pt.val + ((const OffsetDict_Point2D *)qv_pt.dict)->offset_x)))
   ```
-- **Record Returns:** Functions returning records return `QRecordResult_<Target> { void *val; const OffsetDict_<Target> *dict; }`.
-- **Aggregate Storage Guard:** Storing a subtyped record or variant into an array or tuple produces a diagnostic:
-  `"Subtyped record or variant storage in aggregates requires runtime descriptors"`.
+- **Aggregate Storage:** Records in tuples are stored inline as 16-byte `QRecordVal`. In arrays (`QArray`),
+  `QRecordVal` is boxed into an 8-byte heap pointer (`QRecordVal *`) via `quest_record_box`, setting the stage
+  for future unboxed multi-stride arrays. Subtyped variants in aggregates produce a diagnostic:
+  `"Subtyped variant storage in aggregates requires runtime descriptors"`.
 
 ### 10.3. Variant Subtyping & Static Tag Remapping
 - **Object Header:** `QVariant` has `const void *descriptor;` at offset 0 (24 bytes total, payload at offset 16).
@@ -528,7 +535,9 @@ The C code generator is verified by comprehensive unit and integration tests:
 - `tests/python/test_phase4_4_options_variants.py`: Ordered options, tagged variants, tag checks (`?`), tag extractions (`!`),
   case discrimination, and `--nogc` execution.
 - `tests/python/test_phase4_5_subtyping.py`: Prefix tuple subtyping with static assertions, record width/permutation subtyping,
-  evidence dictionary passing through closures, record returns via `QRecordResult`, and static variant tag remapping.
+  evidence dictionary passing through closures, uniform `QRecordVal` returns, and static variant tag remapping.
+- `tests/python/test_phase4_9_aggregate_subtyping.py`: Arrays of subtyped records, array repetition, element mutation,
+  tuples with subtyped records, and passing aggregate record elements to functions.
 - `tests/source/01_lexer_basics.quest`: Verified end-to-end native compilation and execution of tuple operations.
 - `tests/source/02_expressions_control_flow.quest`: Verified end-to-end native compilation and execution.
 - `tests/source/03_functions_closures.quest`: Verified end-to-end native compilation and execution of closures.

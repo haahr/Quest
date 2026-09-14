@@ -114,7 +114,9 @@ native **AArch64 (ARM64)** machine code and providing a **JIT compiler** for int
 - **Bootstrap Compiler Completion Prerequisites:**
   - *Dynamic Subtyping & Compound Type Descriptors:* Structural subtyping in `quest_dynamic_be` (`is_subtype(sub, super)`) across records, variants, and compound types.
   - *Separate Compilation & Object Linking:* Compiling modules independently to `.o` files with header/interface exports and linking.
-  - *Fat Pointers & Aggregate Subtyping:* Storing subtyped records (pointer + evidence dict) and variants in aggregates (`Array`, `Tuple`), breaking the single 64-bit value constraint where needed.
+  - *Fat Pointers & Aggregate Subtyping:* Uniform 16-byte `QRecordVal` fat pointers across parameters, returns,
+    variables, and aggregates (inlined in tuples, boxed in `QRecordVal *` for arrays) — *Complete for Records*;
+    runtime descriptors deferred for subtyped variants in aggregates.
   - *Standard Library Builtins Completeness:* C runtime implementations for remaining Cardelli builtins (`ascii`, `conv`, etc.) and deferred `dynamic.extern`/`intern` text serialization.
 - C transpiler architecture in [codegen-c.md](codegen-c.md);
   C ABI specification in [c-representation.md](c-representation.md).
