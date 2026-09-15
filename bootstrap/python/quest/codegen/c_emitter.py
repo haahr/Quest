@@ -256,6 +256,167 @@ class CEmitter:
             curr = curr.func
         return curr, args
 
+    def _effective_record_type(self, expr: TypedExpr) -> QType:
+        """Extracts the concrete QRecordType if expr is a TypedRecord, otherwise returns expr.type_val."""
+        if isinstance(expr, TypedRecord):
+            return QRecordType(
+                fields=tuple(
+                    QRecordField(name=f.name, type_val=f.value.type_val, is_var=f.is_var)
+                    for f in expr.fields
+                )
+            )
+        return expr.type_val
+
+    def _coerce_record_val(self, c_expr: str, expr: TypedExpr, target_type: QRecordType) -> str:
+        """Coerces a record expression to target_type by attaching an offset dictionary if subtyped."""
+        actual_t = self._effective_record_type(expr)
+        if isinstance(actual_t, QRecordType) and actual_t != target_type:
+            d_name = self.record_ctx.offset_dict_instance_name(target_type, actual_t)
+            return f"((QRecordVal){{ .val = {c_expr}.val, .dict = (const void *)&{d_name} }})"
+        return c_expr
+
+    def _emit_variant_upcast(
+        self,
+        c_val: str,
+        source_t: QVariantType,
+        target_t: QVariantType,
+        lines: list[str],
+        dest: Optional[str] = None,
+    ) -> str:
+        """Allocates and initializes a new QVariant with remapped tag and copied payload."""
+        tmp_v = dest if dest is not None else self.fresh_tmp("_vup")
+        tagmap_name = f"tagmap_{type_to_c_tag(target_t)}_{type_to_c_tag(source_t)}"
+        if dest is None:
+            lines.append(f"QVariant *{tmp_v} = (QVariant *)quest_alloc(sizeof(QVariant));")
+        else:
+            lines.append(f"{tmp_v} = (QVariant *)quest_alloc(sizeof(QVariant));")
+        lines.append(f"{tmp_v}->descriptor = NULL;")
+        lines.append(f"{tmp_v}->tag = {tagmap_name}[{c_val}->tag];")
+        lines.append(f"{tmp_v}->payload = {c_val}->payload;")
+        return tmp_v
+
+    def _emit_fun_return(self, body: TypedExpr, ret_type: QType, fn_lines: list[str]) -> None:
+        """Emits function return handling with appropriate subtyping coercions."""
+        if ret_type == OK_TYPE:
+            self.emit_to(body, None, fn_lines)
+            fn_lines.append("return;")
+        elif isinstance(ret_type, QRecordType):
+            ret_val = self.emit_val(body, fn_lines)
+            coerced = self._coerce_record_val(ret_val, body, ret_type)
+            fn_lines.append(f"return {coerced};")
+        elif (
+            isinstance(ret_type, QTupleType)
+            and isinstance(body.type_val, QTupleType)
+            and body.type_val != ret_type
+        ):
+            ret_val = self.emit_val(body, fn_lines)
+            cast_t = self.c_type(ret_type)
+            fn_lines.append(f"return ({cast_t}){ret_val};")
+        elif (
+            isinstance(ret_type, QVariantType)
+            and isinstance(body.type_val, QVariantType)
+            and body.type_val != ret_type
+        ):
+            ret_val = self.emit_val(body, fn_lines)
+            tmp_v = self._emit_variant_upcast(ret_val, body.type_val, ret_type, fn_lines)
+            fn_lines.append(f"return {tmp_v};")
+        else:
+            ret_val = self.emit_val(body, fn_lines)
+            fn_lines.append(f"return {ret_val};")
+
+    def _emit_call_arg(self, formal_t: QType, actual_a: TypedExpr, lines: list[str]) -> str:
+        """Emits and coerces an argument at a function or closure call site."""
+        c_a = self.emit_val(actual_a, lines)
+        if isinstance(formal_t, QRecordType):
+            return self._coerce_record_val(c_a, actual_a, formal_t)
+        elif (
+            isinstance(formal_t, QTupleType)
+            and isinstance(actual_a.type_val, QTupleType)
+            and actual_a.type_val != formal_t
+        ):
+            cast_t = self.c_type(formal_t)
+            return f"(({cast_t}){c_a})"
+        elif (
+            isinstance(formal_t, QVariantType)
+            and isinstance(actual_a.type_val, QVariantType)
+            and actual_a.type_val != formal_t
+        ):
+            return self._emit_variant_upcast(c_a, actual_a.type_val, formal_t, lines)
+        elif isinstance(formal_t, QTypeVar):
+            return _qval_wrap(c_a, actual_a.type_val)
+        else:
+            return c_a
+
+    def _emit_array_get(self, c_arr: str, c_idx: str, elem_t: QType) -> str:
+        """Emits C expression to extract an element of type elem_t from a QArray slot."""
+        if elem_t in (INT_TYPE, BOOL_TYPE, CHAR_TYPE):
+            return f"({c_arr}->data[{c_idx}].i)"
+        elif elem_t == REAL_TYPE:
+            return f"({c_arr}->data[{c_idx}].r)"
+        elif isinstance(elem_t, QRecordType):
+            return f"(*((QRecordVal *)({c_arr}->data[{c_idx}].p)))"
+        elif (
+            elem_t == STRING_TYPE
+            or elem_t == DYNAMIC_TYPE
+            or (isinstance(elem_t, QTypeVar) and elem_t.name == "Dynamic.T")
+            or isinstance(
+                elem_t,
+                (QTupleType, QFunType, QAllType, QArrayType, QVariantType, QOptionType, QExceptionType),
+            )
+        ):
+            c_elem_t = self.c_type(elem_t)
+            return f"(({c_elem_t})({c_arr}->data[{c_idx}].p))"
+        else:
+            return f"({c_arr}->data[{c_idx}])"
+
+    def _tag_index(self, t: QType, tag: Optional[str]) -> int:
+        """Returns the 0-based integer tag index for an Option or Variant tag."""
+        if tag is None:
+            return 0
+        if isinstance(t, QOptionType):
+            for i, opt in enumerate(t.options):
+                if opt.name == tag:
+                    return i
+        elif isinstance(t, QVariantType):
+            for i, v in enumerate(t.variants):
+                if v.name == tag:
+                    return i
+        return 0
+
+    def _tuple_field_index(self, tuple_t: QTupleType, fld: str) -> int:
+        """Resolves a tuple field name or index string to its 0-based value slot index."""
+        for i, vf in enumerate(tuple_t.value_fields):
+            if vf.name == fld:
+                return i
+        if fld.startswith("_") and fld[1:].isdigit():
+            return int(fld[1:])
+        if fld.isdigit():
+            return int(fld)
+        raise ValueError(f"Cannot resolve tuple field '{fld}' in {tuple_t}")
+
+    def _emit_record_field_access(
+        self,
+        c_tgt: str,
+        rec_t: QRecordType,
+        fld: str,
+        fld_t: QType,
+        lines: list[str],
+        as_ref: bool = False,
+    ) -> str:
+        """Emits field access on a QRecordVal using dynamic dictionary offsets."""
+        if not c_tgt.isidentifier():
+            tmp_r = self.fresh_tmp("_rec")
+            lines.append(f"QRecordVal {tmp_r} = {c_tgt};")
+            c_tgt = tmp_r
+        c_fld_t = self.c_type(fld_t)
+        dict_t = self.record_ctx.offset_dict_struct_name(rec_t)
+        ptr_expr = f"(({c_fld_t} *)((char *){c_tgt}.val + ((const {dict_t} *){c_tgt}.dict)->offset_{fld}))"
+        return ptr_expr if as_ref else f"(*{ptr_expr})"
+
+    def _emit_qval_extract(self, qval_expr: str, elem_t: QType) -> str:
+        """Extracts a scalar or pointer expression from a QVal union."""
+        return _qval_unwrap(qval_expr, elem_t, self)
+
     def emit_program(
         self,
         prog: TypedProgram,
@@ -331,42 +492,7 @@ class CEmitter:
                 # Silence unused descriptor warnings
                 for q in quants:
                     fn_lines.append(f"(void)descriptor_{q.name};")
-                if ret_type == OK_TYPE:
-                    self.emit_to(body, None, fn_lines)
-                    fn_lines.append("return;")
-                elif isinstance(ret_type, QRecordType):
-                    ret_val = self.emit_val(body, fn_lines)
-                    actual_record_t = body.type_val
-                    if isinstance(body, TypedRecord):
-                        actual_record_t = QRecordType(
-                            fields=tuple(
-                                QRecordField(name=f.name, type_val=f.value.type_val, is_var=f.is_var)
-                                for f in body.fields
-                            )
-                        )
-                    if isinstance(actual_record_t, QRecordType) and actual_record_t != ret_type:
-                        d_name = self.record_ctx.offset_dict_instance_name(ret_type, actual_record_t)
-                        fn_lines.append(
-                            f"return (QRecordVal){{ .val = {ret_val}.val, .dict = (const void *)&{d_name} }};"
-                        )
-                    else:
-                        fn_lines.append(f"return {ret_val};")
-                elif isinstance(ret_type, QTupleType) and isinstance(body.type_val, QTupleType) and body.type_val != ret_type:
-                    ret_val = self.emit_val(body, fn_lines)
-                    cast_t = self.c_type(ret_type)
-                    fn_lines.append(f"return ({cast_t}){ret_val};")
-                elif isinstance(ret_type, QVariantType) and isinstance(body.type_val, QVariantType) and body.type_val != ret_type:
-                    ret_val = self.emit_val(body, fn_lines)
-                    tmp_v = self.fresh_tmp("_vup")
-                    tagmap_name = f"tagmap_{type_to_c_tag(ret_type)}_{type_to_c_tag(body.type_val)}"
-                    fn_lines.append(f"QVariant *{tmp_v} = (QVariant *)quest_alloc(sizeof(QVariant));")
-                    fn_lines.append(f"{tmp_v}->descriptor = NULL;")
-                    fn_lines.append(f"{tmp_v}->tag = {tagmap_name}[{ret_val}->tag];")
-                    fn_lines.append(f"{tmp_v}->payload = {ret_val}->payload;")
-                    fn_lines.append(f"return {tmp_v};")
-                else:
-                    ret_val = self.emit_val(body, fn_lines)
-                    fn_lines.append(f"return {ret_val};")
+                self._emit_fun_return(body, ret_type, fn_lines)
                 self.in_scope_type_descriptors = saved_descriptors
                 for f_line in fn_lines:
                     lines.append(f"    {f_line}" if f_line.strip() else f_line)
@@ -401,42 +527,7 @@ class CEmitter:
                     self.in_scope_type_descriptors[q.name] = f"descriptor_{q.name}"
                     fn_lines.append(f"(void)descriptor_{q.name};")
 
-                if ret_type == OK_TYPE:
-                    self.emit_to(l.fun.body, None, fn_lines)
-                    fn_lines.append("return;")
-                elif isinstance(ret_type, QRecordType):
-                    ret_val = self.emit_val(l.fun.body, fn_lines)
-                    actual_record_t = l.fun.body.type_val
-                    if isinstance(l.fun.body, TypedRecord):
-                        actual_record_t = QRecordType(
-                            fields=tuple(
-                                QRecordField(name=f.name, type_val=f.value.type_val, is_var=f.is_var)
-                                for f in l.fun.body.fields
-                            )
-                        )
-                    if isinstance(actual_record_t, QRecordType) and actual_record_t != ret_type:
-                        d_name = self.record_ctx.offset_dict_instance_name(ret_type, actual_record_t)
-                        fn_lines.append(
-                            f"return (QRecordVal){{ .val = {ret_val}.val, .dict = (const void *)&{d_name} }};"
-                        )
-                    else:
-                        fn_lines.append(f"return {ret_val};")
-                elif isinstance(ret_type, QTupleType) and isinstance(l.fun.body.type_val, QTupleType) and l.fun.body.type_val != ret_type:
-                    ret_val = self.emit_val(l.fun.body, fn_lines)
-                    cast_t = self.c_type(ret_type)
-                    fn_lines.append(f"return ({cast_t}){ret_val};")
-                elif isinstance(ret_type, QVariantType) and isinstance(l.fun.body.type_val, QVariantType) and l.fun.body.type_val != ret_type:
-                    ret_val = self.emit_val(l.fun.body, fn_lines)
-                    tmp_v = self.fresh_tmp("_vup")
-                    tagmap_name = f"tagmap_{type_to_c_tag(ret_type)}_{type_to_c_tag(l.fun.body.type_val)}"
-                    fn_lines.append(f"QVariant *{tmp_v} = (QVariant *)quest_alloc(sizeof(QVariant));")
-                    fn_lines.append(f"{tmp_v}->descriptor = NULL;")
-                    fn_lines.append(f"{tmp_v}->tag = {tagmap_name}[{ret_val}->tag];")
-                    fn_lines.append(f"{tmp_v}->payload = {ret_val}->payload;")
-                    fn_lines.append(f"return {tmp_v};")
-                else:
-                    ret_val = self.emit_val(l.fun.body, fn_lines)
-                    fn_lines.append(f"return {ret_val};")
+                self._emit_fun_return(l.fun.body, ret_type, fn_lines)
 
                 self.in_scope_type_descriptors = saved_descriptors
                 self.current_env_vars = prev_env
@@ -484,7 +575,10 @@ class CEmitter:
                     quants, params, _, ret_type = self._collect_fun_params(ffun)
                     ret_c = "void" if ret_type == OK_TYPE else self.c_type(ret_type)
                     quant_decls = [f"const QTypeDescriptor *descriptor_{q.name}" for q in quants]
-                    param_decls = quant_decls + [f"{self.c_type(p.type_val)} {mangle_module_ident(clean_mod, p.name)}" for p in params]
+                    param_decls = quant_decls + [
+                        f"{self.c_type(p.type_val)} {mangle_module_ident(clean_mod, p.name)}"
+                        for p in params
+                    ]
                     sig = "void" if not param_decls else ", ".join(param_decls)
                     lines.append(f"static {ret_c} {m_ident}({sig});")
 
@@ -495,10 +589,15 @@ class CEmitter:
                     quants, params, _, ret_type = self._collect_fun_params(ffun)
                     ret_c = "void" if ret_type == OK_TYPE else self.c_type(ret_type)
                     quant_decls = [f"const QTypeDescriptor *descriptor_{q.name}" for q in quants]
-                    param_decls = quant_decls + [f"{self.c_type(p.type_val)} {mangle_module_ident(clean_mod, p.name)}" for p in params]
+                    param_decls = quant_decls + [
+                        f"{self.c_type(p.type_val)} {mangle_module_ident(clean_mod, p.name)}"
+                        for p in params
+                    ]
                     param_sigs = ["void *env"] + param_decls
                     sig = ", ".join(param_sigs)
-                    f_args = [f"descriptor_{q.name}" for q in quants] + [mangle_module_ident(clean_mod, p.name) for p in params]
+                    f_args = [f"descriptor_{q.name}" for q in quants] + [
+                        mangle_module_ident(clean_mod, p.name) for p in params
+                    ]
                     args_str = ", ".join(f_args)
                     lines.append(f"static {ret_c} {tramp_name}({sig}) {{")
                     lines.append("    (void)env;")
@@ -520,7 +619,10 @@ class CEmitter:
                     quants, params, body, ret_type = self._collect_fun_params(ffun)
                     ret_c = "void" if ret_type == OK_TYPE else self.c_type(ret_type)
                     quant_decls = [f"const QTypeDescriptor *descriptor_{q.name}" for q in quants]
-                    param_decls = quant_decls + [f"{self.c_type(p.type_val)} {mangle_module_ident(clean_mod, p.name)}" for p in params]
+                    param_decls = quant_decls + [
+                        f"{self.c_type(p.type_val)} {mangle_module_ident(clean_mod, p.name)}"
+                        for p in params
+                    ]
                     sig = "void" if not param_decls else ", ".join(param_decls)
                     lines.append(f"static {ret_c} {m_ident}({sig}) {{")
                     fn_lines: list[str] = []
@@ -532,30 +634,7 @@ class CEmitter:
                     mod_emitter.current_env_vars = {p.name: mangle_module_ident(clean_mod, p.name) for p in params}
                     for vname, _, _ in mod_vars:
                         mod_emitter.current_env_vars[vname] = mangle_module_ident(clean_mod, vname)
-                    if ret_type == OK_TYPE:
-                        mod_emitter.emit_to(body, None, fn_lines)
-                        fn_lines.append("return;")
-                    else:
-                        ret_val = mod_emitter.emit_val(body, fn_lines)
-                        actual_record_t = body.type_val
-                        if isinstance(body, TypedRecord):
-                            actual_record_t = QRecordType(
-                                fields=tuple(
-                                    QRecordField(name=f.name, type_val=f.value.type_val, is_var=f.is_var)
-                                    for f in body.fields
-                                )
-                            )
-                        if (
-                            isinstance(ret_type, QRecordType)
-                            and isinstance(actual_record_t, QRecordType)
-                            and actual_record_t != ret_type
-                        ):
-                            d_name = self.record_ctx.offset_dict_instance_name(ret_type, actual_record_t)
-                            fn_lines.append(
-                                f"return (QRecordVal){{ .val = {ret_val}.val, .dict = (const void *)&{d_name} }};"
-                            )
-                        else:
-                            fn_lines.append(f"return {ret_val};")
+                    mod_emitter._emit_fun_return(body, ret_type, fn_lines)
                     mod_emitter.current_env_vars = prev_env
                     for fl in fn_lines:
                         lines.append(f"    {fl}" if fl.strip() else fl)
@@ -572,7 +651,9 @@ class CEmitter:
                     lines.append(f"    qv_mod_{dep_clean}_init();")
                 # Evaluate module let values
                 init_lines: list[str] = []
-                mod_emitter.current_env_vars = {vname: mangle_module_ident(clean_mod, vname) for vname, _, _ in mod_vars}
+                mod_emitter.current_env_vars = {
+                    vname: mangle_module_ident(clean_mod, vname) for vname, _, _ in mod_vars
+                }
                 for b in mod.bindings:
                     match b:
                         case TypedLetValue(name=vname, value=vval, symbol=vsym):
@@ -666,21 +747,8 @@ class CEmitter:
                 elif isinstance(symbol.type_val, QRecordType):
                     phrase_lines = []
                     val_c = self.emit_val(val, phrase_lines)
-                    actual_record_t = val.type_val
-                    if isinstance(val, TypedRecord):
-                        actual_record_t = QRecordType(
-                            fields=tuple(
-                                QRecordField(name=fld.name, type_val=fld.value.type_val, is_var=fld.is_var)
-                                for fld in val.fields
-                            )
-                        )
-                    if isinstance(actual_record_t, QRecordType) and actual_record_t != symbol.type_val:
-                        d_name = self.record_ctx.offset_dict_instance_name(symbol.type_val, actual_record_t)
-                        phrase_lines.append(
-                            f"{c_ident} = (QRecordVal){{ .val = {val_c}.val, .dict = (const void *)&{d_name} }};"
-                        )
-                    else:
-                        phrase_lines.append(f"{c_ident} = {val_c};")
+                    coerced = self._coerce_record_val(val_c, val, symbol.type_val)
+                    phrase_lines.append(f"{c_ident} = {coerced};")
                     for s in phrase_lines:
                         lines.append(f"    {s}" if s.strip() else s)
                 elif (
@@ -701,11 +769,7 @@ class CEmitter:
                 ):
                     phrase_lines = []
                     val_c = self.emit_val(val, phrase_lines)
-                    tagmap_name = f"tagmap_{type_to_c_tag(symbol.type_val)}_{type_to_c_tag(val.type_val)}"
-                    phrase_lines.append(f"{c_ident} = (QVariant *)quest_alloc(sizeof(QVariant));")
-                    phrase_lines.append(f"{c_ident}->descriptor = NULL;")
-                    phrase_lines.append(f"{c_ident}->tag = {tagmap_name}[{val_c}->tag];")
-                    phrase_lines.append(f"{c_ident}->payload = {val_c}->payload;")
+                    self._emit_variant_upcast(val_c, val.type_val, symbol.type_val, phrase_lines, dest=c_ident)
                     for s in phrase_lines:
                         lines.append(f"    {s}" if s.strip() else s)
                 else:
@@ -820,7 +884,7 @@ class CEmitter:
                 return "((void)0)"
 
             case TypedRecord(fields=flds):
-                concrete_t = QRecordType(fields=tuple(QRecordField(name=fld.name, type_val=fld.value.type_val, is_var=fld.is_var) for fld in flds))
+                concrete_t = self._effective_record_type(expr)
                 tmp = self.fresh_tmp("_alloc")
                 c_type = self.c_type(concrete_t)
                 lines.append(f"{c_type} {tmp};")
@@ -836,33 +900,14 @@ class CEmitter:
 
             case TypedVariantCheck(target=tgt, tag=tag):
                 c_tgt = self.emit_val(tgt, lines)
-                if isinstance(tgt.type_val, QOptionType):
-                    tag_idx = 0
-                    for i, opt in enumerate(tgt.type_val.options):
-                        if opt.name == tag:
-                            tag_idx = i
-                            break
-                    return f"({c_tgt}->tag == {tag_idx}LL)"
-                elif isinstance(tgt.type_val, QVariantType):
-                    tag_idx = 0
-                    for i, v in enumerate(tgt.type_val.variants):
-                        if v.name == tag:
-                            tag_idx = i
-                            break
-                    return f"({c_tgt}->tag == {tag_idx}LL)"
-                else:
-                    return f"({c_tgt}->tag == 0LL)"
+                tag_idx = self._tag_index(tgt.type_val, tag)
+                return f"({c_tgt}->tag == {tag_idx}LL)"
 
             case TypedVariantAssert(target=tgt, tag=tag):
                 c_tgt = self.emit_val(tgt, lines)
+                tag_idx = self._tag_index(tgt.type_val, tag)
                 if isinstance(tgt.type_val, QOptionType):
-                    tag_idx = 0
-                    opt_field = None
-                    for i, opt in enumerate(tgt.type_val.options):
-                        if opt.name == tag:
-                            tag_idx = i
-                            opt_field = opt
-                            break
+                    opt_field = tgt.type_val.get_option(tag) if tag is not None else None
                     lines.append(f"if ({c_tgt}->tag != {tag_idx}LL) quest_raise_variant_error();")
                     tup_type = expr.type_val
                     tup_struct = tuple_struct_name(tup_type)
@@ -881,26 +926,10 @@ class CEmitter:
                             lines.append(f"{res_tmp}->_1 = {c_tgt}->u.{tag}.val;")
                     return res_tmp
                 elif isinstance(tgt.type_val, QVariantType):
-                    tag_idx = 0
-                    for i, v in enumerate(tgt.type_val.variants):
-                        if v.name == tag:
-                            tag_idx = i
-                            break
                     lines.append(f"if ({c_tgt}->tag != {tag_idx}LL) quest_raise_variant_error();")
-                    elem_t = expr.type_val
-                    if elem_t == INT_TYPE or elem_t == BOOL_TYPE or elem_t == CHAR_TYPE:
-                        return f"({c_tgt}->payload.i)"
-                    elif elem_t == REAL_TYPE:
-                        return f"({c_tgt}->payload.r)"
-                    elif elem_t == STRING_TYPE or isinstance(elem_t, (QTupleType, QRecordType, QFunType, QArrayType, QVariantType, QOptionType)):
-                        c_elem_t = self.c_type(elem_t)
-                        return f"(({c_elem_t})({c_tgt}->payload.p))"
-                    elif elem_t == OK_TYPE:
-                        return "((void)0)"
-                    else:
-                        return f"({c_tgt}->payload)"
+                    return self._emit_qval_extract(f"{c_tgt}->payload", expr.type_val)
                 else:
-                    lines.append(f"quest_raise_variant_error();")
+                    lines.append("quest_raise_variant_error();")
                     return "((void)0)"
 
             case TypedCase():
@@ -922,54 +951,24 @@ class CEmitter:
                     return "(&quest_exc_dynamic_error)"
                 c_tgt = self.emit_val(tgt, lines)
                 if isinstance(tgt.type_val, QTupleType):
-                    val_idx = None
-                    for i, vf in enumerate(tgt.type_val.value_fields):
-                        if vf.name == fld:
-                            val_idx = i
-                            break
-                    if val_idx is None:
-                        if fld.startswith("_"):
-                            val_idx = int(fld[1:])
-                        elif fld.isdigit():
-                            val_idx = int(fld)
-                        else:
-                            raise ValueError(f"Cannot resolve tuple field '{fld}' in {tgt.type_val}")
+                    val_idx = self._tuple_field_index(tgt.type_val, fld)
                     return f"{c_tgt}->_{val_idx}"
                 elif isinstance(tgt.type_val, QRecordType):
-                    if not c_tgt.isidentifier():
-                        tmp_r = self.fresh_tmp("_rec")
-                        lines.append(f"QRecordVal {tmp_r} = {c_tgt};")
-                        c_tgt = tmp_r
-                    c_fld_t = self.c_type(expr.type_val)
-                    dict_t = self.record_ctx.offset_dict_struct_name(tgt.type_val)
-                    return f"(*({c_fld_t} *)((char *){c_tgt}.val + ((const {dict_t} *){c_tgt}.dict)->offset_{fld}))"
+                    return self._emit_record_field_access(
+                        c_tgt, tgt.type_val, fld, expr.type_val, lines, as_ref=False
+                    )
                 else:
                     return f"{c_tgt}->qf_{fld}"
 
             case TypedSelectRef(target=tgt, field=fld):
                 c_tgt = self.emit_val(tgt, lines)
                 if isinstance(tgt.type_val, QTupleType):
-                    val_idx = None
-                    for i, vf in enumerate(tgt.type_val.value_fields):
-                        if vf.name == fld:
-                            val_idx = i
-                            break
-                    if val_idx is None:
-                        if fld.startswith("_"):
-                            val_idx = int(fld[1:])
-                        elif fld.isdigit():
-                            val_idx = int(fld)
-                        else:
-                            raise ValueError(f"Cannot resolve tuple field '{fld}' in {tgt.type_val}")
+                    val_idx = self._tuple_field_index(tgt.type_val, fld)
                     return f"(&({c_tgt}->_{val_idx}))"
                 elif isinstance(tgt.type_val, QRecordType):
-                    if not c_tgt.isidentifier():
-                        tmp_r = self.fresh_tmp("_rec")
-                        lines.append(f"QRecordVal {tmp_r} = {c_tgt};")
-                        c_tgt = tmp_r
-                    c_fld_t = self.c_type(expr.type_val)
-                    dict_t = self.record_ctx.offset_dict_struct_name(tgt.type_val)
-                    return f"(({c_fld_t} *)((char *){c_tgt}.val + ((const {dict_t} *){c_tgt}.dict)->offset_{fld}))"
+                    return self._emit_record_field_access(
+                        c_tgt, tgt.type_val, fld, expr.type_val, lines, as_ref=True
+                    )
                 else:
                     return f"(&({c_tgt}->qf_{fld}))"
 
@@ -1003,23 +1002,7 @@ class CEmitter:
                             c_arr = self.emit_val(args[0], lines)
                             c_idx = self.emit_val(args[1], lines)
                             lines.append(f"quest_check_array_bounds({c_arr}, {c_idx});")
-                            elem_t = expr.type_val
-                            if elem_t in (INT_TYPE, BOOL_TYPE, CHAR_TYPE):
-                                return f"({c_arr}->data[{c_idx}].i)"
-                            elif elem_t == REAL_TYPE:
-                                return f"({c_arr}->data[{c_idx}].r)"
-                            elif isinstance(elem_t, QRecordType):
-                                return f"(*((QRecordVal *)({c_arr}->data[{c_idx}].p)))"
-                            elif elem_t == STRING_TYPE or elem_t == DYNAMIC_TYPE or (
-                                isinstance(elem_t, QTypeVar) and elem_t.name == "Dynamic.T"
-                            ) or isinstance(
-                                elem_t,
-                                (QTupleType, QFunType, QAllType, QArrayType, QVariantType, QOptionType, QExceptionType),
-                            ):
-                                c_elem_t = self.c_type(elem_t)
-                                return f"(({c_elem_t})({c_arr}->data[{c_idx}].p))"
-                            else:
-                                return f"({c_arr}->data[{c_idx}])"
+                            return self._emit_array_get(c_arr, c_idx, expr.type_val)
                         elif fld == "set" and len(args) == 3:
                             c_arr = self.emit_val(args[0], lines)
                             c_idx = self.emit_val(args[1], lines)
@@ -1031,21 +1014,7 @@ class CEmitter:
                                 else args[2].type_val
                             )
                             if isinstance(target_elem_t, QRecordType):
-                                actual_record_t = args[2].type_val
-                                if isinstance(args[2], TypedRecord):
-                                    actual_record_t = QRecordType(
-                                        fields=tuple(
-                                            QRecordField(
-                                                name=fld.name,
-                                                type_val=fld.value.type_val,
-                                                is_var=fld.is_var,
-                                            )
-                                            for fld in args[2].fields
-                                        )
-                                    )
-                                if isinstance(actual_record_t, QRecordType) and actual_record_t != target_elem_t:
-                                    d_name = self.record_ctx.offset_dict_instance_name(target_elem_t, actual_record_t)
-                                    c_item = f"((QRecordVal){{ .val = {c_item}.val, .dict = (const void *)&{d_name} }})"
+                                c_item = self._coerce_record_val(c_item, args[2], target_elem_t)
                             wrap = _qval_wrap(c_item, target_elem_t)
                             lines.append(f"{c_arr}->data[{c_idx}] = {wrap};")
                             return "((void)0)"
@@ -1073,41 +1042,7 @@ class CEmitter:
                     fun, _ = self.top_funs_dict[effective_func.name]
                     _, formal_params, _, ret_type = self._collect_fun_params(fun)
                     for formal_p, actual_a in zip(formal_params, args):
-                        pt = formal_p.type_val
-                        c_a = self.emit_val(actual_a, lines)
-                        if isinstance(pt, QRecordType):
-                            actual_record_t = actual_a.type_val
-                            if isinstance(actual_a, TypedRecord):
-                                actual_record_t = QRecordType(
-                                    fields=tuple(
-                                        QRecordField(
-                                            name=fld.name,
-                                            type_val=fld.value.type_val,
-                                            is_var=fld.is_var,
-                                        )
-                                        for fld in actual_a.fields
-                                    )
-                                )
-                            if isinstance(actual_record_t, QRecordType) and actual_record_t != pt:
-                                d_name = self.record_ctx.offset_dict_instance_name(pt, actual_record_t)
-                                c_args.append(f"((QRecordVal){{ .val = {c_a}.val, .dict = (const void *)&{d_name} }})")
-                            else:
-                                c_args.append(c_a)
-                        elif isinstance(pt, QTupleType) and isinstance(actual_a.type_val, QTupleType) and actual_a.type_val != pt:
-                            cast_t = self.c_type(pt)
-                            c_args.append(f"(({cast_t}){c_a})")
-                        elif isinstance(pt, QVariantType) and isinstance(actual_a.type_val, QVariantType) and actual_a.type_val != pt:
-                            tmp_v = self.fresh_tmp("_vup")
-                            tagmap_name = f"tagmap_{type_to_c_tag(pt)}_{type_to_c_tag(actual_a.type_val)}"
-                            lines.append(f"QVariant *{tmp_v} = (QVariant *)quest_alloc(sizeof(QVariant));")
-                            lines.append(f"{tmp_v}->descriptor = NULL;")
-                            lines.append(f"{tmp_v}->tag = {tagmap_name}[{c_a}->tag];")
-                            lines.append(f"{tmp_v}->payload = {c_a}->payload;")
-                            c_args.append(tmp_v)
-                        elif isinstance(pt, QTypeVar):
-                            c_args.append(_qval_wrap(c_a, actual_a.type_val))
-                        else:
-                            c_args.append(c_a)
+                        c_args.append(self._emit_call_arg(formal_p.type_val, actual_a, lines))
                     args_str = ", ".join(c_args)
                     call_str = f"{c_func}({args_str})"
                     if isinstance(ret_type, QTypeVar) and expr.type_val != ret_type:
@@ -1126,40 +1061,7 @@ class CEmitter:
                         formal_types = [a.type_val for a in args]
                     c_args = list(descriptor_args)
                     for pt, actual_a in zip(formal_types, args):
-                        c_a = self.emit_val(actual_a, lines)
-                        if isinstance(pt, QRecordType):
-                            actual_record_t = actual_a.type_val
-                            if isinstance(actual_a, TypedRecord):
-                                actual_record_t = QRecordType(
-                                    fields=tuple(
-                                        QRecordField(
-                                            name=fld.name,
-                                            type_val=fld.value.type_val,
-                                            is_var=fld.is_var,
-                                        )
-                                        for fld in actual_a.fields
-                                    )
-                                )
-                            if isinstance(actual_record_t, QRecordType) and actual_record_t != pt:
-                                d_name = self.record_ctx.offset_dict_instance_name(pt, actual_record_t)
-                                c_args.append(f"((QRecordVal){{ .val = {c_a}.val, .dict = (const void *)&{d_name} }})")
-                            else:
-                                c_args.append(c_a)
-                        elif isinstance(pt, QTupleType) and isinstance(actual_a.type_val, QTupleType) and actual_a.type_val != pt:
-                            cast_t = self.c_type(pt)
-                            c_args.append(f"(({cast_t}){c_a})")
-                        elif isinstance(pt, QVariantType) and isinstance(actual_a.type_val, QVariantType) and actual_a.type_val != pt:
-                            tmp_v = self.fresh_tmp("_vup")
-                            tagmap_name = f"tagmap_{type_to_c_tag(pt)}_{type_to_c_tag(actual_a.type_val)}"
-                            lines.append(f"QVariant *{tmp_v} = (QVariant *)quest_alloc(sizeof(QVariant));")
-                            lines.append(f"{tmp_v}->descriptor = NULL;")
-                            lines.append(f"{tmp_v}->tag = {tagmap_name}[{c_a}->tag];")
-                            lines.append(f"{tmp_v}->payload = {c_a}->payload;")
-                            c_args.append(tmp_v)
-                        elif isinstance(pt, QTypeVar):
-                            c_args.append(_qval_wrap(c_a, actual_a.type_val))
-                        else:
-                            c_args.append(c_a)
+                        c_args.append(self._emit_call_arg(pt, actual_a, lines))
                     all_c_args = [f"{clos_val}->env"] + c_args
                     args_str = ", ".join(all_c_args)
                     call_str = f"(({fn_ptr_t})({clos_val}->fn))({args_str})"
@@ -1182,23 +1084,7 @@ class CEmitter:
                 c_tgt = self.emit_val(tgt, lines)
                 c_idx = self.emit_val(idx, lines)
                 lines.append(f"quest_check_array_bounds({c_tgt}, {c_idx});")
-                elem_t = expr.type_val
-                if elem_t in (INT_TYPE, BOOL_TYPE, CHAR_TYPE):
-                    return f"({c_tgt}->data[{c_idx}].i)"
-                elif elem_t == REAL_TYPE:
-                    return f"({c_tgt}->data[{c_idx}].r)"
-                elif isinstance(elem_t, QRecordType):
-                    return f"(*((QRecordVal *)({c_tgt}->data[{c_idx}].p)))"
-                elif elem_t == STRING_TYPE or elem_t == DYNAMIC_TYPE or (
-                    isinstance(elem_t, QTypeVar) and elem_t.name == "Dynamic.T"
-                ) or isinstance(
-                    elem_t,
-                    (QTupleType, QFunType, QAllType, QArrayType, QVariantType, QOptionType, QExceptionType),
-                ):
-                    c_elem_t = self.c_type(elem_t)
-                    return f"(({c_elem_t})({c_tgt}->data[{c_idx}].p))"
-                else:
-                    return f"({c_tgt}->data[{c_idx}])"
+                return self._emit_array_get(c_tgt, c_idx, expr.type_val)
 
             case TypedIndexAssign(target=tgt, index=idx, value=val):
                 c_tgt = self.emit_val(tgt, lines)
@@ -1207,21 +1093,7 @@ class CEmitter:
                 c_val = self.emit_val(val, lines)
                 target_elem_t = tgt.type_val.element_type if isinstance(tgt.type_val, QArrayType) else val.type_val
                 if isinstance(target_elem_t, QRecordType):
-                    actual_record_t = val.type_val
-                    if isinstance(val, TypedRecord):
-                        actual_record_t = QRecordType(
-                            fields=tuple(
-                                QRecordField(
-                                    name=fld.name,
-                                    type_val=fld.value.type_val,
-                                    is_var=fld.is_var,
-                                )
-                                for fld in val.fields
-                            )
-                        )
-                    if isinstance(actual_record_t, QRecordType) and actual_record_t != target_elem_t:
-                        d_name = self.record_ctx.offset_dict_instance_name(target_elem_t, actual_record_t)
-                        c_val = f"((QRecordVal){{ .val = {c_val}.val, .dict = (const void *)&{d_name} }})"
+                    c_val = self._coerce_record_val(c_val, val, target_elem_t)
                 wrap = _qval_wrap(c_val, target_elem_t)
                 lines.append(f"{c_tgt}->data[{c_idx}] = {wrap};")
                 return "((void)0)"
@@ -1286,28 +1158,8 @@ class CEmitter:
                             elif isinstance(symbol.type_val, QRecordType):
                                 block_lines.append(f"QRecordVal {c_ident};")
                                 val_c = self.emit_val(val, block_lines)
-                                actual_record_t = val.type_val
-                                if isinstance(val, TypedRecord):
-                                    actual_record_t = QRecordType(
-                                        fields=tuple(
-                                            QRecordField(
-                                                name=fld.name,
-                                                type_val=fld.value.type_val,
-                                                is_var=fld.is_var,
-                                            )
-                                            for fld in val.fields
-                                        )
-                                    )
-                                if isinstance(actual_record_t, QRecordType) and actual_record_t != symbol.type_val:
-                                    d_name = self.record_ctx.offset_dict_instance_name(
-                                        symbol.type_val, actual_record_t
-                                    )
-                                    block_lines.append(
-                                        f"{c_ident} = (QRecordVal){{ .val = {val_c}.val, "
-                                        f".dict = (const void *)&{d_name} }};"
-                                    )
-                                else:
-                                    block_lines.append(f"{c_ident} = {val_c};")
+                                coerced = self._coerce_record_val(val_c, val, symbol.type_val)
+                                block_lines.append(f"{c_ident} = {coerced};")
                             elif (
                                 isinstance(symbol.type_val, QTupleType)
                                 and isinstance(val.type_val, QTupleType)
@@ -1323,11 +1175,9 @@ class CEmitter:
                                 and val.type_val != symbol.type_val
                             ):
                                 val_c = self.emit_val(val, block_lines)
-                                tagmap_name = f"tagmap_{type_to_c_tag(symbol.type_val)}_{type_to_c_tag(val.type_val)}"
-                                block_lines.append(f"QVariant *{c_ident} = (QVariant *)quest_alloc(sizeof(QVariant));")
-                                block_lines.append(f"{c_ident}->descriptor = NULL;")
-                                block_lines.append(f"{c_ident}->tag = {tagmap_name}[{val_c}->tag];")
-                                block_lines.append(f"{c_ident}->payload = {val_c}->payload;")
+                                self._emit_variant_upcast(
+                                    val_c, val.type_val, symbol.type_val, block_lines, dest=f"QVariant *{c_ident}"
+                                )
                             else:
                                 c_type = self.c_type(symbol.type_val)
                                 block_lines.append(f"{c_type} {c_ident};")
@@ -1407,26 +1257,8 @@ class CEmitter:
                     expected_fld_t = t.value_fields[val_idx].type_val
                     if isinstance(expected_fld_t, QRecordType):
                         val_c = self.emit_val(elem, lines)
-                        actual_record_t = elem.type_val
-                        if isinstance(elem, TypedRecord):
-                            actual_record_t = QRecordType(
-                                fields=tuple(
-                                    QRecordField(
-                                        name=fld.name,
-                                        type_val=fld.value.type_val,
-                                        is_var=fld.is_var,
-                                    )
-                                    for fld in elem.fields
-                                )
-                            )
-                        if isinstance(actual_record_t, QRecordType) and actual_record_t != expected_fld_t:
-                            d_name = self.record_ctx.offset_dict_instance_name(expected_fld_t, actual_record_t)
-                            lines.append(
-                                f"{target_dest}->_{val_idx} = (QRecordVal){{ .val = {val_c}.val, "
-                                f".dict = (const void *)&{d_name} }};"
-                            )
-                        else:
-                            lines.append(f"{target_dest}->_{val_idx} = {val_c};")
+                        coerced = self._coerce_record_val(val_c, elem, expected_fld_t)
+                        lines.append(f"{target_dest}->_{val_idx} = {coerced};")
                     elif isinstance(expected_fld_t, QVariantType) and elem.type_val != expected_fld_t:
                         raise NotImplementedError(
                             "Subtyped variant storage in aggregates requires runtime descriptors"
@@ -1436,12 +1268,7 @@ class CEmitter:
                     val_idx += 1
 
             case TypedRecord(fields=flds, type_val=t):
-                concrete_t = QRecordType(
-                    fields=tuple(
-                        QRecordField(name=fld.name, type_val=fld.value.type_val, is_var=fld.is_var)
-                        for fld in flds
-                    )
-                )
+                concrete_t = self._effective_record_type(expr)
                 struct_name = self.record_struct_name(concrete_t)
                 alloc_expr = f"({struct_name} *)quest_alloc(sizeof({struct_name}))"
                 payload_tmp = self.fresh_tmp("_rec_payload")
@@ -1502,21 +1329,7 @@ class CEmitter:
                 for i, elem in enumerate(elems):
                     c_elem = self.emit_val(elem, lines)
                     if isinstance(t.element_type, QRecordType):
-                        actual_record_t = elem.type_val
-                        if isinstance(elem, TypedRecord):
-                            actual_record_t = QRecordType(
-                                fields=tuple(
-                                    QRecordField(
-                                        name=fld.name,
-                                        type_val=fld.value.type_val,
-                                        is_var=fld.is_var,
-                                    )
-                                    for fld in elem.fields
-                                )
-                            )
-                        if isinstance(actual_record_t, QRecordType) and actual_record_t != t.element_type:
-                            d_name = self.record_ctx.offset_dict_instance_name(t.element_type, actual_record_t)
-                            c_elem = f"((QRecordVal){{ .val = {c_elem}.val, .dict = (const void *)&{d_name} }})"
+                        c_elem = self._coerce_record_val(c_elem, elem, t.element_type)
                     wrap = _qval_wrap(c_elem, t.element_type)
                     lines.append(f"{target_dest}->data[{i}LL] = {wrap};")
 
@@ -1529,21 +1342,7 @@ class CEmitter:
                 c_cnt = self.emit_val(cnt, lines)
                 c_init = self.emit_val(init_v, lines)
                 if isinstance(t.element_type, QRecordType):
-                    actual_record_t = init_v.type_val
-                    if isinstance(init_v, TypedRecord):
-                        actual_record_t = QRecordType(
-                            fields=tuple(
-                                QRecordField(
-                                    name=fld.name,
-                                    type_val=fld.value.type_val,
-                                    is_var=fld.is_var,
-                                )
-                                for fld in init_v.fields
-                            )
-                        )
-                    if isinstance(actual_record_t, QRecordType) and actual_record_t != t.element_type:
-                        d_name = self.record_ctx.offset_dict_instance_name(t.element_type, actual_record_t)
-                        c_init = f"((QRecordVal){{ .val = {c_init}.val, .dict = (const void *)&{d_name} }})"
+                    c_init = self._coerce_record_val(c_init, init_v, t.element_type)
                 wrap = _qval_wrap(c_init, t.element_type)
                 target_dest = dest
                 if target_dest is None:
@@ -1558,11 +1357,7 @@ class CEmitter:
                     lines.append(f"QVariant *{target_dest};")
                 lines.append(f"{target_dest} = (QVariant *)quest_alloc(sizeof(QVariant));")
                 lines.append(f"{target_dest}->descriptor = NULL;")
-                tag_idx = 0
-                for i, v in enumerate(t.variants):
-                    if v.name == tag:
-                        tag_idx = i
-                        break
+                tag_idx = self._tag_index(t, tag)
                 lines.append(f"{target_dest}->tag = {tag_idx}LL;")
                 if payload is not None:
                     c_payload = self.emit_val(payload, lines)
@@ -1582,14 +1377,7 @@ class CEmitter:
                     c_ord = self.emit_val(ordinal_expr, lines)
                     lines.append(f"{target_dest}->tag = {c_ord};")
                 else:
-                    tag_idx = 0
-                    if tag is not None:
-                        for i, opt in enumerate(t.options):
-                            if opt.name == tag:
-                                tag_idx = i
-                                break
-                    else:
-                        tag_idx = ordinal
+                    tag_idx = self._tag_index(t, tag) if tag is not None else ordinal
                     lines.append(f"{target_dest}->tag = {tag_idx}LL;")
 
                 if payload is not None and tag is not None:
@@ -1614,20 +1402,7 @@ class CEmitter:
                 lines.append(f"switch ({c_tgt}->tag) {{")
                 for branch in branches:
                     for tag in branch.tags:
-                        tag_idx = 0
-                        opt_or_var_field = None
-                        if isinstance(target_type, QOptionType):
-                            for i, opt in enumerate(target_type.options):
-                                if opt.name == tag:
-                                    tag_idx = i
-                                    opt_or_var_field = opt
-                                    break
-                        elif isinstance(target_type, QVariantType):
-                            for i, v in enumerate(target_type.variants):
-                                if v.name == tag:
-                                    tag_idx = i
-                                    opt_or_var_field = v
-                                    break
+                        tag_idx = self._tag_index(target_type, tag)
                         lines.append(f"    case {tag_idx}LL:")
                     lines.append("    {")
                     branch_lines: list[str] = []
@@ -1647,18 +1422,14 @@ class CEmitter:
                                 branch_lines.append(f"{b_name} = ({s_rec} *)quest_alloc(sizeof({s_rec}));")
                                 branch_lines.append(f"{b_name}->header.descriptor = NULL;")
                                 for f in sorted(b_type.fields, key=lambda fld: fld.name):
-                                    branch_lines.append(f"{b_name}->qf_{f.name} = {c_tgt}->u.{branch.tags[0]}.qf_{f.name};")
+                                    branch_lines.append(
+                                        f"{b_name}->qf_{f.name} = {c_tgt}->u.{branch.tags[0]}.qf_{f.name};"
+                                    )
                             else:
                                 branch_lines.append(f"{b_name} = {c_tgt}->u.{branch.tags[0]}.val;")
                         elif isinstance(target_type, QVariantType):
-                            if b_type == INT_TYPE or b_type == BOOL_TYPE or b_type == CHAR_TYPE:
-                                branch_lines.append(f"{b_name} = {c_tgt}->payload.i;")
-                            elif b_type == REAL_TYPE:
-                                branch_lines.append(f"{b_name} = {c_tgt}->payload.r;")
-                            elif b_type == STRING_TYPE or isinstance(b_type, (QTupleType, QRecordType, QFunType, QArrayType, QVariantType, QOptionType)):
-                                branch_lines.append(f"{b_name} = ({c_b_type})({c_tgt}->payload.p);")
-                            else:
-                                branch_lines.append(f"{b_name} = {c_tgt}->payload;")
+                            extracted = self._emit_qval_extract(f"{c_tgt}->payload", b_type)
+                            branch_lines.append(f"{b_name} = {extracted};")
 
                     self.emit_to(branch.body, dest, branch_lines)
                     for bline in branch_lines:
@@ -1725,14 +1496,8 @@ class CEmitter:
                         b_type = branch.binder.type_val
                         c_b_type = self.c_type(b_type)
                         branch_lines.append(f"{c_b_type} {b_name};")
-                        if b_type == INT_TYPE or b_type == BOOL_TYPE or b_type == CHAR_TYPE:
-                            branch_lines.append(f"{b_name} = ({c_b_type})({caught_name}.payload.i);")
-                        elif b_type == REAL_TYPE:
-                            branch_lines.append(f"{b_name} = {caught_name}.payload.r;")
-                        elif b_type == STRING_TYPE or isinstance(b_type, (QTupleType, QRecordType, QFunType, QArrayType, QVariantType, QOptionType, QExceptionType)):
-                            branch_lines.append(f"{b_name} = ({c_b_type})({caught_name}.payload.p);")
-                        else:
-                            branch_lines.append(f"{b_name} = {caught_name}.payload;")
+                        extracted = self._emit_qval_extract(f"{caught_name}.payload", b_type)
+                        branch_lines.append(f"{b_name} = ({c_b_type})({extracted});")
                     self.emit_to(branch.body, dest, branch_lines)
                     for bl in branch_lines:
                         lines.append(f"            {bl}" if bl.strip() else bl)
