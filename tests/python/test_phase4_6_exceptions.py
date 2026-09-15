@@ -231,3 +231,47 @@ class TestPhase46Exceptions(unittest.TestCase):
         self.assertEqual(proc.returncode, 0)
         self.assertIn("50 : Int", proc.stdout)
 
+    def test_parameterized_exception_type_annotation(self):
+        """Tests let-binding an exception with explicit Exception(Tuple ...) type annotation."""
+        code = """
+        let mismatchedExc: Exception(Tuple guessLength:Int answerLength:Int end) =
+          exception
+            mismatchedException: Tuple guessLength: Int answerLength: Int end
+          end;
+
+        try
+            raise mismatchedExc with tuple let guessLength = 4 let answerLength = 5 end as Int end
+        when mismatchedExc with t then
+            t.guessLength + t.answerLength
+        end
+        """
+        proc = self.compile_quest(code)
+        self.assertEqual(proc.returncode, 0)
+        self.assertIn("9 : Int", proc.stdout)
+
+    def test_parameterized_exception_primitive_payload(self):
+        """Tests let-binding an exception with explicit Exception(String) type annotation."""
+        code = """
+        let errExc: Exception(String) = exception CustomErr: String end;
+        try
+            raise errExc with "payload message" as String end
+        when errExc with msg then
+            msg
+        end
+        """
+        proc = self.compile_quest(code)
+        self.assertEqual(proc.returncode, 0)
+        self.assertIn('"payload message" : String', proc.stdout)
+
+    def test_parameterized_exception_invalid_arity(self):
+        """Tests that applying Exception with invalid arity fails at compile-time."""
+        code = """
+        let badExc: Exception(Int String) = exception Bad: Int end;
+        """
+        pipeline = compile_pipeline()
+        res = pipeline.execute(code, "<test>")
+        self.assertFalse(res.success)
+        self.assertTrue(
+            any("Exception type constructor expects 1 argument" in str(d) for d in res.diagnostics)
+        )
+

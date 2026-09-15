@@ -36,6 +36,7 @@ from quest.types import (
     QTypeFormal,
     QTypeFun,
     QTypeApp,
+    QExceptionType,
     QRecType,
     QRecGroupType,
     QTypeVar,
@@ -360,6 +361,14 @@ def elaborate_type(ast_type: ast.Type, env: Environment) -> QType:
         case ast.TypeApp(constructor=ctor, arguments=arguments):
             ctor_type = elaborate_type(ctor, env)
             args = tuple(elaborate_type(arg, env) for arg in arguments)
+            if isinstance(ctor_type, QExceptionType):
+                if len(args) != 1:
+                    raise KindError(
+                        f"Exception type constructor expects 1 argument, got {len(args)}",
+                        offset=getattr(ctor, "offset", 0),
+                    )
+                check_kind(args[0], TYPE_KIND, env)
+                return QExceptionType(payload_type=args[0])
             return QTypeApp(constructor=ctor_type, arguments=args)
 
         case ast.TypeAll(quantifiers=quants_ast, result_type=res_type):

@@ -662,6 +662,8 @@ class QTypeApp(QType):
 
     def evaluate_lazily(self, env: Optional[Any] = None) -> QType:
         ctor = self.constructor.evaluate_lazily(env)
+        if isinstance(ctor, QExceptionType) and len(self.arguments) == 1:
+            return QExceptionType(payload_type=self.arguments[0].evaluate_lazily(env))
         if isinstance(ctor, QTypeFun):
             subst = {
                 formal.symbol_id: arg
