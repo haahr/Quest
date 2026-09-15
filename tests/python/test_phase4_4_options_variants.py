@@ -1,12 +1,17 @@
 """Unit and integration tests for Phase 4.4: Options & Variants (Sums)."""
 
+import os
 import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
 
+# Ensure bootstrap/python is in sys.path
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "bootstrap", "python"))
+
 from quest.codegen import compile_c_source, run_binary
-from quest.pipeline import CompilerOptions, compile_pipeline
+from quest.pipeline import CompilerOptions, compile_pipeline, default_pipeline
 
 
 class TestPhase44OptionsVariants(unittest.TestCase):
@@ -149,6 +154,30 @@ class TestPhase44OptionsVariants(unittest.TestCase):
         self.assertEqual(proc.returncode, 0)
         self.assertIn("10 : Int", proc.stdout)  # px = 10
         self.assertIn("1 : Int", proc.stdout)   # first = arr1[0] = 1
+
+    def test_array_of_options_function(self):
+        """Tests function returning Array(Option) with empty array literal."""
+        code = """
+        Let MatchType =
+          Option
+            miss
+            elsewhere
+            exact
+          end;
+
+        let checkGuess(answer: String guess: String): Array(MatchType) = array of end;
+        let res = checkGuess("apple" "apply");
+        res
+        """
+        # Test interpreter pipeline
+        pipe = default_pipeline()
+        interp_res = pipe.execute(code)
+        self.assertTrue(interp_res.success, f"Interpreter failed: {interp_res.diagnostics}")
+
+        # Test C codegen and execution
+        proc = self.compile_quest(code, echo=True)
+        self.assertEqual(proc.returncode, 0)
+        self.assertIn("Array(Option miss elsewhere exact end)", proc.stdout)
 
 
 if __name__ == "__main__":

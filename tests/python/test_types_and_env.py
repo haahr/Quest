@@ -52,6 +52,9 @@ from quest.types import (
     check_kind_well_formed,
     check_kind,
     synth_kind,
+    find_path_types,
+    type_mentions_symbol_ids,
+    QPathType,
     qtype_dump,
 )
 from quest.env import (
@@ -420,6 +423,46 @@ class TestSemanticTypesAndKinds(unittest.TestCase):
             "  ))"
         )
         self.assertEqual(dump, expected)
+
+    def test_find_path_types_option_and_variant(self):
+        path_t = QPathType(root_name="x", root_symbol_id=42, field_name="A", bound=TYPE_KIND)
+
+        # QOptionType with payload
+        opt_with = QOptionType((QOptionField("val", payload_type=path_t),))
+        self.assertEqual(find_path_types(opt_with), [path_t])
+
+        # QOptionType without payload
+        opt_without = QOptionType((QOptionField("none"),))
+        self.assertEqual(find_path_types(opt_without), [])
+
+        # QVariantType with payload
+        var_with = QVariantType((QVariantField("branch", type_val=path_t),))
+        self.assertEqual(find_path_types(var_with), [path_t])
+
+        # QVariantType without payload
+        var_without = QVariantType((QVariantField("tag"),))
+        self.assertEqual(find_path_types(var_without), [])
+
+        # Nested in Array
+        self.assertEqual(find_path_types(QArrayType(opt_without)), [])
+        self.assertEqual(find_path_types(QArrayType(opt_with)), [path_t])
+        self.assertEqual(find_path_types(QArrayType(var_without)), [])
+        self.assertEqual(find_path_types(QArrayType(var_with)), [path_t])
+
+    def test_type_mentions_symbol_ids_option_and_variant(self):
+        type_var = QTypeVar("T", symbol_id=42)
+
+        opt_with = QOptionType((QOptionField("val", payload_type=type_var),))
+        opt_without = QOptionType((QOptionField("none"),))
+        self.assertTrue(type_mentions_symbol_ids(opt_with, {42}))
+        self.assertFalse(type_mentions_symbol_ids(opt_with, {99}))
+        self.assertFalse(type_mentions_symbol_ids(opt_without, {42}))
+
+        var_with = QVariantType((QVariantField("branch", type_val=type_var),))
+        var_without = QVariantType((QVariantField("tag"),))
+        self.assertTrue(type_mentions_symbol_ids(var_with, {42}))
+        self.assertFalse(type_mentions_symbol_ids(var_with, {99}))
+        self.assertFalse(type_mentions_symbol_ids(var_without, {42}))
 
 
 class TestScopingAndEnvironment(unittest.TestCase):

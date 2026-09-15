@@ -860,10 +860,14 @@ def find_path_types(typ: QType) -> list[QPathType]:
         elif isinstance(t, QAutoType):
             for rf in t.signature:
                 visit(rf.type_val)
-        elif isinstance(t, (QOptionType, QVariantType)):
-            for vf in t.fields:
-                if vf.payload_type is not None:
-                    visit(vf.payload_type)
+        elif isinstance(t, QOptionType):
+            for of in t.options:
+                if of.payload_type is not None:
+                    visit(of.payload_type)
+        elif isinstance(t, QVariantType):
+            for vf in t.variants:
+                if vf.type_val is not None:
+                    visit(vf.type_val)
         elif isinstance(t, (QVarType, QArrayType, QOutType)):
             visit(t.element_type)
         elif isinstance(t, QTypeApp):
@@ -919,8 +923,10 @@ def type_mentions_symbol_ids(typ: QType, sym_ids: set[int]) -> bool:
             return visit(t.body)
         elif isinstance(t, QAutoType):
             return any(visit(rf.type_val) for rf in t.signature)
-        elif isinstance(t, (QOptionType, QVariantType)):
-            return any(vf.payload_type is not None and visit(vf.payload_type) for vf in t.fields)
+        elif isinstance(t, QOptionType):
+            return any(of.payload_type is not None and visit(of.payload_type) for of in t.options)
+        elif isinstance(t, QVariantType):
+            return any(vf.type_val is not None and visit(vf.type_val) for vf in t.variants)
         elif isinstance(t, (QVarType, QArrayType, QOutType)):
             return visit(t.element_type)
         elif isinstance(t, QTypeApp):
