@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterator
+from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
 from typing import Any, Optional, Union
 
@@ -224,6 +224,186 @@ class TypeElaborator:
                 raise TypeError(msg, offset=offset)
         return join_type
 
+    def _elaborate_subexpr(
+        self,
+        expr: ast.Expr,
+        expected_type: Optional[QType],
+        env: Environment,
+        loop_depth: int,
+    ) -> TypedExpr:
+        """Elaborates an expression in checking mode if expected_type is provided, else synthesis mode."""
+        if expected_type is not None:
+            return self.check_expr(expr, expected_type, env, loop_depth)
+        return self.synth_expr(expr, env, loop_depth)
+
+    def _elaborate_optional_branch(
+        self,
+        expr: Optional[ast.Expr],
+        expected_type: Optional[QType],
+        env: Environment,
+        loop_depth: int,
+    ) -> Optional[TypedExpr]:
+        """Elaborates an optional branch (e.g. else branch) if present, returning None otherwise."""
+        if expr is None:
+            return None
+        return self._elaborate_subexpr(expr, expected_type, env, loop_depth)
+
+    def _collect_branch_types(
+        self,
+        branches: Sequence[Any],
+        else_branch: Optional[TypedExpr] = None,
+        initial_type: Optional[QType] = None,
+    ) -> list[QType]:
+        """Collects body/result types from typed branch nodes and an optional else branch."""
+        types: list[QType] = [initial_type] if initial_type is not None else []
+        for b in branches:
+            types.append(b.body.type_val if hasattr(b, "body") else b.type_val)
+        if else_branch is not None:
+            types.append(else_branch.type_val)
+        return types
+
+    def _check_subsumption(
+        self,
+        expr: ast.Expr,
+        expected_type: QType,
+        env: Environment,
+        loop_depth: int,
+        type_desc: Optional[str] = None,
+    ) -> TypedExpr:
+        """Synthesizes expr and asserts that the synthesized type is a subtype of expected_type."""
+        typed = self.synth_expr(expr, env, loop_depth)
+        if not is_subtype(typed.type_val, expected_type, env):
+            prefix = "Type mismatch: synthesized" if type_desc is None else f"{type_desc}"
+            raise TypeError(
+                f"{prefix} type '{typed.type_val}' is not a subtype of expected type '{expected_type}'",
+                offset=expr.offset,
+            )
+        return typed
+
+    def _check_call_args(
+        self,
+        args: Sequence[ast.Expr],
+        params: Sequence[QParam],
+        env: Environment,
+        loop_depth: int,
+        offset: int,
+    ) -> list[TypedExpr]:
+        """Validates arity and elaborates call arguments against formal parameter modes."""
+        if len(args) != len(params):
+            raise TypeError(
+                f"Function expects {len(params)} arguments, but got {len(args)}",
+                offset=offset,
+            )
+        typed_args: list[TypedExpr] = []
+        for arg, param in zip(args, params):
+            if param.is_var or param.is_out:
+                typed_args.append(
+                    self._check_lvalue_arg(arg, param.type_val, env, loop_depth, is_out=param.is_out)
+                )
+            else:
+                typed_args.append(self.check_expr(arg, param.type_val, env, loop_depth))
+        return typed_args
+
+    def _check_lvalue_mode_type(
+        self,
+        param_type: QType,
+        dest_raw_type: QType,
+        is_out: bool,
+        target_desc: str,
+        offset: int,
+        env: Environment,
+    ) -> QType:
+        """Unwraps reference cell types and validates invariance (var) or covariance (out)."""
+        dest_type = (
+            dest_raw_type.element_type
+            if isinstance(dest_raw_type, (QVarType, QOutType))
+            else dest_raw_type
+        )
+        if is_out:
+            if not is_subtype(param_type, dest_type, env):
+                raise TypeError(
+                    f"Type mismatch on out parameter: parameter type '{param_type}' is not a subtype "
+                    f"of destination {target_desc} type '{dest_type}'",
+                    offset=offset,
+                )
+        else:
+            if not (
+                is_subtype(param_type, dest_type, env)
+                and is_subtype(dest_type, param_type, env)
+            ):
+                raise TypeError(
+                    f"Type mismatch on var parameter: expected exactly '{param_type}', but got "
+                    f"{target_desc} of type '{dest_type}' (var parameters are invariant)",
+                    offset=offset,
+                )
+        return dest_type
+
+    def _declare_fun_params(
+        self,
+        params: Sequence[ast.Param],
+        expected_params: Optional[Sequence[QParam]],
+        env: Environment,
+    ) -> tuple[tuple[TypedParam, ...], tuple[QParam, ...]]:
+        """Declares function parameters in local scope and returns typed params and signature formals."""
+        formal_params: list[TypedParam] = []
+        q_params: list[QParam] = []
+        for i, p in enumerate(params):
+            is_var = p.mode == ast.ParamMode.VAR
+            is_out = p.mode == ast.ParamMode.OUT
+            if p.type_annot is not None:
+                p_type = elaborate_type(p.type_annot, env)
+            elif expected_params is not None and i < len(expected_params):
+                p_type = expected_params[i].type_val
+            else:
+                raise TypeError(
+                    f"Parameter '{p.name}' requires a type annotation in synthesis mode",
+                    offset=p.offset,
+                )
+            p_sym = ValueSymbol(name=p.name, type_val=p_type, is_var=is_var, is_out=is_out)
+            env.current_scope.declare_value(p_sym)
+            formal_params.append(
+                TypedParam(
+                    name=p.name,
+                    symbol=p_sym,
+                    type_val=p_type,
+                    is_var=is_var,
+                    is_out=is_out,
+                    offset=p.offset,
+                )
+            )
+            q_params.append(QParam(name=p.name, type_val=p_type, is_var=is_var, is_out=is_out))
+        return tuple(formal_params), tuple(q_params)
+
+    def _resolve_variant_or_option_field(
+        self,
+        target_type: QType,
+        tag: str,
+        op_desc: str,
+        offset: int,
+    ) -> tuple[Optional[QType], bool]:
+        """Resolves payload type and option flag for a tag on Variant or Option target types."""
+        if isinstance(target_type, QVariantType):
+            field = target_type.get_variant(tag)
+            if field is None:
+                raise TypeError(
+                    f"Tag '{tag}' is not a valid variant of type '{target_type}'",
+                    offset=offset,
+                )
+            return field.type_val, False
+        elif isinstance(target_type, QOptionType):
+            opt = target_type.get_option(tag)
+            if opt is None:
+                raise TypeError(
+                    f"Tag '{tag}' is not a valid option of type '{target_type}'",
+                    offset=offset,
+                )
+            return opt.payload_type, True
+        else:
+            raise TypeError(
+                f"{op_desc} requires Variant or Option target, got '{target_type}'",
+                offset=offset,
+            )
+
     def check_no_escaping_path_types(
         self,
         typ: QType,
@@ -338,14 +518,7 @@ class TypeElaborator:
 
             # 12. Subsumption: synthesize minimal type and check subtyping (S <= T)
             case _:
-                typed = self.synth_expr(expr, env, loop_depth)
-                if not is_subtype(typed.type_val, expected_type, env):
-                    raise TypeError(
-                        f"Type mismatch: synthesized type '{typed.type_val}' is not a subtype "
-                        f"of expected type '{expected_type}'",
-                        offset=expr.offset,
-                    )
-                return typed
+                return self._check_subsumption(expr, expected_type, env, loop_depth)
 
 
     def synth_expr(
@@ -554,40 +727,18 @@ class TypeElaborator:
                 )
                 quants.append(QQuantifier(name=tp.name, symbol_id=sym_id, bound=bound_kind))
 
-            formal_params: list[TypedParam] = []
-            q_params: list[QParam] = []
-
-            for p in expr.params:
-                if p.type_annot is None:
-                    raise TypeError(
-                        f"Parameter '{p.name}' requires a type annotation in synthesis mode",
-                        offset=p.offset,
-                    )
-                p_type = elaborate_type(p.type_annot, env)
-                is_var = p.mode == ast.ParamMode.VAR
-                is_out = p.mode == ast.ParamMode.OUT
-                p_sym = ValueSymbol(name=p.name, type_val=p_type, is_var=is_var, is_out=is_out)
-                env.current_scope.declare_value(p_sym)
-                formal_params.append(
-                    TypedParam(
-                        name=p.name,
-                        symbol=p_sym,
-                        type_val=p_type,
-                        is_var=is_var,
-                        is_out=is_out,
-                        offset=p.offset,
-                    )
-                )
-                q_params.append(QParam(name=p.name, type_val=p_type, is_var=is_var, is_out=is_out))
+            formal_params, q_params = self._declare_fun_params(expr.params, None, env)
 
             with self.in_function():
-                if expr.return_type is not None:
-                    expected_ret = elaborate_type(expr.return_type, env)
-                    body_typed = self.check_expr(expr.body, expected_ret, env, loop_depth=self.loop_depth)
-                    ret_type = expected_ret
-                else:
-                    body_typed = self.synth_expr(expr.body, env, loop_depth=self.loop_depth)
-                    ret_type = body_typed.type_val
+                expected_ret = (
+                    elaborate_type(expr.return_type, env)
+                    if expr.return_type is not None
+                    else None
+                )
+                body_typed = self._elaborate_subexpr(
+                    expr.body, expected_ret, env, loop_depth=self.loop_depth
+                )
+                ret_type = expected_ret if expected_ret is not None else body_typed.type_val
 
             local_symbol_ids = {sym.symbol_id for sym in env.current_scope.values.values()}
             check_no_escaping_path_types(ret_type, local_symbol_ids, "function scope", expr.offset)
@@ -650,13 +801,7 @@ class TypeElaborator:
                 )
 
         if not isinstance(expected_lazy, QFunType):
-            typed_fun = self._synth_fun_expr(expr, env, loop_depth)
-            if not is_subtype(typed_fun.type_val, expected_type, env):
-                raise TypeError(
-                    f"Function type '{typed_fun.type_val}' is not a subtype of expected type '{expected_type}'",
-                    offset=expr.offset,
-                )
-            return typed_fun
+            return self._check_subsumption(expr, expected_type, env, loop_depth, type_desc="Function")
 
         if len(expr.params) != len(expected_lazy.params):
             raise TypeError(
@@ -666,30 +811,9 @@ class TypeElaborator:
             )
 
         with env.scoped("fun"):
-            formal_params: list[TypedParam] = []
-            q_params: list[QParam] = []
-
-            for p, exp_p in zip(expr.params, expected_lazy.params):
-                is_var = p.mode == ast.ParamMode.VAR
-                is_out = p.mode == ast.ParamMode.OUT
-                if p.type_annot is not None:
-                    p_type = elaborate_type(p.type_annot, env)
-                else:
-                    p_type = exp_p.type_val
-
-                p_sym = ValueSymbol(name=p.name, type_val=p_type, is_var=is_var, is_out=is_out)
-                env.current_scope.declare_value(p_sym)
-                formal_params.append(
-                    TypedParam(
-                        name=p.name,
-                        symbol=p_sym,
-                        type_val=p_type,
-                        is_var=is_var,
-                        is_out=is_out,
-                        offset=p.offset,
-                    )
-                )
-                q_params.append(QParam(name=p.name, type_val=p_type, is_var=is_var, is_out=is_out))
+            formal_params, q_params = self._declare_fun_params(
+                expr.params, expected_lazy.params, env
+            )
 
             with self.in_function():
                 body_typed = self.check_expr(
@@ -751,23 +875,7 @@ class TypeElaborator:
         loop_depth: int,
     ) -> TypedApp:
         """Synthesizes a monomorphic function application."""
-        if len(expr.args) != len(fn_type.params):
-            raise TypeError(
-                f"Function expects {len(fn_type.params)} arguments, but got {len(expr.args)}",
-                offset=expr.offset,
-            )
-
-        typed_args: list[TypedExpr] = []
-        for arg, param in zip(expr.args, fn_type.params):
-            if param.is_var:
-                typed_arg = self._check_lvalue_arg(arg, param.type_val, env, loop_depth, is_out=False)
-                typed_args.append(typed_arg)
-            elif param.is_out:
-                typed_arg = self._check_lvalue_arg(arg, param.type_val, env, loop_depth, is_out=True)
-                typed_args.append(typed_arg)
-            else:
-                typed_arg = self.check_expr(arg, param.type_val, env, loop_depth)
-                typed_args.append(typed_arg)
+        typed_args = self._check_call_args(expr.args, fn_type.params, env, loop_depth, expr.offset)
 
         return TypedApp(
             func=func_typed,
@@ -819,28 +927,9 @@ class TypeElaborator:
                     f"Argument to '{mode_name}' parameter '{target.name}' must be a mutable variable",
                     offset=offset,
                 )
-            dest_type = (
-                sym.type_val.element_type
-                if isinstance(sym.type_val, (QVarType, QOutType))
-                else sym.type_val
+            dest_type = self._check_lvalue_mode_type(
+                param_type, sym.type_val, is_out, "variable", offset, env
             )
-            if is_out:
-                if not is_subtype(param_type, dest_type, env):
-                    raise TypeError(
-                        f"Type mismatch on out parameter: parameter type '{param_type}' is not a subtype "
-                        f"of destination variable type '{dest_type}'",
-                        offset=offset,
-                    )
-            else:
-                if not (
-                    is_subtype(param_type, dest_type, env)
-                    and is_subtype(dest_type, param_type, env)
-                ):
-                    raise TypeError(
-                        f"Type mismatch on var parameter: expected exactly '{param_type}', but got "
-                        f"variable of type '{dest_type}' (var parameters are invariant)",
-                        offset=offset,
-                    )
             return TypedVar(
                 name=sym.name,
                 symbol=sym,
@@ -868,28 +957,9 @@ class TypeElaborator:
                     f"Record field '{target.field}' is not mutable",
                     offset=offset,
                 )
-            field_type = (
-                field.type_val.element_type
-                if isinstance(field.type_val, (QVarType, QOutType))
-                else field.type_val
+            field_type = self._check_lvalue_mode_type(
+                param_type, field.type_val, is_out, "field", offset, env
             )
-            if is_out:
-                if not is_subtype(param_type, field_type, env):
-                    raise TypeError(
-                        f"Type mismatch on out parameter: parameter type '{param_type}' is not a subtype "
-                        f"of destination field type '{field_type}'",
-                        offset=offset,
-                    )
-            else:
-                if not (
-                    is_subtype(param_type, field_type, env)
-                    and is_subtype(field_type, param_type, env)
-                ):
-                    raise TypeError(
-                        f"Type mismatch on var parameter: expected exactly '{param_type}', but got "
-                        f"field of type '{field_type}' (var parameters are invariant)",
-                        offset=offset,
-                    )
             return TypedSelectRef(
                 target=rec_typed,
                 field=target.field,
@@ -997,12 +1067,6 @@ class TypeElaborator:
                 offset=expr.offset,
             )
 
-        if len(expr.args) != len(fn_body.params):
-            raise TypeError(
-                f"Function expects {len(fn_body.params)} arguments, but got {len(expr.args)}",
-                offset=expr.offset,
-            )
-
         meta_map: dict[int, QTypeMeta] = {}
         for q in all_type.quantifiers:
             meta_map[q.symbol_id] = QTypeMeta(name=f"?{q.name}")
@@ -1010,15 +1074,9 @@ class TypeElaborator:
         instantiated_fn = fn_body.substitute(meta_map)
         assert isinstance(instantiated_fn, QFunType)
 
-        typed_args = []
-        for arg, param in zip(expr.args, instantiated_fn.params):
-            if param.is_var or param.is_out:
-                typed_arg = self._check_lvalue_arg(
-                    arg, param.type_val, env, loop_depth, is_out=param.is_out
-                )
-            else:
-                typed_arg = self.check_expr(arg, param.type_val, env, loop_depth)
-            typed_args.append(typed_arg)
+        typed_args = self._check_call_args(
+            expr.args, instantiated_fn.params, env, loop_depth, expr.offset
+        )
 
         resolved_targs = []
         for q in all_type.quantifiers:
@@ -1077,13 +1135,7 @@ class TypeElaborator:
         """Checks a record constructor against an expected record type."""
         expected_lazy = expected_type.evaluate_lazily(env)
         if not isinstance(expected_lazy, QRecordType):
-            typed_rec = self._synth_record_expr(expr, env, loop_depth)
-            if not is_subtype(typed_rec.type_val, expected_type, env):
-                raise TypeError(
-                    f"Record type '{typed_rec.type_val}' is not a subtype of expected '{expected_type}'",
-                    offset=expr.offset,
-                )
-            return typed_rec
+            return self._check_subsumption(expr, expected_type, env, loop_depth, type_desc="Record")
 
         field_map = {b.name: b for b in expr.fields}
         field_typeds: list[TypedRecordField] = []
@@ -1188,13 +1240,7 @@ class TypeElaborator:
         """Checks a tuple constructor against an expected tuple type."""
         expected_lazy = expected_type.evaluate_lazily(env)
         if not isinstance(expected_lazy, QTupleType):
-            typed_tup = self._synth_tuple_expr(expr, env, loop_depth)
-            if not is_subtype(typed_tup.type_val, expected_type, env):
-                raise TypeError(
-                    f"Tuple type '{typed_tup.type_val}' is not a subtype of expected '{expected_type}'",
-                    offset=expr.offset,
-                )
-            return typed_tup
+            return self._check_subsumption(expr, expected_type, env, loop_depth, type_desc="Tuple")
 
         if len(expr.fields) != len(expected_lazy.fields):
             raise TypeError(
@@ -1536,25 +1582,9 @@ class TypeElaborator:
         """Synthesizes a variant/option tag query: target?tag."""
         target_typed = self.synth_expr(expr.target, env, loop_depth)
         target_type = target_typed.type_val.evaluate_lazily(env)
-        if isinstance(target_type, QVariantType):
-            field = target_type.get_variant(expr.tag)
-            if field is None:
-                raise TypeError(
-                    f"Tag '{expr.tag}' is not a valid variant of type '{target_type}'",
-                    offset=expr.offset,
-                )
-        elif isinstance(target_type, QOptionType):
-            opt = target_type.get_option(expr.tag)
-            if opt is None:
-                raise TypeError(
-                    f"Tag '{expr.tag}' is not a valid option of type '{target_type}'",
-                    offset=expr.offset,
-                )
-        else:
-            raise TypeError(
-                f"Variant query '?' requires Variant or Option target, got '{target_type}'",
-                offset=expr.offset,
-            )
+        self._resolve_variant_or_option_field(
+            target_type, expr.tag, "Variant query '?'", expr.offset
+        )
         return TypedVariantCheck(target=target_typed, tag=expr.tag, type_val=BOOL_TYPE, offset=expr.offset)
 
 
@@ -1565,36 +1595,21 @@ class TypeElaborator:
         """Synthesizes a variant/option payload extraction: target!tag."""
         target_typed = self.synth_expr(expr.target, env, loop_depth)
         target_type = target_typed.type_val.evaluate_lazily(env)
-        if isinstance(target_type, QVariantType):
-            field = target_type.get_variant(expr.tag)
-            if field is None:
-                raise TypeError(
-                    f"Tag '{expr.tag}' is not a valid variant of type '{target_type}'",
-                    offset=expr.offset,
-                )
-            result_type = field.type_val if field.type_val is not None else OK_TYPE
-        elif isinstance(target_type, QOptionType):
-            opt = target_type.get_option(expr.tag)
-            if opt is None:
-                raise TypeError(
-                    f"Tag '{expr.tag}' is not a valid option of type '{target_type}'",
-                    offset=expr.offset,
-                )
-            # Cardelli §4.5: ! extracts a tuple with 0-based integer ordinal as the first component
+        payload_t, is_option = self._resolve_variant_or_option_field(
+            target_type, expr.tag, "Variant assertion '!'", expr.offset
+        )
+        if not is_option:
+            result_type = payload_t if payload_t is not None else OK_TYPE
+        else:
             ordinal_field = QTupleField(name=None, type_val=INT_TYPE)
-            if opt.payload_type is None:
+            if payload_t is None:
                 result_type = QTupleType((ordinal_field,))
             else:
-                payload_lazy = opt.payload_type.evaluate_lazily(env)
+                payload_lazy = payload_t.evaluate_lazily(env)
                 if isinstance(payload_lazy, QTupleType):
                     result_type = QTupleType((ordinal_field, *payload_lazy.fields))
                 else:
                     result_type = QTupleType((ordinal_field, QTupleField(name=None, type_val=payload_lazy)))
-        else:
-            raise TypeError(
-                f"Variant assertion '!' requires Variant or Option target, got '{target_type}'",
-                offset=expr.offset,
-            )
         return TypedVariantAssert(target=target_typed, tag=expr.tag, type_val=result_type, offset=expr.offset)
 
 
@@ -1607,14 +1622,8 @@ class TypeElaborator:
             expr, target_type, expected_type=None, env=env, loop_depth=loop_depth
         )
 
-        if expr.else_branch is not None:
-            else_typed: Optional[TypedExpr] = self.synth_expr(expr.else_branch, env, loop_depth)
-        else:
-            else_typed = None
-
-        branch_types = [b.body.type_val for b in typed_branches]
-        if else_typed is not None:
-            branch_types.append(else_typed.type_val)
+        else_typed = self._elaborate_optional_branch(expr.else_branch, None, env, loop_depth)
+        branch_types = self._collect_branch_types(typed_branches, else_typed)
 
         if not branch_types:
             return TypedCase(
@@ -1656,10 +1665,9 @@ class TypeElaborator:
             expr, target_type, expected_type=expected_type, env=env, loop_depth=loop_depth
         )
 
-        if expr.else_branch is not None:
-            else_typed: Optional[TypedExpr] = self.check_expr(expr.else_branch, expected_type, env, loop_depth)
-        else:
-            else_typed = None
+        else_typed = self._elaborate_optional_branch(
+            expr.else_branch, expected_type, env, loop_depth
+        )
 
         return TypedCase(
             target=target_typed,
@@ -1723,10 +1731,8 @@ class TypeElaborator:
                 with env.scoped(f"case_{branch.binder}"):
                     binder_sym = ValueSymbol(name=branch.binder, type_val=binder_t, is_var=False)
                     env.current_scope.declare_value(binder_sym)
-                    if expected_type is not None:
-                        body_typed = self.check_expr(branch.body, expected_type, env, loop_depth)
-                    else:
-                        body_typed = self.synth_expr(branch.body, env, loop_depth)
+                    body_typed = self._elaborate_subexpr(branch.body, expected_type, env, loop_depth)
+                    if expected_type is None:
                         check_no_escaping_path_types(
                             body_typed.type_val,
                             {binder_sym.symbol_id},
@@ -1735,10 +1741,7 @@ class TypeElaborator:
                         )
             else:
                 binder_sym = None
-                if expected_type is not None:
-                    body_typed = self.check_expr(branch.body, expected_type, env, loop_depth)
-                else:
-                    body_typed = self.synth_expr(branch.body, env, loop_depth)
+                body_typed = self._elaborate_subexpr(branch.body, expected_type, env, loop_depth)
 
             typed_branches.append(
                 TypedCaseBranch(
@@ -1803,13 +1806,7 @@ class TypeElaborator:
         """Checks an array literal against an expected array type."""
         expected_lazy = expected_type.evaluate_lazily(env)
         if not isinstance(expected_lazy, QArrayType):
-            typed_arr = self._synth_array_expr(expr, env, loop_depth)
-            if not is_subtype(typed_arr.type_val, expected_type, env):
-                raise TypeError(
-                    f"Array type '{typed_arr.type_val}' is not a subtype of expected '{expected_type}'",
-                    offset=expr.offset,
-                )
-            return typed_arr
+            return self._check_subsumption(expr, expected_type, env, loop_depth, type_desc="Array")
 
         if getattr(expr, "element_type", None) is not None:
             annot_elem_type = elaborate_type(expr.element_type, env)
@@ -1855,13 +1852,7 @@ class TypeElaborator:
         """Checks an array repetition against an expected array type."""
         expected_lazy = expected_type.evaluate_lazily(env)
         if not isinstance(expected_lazy, QArrayType):
-            typed_rep = self._synth_array_rep_expr(expr, env, loop_depth)
-            if not is_subtype(typed_rep.type_val, expected_type, env):
-                raise TypeError(
-                    f"Array type '{typed_rep.type_val}' is not a subtype of expected '{expected_type}'",
-                    offset=expr.offset,
-                )
-            return typed_rep
+            return self._check_subsumption(expr, expected_type, env, loop_depth, type_desc="Array")
 
         count_typed = self.check_expr(expr.count, INT_TYPE, env, loop_depth)
         init_typed = self.check_expr(expr.init_val, expected_lazy.element_type, env, loop_depth)
@@ -1988,10 +1979,7 @@ class TypeElaborator:
         loop_depth: int,
     ) -> tuple[TypedExpr, list[TypedTryBranch], Optional[TypedExpr]]:
         """Elaborates body, handler branches, and optional else branch for a try expression."""
-        if expected_type is not None:
-            body_typed = self.check_expr(expr.body, expected_type, env, loop_depth)
-        else:
-            body_typed = self.synth_expr(expr.body, env, loop_depth)
+        body_typed = self._elaborate_subexpr(expr.body, expected_type, env, loop_depth)
 
         typed_branches: list[TypedTryBranch] = []
         for branch in expr.branches:
@@ -2007,16 +1995,10 @@ class TypeElaborator:
                 with env.scoped(f"try_{branch.binder}"):
                     binder_sym = ValueSymbol(name=branch.binder, type_val=exc_type.payload_type, is_var=False)
                     env.current_scope.declare_value(binder_sym)
-                    if expected_type is not None:
-                        h_body = self.check_expr(branch.body, expected_type, env, loop_depth)
-                    else:
-                        h_body = self.synth_expr(branch.body, env, loop_depth)
+                    h_body = self._elaborate_subexpr(branch.body, expected_type, env, loop_depth)
             else:
                 binder_sym = None
-                if expected_type is not None:
-                    h_body = self.check_expr(branch.body, expected_type, env, loop_depth)
-                else:
-                    h_body = self.synth_expr(branch.body, env, loop_depth)
+                h_body = self._elaborate_subexpr(branch.body, expected_type, env, loop_depth)
 
             typed_branches.append(
                 TypedTryBranch(
@@ -2027,14 +2009,7 @@ class TypeElaborator:
                 )
             )
 
-        if expr.else_branch is not None:
-            if expected_type is not None:
-                else_typed: Optional[TypedExpr] = self.check_expr(expr.else_branch, expected_type, env, loop_depth)
-            else:
-                else_typed = self.synth_expr(expr.else_branch, env, loop_depth)
-        else:
-            else_typed = None
-
+        else_typed = self._elaborate_optional_branch(expr.else_branch, expected_type, env, loop_depth)
         return body_typed, typed_branches, else_typed
 
 
@@ -2063,9 +2038,9 @@ class TypeElaborator:
         body_typed, typed_branches, else_typed = self._elaborate_try_branches(
             expr, None, env, loop_depth
         )
-        all_types = [body_typed.type_val] + [b.body.type_val for b in typed_branches]
-        if else_typed is not None:
-            all_types.append(else_typed.type_val)
+        all_types = self._collect_branch_types(
+            typed_branches, else_typed, initial_type=body_typed.type_val
+        )
 
         join_type = self._join_types(
             all_types,
@@ -2105,10 +2080,8 @@ class TypeElaborator:
                         b_sym = ValueSymbol(name=name, type_val=match_t, is_var=False)
                         env.current_scope.declare_value(b_sym)
                         b_syms.append(b_sym)
-                    if expected_type is not None:
-                        h_body = self.check_expr(branch.body, expected_type, env, loop_depth)
-                    else:
-                        h_body = self.synth_expr(branch.body, env, loop_depth)
+                    h_body = self._elaborate_subexpr(branch.body, expected_type, env, loop_depth)
+                    if expected_type is None:
                         b_ids = {s.symbol_id for s in b_syms}
                         check_no_escaping_path_types(
                             h_body.type_val,
@@ -2118,10 +2091,7 @@ class TypeElaborator:
                         )
             else:
                 b_syms = []
-                if expected_type is not None:
-                    h_body = self.check_expr(branch.body, expected_type, env, loop_depth)
-                else:
-                    h_body = self.synth_expr(branch.body, env, loop_depth)
+                h_body = self._elaborate_subexpr(branch.body, expected_type, env, loop_depth)
 
             typed_branches.append(
                 TypedInspectBranch(
@@ -2132,14 +2102,7 @@ class TypeElaborator:
                 )
             )
 
-        if expr.else_branch is not None:
-            if expected_type is not None:
-                else_typed: Optional[TypedExpr] = self.check_expr(expr.else_branch, expected_type, env, loop_depth)
-            else:
-                else_typed = self.synth_expr(expr.else_branch, env, loop_depth)
-        else:
-            else_typed = None
-
+        else_typed = self._elaborate_optional_branch(expr.else_branch, expected_type, env, loop_depth)
         return target_typed, typed_branches, else_typed
 
 
@@ -2168,9 +2131,7 @@ class TypeElaborator:
         target_typed, typed_branches, else_typed = self._elaborate_inspect_branches(
             expr, None, env, loop_depth
         )
-        branch_types = [b.body.type_val for b in typed_branches]
-        if else_typed is not None:
-            branch_types.append(else_typed.type_val)
+        branch_types = self._collect_branch_types(typed_branches, else_typed)
 
         if not branch_types:
             return TypedInspect(
