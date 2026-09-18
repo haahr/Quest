@@ -428,23 +428,27 @@ Option types are ordered sums with inline union payloads. Each unique `QOptionTy
   ```
 
 ### 9.2. Variant Types
-Variant types are unordered sums with a single 64-bit payload word:
+Variant types are unordered sums with a single 64-bit payload word, represented as first-class 16-byte values:
 ```c
-typedef struct QVariant {
+typedef struct QVariantVal {
     int64_t tag;
     QVal    payload;
-} QVariant;
+} QVariantVal;
 
-static_assert(sizeof(QVariant) == 16, qvariant_must_be_16_bytes);
+static_assert(sizeof(QVariantVal) == 16, qvariantval_must_be_16_bytes);
+static_assert(offsetof(QVariantVal, tag) == 0, qvariantval_tag_at_offset_0);
+static_assert(offsetof(QVariantVal, payload) == 8, qvariantval_payload_at_offset_8);
 ```
 
 ### 9.3. Injections, Tag Queries, Extractions, and Pattern Matching
 - **Injection:** `option b of T with payload end` allocates and populates the union branch; `variant b of T with v end`
-  allocates `QVariant` and populates `payload` via `_qval_wrap`.
-- **Tag Query (`target?tag`):** Checks `target->tag == EXPECTED_TAG`.
-- **Tag Assertion (`target!tag`):** Asserts `target->tag == EXPECTED_TAG` (panics with `Exception: variant.tagMismatch\n`
-  on failure). Returns `payload` for variants, or a `QTuple` prepending the ordinal for options.
-- **Pattern Matching (`case`):** Lowers to standard C `switch (target->tag)` with branch payload binders.
+  constructs an unboxed `QVariantVal` compound literal directly with zero heap allocations.
+- **Tag Query (`target?tag`):** Checks `target.tag == EXPECTED_TAG` on variants (or `target->tag == EXPECTED_TAG`
+  on options).
+- **Tag Assertion (`target!tag`):** Asserts tag match (panics with `Exception: variant.tagMismatch\n` on failure).
+  Returns `payload` for variants, or a `QTuple` prepending the ordinal for options.
+- **Pattern Matching (`case`):** Lowers to standard C `switch (target.tag)` (or `target->tag` for options) with
+  branch payload binders.
 
 ---
 
@@ -477,17 +481,20 @@ Phase 4.5 implements Cardelli's structural subtyping across tuples, records, and
   ```c
   (*((QInt *)((char *)qv_pt.val + ((const OffsetDict_Point2D *)qv_pt.dict)->offset_x)))
   ```
-- **Aggregate Storage:** Records in tuples are stored inline as 16-byte `QRecordVal`. In arrays (`QArray`),
-  `QRecordVal` is boxed into an 8-byte heap pointer (`QRecordVal *`) via `quest_record_box`, setting the stage
-  for future unboxed multi-stride arrays. Subtyped variants in aggregates produce a diagnostic:
-  `"Subtyped variant storage in aggregates requires runtime descriptors"`.
+- **Aggregate Storage:** Records and variants in tuples are stored inline as 16-byte values (`QRecordVal` and
+  `QVariantVal`). In arrays (`QArray`), they are boxed into 8-byte heap pointers (`QRecordVal *`, `QVariantVal *`)
+  via `quest_record_box` and `quest_variant_box`, setting the stage for future unboxed multi-stride arrays.
+  Subtyped variants in aggregates apply static tag remapping (`tagmap_<Target>_<Source>`) at insertion time.
 
 ### 10.3. Variant Subtyping & Static Tag Remapping
-- **Object Header:** `QVariant` has `const void *descriptor;` at offset 0 (24 bytes total, payload at offset 16).
+- **First-Class Value Representation:** `QVariantVal` is a 16-byte value type (`int64_t tag; QVal payload;`).
+  Variant creation, checks (`v?x`), assertions (`v!x`), and `case` pattern matching execute with zero heap allocations.
 - **Static Tag Tables:** Static lookup tables in `.rodata` translate source tags to target tags:
   ```c
   static const int64_t tagmap_Large_Small[] = { 2LL, 1LL };
   ```
+- **Zero-Allocation Upcast:** Coercion emits an unboxed compound literal:
+  `((QVariantVal){ .tag = tagmap_Large_Small[src.tag], .payload = src.payload })`.
 
 ---
 

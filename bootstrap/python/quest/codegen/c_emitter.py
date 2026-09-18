@@ -283,16 +283,23 @@ class CEmitter:
         lines: list[str],
         dest: Optional[str] = None,
     ) -> str:
-        """Allocates and initializes a new QVariant with remapped tag and copied payload."""
-        tmp_v = dest if dest is not None else self.fresh_tmp("_vup")
+        """Remaps tag and copies payload into an unboxed QVariantVal."""
+        tmp_src = self.fresh_tmp("_vsrc")
+        lines.append(f"QVariantVal {tmp_src} = {c_val};")
         tagmap_name = f"tagmap_{type_to_c_tag(target_t)}_{type_to_c_tag(source_t)}"
+        tmp_v = dest if dest is not None else self.fresh_tmp("_vup")
         if dest is None:
-            lines.append(f"QVariant *{tmp_v} = (QVariant *)quest_alloc(sizeof(QVariant));")
+            lines.append(
+                f"QVariantVal {tmp_v} = (QVariantVal){{ "
+                f".tag = {tagmap_name}[{tmp_src}.tag], "
+                f".payload = {tmp_src}.payload }};"
+            )
         else:
-            lines.append(f"{tmp_v} = (QVariant *)quest_alloc(sizeof(QVariant));")
-        lines.append(f"{tmp_v}->descriptor = NULL;")
-        lines.append(f"{tmp_v}->tag = {tagmap_name}[{c_val}->tag];")
-        lines.append(f"{tmp_v}->payload = {c_val}->payload;")
+            lines.append(
+                f"{tmp_v} = (QVariantVal){{ "
+                f".tag = {tagmap_name}[{tmp_src}.tag], "
+                f".payload = {tmp_src}.payload }};"
+            )
         return tmp_v
 
     def _emit_fun_return(self, body: TypedExpr, ret_type: QType, fn_lines: list[str]) -> None:
@@ -355,13 +362,15 @@ class CEmitter:
             return f"({c_arr}->data[{c_idx}].r)"
         elif isinstance(elem_t, QRecordType):
             return f"(*((QRecordVal *)({c_arr}->data[{c_idx}].p)))"
+        elif isinstance(elem_t, QVariantType):
+            return f"(*((QVariantVal *)({c_arr}->data[{c_idx}].p)))"
         elif (
             elem_t == STRING_TYPE
             or elem_t == DYNAMIC_TYPE
             or (isinstance(elem_t, QTypeVar) and elem_t.name == "Dynamic.T")
             or isinstance(
                 elem_t,
-                (QTupleType, QFunType, QAllType, QArrayType, QVariantType, QOptionType, QExceptionType),
+                (QTupleType, QFunType, QAllType, QArrayType, QOptionType, QExceptionType),
             )
         ):
             c_elem_t = self.c_type(elem_t)
@@ -880,7 +889,20 @@ class CEmitter:
 
             case TypedAssign(target=tgt, value=val):
                 c_tgt = self.emit_val(tgt, lines)
-                self.emit_to(val, c_tgt, lines)
+                target_t = tgt.type_val
+                if isinstance(target_t, QRecordType):
+                    c_val = self.emit_val(val, lines)
+                    coerced = self._coerce_record_val(c_val, val, target_t)
+                    lines.append(f"{c_tgt} = {coerced};")
+                elif (
+                    isinstance(target_t, QVariantType)
+                    and isinstance(val.type_val, QVariantType)
+                    and val.type_val != target_t
+                ):
+                    c_val = self.emit_val(val, lines)
+                    self._emit_variant_upcast(c_val, val.type_val, target_t, lines, dest=c_tgt)
+                else:
+                    self.emit_to(val, c_tgt, lines)
                 return "((void)0)"
 
             case TypedRecord(fields=flds):
@@ -901,6 +923,8 @@ class CEmitter:
             case TypedVariantCheck(target=tgt, tag=tag):
                 c_tgt = self.emit_val(tgt, lines)
                 tag_idx = self._tag_index(tgt.type_val, tag)
+                if isinstance(tgt.type_val, QVariantType):
+                    return f"({c_tgt}.tag == {tag_idx}LL)"
                 return f"({c_tgt}->tag == {tag_idx}LL)"
 
             case TypedVariantAssert(target=tgt, tag=tag):
@@ -926,8 +950,12 @@ class CEmitter:
                             lines.append(f"{res_tmp}->_1 = {c_tgt}->u.{tag}.val;")
                     return res_tmp
                 elif isinstance(tgt.type_val, QVariantType):
-                    lines.append(f"if ({c_tgt}->tag != {tag_idx}LL) quest_raise_variant_error();")
-                    return self._emit_qval_extract(f"{c_tgt}->payload", expr.type_val)
+                    if not c_tgt.isidentifier():
+                        tmp_v = self.fresh_tmp("_vtgt")
+                        lines.append(f"QVariantVal {tmp_v} = {c_tgt};")
+                        c_tgt = tmp_v
+                    lines.append(f"if ({c_tgt}.tag != {tag_idx}LL) quest_raise_variant_error();")
+                    return self._emit_qval_extract(f"{c_tgt}.payload", expr.type_val)
                 else:
                     lines.append("quest_raise_variant_error();")
                     return "((void)0)"
@@ -993,7 +1021,22 @@ class CEmitter:
                         if fld == "new" and len(args) == 2:
                             c_sz = self.emit_val(args[0], lines)
                             c_init = self.emit_val(args[1], lines)
-                            wrap = _qval_wrap(c_init, args[1].type_val)
+                            target_elem_t = (
+                                expr.type_val.element_type
+                                if isinstance(expr.type_val, QArrayType)
+                                else args[1].type_val
+                            )
+                            if isinstance(target_elem_t, QRecordType):
+                                c_init = self._coerce_record_val(c_init, args[1], target_elem_t)
+                            elif (
+                                isinstance(target_elem_t, QVariantType)
+                                and isinstance(args[1].type_val, QVariantType)
+                                and args[1].type_val != target_elem_t
+                            ):
+                                c_init = self._emit_variant_upcast(
+                                    c_init, args[1].type_val, target_elem_t, lines
+                                )
+                            wrap = _qval_wrap(c_init, target_elem_t)
                             return f"quest_array_new({c_sz}, {wrap})"
                         elif fld == "size" and len(args) == 1:
                             c_arr = self.emit_val(args[0], lines)
@@ -1015,6 +1058,14 @@ class CEmitter:
                             )
                             if isinstance(target_elem_t, QRecordType):
                                 c_item = self._coerce_record_val(c_item, args[2], target_elem_t)
+                            elif (
+                                isinstance(target_elem_t, QVariantType)
+                                and isinstance(args[2].type_val, QVariantType)
+                                and args[2].type_val != target_elem_t
+                            ):
+                                c_item = self._emit_variant_upcast(
+                                    c_item, args[2].type_val, target_elem_t, lines
+                                )
                             wrap = _qval_wrap(c_item, target_elem_t)
                             lines.append(f"{c_arr}->data[{c_idx}] = {wrap};")
                             return "((void)0)"
@@ -1094,6 +1145,14 @@ class CEmitter:
                 target_elem_t = tgt.type_val.element_type if isinstance(tgt.type_val, QArrayType) else val.type_val
                 if isinstance(target_elem_t, QRecordType):
                     c_val = self._coerce_record_val(c_val, val, target_elem_t)
+                elif (
+                    isinstance(target_elem_t, QVariantType)
+                    and isinstance(val.type_val, QVariantType)
+                    and val.type_val != target_elem_t
+                ):
+                    c_val = self._emit_variant_upcast(
+                        c_val, val.type_val, target_elem_t, lines
+                    )
                 wrap = _qval_wrap(c_val, target_elem_t)
                 lines.append(f"{c_tgt}->data[{c_idx}] = {wrap};")
                 return "((void)0)"
@@ -1174,9 +1233,10 @@ class CEmitter:
                                 and isinstance(val.type_val, QVariantType)
                                 and val.type_val != symbol.type_val
                             ):
+                                block_lines.append(f"QVariantVal {c_ident};")
                                 val_c = self.emit_val(val, block_lines)
                                 self._emit_variant_upcast(
-                                    val_c, val.type_val, symbol.type_val, block_lines, dest=f"QVariant *{c_ident}"
+                                    val_c, val.type_val, symbol.type_val, block_lines, dest=c_ident
                                 )
                             else:
                                 c_type = self.c_type(symbol.type_val)
@@ -1259,10 +1319,16 @@ class CEmitter:
                         val_c = self.emit_val(elem, lines)
                         coerced = self._coerce_record_val(val_c, elem, expected_fld_t)
                         lines.append(f"{target_dest}->_{val_idx} = {coerced};")
-                    elif isinstance(expected_fld_t, QVariantType) and elem.type_val != expected_fld_t:
-                        raise NotImplementedError(
-                            "Subtyped variant storage in aggregates requires runtime descriptors"
+                    elif (
+                        isinstance(expected_fld_t, QVariantType)
+                        and isinstance(elem.type_val, QVariantType)
+                        and elem.type_val != expected_fld_t
+                    ):
+                        val_c = self.emit_val(elem, lines)
+                        tmp_v = self._emit_variant_upcast(
+                            val_c, elem.type_val, expected_fld_t, lines
                         )
+                        lines.append(f"{target_dest}->_{val_idx} = {tmp_v};")
                     else:
                         self.emit_to(elem, f"{target_dest}->_{val_idx}", lines)
                     val_idx += 1
@@ -1311,12 +1377,6 @@ class CEmitter:
                     lines.append(f"{target_dest}->env = (void *){env_tmp};")
 
             case TypedArray(elements=elems, type_val=t):
-                if isinstance(t.element_type, QVariantType):
-                    for elem in elems:
-                        if elem.type_val != t.element_type:
-                            raise NotImplementedError(
-                                "Subtyped variant storage in aggregates requires runtime descriptors"
-                            )
                 target_dest = dest
                 if target_dest is None:
                     target_dest = self.fresh_tmp("_arr")
@@ -1330,19 +1390,30 @@ class CEmitter:
                     c_elem = self.emit_val(elem, lines)
                     if isinstance(t.element_type, QRecordType):
                         c_elem = self._coerce_record_val(c_elem, elem, t.element_type)
+                    elif (
+                        isinstance(t.element_type, QVariantType)
+                        and isinstance(elem.type_val, QVariantType)
+                        and elem.type_val != t.element_type
+                    ):
+                        c_elem = self._emit_variant_upcast(
+                            c_elem, elem.type_val, t.element_type, lines
+                        )
                     wrap = _qval_wrap(c_elem, t.element_type)
                     lines.append(f"{target_dest}->data[{i}LL] = {wrap};")
 
             case TypedArrayRep(count=cnt, init_val=init_v, type_val=t):
-                if isinstance(t.element_type, QVariantType):
-                    if init_v.type_val != t.element_type:
-                        raise NotImplementedError(
-                            "Subtyped variant storage in aggregates requires runtime descriptors"
-                        )
                 c_cnt = self.emit_val(cnt, lines)
                 c_init = self.emit_val(init_v, lines)
                 if isinstance(t.element_type, QRecordType):
                     c_init = self._coerce_record_val(c_init, init_v, t.element_type)
+                elif (
+                    isinstance(t.element_type, QVariantType)
+                    and isinstance(init_v.type_val, QVariantType)
+                    and init_v.type_val != t.element_type
+                ):
+                    c_init = self._emit_variant_upcast(
+                        c_init, init_v.type_val, t.element_type, lines
+                    )
                 wrap = _qval_wrap(c_init, t.element_type)
                 target_dest = dest
                 if target_dest is None:
@@ -1351,20 +1422,39 @@ class CEmitter:
                 lines.append(f"{target_dest} = quest_array_new({c_cnt}, {wrap});")
 
             case TypedVariant(tag=tag, payload=payload, type_val=t):
+                tag_idx = self._tag_index(t, tag)
+                if payload is not None:
+                    c_payload = self.emit_val(payload, lines)
+                    v_field = t.get_variant(tag) if isinstance(t, QVariantType) else None
+                    payload_expected_t = (
+                        v_field.type_val if v_field and v_field.type_val else payload.type_val
+                    )
+                    if isinstance(payload_expected_t, QRecordType):
+                        c_payload = self._coerce_record_val(c_payload, payload, payload_expected_t)
+                    elif (
+                        isinstance(payload_expected_t, QVariantType)
+                        and isinstance(payload.type_val, QVariantType)
+                        and payload.type_val != payload_expected_t
+                    ):
+                        c_payload = self._emit_variant_upcast(
+                            c_payload, payload.type_val, payload_expected_t, lines
+                        )
+                    wrap = _qval_wrap(c_payload, payload_expected_t)
+                else:
+                    wrap = "Q_OK_VAL"
+
                 target_dest = dest
                 if target_dest is None:
                     target_dest = self.fresh_tmp("_var")
-                    lines.append(f"QVariant *{target_dest};")
-                lines.append(f"{target_dest} = (QVariant *)quest_alloc(sizeof(QVariant));")
-                lines.append(f"{target_dest}->descriptor = NULL;")
-                tag_idx = self._tag_index(t, tag)
-                lines.append(f"{target_dest}->tag = {tag_idx}LL;")
-                if payload is not None:
-                    c_payload = self.emit_val(payload, lines)
-                    wrap = _qval_wrap(c_payload, payload.type_val)
-                    lines.append(f"{target_dest}->payload = {wrap};")
+                    lines.append(
+                        f"QVariantVal {target_dest} = (QVariantVal){{ "
+                        f".tag = {tag_idx}LL, .payload = {wrap} }};"
+                    )
                 else:
-                    lines.append(f"{target_dest}->payload = Q_OK_VAL;")
+                    lines.append(
+                        f"{target_dest} = (QVariantVal){{ "
+                        f".tag = {tag_idx}LL, .payload = {wrap} }};"
+                    )
 
             case TypedOption(tag=tag, payload=payload, ordinal=ordinal, ordinal_expr=ordinal_expr, type_val=t):
                 target_dest = dest
@@ -1399,7 +1489,15 @@ class CEmitter:
             case TypedCase(target=tgt, branches=branches, else_branch=else_b, type_val=t):
                 c_tgt = self.emit_val(tgt, lines)
                 target_type = tgt.type_val
-                lines.append(f"switch ({c_tgt}->tag) {{")
+                if isinstance(target_type, QVariantType):
+                    if not c_tgt.isidentifier():
+                        tmp_tgt = self.fresh_tmp("_case_tgt")
+                        lines.append(f"QVariantVal {tmp_tgt} = {c_tgt};")
+                        c_tgt = tmp_tgt
+                    tag_expr = f"{c_tgt}.tag"
+                else:
+                    tag_expr = f"{c_tgt}->tag"
+                lines.append(f"switch ({tag_expr}) {{")
                 for branch in branches:
                     for tag in branch.tags:
                         tag_idx = self._tag_index(target_type, tag)
@@ -1428,7 +1526,7 @@ class CEmitter:
                             else:
                                 branch_lines.append(f"{b_name} = {c_tgt}->u.{branch.tags[0]}.val;")
                         elif isinstance(target_type, QVariantType):
-                            extracted = self._emit_qval_extract(f"{c_tgt}->payload", b_type)
+                            extracted = self._emit_qval_extract(f"{c_tgt}.payload", b_type)
                             branch_lines.append(f"{b_name} = {extracted};")
 
                     self.emit_to(branch.body, dest, branch_lines)

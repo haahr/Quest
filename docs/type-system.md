@@ -287,6 +287,9 @@ Array constructors synthesize `QArrayType`:
 - `array of a1 ... an end`: If all elements are homogeneous, synthesizes `Array(T)`.
 - `array of :T a1 ... an end`: Explicitly checks each element against $T$ and synthesizes `Array(T)`.
 - `array of(cnt init)`: Checks $cnt \Leftarrow \text{Int}$, synthesizes `Array(T)` where $\text{init} \Rightarrow T$.
+- **Variant Subtyping in Aggregates:**
+  When array elements or tuple components are checked against an expected variant supertype, subtyped variants
+  are accepted and coerced via static tag remapping at the aggregate boundary.
 
 ### 6.8. Option Typing and Extraction Semantics
 Option types provide ordered sum types with ordinal reflection and extraction (Cardelli §4.5):

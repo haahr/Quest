@@ -116,7 +116,7 @@ native **AArch64 (ARM64)** machine code and providing a **JIT compiler** for int
   - *Separate Compilation & Object Linking:* Compiling modules independently to `.o` files with header/interface exports and linking.
   - *Fat Pointers & Aggregate Subtyping:* Uniform 16-byte `QRecordVal` fat pointers across parameters, returns,
     variables, and aggregates (inlined in tuples, boxed in `QRecordVal *` for arrays) — *Complete for Records*;
-    runtime descriptors deferred for subtyped variants in aggregates.
+    subtyped variant storage in aggregates via static `.rodata` tag remapping tables — *Complete for Variants*.
   - *Standard Library Builtins Completeness:* C runtime implementations for remaining Cardelli builtins (`ascii`, `conv`, etc.) and deferred `dynamic.extern`/`intern` text serialization.
 - C transpiler architecture in [codegen-c.md](codegen-c.md);
   C ABI specification in [c-representation.md](c-representation.md).

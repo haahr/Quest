@@ -38,6 +38,25 @@ subtyping, field offsets cannot be assigned globally without conflict.
 +-----------------------------------------------------------------------------------------+
 ```
 
+### Variant Representation & Subtyping in Aggregates
+
+Variants are represented uniformly as unboxed 16-byte value structures (`QVariantVal`):
+```c
+typedef struct QVariantVal {
+    int64_t tag;        /* 0-based branch discriminant */
+    QVal    payload;    /* Branch payload (or Q_OK_VAL) */
+} QVariantVal;
+```
+- **Zero-Allocation Construction & Tag Remapping:** Variant creation, pattern matching (`case`), checks (`v?x`),
+  and assertions (`v!x`) operate directly on `QVariantVal` with **zero heap allocations**. Upcasting across
+  subtyped variant boundaries generates a static lookup table (`static const int64_t tagmap_<Target>_<Source>[]`)
+  in `.rodata` and constructs an unboxed compound literal with remapped tag and copied payload.
+- **Aggregate Storage:** When a subtyped variant is stored into an aggregate (`Array(SuperVariant)` or
+  `Tuple ... SuperVariant ...`), the compiler coerces the variant at insertion time using the static tag table.
+  Tuples store the 16-byte `QVariantVal` inline. Arrays box into `QVariantVal *` within the 8-byte `QVal.p` slot.
+  Extracting from aggregates accesses values whose tags are pre-aligned to the supertype's tag space, allowing
+  direct `switch (v.tag)` matching without runtime descriptor overhead.
+
 ---
 
 ## 2. Architecture & Design Tradeoffs

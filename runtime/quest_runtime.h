@@ -80,7 +80,13 @@ typedef struct QRecordVal {
     const void *dict;
 } QRecordVal;
 
-/* Variant representation: descriptor, tag and single 64-bit value word */
+/* First-class 16-byte variant value: local tag index and payload value */
+typedef struct QVariantVal {
+    int64_t tag;
+    QVal    payload;
+} QVariantVal;
+
+/* Legacy Variant representation: descriptor, tag and single 64-bit value word */
 typedef struct QVariant {
     const void *descriptor;
     int64_t     tag;
@@ -194,6 +200,9 @@ static_assert(sizeof(QClosure)      == 16, qclosure_must_be_16_bytes);
 static_assert(sizeof(QRecordHeader) == 8, qrecord_header_must_be_8_bytes);
 static_assert(sizeof(QRecordVal)    == 16, qrecordval_must_be_16_bytes);
 static_assert(offsetof(QRecordVal, dict) == 8, qrecordval_dict_at_offset_8);
+static_assert(sizeof(QVariantVal)          == 16, qvariantval_must_be_16_bytes);
+static_assert(offsetof(QVariantVal, tag)     == 0,  qvariantval_tag_at_offset_0);
+static_assert(offsetof(QVariantVal, payload) == 8,  qvariantval_payload_at_offset_8);
 static_assert(sizeof(QVariant)      == 24, qvariant_must_be_24_bytes);
 static_assert(sizeof(QException)    == 8, qexception_must_be_8_bytes);
 static_assert(sizeof(QExceptionState) == 16, qexception_state_must_be_16_bytes);
@@ -251,6 +260,12 @@ QVal                   quest_dynamic_be(const QTypeDescriptor *target_type_desc,
 static inline QRecordVal *quest_record_box(QRecordVal rec) {
     QRecordVal *box = (QRecordVal *)quest_alloc(sizeof(QRecordVal));
     *box = rec;
+    return box;
+}
+
+static inline QVariantVal *quest_variant_box(QVariantVal var) {
+    QVariantVal *box = (QVariantVal *)quest_alloc(sizeof(QVariantVal));
+    *box = var;
     return box;
 }
 

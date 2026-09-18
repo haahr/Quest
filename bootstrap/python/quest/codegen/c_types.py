@@ -70,7 +70,13 @@ def type_to_c_tag(t: QType) -> str:
     if isinstance(t, QArrayType):
         return "QArray"
     if isinstance(t, QVariantType):
-        return "QVariant"
+        tags = []
+        for v in t.variants:
+            if v.type_val:
+                tags.append(f"{v.name}_{type_to_c_tag(v.type_val)}")
+            else:
+                tags.append(v.name)
+        return "QVariant_" + ("_".join(tags) if tags else "empty")
     if isinstance(t, QExceptionType):
         return "QException"
     if isinstance(t, QOptionType):
@@ -171,7 +177,7 @@ def qtype_to_c_type(t: QType, ctx: Optional[RecordNamingContext] = None) -> str:
     if isinstance(t, QArrayType):
         return "QArray *"
     if isinstance(t, QVariantType):
-        return "QVariant *"
+        return "QVariantVal"
     if isinstance(t, QExceptionType):
         return "const QException *"
     if isinstance(t, QOptionType):
@@ -248,8 +254,10 @@ def qval_wrap(expr_str: str, t: QType) -> str:
         return f"((QVal){{ .r = (double)({expr_str}) }})"
     if isinstance(t, QRecordType):
         return f"((QVal){{ .p = (void *)quest_record_box({expr_str}) }})"
+    if isinstance(t, QVariantType):
+        return f"((QVal){{ .p = (void *)quest_variant_box({expr_str}) }})"
     if t == STRING_TYPE or isinstance(
-        t, (QTupleType, QFunType, QAllType, QArrayType, QVariantType, QOptionType, QExceptionType)
+        t, (QTupleType, QFunType, QAllType, QArrayType, QOptionType, QExceptionType)
     ):
         return f"((QVal){{ .p = (void *)({expr_str}) }})"
     return f"((QVal){{ .u = 0 }})"
@@ -269,6 +277,8 @@ def qval_unwrap(qval_expr: str, t: QType, ctx: Optional[RecordNamingContext] = N
         return "((void)0)"
     if isinstance(t, QRecordType):
         return f"(*((QRecordVal *)({qval_expr}.p)))"
+    if isinstance(t, QVariantType):
+        return f"(*((QVariantVal *)({qval_expr}.p)))"
     c_t = qtype_to_c_type(t, ctx)
     return f"(({c_t})({qval_expr}.p))"
 

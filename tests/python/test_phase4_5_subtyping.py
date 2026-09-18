@@ -244,8 +244,8 @@ class TestPhase45Subtyping(unittest.TestCase):
         self.assertEqual(proc.returncode, 0)
         self.assertIn("10 : Int", proc.stdout)
 
-    def test_variant_storage_in_tuple_rejected(self):
-        """Verifies that storing subtyped variants in aggregates produces a diagnostic."""
+    def test_variant_storage_in_tuple_accepted(self):
+        """Verifies that storing subtyped variants in tuples works via tag remapping."""
         code = """
         Let Small = Variant
             a: Int
@@ -257,22 +257,18 @@ class TestPhase45Subtyping(unittest.TestCase):
         Let Cont = Tuple
             v: Large
         end;
-        let s = variant a of Small with 1 end;
+        let s = variant a of Small with 42 end;
         let c: Cont = tuple
             let v = s
         end;
-        1
+        case c.v
+            when a with val: Int then val
+            else 0
+        end
         """
-        pipeline = compile_pipeline()
-        res = pipeline.execute(code, "<test>")
-        self.assertFalse(res.success)
-        self.assertTrue(
-            any(
-                "Subtyped variant storage in aggregates requires runtime descriptors" in d.message
-                for d in res.diagnostics
-            ),
-            f"Expected error diagnostic not found in {res.diagnostics}"
-        )
+        proc = self.compile_quest(code)
+        self.assertEqual(proc.returncode, 0)
+        self.assertIn("42 : Int", proc.stdout)
 
 
 if __name__ == "__main__":

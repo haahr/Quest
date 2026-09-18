@@ -15,8 +15,8 @@ These representations are designed to be shared directly with the **Step 6: Nati
 2. **Recommended Synthesis for Aggregates:**
    - Specific, typed C `struct` definitions for concrete, statically-known types (enabling natural field access and
      seamless debugger inspection in `lldb` and `gdb`).
-   - Binary layout compatibility with uniform generic representations (`QVal[]`, `QVariant`), ensuring zero-cost
-     coercions for prefix tuple subtyping, evidence-passing record subtyping, and global variant tag dispatch.
+   - Binary layout compatibility with uniform generic representations (`QVal[]`, `QVariantVal`), ensuring zero-cost
+     coercions for prefix tuple subtyping, evidence-passing record subtyping, and static variant tag remapping.
 3. **Clean Identifier Namespacing:** Use prefix tags (`qv_`, `QT_`, `QK_`) to prevent collisions with C keywords and
    standard library symbols.
 4. **Human-Readable Operator Mangling:** Map symbolic operators to descriptive English names
@@ -276,7 +276,11 @@ As established in `docs/runtime-design.md`, Quest uses the **Evidence Passing** 
      }
      ```
      Array indexing unwraps `(*((QRecordVal *)arr->data[idx].p))` transparently back into `QRecordVal`.
-   - Storing subtyped variants in aggregates produces a compile-time diagnostic requiring runtime descriptors.
+   - Subtyped variants in aggregates (`Array`, `Tuple`) are stored via insertion-time tag remapping:
+     when inserting into an aggregate expecting a super-variant type, the compiler upcasts the variant via a
+     zero-allocation compound literal with its tag mapped through the static `tagmap_<Target>_<Source>[]` table.
+     In `Tuple`, the 16-byte `QVariantVal` is stored inline. In `QArray`, it is boxed into `QVal.p` via
+     `quest_variant_box`.
 
 ### 5.3. Options and Variants (Sums)
 
@@ -347,32 +351,41 @@ typedef struct QT_T {
   }
   ```
 
-#### 2. Variant Types (Unordered, Single 64-bit Payload, Evidence-Passing)
+#### 2. Variant Types (Unordered, First-Class 16-Byte `QVariantVal`, Zero-Allocation Tag Remapping)
 Unlike options, variants are unordered and each branch has **exactly one type** $A_i$ (§6.3):
 ```quest
 Variant x1:A1 .. xn:An end
 variant x of A with a end
 ```
 If a branch requires no payload value, it uses the unit type `Ok` (`Variant mon,tue:Ok end`). Thus, every variant
-payload is always **exactly one 64-bit word** (`QVal`):
+payload is always **exactly one 64-bit word** (`QVal`). Variants are first-class unboxed values represented by
+the 16-byte structure `QVariantVal`:
 ```c
-typedef struct QVariant {
-    const void *descriptor; /* Object header / runtime type descriptor (8 bytes, descriptor = NULL) */
-    int64_t     tag;        /* Local dense tag index (0, 1, ...) */
-    QVal        payload;    /* Exactly one 64-bit word */
-} QVariant;
+typedef struct QVariantVal {
+    int64_t tag;        /* Local dense tag index (0, 1, ...) */
+    QVal    payload;    /* Exactly one 64-bit word */
+} QVariantVal;
 
-static_assert(sizeof(QVariant) == 24, qvariant_must_be_24_bytes);
-static_assert(offsetof(QVariant, payload) == 16, qvariant_payload_at_offset_16);
+static_assert(sizeof(QVariantVal) == 16, qvariantval_must_be_16_bytes);
+static_assert(offsetof(QVariantVal, tag) == 0, qvariantval_tag_at_offset_0);
+static_assert(offsetof(QVariantVal, payload) == 8, qvariantval_payload_at_offset_8);
 ```
+- **Zero-Allocation Construction & Operations:** Local variants, function parameters, returns, and variable
+  bindings use `QVariantVal` directly by value. Variant construction `variant x of V with a end`, checks `v?x`,
+  assertions `v!x`, and `case` pattern matching require **zero heap allocations**.
 - **Static Tag Remapping Dictionaries (`.rodata`):** When a variant is upcast across an unordered subtyping boundary,
-  the compiler emits a static lookup table `static const int64_t tagmap_<Target>_<Source>[]`:
+  the compiler emits a static lookup table `static const int64_t tagmap_<Target>_<Source>[]` in `.rodata`, and
+  performs a zero-allocation upcast by returning an unboxed compound literal:
   ```c
-  QVariant *tmp = (QVariant *)quest_alloc(sizeof(QVariant));
-  tmp->descriptor = NULL;
-  tmp->tag = tagmap_Large_Small[src->tag];
-  tmp->payload = src->payload;
+  (QVariantVal){ .tag = tagmap_Large_Small[src.tag], .payload = src.payload }
   ```
+- **Aggregate Storage:** Storing a subtyped variant into an aggregate (`Array` or `Tuple`) applies the static
+  `tagmap` remapping at insertion time. In `Tuple`, `QVariantVal` is stored inline (16 bytes). In `Array`, it is
+  boxed into an 8-byte pointer (`QVariantVal *`) via `quest_variant_box`, setting the stage for future flat stride
+  arrays. Reading from aggregates accesses values whose tags are pre-aligned to the supertype's tag space,
+  allowing normal, zero-cost dynamic tag dispatch on extraction and `case` expressions.
+- **Polymorphic Contexts:** When passed to unbounded polymorphic functions (`All(A::TYPE)`), `QVariantVal` is
+  boxed via `quest_variant_box(v)` into `QVal.p` and unboxed via `(*((QVariantVal *)qval.p))`.
 - **Specialization:** Eliminated entirely when the variant type is statically known.
 
 ### 5.4. Arrays
