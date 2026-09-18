@@ -57,6 +57,19 @@ typedef struct QVariantVal {
   Extracting from aggregates accesses values whose tags are pre-aligned to the supertype's tag space, allowing
   direct `switch (v.tag)` matching without runtime descriptor overhead.
 
+### Bounded Specialization for Records & Variants (`A <: Record`, `V <: Variant`)
+
+- **Descriptor Retention:** Bounded polymorphic functions retain `const QTypeDescriptor *descriptor_<T>` parameters in
+  their C signatures to support separate compilation and uniform reflection across translation units.
+- **Bounded Records (`A <: Record`):** Functions take `QRecordVal` fat pointers directly. When passing a subtype
+  $S <: T$, the caller pairs the payload with the subtyping offset dictionary (`&offsetdict_T_S`). Inside the callee,
+  field accesses dynamically evaluate offsets from `p.dict`. When returning a bounded type variable $A$, the caller
+  restores the dictionary (`Option A: Caller Restores Dictionary`), attaching the concrete subtype's identity dictionary
+  `&offsetdict_S_S` to the returned `.val`.
+- **Bounded Variants (`V <: Variant`):** Functions take unboxed `QVariantVal` directly. Callers perform call-site tag
+  alignment to the bound variant type using static `.rodata` tag tables. Callees dispatch directly on `v.tag` without
+  runtime translation or heap allocation.
+
 ---
 
 ## 2. Architecture & Design Tradeoffs

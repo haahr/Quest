@@ -269,6 +269,7 @@ def _build_curried_field_sig(
                         else getattr(sig, "bound", ast.KindType(offset=colon_token.offset))
                     ),
                     mode=getattr(sig, "mode", ast.ParamMode.VALUE),
+                    is_type=isinstance(sig, ast.TypeFormal),
                     offset=getattr(sig, "offset", colon_token.offset),
                 )
                 for sig in grp_sigs
@@ -360,6 +361,7 @@ def _build_curried_value_decl(
                             else getattr(sig, "bound", ast.KindType(offset=ident_token.offset))
                         ),
                         mode=getattr(sig, "mode", ast.ParamMode.VALUE),
+                        is_type=isinstance(sig, ast.TypeFormal),
                         offset=getattr(sig, "offset", ident_token.offset),
                     )
                     for sig in grp_sigs
@@ -569,6 +571,7 @@ def build_quest_grammar() -> None:
                         )
                     ),
                     mode=getattr(sig, "mode", ast.ParamMode.VALUE),
+                    is_type=isinstance(sig, ast.TypeFormal),
                     offset=getattr(sig, "offset", left_paren.offset),
                 )
                 for sig in signatures

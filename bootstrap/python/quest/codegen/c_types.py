@@ -24,6 +24,8 @@ from quest.types import (
     QTypeVar,
     QVariantField,
     QVariantType,
+    resolve_record_bound,
+    resolve_variant_bound,
 )
 
 
@@ -170,13 +172,13 @@ def qtype_to_c_type(t: QType, ctx: Optional[RecordNamingContext] = None) -> str:
         return "QDynamic *"
     if isinstance(t, QTupleType):
         return f"{tuple_struct_name(t)} *"
-    if isinstance(t, QRecordType):
+    if isinstance(t, QRecordType) or resolve_record_bound(t) is not None:
         return "QRecordVal"
     if isinstance(t, (QFunType, QAllType)):
         return "QClosure *"
     if isinstance(t, QArrayType):
         return "QArray *"
-    if isinstance(t, QVariantType):
+    if isinstance(t, QVariantType) or resolve_variant_bound(t) is not None:
         return "QVariantVal"
     if isinstance(t, QExceptionType):
         return "const QException *"
@@ -246,16 +248,16 @@ def qval_wrap(expr_str: str, t: QType) -> str:
     """Wraps a scalar or pointer expression into a QVal union initializer."""
     if t == DYNAMIC_TYPE or (isinstance(t, QTypeVar) and t.name == "Dynamic.T"):
         return f"((QVal){{ .p = (void *)({expr_str}) }})"
+    if resolve_record_bound(t) is not None:
+        return f"((QVal){{ .p = (void *)quest_record_box({expr_str}) }})"
+    if resolve_variant_bound(t) is not None:
+        return f"((QVal){{ .p = (void *)quest_variant_box({expr_str}) }})"
     if isinstance(t, QTypeVar):
         return expr_str
     if t == INT_TYPE or t == BOOL_TYPE or t == CHAR_TYPE:
         return f"((QVal){{ .i = (int64_t)({expr_str}) }})"
     if t == REAL_TYPE:
         return f"((QVal){{ .r = (double)({expr_str}) }})"
-    if isinstance(t, QRecordType):
-        return f"((QVal){{ .p = (void *)quest_record_box({expr_str}) }})"
-    if isinstance(t, QVariantType):
-        return f"((QVal){{ .p = (void *)quest_variant_box({expr_str}) }})"
     if t == STRING_TYPE or isinstance(
         t, (QTupleType, QFunType, QAllType, QArrayType, QOptionType, QExceptionType)
     ):
@@ -267,6 +269,10 @@ def qval_unwrap(qval_expr: str, t: QType, ctx: Optional[RecordNamingContext] = N
     """Extracts the underlying concrete scalar or pointer from a QVal expression."""
     if t == DYNAMIC_TYPE or (isinstance(t, QTypeVar) and t.name == "Dynamic.T"):
         return f"((QDynamic *)({qval_expr}.p))"
+    if resolve_record_bound(t) is not None:
+        return f"(*((QRecordVal *)({qval_expr}.p)))"
+    if resolve_variant_bound(t) is not None:
+        return f"(*((QVariantVal *)({qval_expr}.p)))"
     if isinstance(t, QTypeVar):
         return qval_expr
     if t in (INT_TYPE, BOOL_TYPE, CHAR_TYPE):
@@ -275,10 +281,6 @@ def qval_unwrap(qval_expr: str, t: QType, ctx: Optional[RecordNamingContext] = N
         return f"({qval_expr}.r)"
     if t == OK_TYPE:
         return "((void)0)"
-    if isinstance(t, QRecordType):
-        return f"(*((QRecordVal *)({qval_expr}.p)))"
-    if isinstance(t, QVariantType):
-        return f"(*((QVariantVal *)({qval_expr}.p)))"
     c_t = qtype_to_c_type(t, ctx)
     return f"(({c_t})({qval_expr}.p))"
 

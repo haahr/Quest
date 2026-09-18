@@ -45,6 +45,7 @@ class Quantifier(ASTNode):
     name: str
     bound: Kind
     mode: ParamMode = ParamMode.VALUE
+    is_type: bool = False
 
 
 # ============================================================================

@@ -303,7 +303,18 @@ Option types provide ordered sum types with ordinal reflection and extraction (C
     branch signatures trigger a compile-time `TypeError`.
   - Checks the payload binding against the common branch signature.
 
-### 6.9. Function Signatures and Recursive Bindings (`let rec`)
+### 6.9. Bounded Quantifiers and Type Variables
+Universal quantifiers can be bounded by power kinds (`A <: Bound`, represented semantically as `QPowerKind(Bound)`):
+- **Bounded Record Type Variables:** When $A <: \text{Record}$, selecting a field `p.x` where $p: A$ succeeds if the
+  bound record type declares $x$, synthesizing $x$'s field type. Assigning to a mutable field `p.x := v` is permitted
+  when $x$ is declared `var`.
+- **Bounded Variant Type Variables:** When $V <: \text{Variant}$, checking `v?tag`, extracting `v!tag`, and pattern
+  matching `case v ... end` inspect the bound variant type to validate variant tags and payload types.
+- **Subkinding and Type Argument Inference:** When instantiating a bounded quantifier implicitly or explicitly, type
+  arguments are validated against the upper bound via `is_subkind(POWER(Actual), POWER(Bound)) <=> Actual <: Bound`.
+  Unconstrained bounded type variables default to their upper bound rather than `Int`.
+
+### 6.10. Function Signatures and Recursive Bindings (`let rec`)
 - **Explicit Parameter Types:** Function parameters are syntactically signatures ($S$). In Quest, every value
   parameter in a signature must provide an explicit type annotation (`x: Int` or `: Int`); parameter types are
   not inferred from usage (Cardelli, *The Quest Language and System* §4).

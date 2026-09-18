@@ -106,6 +106,8 @@ from quest.types import (
     QType,
     QTypeVar,
     QVariantType,
+    resolve_record_bound,
+    resolve_variant_bound,
 )
 
 
@@ -311,6 +313,10 @@ class CEmitter:
             ret_val = self.emit_val(body, fn_lines)
             coerced = self._coerce_record_val(ret_val, body, ret_type)
             fn_lines.append(f"return {coerced};")
+        elif (rec_bound := resolve_record_bound(ret_type)) is not None:
+            ret_val = self.emit_val(body, fn_lines)
+            coerced = self._coerce_record_val(ret_val, body, rec_bound)
+            fn_lines.append(f"return {coerced};")
         elif (
             isinstance(ret_type, QTupleType)
             and isinstance(body.type_val, QTupleType)
@@ -327,6 +333,16 @@ class CEmitter:
             ret_val = self.emit_val(body, fn_lines)
             tmp_v = self._emit_variant_upcast(ret_val, body.type_val, ret_type, fn_lines)
             fn_lines.append(f"return {tmp_v};")
+        elif (var_bound := resolve_variant_bound(ret_type)) is not None:
+            ret_val = self.emit_val(body, fn_lines)
+            if isinstance(body.type_val, QVariantType) and body.type_val != var_bound:
+                tmp_v = self._emit_variant_upcast(ret_val, body.type_val, var_bound, fn_lines)
+                fn_lines.append(f"return {tmp_v};")
+            else:
+                fn_lines.append(f"return {ret_val};")
+        elif isinstance(ret_type, QTypeVar):
+            ret_val = self.emit_val(body, fn_lines)
+            fn_lines.append(f"return {_qval_wrap(ret_val, body.type_val)};")
         else:
             ret_val = self.emit_val(body, fn_lines)
             fn_lines.append(f"return {ret_val};")
@@ -336,6 +352,8 @@ class CEmitter:
         c_a = self.emit_val(actual_a, lines)
         if isinstance(formal_t, QRecordType):
             return self._coerce_record_val(c_a, actual_a, formal_t)
+        elif (rec_bound := resolve_record_bound(formal_t)) is not None:
+            return self._coerce_record_val(c_a, actual_a, rec_bound)
         elif (
             isinstance(formal_t, QTupleType)
             and isinstance(actual_a.type_val, QTupleType)
@@ -349,6 +367,10 @@ class CEmitter:
             and actual_a.type_val != formal_t
         ):
             return self._emit_variant_upcast(c_a, actual_a.type_val, formal_t, lines)
+        elif (var_bound := resolve_variant_bound(formal_t)) is not None:
+            if isinstance(actual_a.type_val, QVariantType) and actual_a.type_val != var_bound:
+                return self._emit_variant_upcast(c_a, actual_a.type_val, var_bound, lines)
+            return c_a
         elif isinstance(formal_t, QTypeVar):
             return _qval_wrap(c_a, actual_a.type_val)
         else:
@@ -922,16 +944,22 @@ class CEmitter:
 
             case TypedVariantCheck(target=tgt, tag=tag):
                 c_tgt = self.emit_val(tgt, lines)
-                tag_idx = self._tag_index(tgt.type_val, tag)
-                if isinstance(tgt.type_val, QVariantType):
+                target_t = tgt.type_val
+                if (var_bound := resolve_variant_bound(target_t)) is not None:
+                    target_t = var_bound
+                tag_idx = self._tag_index(target_t, tag)
+                if isinstance(target_t, QVariantType):
                     return f"({c_tgt}.tag == {tag_idx}LL)"
                 return f"({c_tgt}->tag == {tag_idx}LL)"
 
             case TypedVariantAssert(target=tgt, tag=tag):
                 c_tgt = self.emit_val(tgt, lines)
-                tag_idx = self._tag_index(tgt.type_val, tag)
-                if isinstance(tgt.type_val, QOptionType):
-                    opt_field = tgt.type_val.get_option(tag) if tag is not None else None
+                target_t = tgt.type_val
+                if (var_bound := resolve_variant_bound(target_t)) is not None:
+                    target_t = var_bound
+                tag_idx = self._tag_index(target_t, tag)
+                if isinstance(target_t, QOptionType):
+                    opt_field = target_t.get_option(tag) if tag is not None else None
                     lines.append(f"if ({c_tgt}->tag != {tag_idx}LL) quest_raise_variant_error();")
                     tup_type = expr.type_val
                     tup_struct = tuple_struct_name(tup_type)
@@ -949,7 +977,7 @@ class CEmitter:
                         else:
                             lines.append(f"{res_tmp}->_1 = {c_tgt}->u.{tag}.val;")
                     return res_tmp
-                elif isinstance(tgt.type_val, QVariantType):
+                elif isinstance(target_t, QVariantType):
                     if not c_tgt.isidentifier():
                         tmp_v = self.fresh_tmp("_vtgt")
                         lines.append(f"QVariantVal {tmp_v} = {c_tgt};")
@@ -985,6 +1013,10 @@ class CEmitter:
                     return self._emit_record_field_access(
                         c_tgt, tgt.type_val, fld, expr.type_val, lines, as_ref=False
                     )
+                elif (rec_bound := resolve_record_bound(tgt.type_val)) is not None:
+                    return self._emit_record_field_access(
+                        c_tgt, rec_bound, fld, expr.type_val, lines, as_ref=False
+                    )
                 else:
                     return f"{c_tgt}->qf_{fld}"
 
@@ -996,6 +1028,10 @@ class CEmitter:
                 elif isinstance(tgt.type_val, QRecordType):
                     return self._emit_record_field_access(
                         c_tgt, tgt.type_val, fld, expr.type_val, lines, as_ref=True
+                    )
+                elif (rec_bound := resolve_record_bound(tgt.type_val)) is not None:
+                    return self._emit_record_field_access(
+                        c_tgt, rec_bound, fld, expr.type_val, lines, as_ref=True
                     )
                 else:
                     return f"(&({c_tgt}->qf_{fld}))"
@@ -1097,7 +1133,21 @@ class CEmitter:
                     args_str = ", ".join(c_args)
                     call_str = f"{c_func}({args_str})"
                     if isinstance(ret_type, QTypeVar) and expr.type_val != ret_type:
-                        call_str = _qval_unwrap(call_str, expr.type_val, self)
+                        if (rec_bound := resolve_record_bound(ret_type)) is not None:
+                            if isinstance(expr.type_val, QRecordType):
+                                tmp_ret = self.fresh_tmp("_call_ret")
+                                lines.append(f"QRecordVal {tmp_ret} = {call_str};")
+                                d_name = self.record_ctx.offset_dict_instance_name(
+                                    expr.type_val, expr.type_val
+                                )
+                                call_str = (
+                                    f"((QRecordVal){{ .val = {tmp_ret}.val, "
+                                    f".dict = (const void *)&{d_name} }})"
+                                )
+                        elif resolve_variant_bound(ret_type) is not None:
+                            pass
+                        else:
+                            call_str = _qval_unwrap(call_str, expr.type_val, self)
                     if expr.type_val == OK_TYPE:
                         lines.append(f"{call_str};")
                         return "((void)0)"
@@ -1118,7 +1168,21 @@ class CEmitter:
                     call_str = f"(({fn_ptr_t})({clos_val}->fn))({args_str})"
                     formal_ret = inner_formal.result_type if isinstance(inner_formal, QFunType) else None
                     if isinstance(formal_ret, QTypeVar) and expr.type_val != formal_ret:
-                        call_str = _qval_unwrap(call_str, expr.type_val, self)
+                        if (rec_bound := resolve_record_bound(formal_ret)) is not None:
+                            if isinstance(expr.type_val, QRecordType):
+                                tmp_ret = self.fresh_tmp("_call_ret")
+                                lines.append(f"QRecordVal {tmp_ret} = {call_str};")
+                                d_name = self.record_ctx.offset_dict_instance_name(
+                                    expr.type_val, expr.type_val
+                                )
+                                call_str = (
+                                    f"((QRecordVal){{ .val = {tmp_ret}.val, "
+                                    f".dict = (const void *)&{d_name} }})"
+                                )
+                        elif resolve_variant_bound(formal_ret) is not None:
+                            pass
+                        else:
+                            call_str = _qval_unwrap(call_str, expr.type_val, self)
                     if expr.type_val == OK_TYPE:
                         lines.append(f"{call_str};")
                         return "((void)0)"
@@ -1489,6 +1553,8 @@ class CEmitter:
             case TypedCase(target=tgt, branches=branches, else_branch=else_b, type_val=t):
                 c_tgt = self.emit_val(tgt, lines)
                 target_type = tgt.type_val
+                if (var_bound := resolve_variant_bound(target_type)) is not None:
+                    target_type = var_bound
                 if isinstance(target_type, QVariantType):
                     if not c_tgt.isidentifier():
                         tmp_tgt = self.fresh_tmp("_case_tgt")

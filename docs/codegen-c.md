@@ -496,6 +496,19 @@ Phase 4.5 implements Cardelli's structural subtyping across tuples, records, and
 - **Zero-Allocation Upcast:** Coercion emits an unboxed compound literal:
   `((QVariantVal){ .tag = tagmap_Large_Small[src.tag], .payload = src.payload })`.
 
+### 10.4. Bounded Specialization for Records and Variants
+- **Runtime Descriptor Retention:** Bounded polymorphic functions retain `const QTypeDescriptor *descriptor_<T>`
+  parameters in their C signatures to facilitate separate compilation and uniform reflection.
+- **Bounded Record Parameters & Field Selection:** Functions expecting `A <: Record` receive `QRecordVal` directly.
+  Field selection `p.x` dynamically indexes through the passed-in dictionary:
+  `((const OffsetDict_Bound *)p.dict)->offset_x`.
+- **Caller Dictionary Restoration on Return:** When returning a bounded type variable `A <: Record`, the caller
+  restores the dictionary (`Option A: Caller Restores Dictionary`), attaching the identity dictionary `&offsetdict_T_T`
+  of the concrete type argument `T` to the returned `.val`.
+- **Bounded Variant Parameters & Call-Site Tag Alignment:** Callers align variant tags to the bound variant type using
+  static `.rodata` tag tables into an unboxed compound literal, allowing callees to switch directly on `v.tag` without
+  runtime translation or heap allocation.
+
 ---
 
 ## 11. Host Compiler Runner (`compiler_runner.py`)
@@ -545,6 +558,8 @@ The C code generator is verified by comprehensive unit and integration tests:
   evidence dictionary passing through closures, uniform `QRecordVal` returns, and static variant tag remapping.
 - `tests/python/test_phase4_9_aggregate_subtyping.py`: Arrays of subtyped records, array repetition, element mutation,
   tuples with subtyped records, and passing aggregate record elements to functions.
+- `tests/python/test_phase4_10_bounded_specialization.py`: Bounded specialization for records and variants,
+  dynamic offset evaluation via evidence dictionaries, caller dictionary restoration, and call-site tag alignment.
 - `tests/source/01_lexer_basics.quest`: Verified end-to-end native compilation and execution of tuple operations.
 - `tests/source/02_expressions_control_flow.quest`: Verified end-to-end native compilation and execution.
 - `tests/source/03_functions_closures.quest`: Verified end-to-end native compilation and execution of closures.

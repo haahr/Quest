@@ -281,6 +281,17 @@ As established in `docs/runtime-design.md`, Quest uses the **Evidence Passing** 
      zero-allocation compound literal with its tag mapped through the static `tagmap_<Target>_<Source>[]` table.
      In `Tuple`, the 16-byte `QVariantVal` is stored inline. In `QArray`, it is boxed into `QVal.p` via
      `quest_variant_box`.
+ 6. **Bounded Specialization for Records (`A <: Record`):**
+    - **Descriptor Retention:** Bounded polymorphic functions retain `const QTypeDescriptor *descriptor_A` in their
+      C function signatures to support separate compilation and uniform reflection.
+    - **Uniform Fat Pointer Parameter Passing:** Parameters of bounded type `p: A` are passed as unboxed 16-byte
+      `QRecordVal` structs. At the call site, the caller coerces the concrete subtype argument to `A`'s bound by
+      attaching the appropriate static subtyping offset dictionary (`(const void *)&offsetdict_Bound_Actual`).
+    - **Dynamic Offset Evaluation:** Field access `p.x` inside the bounded function evaluates dynamic byte offsets
+      through the passed-in dictionary: `((const OffsetDict_Bound *)p.dict)->offset_x`.
+    - **Caller Dictionary Restoration on Return:** When a bounded function returns a bounded type variable `A` and the
+      caller receives it as concrete subtype `T`, the caller restores the dictionary (`Option A: Caller Restores
+      Dictionary`) by attaching `T`'s identity dictionary `&offsetdict_T_T` to the returned `.val`.
 
 ### 5.3. Options and Variants (Sums)
 
@@ -386,6 +397,14 @@ static_assert(offsetof(QVariantVal, payload) == 8, qvariantval_payload_at_offset
   allowing normal, zero-cost dynamic tag dispatch on extraction and `case` expressions.
 - **Polymorphic Contexts:** When passed to unbounded polymorphic functions (`All(A::TYPE)`), `QVariantVal` is
   boxed via `quest_variant_box(v)` into `QVal.p` and unboxed via `(*((QVariantVal *)qval.p))`.
+- **Bounded Specialization for Variants (`V <: Variant`):**
+  - **Descriptor Retention:** Bounded variant functions retain `const QTypeDescriptor *descriptor_V` in their C
+    function signature.
+  - **Call-Site Tag Alignment:** When invoking a function expecting `V <: BoundVariant`, the caller aligns the
+    variant's tag to `BoundVariant`'s tag space via the static `tagmap_Bound_Actual[]` table using an unboxed compound
+    literal `(QVariantVal){ .tag = tagmap[v.tag], .payload = v.payload }`.
+  - **Zero-Allocation Callee Dispatch:** Because tags are pre-aligned at call sites, the callee evaluates `case`, `?`,
+    and `!` directly on `v.tag` without runtime tag translation, dictionary lookups, or heap allocations.
 - **Specialization:** Eliminated entirely when the variant type is statically known.
 
 ### 5.4. Arrays

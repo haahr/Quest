@@ -1853,3 +1853,46 @@ INFIX_OPERATORS: dict[str, tuple[QType, QType, QType]] = {
     "\\/": (BOOL_TYPE, BOOL_TYPE, BOOL_TYPE),
 }
 
+
+def resolve_record_bound(t: QType, env: Optional[Any] = None) -> Optional[QRecordType]:
+    """Resolves upper bound for a type variable or path type if bounded by a record type."""
+    curr = t
+    visited = set()
+    while True:
+        curr_lazy = curr.evaluate_lazily(env) if env is not None else curr
+        if isinstance(curr_lazy, QRecordType):
+            return curr_lazy
+        if (
+            isinstance(curr_lazy, (QTypeVar, QAbstractType, QPathType))
+            and isinstance(curr_lazy.bound, QPowerKind)
+        ):
+            sym_id = getattr(curr_lazy, "symbol_id", id(curr_lazy))
+            if sym_id in visited:
+                return None
+            visited.add(sym_id)
+            curr = curr_lazy.bound.bound
+        else:
+            return None
+
+
+def resolve_variant_bound(t: QType, env: Optional[Any] = None) -> Optional[QVariantType]:
+    """Resolves upper bound for a type variable or path type if bounded by a variant type."""
+    curr = t
+    visited = set()
+    while True:
+        curr_lazy = curr.evaluate_lazily(env) if env is not None else curr
+        if isinstance(curr_lazy, QVariantType):
+            return curr_lazy
+        if (
+            isinstance(curr_lazy, (QTypeVar, QAbstractType, QPathType))
+            and isinstance(curr_lazy.bound, QPowerKind)
+        ):
+            sym_id = getattr(curr_lazy, "symbol_id", id(curr_lazy))
+            if sym_id in visited:
+                return None
+            visited.add(sym_id)
+            curr = curr_lazy.bound.bound
+        else:
+            return None
+
+

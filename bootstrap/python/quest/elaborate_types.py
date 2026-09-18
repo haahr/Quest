@@ -377,7 +377,13 @@ def elaborate_type(ast_type: ast.Type, env: Environment) -> QType:
                 val_params: list[QParam] = []
                 for q in quants_ast:
                     bound_kind = elaborate_kind(q.bound, env)
-                    if isinstance(bound_kind, QPowerKind):
+                    if getattr(q, "is_type", False):
+                        symbol_id = env.fresh_symbol_id()
+                        env.current_scope.declare_type(
+                            TypeSymbol(name=q.name, symbol_id=symbol_id, kind=bound_kind)
+                        )
+                        quants.append(QQuantifier(name=q.name, symbol_id=symbol_id, bound=bound_kind))
+                    elif isinstance(bound_kind, QPowerKind):
                         # Value formal parameter: x : T (represented via Power(T))
                         val_type = bound_kind.bound
                         is_var = getattr(q, "mode", ast.ParamMode.VALUE) == ast.ParamMode.VAR

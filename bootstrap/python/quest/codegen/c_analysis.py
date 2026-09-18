@@ -170,15 +170,31 @@ def collect_aggregate_types(
             visit_type(getattr(t, "element_type", None))
         elif hasattr(t, "inner_type"):
             visit_type(getattr(t, "inner_type", None))
+        if hasattr(t, "bound"):
+            bound = getattr(t, "bound")
+            if hasattr(bound, "bound"):
+                visit_type(getattr(bound, "bound"))
+        if hasattr(t, "quantifiers") and hasattr(t, "body"):
+            for q in getattr(t, "quantifiers", ()):
+                if hasattr(q, "bound") and hasattr(q.bound, "bound"):
+                    visit_type(getattr(q.bound, "bound"))
+            visit_type(getattr(t, "body", None))
 
     def visit_node(n: Any) -> None:
         if n is None:
             return
+        if isinstance(n, QType):
+            visit_type(n)
         if isinstance(n, TypedLetType) and n.symbol.definition is not None:
             if isinstance(n.symbol.definition, QRecordType):
                 ctx.register_alias(n.name, n.symbol.definition)
         if isinstance(n, TypedRecord):
-            concrete_t = QRecordType(fields=tuple(QRecordField(name=fld.name, type_val=fld.value.type_val, is_var=fld.is_var) for fld in n.fields))
+            concrete_t = QRecordType(
+                fields=tuple(
+                    QRecordField(name=fld.name, type_val=fld.value.type_val, is_var=fld.is_var)
+                    for fld in n.fields
+                )
+            )
             visit_type(concrete_t)
         if hasattr(n, "type_val") and isinstance(getattr(n, "type_val"), QType):
             visit_type(getattr(n, "type_val"))

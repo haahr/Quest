@@ -51,6 +51,8 @@ from quest.types import (
     is_subkind,
     is_subtype,
     is_type_equal,
+    resolve_record_bound,
+    resolve_variant_bound,
 )
 from quest.env import (
     Environment,
@@ -380,6 +382,7 @@ class TypeElaborator:
         tag: str,
         op_desc: str,
         offset: int,
+        env: Optional[Environment] = None,
     ) -> tuple[Optional[QType], bool]:
         """Resolves payload type and option flag for a tag on Variant or Option target types."""
         if isinstance(target_type, QVariantType):
@@ -398,6 +401,14 @@ class TypeElaborator:
                     offset=offset,
                 )
             return opt.payload_type, True
+        elif (var_bound := resolve_variant_bound(target_type, env)) is not None:
+            field = var_bound.get_variant(tag)
+            if field is None:
+                raise TypeError(
+                    f"Tag '{tag}' is not a valid variant of bound '{var_bound}'",
+                    offset=offset,
+                )
+            return field.type_val, False
         else:
             raise TypeError(
                 f"{op_desc} requires Variant or Option target, got '{target_type}'",
@@ -1083,7 +1094,16 @@ class TypeElaborator:
             meta = meta_map[q.symbol_id]
             solved = meta.prune()
             if solved is meta:
-                solved = INT_TYPE
+                if isinstance(q.bound, QPowerKind):
+                    solved = q.bound.bound
+                else:
+                    solved = INT_TYPE
+            elif isinstance(q.bound, QPowerKind):
+                if not is_subtype(solved, q.bound.bound, env):
+                    raise TypeError(
+                        f"Inferred type argument '{solved}' is not a subtype of bound '{q.bound.bound}'",
+                        offset=expr.offset,
+                    )
             resolved_targs.append(solved)
 
         final_subst = {q.symbol_id: resolved_targs[i] for i, q in enumerate(all_type.quantifiers)}
@@ -1388,6 +1408,15 @@ class TypeElaborator:
                     )
                 return TypedSelect(target=target_typed, field=expr.field, type_val=rec_f.type_val, offset=expr.offset)
 
+            case _ if (rec_bound := resolve_record_bound(target_type, env)) is not None:
+                rec_f = rec_bound.get_field(expr.field)
+                if rec_f is None:
+                    raise TypeError(
+                        f"Bounded record type '{target_type}' has no field named '{expr.field}'",
+                        offset=expr.offset,
+                    )
+                return TypedSelect(target=target_typed, field=expr.field, type_val=rec_f.type_val, offset=expr.offset)
+
             case QTupleType():
                 tup_f = target_type.get_field(expr.field)
                 if tup_f is None:
@@ -1583,7 +1612,7 @@ class TypeElaborator:
         target_typed = self.synth_expr(expr.target, env, loop_depth)
         target_type = target_typed.type_val.evaluate_lazily(env)
         self._resolve_variant_or_option_field(
-            target_type, expr.tag, "Variant query '?'", expr.offset
+            target_type, expr.tag, "Variant query '?'", expr.offset, env=env
         )
         return TypedVariantCheck(target=target_typed, tag=expr.tag, type_val=BOOL_TYPE, offset=expr.offset)
 
@@ -1596,7 +1625,7 @@ class TypeElaborator:
         target_typed = self.synth_expr(expr.target, env, loop_depth)
         target_type = target_typed.type_val.evaluate_lazily(env)
         payload_t, is_option = self._resolve_variant_or_option_field(
-            target_type, expr.tag, "Variant assertion '!'", expr.offset
+            target_type, expr.tag, "Variant assertion '!'", expr.offset, env=env
         )
         if not is_option:
             result_type = payload_t if payload_t is not None else OK_TYPE
@@ -1691,6 +1720,8 @@ class TypeElaborator:
             available_tags = {opt.name: opt.payload_type for opt in target_type.options}
         elif isinstance(target_type, QVariantType):
             available_tags = {var.name: var.type_val for var in target_type.variants}
+        elif (var_bound := resolve_variant_bound(target_type, env)) is not None:
+            available_tags = {var.name: var.type_val for var in var_bound.variants}
         else:
             raise TypeError(
                 f"Case target must have Option or Variant type, got '{target_type}'",
@@ -2304,12 +2335,13 @@ class TypeElaborator:
             case ast.ExprSelect(target=target, field=field, offset=sel_off):
                 target_typed = self.synth_expr(target, env, loop_depth)
                 target_type = target_typed.type_val.evaluate_lazily(env)
-                if not isinstance(target_type, QRecordType):
+                rec_bound = resolve_record_bound(target_type, env)
+                if rec_bound is None:
                     raise TypeError(
                         f"Cannot mutate field of non-record type '{target_type}'",
                         offset=sel_off,
                     )
-                rec_f = target_type.get_field(field)
+                rec_f = rec_bound.get_field(field)
                 if rec_f is None:
                     raise TypeError(
                         f"Record has no field '{field}'",
