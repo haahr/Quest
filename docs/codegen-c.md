@@ -509,6 +509,19 @@ Phase 4.5 implements Cardelli's structural subtyping across tuples, records, and
   static `.rodata` tag tables into an unboxed compound literal, allowing callees to switch directly on `v.tag` without
   runtime translation or heap allocation.
 
+### 10.5. Call-Site Specialization for Unbounded Quantifiers (Phase 4.11)
+When unbounded polymorphic functions (`All(A::TYPE)`) are invoked at call sites with concrete `Record` or `Variant`
+arguments:
+- **Specialization Analysis Pass (`c_analysis.py`):** Scans the AST worklist for call sites where type arguments
+  require specialization (`is_specialization_needed`). Clones the `TypedFun` node with substituted types, synthesizes
+  specialized identifier `qv_<name>_spec_<type_tags>`, and populates aggregate types from cloned bodies.
+- **Direct Calling Convention & Zero-Boxing:** Specialized function clones take unboxed `QRecordVal` and `QVariantVal`
+  parameters directly without descriptor parameters (unless uninstantiated quantifiers remain) and pass them in
+  register pairs `(x0, x1)` without heap boxing.
+- **Struct Layout Alignment:** Generic tuples within specialized clones instantiate concrete C structs
+  (`struct QTuple_<TypeTags>`) with 16-byte inline slots matching caller expectations, eliminating pointer mismatches.
+- **First-Class Fallback:** The canonical unspecialized `QVal` version is retained for indirect calls and closures.
+
 ---
 
 ## 11. Host Compiler Runner (`compiler_runner.py`)
@@ -560,6 +573,8 @@ The C code generator is verified by comprehensive unit and integration tests:
   tuples with subtyped records, and passing aggregate record elements to functions.
 - `tests/python/test_phase4_10_bounded_specialization.py`: Bounded specialization for records and variants,
   dynamic offset evaluation via evidence dictionaries, caller dictionary restoration, and call-site tag alignment.
+- `tests/python/test_phase4_11_callsite_specialization.py`: Call-site specialization for unbounded quantifiers,
+  unboxed QRecordVal/QVariantVal parameters and returns, generic tuple layout alignment, and scalar coexistence.
 - `tests/source/01_lexer_basics.quest`: Verified end-to-end native compilation and execution of tuple operations.
 - `tests/source/02_expressions_control_flow.quest`: Verified end-to-end native compilation and execution.
 - `tests/source/03_functions_closures.quest`: Verified end-to-end native compilation and execution of closures.

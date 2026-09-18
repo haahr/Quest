@@ -258,7 +258,7 @@ class CDeclarationEmitter:
                 )
                 decls, _ = self.param_signatures(fun.params, quants)
                 param_sig = "void" if not decls else ", ".join(decls)
-                lines.append(f"static {ret_c} {c_name}({param_sig});")
+                lines.append(f"static Q_UNUSED {ret_c} {c_name}({param_sig});")
             lines.append("")
 
         if lifted_lambdas:
@@ -277,14 +277,14 @@ class CDeclarationEmitter:
                 decls, _ = self.param_signatures(l.fun.params, quants)
                 param_sigs = ["void *_raw_env"] + decls
                 sig = ", ".join(param_sigs)
-                lines.append(f"static {ret_c} {l.c_fn_name}({sig});")
+                lines.append(f"static Q_UNUSED {ret_c} {l.c_fn_name}({sig});")
             lines.append("")
 
         non_capturing = [l for l in lifted_lambdas if not l.free_vars]
         if non_capturing:
             lines.append("/* Static closures for non-capturing lambdas */")
             for l in non_capturing:
-                lines.append(f"static QClosure {l.closure_var_name} = {{ (void *){l.c_fn_name}, NULL }};")
+                lines.append(f"static Q_UNUSED QClosure {l.closure_var_name} = {{ (void *){l.c_fn_name}, NULL }};")
             lines.append("")
 
         if val_referenced_top_funs:
@@ -304,7 +304,7 @@ class CDeclarationEmitter:
                 param_sigs = ["void *env"] + decls
                 sig = ", ".join(param_sigs)
                 args_str = ", ".join(forward_args)
-                lines.append(f"static {ret_c} {tramp_name}({sig}) {{")
+                lines.append(f"static Q_UNUSED {ret_c} {tramp_name}({sig}) {{")
                 lines.append("    (void)env;")
                 if ret_type == OK_TYPE:
                     lines.append(f"    {c_name}({args_str});")
@@ -312,6 +312,6 @@ class CDeclarationEmitter:
                 else:
                     lines.append(f"    return {c_name}({args_str});")
                 lines.append("}")
-                lines.append(f"static QClosure {c_name}_closure = {{ (void *){tramp_name}, NULL }};")
+                lines.append(f"static Q_UNUSED QClosure {c_name}_closure = {{ (void *){tramp_name}, NULL }};")
                 lines.append("")
         return lines

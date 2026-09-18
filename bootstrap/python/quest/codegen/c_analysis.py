@@ -16,8 +16,12 @@ from quest.typed_ast import (
     TypedLetType,
     TypedLetValue,
     TypedModule,
+    TypedNode,
+    TypedParam,
     TypedProgram,
     TypedRecord,
+    TypedSelect,
+    TypedTypeApp,
     TypedVar,
 )
 from quest.codegen.c_types import (
@@ -28,14 +32,23 @@ from quest.codegen.c_types import (
     option_struct_name,
     record_struct_name,
     tuple_struct_name,
+    type_to_c_tag,
 )
 from quest.types import (
+    QAllType,
+    QArrayType,
+    QFunType,
     QOptionType,
+    QParam,
+    QQuantifier,
     QRecordField,
     QRecordType,
     QTupleType,
     QType,
+    QTypeVar,
     QVariantType,
+    resolve_record_bound,
+    resolve_variant_bound,
 )
 
 
@@ -67,6 +80,7 @@ class CProgramAnalysis:
     lifted_lambdas: list[CLambdaInfo]
     lambda_info_by_id: dict[int, CLambdaInfo]
     top_funs_dict: dict[str, tuple[TypedFun, Any]]
+    specializations: dict[tuple[str, tuple[QType, ...]], tuple[str, TypedFun]]
 
 
 def topological_sort_modules(modules: list[TypedModule]) -> list[TypedModule]:
@@ -101,7 +115,10 @@ def find_val_referenced_top_funs(prog: TypedProgram, top_fun_names: set[str]) ->
             return
         match node:
             case TypedApp(func=f, args=args):
-                if isinstance(f, TypedVar) and f.name in top_fun_names:
+                effective_f = f
+                while isinstance(effective_f, TypedTypeApp):
+                    effective_f = effective_f.func
+                if isinstance(effective_f, TypedVar) and effective_f.name in top_fun_names:
                     for a in args:
                         scan(a)
                     return
@@ -121,6 +138,147 @@ def find_val_referenced_top_funs(prog: TypedProgram, top_fun_names: set[str]) ->
 
     scan(prog)
     return referenced
+
+
+def collect_fun_quantifiers(fun_type: QType) -> tuple[tuple[QQuantifier, ...], QType]:
+    """Extracts any universal quantifiers wrapping a function type."""
+    quants: tuple[QQuantifier, ...] = ()
+    curr = fun_type
+    while isinstance(curr, QAllType):
+        quants = quants + curr.quantifiers
+        curr = curr.body
+    return quants, curr
+
+
+def is_specialization_needed(t: QType) -> bool:
+    """Returns True if type t contains records or variants requiring call-site specialization."""
+    if isinstance(t, (QRecordType, QVariantType)):
+        return True
+    if resolve_record_bound(t) is not None or resolve_variant_bound(t) is not None:
+        return True
+    if isinstance(t, QTupleType):
+        return any(is_specialization_needed(f.type_val) for f in t.value_fields)
+    if isinstance(t, QArrayType):
+        return is_specialization_needed(t.element_type)
+    if isinstance(t, QOptionType):
+        return any(
+            is_specialization_needed(o.payload_type)
+            for o in t.options
+            if o.payload_type is not None
+        )
+    return False
+
+
+def substitute_typed_node(node: Any, subst: dict[int, QType]) -> Any:
+    """Clones a TypedNode AST replacing any QType references with subst."""
+    if node is None or isinstance(node, (int, float, str, bool)):
+        return node
+    if isinstance(node, QType):
+        return node.substitute(subst)
+    if isinstance(node, (list, tuple)):
+        return type(node)(substitute_typed_node(x, subst) for x in node)
+    if isinstance(node, TypedNode):
+        kwargs = {}
+        for f_name in node.__dataclass_fields__:
+            val = getattr(node, f_name)
+            kwargs[f_name] = substitute_typed_node(val, subst)
+        return type(node)(**kwargs)
+    return node
+
+
+def specialize_typed_fun(
+    name: str,
+    fun: TypedFun,
+    type_args: tuple[QType, ...],
+) -> tuple[str, TypedFun]:
+    """Clones a TypedFun substituting type parameters for call-site specialization."""
+    quants, inner_t = collect_fun_quantifiers(fun.type_val)
+    subst: dict[int, QType] = {}
+    instantiated_ids: set[int] = set()
+    quant_names: dict[str, QType] = {}
+    for q, targ in zip(quants, type_args):
+        subst[q.symbol_id] = targ
+        instantiated_ids.add(q.symbol_id)
+        quant_names[q.name] = targ
+
+    def collect_internal_type_vars(node: Any) -> None:
+        if isinstance(node, QTypeVar) and node.name in quant_names:
+            subst[node.symbol_id] = quant_names[node.name]
+        elif hasattr(node, "__dataclass_fields__"):
+            for f_name in node.__dataclass_fields__:
+                collect_internal_type_vars(getattr(node, f_name))
+        elif isinstance(node, (list, tuple)):
+            for item in node:
+                collect_internal_type_vars(item)
+
+    for p in fun.params:
+        collect_internal_type_vars(p)
+    collect_internal_type_vars(fun.body)
+
+    remaining_quants = tuple(
+        q.substitute(subst) for q in quants if q.symbol_id not in instantiated_ids
+    )
+    new_inner_t = inner_t.substitute(subst)
+    if remaining_quants:
+        new_type_val: QType = QAllType(quantifiers=remaining_quants, body=new_inner_t)
+    else:
+        new_type_val = new_inner_t
+
+    new_params = tuple(substitute_typed_node(p, subst) for p in fun.params)
+    new_body = substitute_typed_node(fun.body, subst)
+    cloned_fun = TypedFun(
+        params=new_params,
+        body=new_body,
+        type_val=new_type_val,
+        offset=fun.offset,
+    )
+    clean_name = name.replace(".", "_")
+    type_tags = "_".join(type_to_c_tag(t) for t in type_args)
+    spec_ident = f"{clean_name}_spec_{type_tags}"
+    return spec_ident, cloned_fun
+
+
+def find_specialization_calls(node: Any) -> list[tuple[str, tuple[QType, ...]]]:
+    """Finds all polymorphic function calls needing call-site specialization."""
+    calls: list[tuple[str, tuple[QType, ...]]] = []
+
+    def scan(n: Any) -> None:
+        if n is None:
+            return
+        match n:
+            case TypedApp(func=f, args=args):
+                effective_func = f
+                type_args: list[QType] = []
+                while isinstance(effective_func, TypedTypeApp):
+                    type_args = list(effective_func.type_args) + type_args
+                    effective_func = effective_func.func
+
+                func_name = None
+                if isinstance(effective_func, TypedVar):
+                    func_name = effective_func.name
+                elif (
+                    isinstance(effective_func, TypedSelect)
+                    and isinstance(effective_func.target, TypedVar)
+                ):
+                    func_name = f"{effective_func.target.name}.{effective_func.field}"
+
+                if func_name and type_args:
+                    if any(is_specialization_needed(t) for t in type_args):
+                        calls.append((func_name, tuple(type_args)))
+
+                scan(f)
+                for a in args:
+                    scan(a)
+            case _:
+                if isinstance(n, (list, tuple)):
+                    for item in n:
+                        scan(item)
+                elif hasattr(n, "__dataclass_fields__"):
+                    for field_name in n.__dataclass_fields__:
+                        scan(getattr(n, field_name))
+
+    scan(node)
+    return calls
 
 
 def collect_aggregate_types(
@@ -240,48 +398,7 @@ def analyze_program_for_c(
 
     sorted_modules = topological_sort_modules(list(all_module_map.values()))
 
-    # 1. Aggregate and variant types collection
-    agg_types, variant_types = collect_aggregate_types(prog, record_ctx)
-
-    for mod in sorted_modules:
-        for b in mod.bindings:
-            b_agg, b_var = collect_aggregate_types(b, record_ctx)
-            for item in b_agg:
-                if item not in agg_types:
-                    agg_types.append(item)
-            for v in b_var:
-                if v not in variant_types:
-                    variant_types.append(v)
-        mod_rec_t = BuiltinModuleRegistry._build_record_type_from_scope(mod.scope)
-        rec_tag = record_struct_name(mod_rec_t, record_ctx)
-        if not any(tag == rec_tag for tag, _ in agg_types):
-            agg_types.append((rec_tag, mod_rec_t))
-
-    all_records = [t for _, t in agg_types if isinstance(t, QRecordType)]
-    all_tuples = [t for _, t in agg_types if isinstance(t, QTupleType)]
-
-    # 2. Pre-populate all subtyping coercions
-    needed_dicts: set[tuple[QRecordType, QRecordType]] = set()
-    tuple_coercions: set[tuple[QTupleType, QTupleType]] = set()
-    variant_coercions: set[tuple[QVariantType, QVariantType]] = set()
-
-    for t in all_records:
-        needed_dicts.add((t, t))
-        for s in all_records:
-            if s != t and is_record_subtype(s, t):
-                needed_dicts.add((t, s))
-
-    for t in all_tuples:
-        for s in all_tuples:
-            if s != t and is_tuple_subtype(s, t):
-                tuple_coercions.add((t, s))
-
-    for t in variant_types:
-        for s in variant_types:
-            if s != t and is_variant_subtype(s, t):
-                variant_coercions.add((t, s))
-
-    # 3. Top-level phrases in prog
+    # 1. Top-level phrases in prog
     top_funs: list[tuple[str, TypedFun, Any]] = []
     top_vars: list[tuple[str, TypedExpr, Any]] = []
 
@@ -305,11 +422,93 @@ def analyze_program_for_c(
 
     top_fun_names = {name for name, _, _ in top_funs}
     top_var_names = {name for name, _, _ in top_vars}
-    top_names = top_fun_names | top_var_names
+    top_funs_dict = {name: (fun, sym) for name, fun, sym in top_funs}
 
+    # Index module functions for possible specialization
+    module_funs_dict: dict[str, tuple[TypedFun, Any]] = {}
+    for mod in sorted_modules:
+        clean_mod = mod.name.replace(".", "_")
+        for b in mod.bindings:
+            if isinstance(b, TypedLetValue) and isinstance(b.value, TypedFun):
+                module_funs_dict[f"{mod.name}.{b.name}"] = (b.value, b.symbol)
+                module_funs_dict[f"{clean_mod}.{b.name}"] = (b.value, b.symbol)
+
+    # 2. Call-site specialization discovery and synthesis
+    specializations: dict[tuple[str, tuple[QType, ...]], tuple[str, TypedFun]] = {}
+    worklist: list[Any] = list(prog.phrases)
+
+    while worklist:
+        curr_node = worklist.pop(0)
+        found_calls = find_specialization_calls(curr_node)
+        for fname, targs in found_calls:
+            spec_key = (fname, targs)
+            if spec_key in specializations:
+                continue
+            orig = top_funs_dict.get(fname) or module_funs_dict.get(fname)
+            if orig is None:
+                continue
+            orig_fun, orig_sym = orig
+            spec_ident, spec_fun = specialize_typed_fun(fname, orig_fun, targs)
+            specializations[spec_key] = (spec_ident, spec_fun)
+            top_funs.append((spec_ident, spec_fun, orig_sym))
+            top_funs_dict[spec_ident] = (spec_fun, orig_sym)
+            top_fun_names.add(spec_ident)
+            worklist.append(spec_fun)
+
+    # 3. Aggregate and variant types collection across prog and all specialized functions
+    agg_types, variant_types = collect_aggregate_types(prog, record_ctx)
+
+    for _, sfun, _ in top_funs:
+        s_agg, s_var = collect_aggregate_types(sfun, record_ctx)
+        for item in s_agg:
+            if item not in agg_types:
+                agg_types.append(item)
+        for v in s_var:
+            if v not in variant_types:
+                variant_types.append(v)
+
+    for mod in sorted_modules:
+        for b in mod.bindings:
+            b_agg, b_var = collect_aggregate_types(b, record_ctx)
+            for item in b_agg:
+                if item not in agg_types:
+                    agg_types.append(item)
+            for v in b_var:
+                if v not in variant_types:
+                    variant_types.append(v)
+        mod_rec_t = BuiltinModuleRegistry._build_record_type_from_scope(mod.scope)
+        rec_tag = record_struct_name(mod_rec_t, record_ctx)
+        if not any(tag == rec_tag for tag, _ in agg_types):
+            agg_types.append((rec_tag, mod_rec_t))
+
+    all_records = [t for _, t in agg_types if isinstance(t, QRecordType)]
+    all_tuples = [t for _, t in agg_types if isinstance(t, QTupleType)]
+
+    # 4. Pre-populate all subtyping coercions
+    needed_dicts: set[tuple[QRecordType, QRecordType]] = set()
+    tuple_coercions: set[tuple[QTupleType, QTupleType]] = set()
+    variant_coercions: set[tuple[QVariantType, QVariantType]] = set()
+
+    for t in all_records:
+        needed_dicts.add((t, t))
+        for s in all_records:
+            if s != t and is_record_subtype(s, t):
+                needed_dicts.add((t, s))
+
+    for t in all_tuples:
+        for s in all_tuples:
+            if s != t and is_tuple_subtype(s, t):
+                tuple_coercions.add((t, s))
+
+    for t in variant_types:
+        for s in variant_types:
+            if s != t and is_variant_subtype(s, t):
+                variant_coercions.add((t, s))
+
+    top_names = top_fun_names | top_var_names
     val_referenced_top_funs = find_val_referenced_top_funs(prog, top_fun_names)
 
-    # 4. Closures
+    # 5. Closures
     top_fun_objs = {id(f) for _, f, _ in top_funs}
     agnostic_lambdas = analyze_closures(prog, top_fun_objs, top_names)
 
@@ -331,7 +530,6 @@ def analyze_program_for_c(
         )
 
     lambda_info_by_id = {id(l.fun): l for l in lifted_lambdas}
-    top_funs_dict = {name: (fun, sym) for name, fun, sym in top_funs}
 
     return CProgramAnalysis(
         sorted_modules=sorted_modules,
@@ -348,4 +546,5 @@ def analyze_program_for_c(
         lifted_lambdas=lifted_lambdas,
         lambda_info_by_id=lambda_info_by_id,
         top_funs_dict=top_funs_dict,
+        specializations=specializations,
     )

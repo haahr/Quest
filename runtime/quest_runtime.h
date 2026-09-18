@@ -25,6 +25,12 @@
 #  define Q_THREAD_LOCAL
 #endif
 
+#if defined(__GNUC__) || defined(__clang__)
+#  define Q_UNUSED __attribute__((unused))
+#else
+#  define Q_UNUSED
+#endif
+
 /* Compile-time portable layout assertions */
 #define Q_ASSERT_CONCAT_(a, b) a##b
 #define Q_ASSERT_CONCAT(a, b)  Q_ASSERT_CONCAT_(a, b)

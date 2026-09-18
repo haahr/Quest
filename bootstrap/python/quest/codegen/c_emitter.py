@@ -153,6 +153,7 @@ class CEmitter:
         self.var_dict_names: dict[str, str] = {}
         self.top_funs_dict: dict[str, tuple[TypedFun, Any]] = {}
         self.in_scope_type_descriptors: dict[str, str] = {}
+        self.specializations: dict[tuple[str, tuple[QType, ...]], tuple[str, TypedFun]] = {}
 
     def c_type(self, t: QType) -> str:
         return qtype_to_c_type(t, self.record_ctx)
@@ -465,6 +466,7 @@ class CEmitter:
         self.lifted_lambdas = analysis.lifted_lambdas
         self.lambda_info_by_id = analysis.lambda_info_by_id
         self.top_funs_dict = analysis.top_funs_dict
+        self.specializations = analysis.specializations
 
         decl_emitter = CDeclarationEmitter(
             record_ctx=self.record_ctx,
@@ -515,7 +517,7 @@ class CEmitter:
                 ret_c = "void" if ret_type == OK_TYPE else self.c_type(ret_type)
                 decls, _ = self._param_signatures(params, quants)
                 param_sig = "void" if not decls else ", ".join(decls)
-                lines.append(f"static {ret_c} {c_name}({param_sig}) {{")
+                lines.append(f"static Q_UNUSED {ret_c} {c_name}({param_sig}) {{")
                 saved_descriptors = dict(self.in_scope_type_descriptors)
                 for q in quants:
                     self.in_scope_type_descriptors[q.name] = f"descriptor_{q.name}"
@@ -540,7 +542,7 @@ class CEmitter:
                 decls, _ = self._param_signatures(l.fun.params, quants)
                 param_sigs = ["void *_raw_env"] + decls
                 sig = ", ".join(param_sigs)
-                lines.append(f"static {ret_c} {l.c_fn_name}({sig}) {{")
+                lines.append(f"static Q_UNUSED {ret_c} {l.c_fn_name}({sig}) {{")
                 fn_lines = []
                 if l.free_vars:
                     fn_lines.append(f"{l.env_struct_name} *_env = ({l.env_struct_name} *)_raw_env;")
@@ -1123,7 +1125,38 @@ class CEmitter:
                 # Preceding descriptor arguments from type_args
                 descriptor_args = [self.c_type_descriptor(targ) for targ in type_args]
 
-                if isinstance(effective_func, TypedVar) and effective_func.name in self.top_fun_names:
+                spec_fname = (
+                    effective_func.name
+                    if isinstance(effective_func, TypedVar)
+                    else (
+                        f"{effective_func.target.name}.{effective_func.field}"
+                        if (
+                            isinstance(effective_func, TypedSelect)
+                            and isinstance(effective_func.target, TypedVar)
+                        )
+                        else None
+                    )
+                )
+                spec_entry = (
+                    self.specializations.get((spec_fname, tuple(type_args)))
+                    if spec_fname and type_args
+                    else None
+                )
+
+                if spec_entry is not None:
+                    spec_ident, spec_fun = spec_entry
+                    c_func = mangle_ident(spec_ident)
+                    spec_quants, formal_params, _, ret_type = self._collect_fun_params(spec_fun)
+                    c_args = [self.c_type_descriptor(q) for q in spec_quants]
+                    for formal_p, actual_a in zip(formal_params, args):
+                        c_args.append(self._emit_call_arg(formal_p.type_val, actual_a, lines))
+                    args_str = ", ".join(c_args)
+                    call_str = f"{c_func}({args_str})"
+                    if ret_type == OK_TYPE:
+                        lines.append(f"{call_str};")
+                        return "((void)0)"
+                    return call_str
+                elif isinstance(effective_func, TypedVar) and effective_func.name in self.top_fun_names:
                     c_func = mangle_ident(effective_func.name)
                     c_args = list(descriptor_args)
                     fun, _ = self.top_funs_dict[effective_func.name]

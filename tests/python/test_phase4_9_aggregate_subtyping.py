@@ -450,7 +450,7 @@ class TestPhase49AggregateSubtyping(unittest.TestCase):
         self.assertIn("52 : Int", proc.stdout)
 
     def test_variant_polymorphic_boxing(self):
-        """Tests that passing unboxed QVariantVal to a polymorphic function boxes into QVal and unboxes correctly."""
+        """Tests that passing unboxed QVariantVal to an opaque polymorphic closure boxes into QVal."""
         code = """
         Let Color = Variant
             red: Int
@@ -458,9 +458,10 @@ class TestPhase49AggregateSubtyping(unittest.TestCase):
         end;
 
         let id(A::TYPE a: A): A = a;
+        let clos = id;
 
         let c = variant red of Color with 123 end;
-        let boxedAndBack = id(:Color c);
+        let boxedAndBack = clos(:Color c);
 
         if boxedAndBack?red then
             boxedAndBack!red
@@ -474,7 +475,7 @@ class TestPhase49AggregateSubtyping(unittest.TestCase):
         c_code = res.artifacts.get("codegen_c")
         self.assertIsNotNone(c_code)
 
-        # Should box on call and unwrap on return
+        # Should box on opaque closure call and unwrap on return
         self.assertIn("quest_variant_box", c_code)
         self.assertIn("(*((QVariantVal *)", c_code)
 

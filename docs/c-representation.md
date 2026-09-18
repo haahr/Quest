@@ -515,10 +515,31 @@ In Cardelli's formal terminology (*Typeful Programming* §3 & §5), applying a p
    - Ground compounds emit a memoized, statically initialized compound descriptor `&quest_type_Array_Int`.
    - Open compounds involving type variables emit a call to an allocator helper `quest_make_array_descriptor(descriptor_X)`.
 
-#### 3. Optimization via Inlining and Partial Evaluation (Specialization)
-While the uniform quantifier rule guarantees modular separate compilation, it does not mandate runtime overhead when optimizations are enabled:
-- **Inlining:** When a polymorphic call site is inlined into the caller, the concrete type descriptor becomes statically known. If the inlined body does not perform dynamic inspection or packaging, the unused descriptor parameter is eliminated via dead-code elimination.
-- **Partial Evaluation with Respect to Types (Specialization):** Statically monomorphic call sites can be specialized for their concrete type arguments. Under partial evaluation, `id(:Int 42)` specializes to an unquantified function `id_Int(42)` where all descriptor references are resolved at compile time, generating unboxed, zero-overhead native code.
+#### 3. Call-Site Specialization for Unbounded Quantifiers (`A::TYPE`)
+While the uniform quantifier rule guarantees modular separate compilation with uniform 8-byte `QVal` representations,
+unbounded generic functions called with 16-byte record fat pointers (`QRecordVal`) or 16-byte unboxed variants
+(`QVariantVal`) undergo **Selective Call-Site Specialization**:
+- **Selective Trigger**: Specialization is only synthesized when at least one concrete type argument involves a
+  `Record`, `Variant`, or aggregate containing them. Calls with standard 8-byte types (`Int`, `Bool`, `String`)
+  continue executing via the canonical uniform `QVal` implementation without code bloat.
+- **Typed AST Cloning & Type Substitution**: When `c_analysis.py` encounters a call site `f(:Point, p)`, the compiler
+  clones the `TypedFun` AST node with all occurrences of type parameter `A` substituted by `Point`. The specialized
+  clone is emitted as `static Q_UNUSED ret_t qv_<name>_spec_<type_tags>(param_types...)`.
+- **Layout Alignment & Zero-Boxing**: Inside the specialized clone, any generic tuple (e.g. `Tuple item: A end`)
+  allocates a concrete specialized struct (`struct QTuple_QRecord_x_Int` with a 16-byte `QRecordVal` slot) matching the
+  exact struct and layout expected by the caller. Arguments and return values are passed unboxed in register pairs
+  `(x0, x1)` without heap allocation (`quest_record_box` and `quest_variant_box` eliminated).
+- **First-Class Fallback**: The canonical boxed (`QVal`) version of any generic function is always emitted to serve
+  indirect closure calls and first-class function values.
+
+#### 4. Optimization via Inlining and Partial Evaluation
+While the uniform quantifier rule guarantees modular separate compilation, it does not mandate runtime overhead when
+optimizations are enabled:
+- **Inlining:** When a polymorphic call site is inlined into the caller, the concrete type descriptor becomes statically
+  known. If the inlined body does not perform dynamic inspection or packaging, the unused descriptor parameter is
+  eliminated via dead-code elimination.
+- **Partial Evaluation with Respect to Types (Specialization):** Call sites with concrete type arguments can be
+  specialized at compile time, eliminating descriptor parameters and generating unboxed, zero-overhead native code.
 
 #### 4. Descriptor Structure and Memory Management
 Every type descriptor is an instance of `QTypeDescriptor`:
