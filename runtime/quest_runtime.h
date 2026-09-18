@@ -92,6 +92,17 @@ typedef struct QVariantVal {
     QVal    payload;
 } QVariantVal;
 
+/* Wide array representations: length-prefixed buffers of 16-byte elements */
+typedef struct QArrayWideRecord {
+    int64_t    length;
+    QRecordVal data[];
+} QArrayWideRecord;
+
+typedef struct QArrayWideVariant {
+    int64_t     length;
+    QVariantVal data[];
+} QArrayWideVariant;
+
 /* Legacy Variant representation: descriptor, tag and single 64-bit value word */
 typedef struct QVariant {
     const void *descriptor;
@@ -214,6 +225,8 @@ static_assert(sizeof(QException)    == 8, qexception_must_be_8_bytes);
 static_assert(sizeof(QExceptionState) == 16, qexception_state_must_be_16_bytes);
 static_assert(offsetof(QClosure, env) == 8, qclosure_env_at_offset_8);
 static_assert(offsetof(QArray, data)  == 8, qarray_data_at_offset_8);
+static_assert(offsetof(QArrayWideRecord, data)  == 8, qarray_wide_rec_data_at_offset_8);
+static_assert(offsetof(QArrayWideVariant, data) == 8, qarray_wide_var_data_at_offset_8);
 static_assert(offsetof(QVariant, tag)     == 8, qvariant_tag_at_offset_8);
 static_assert(offsetof(QVariant, payload) == 16, qvariant_payload_at_offset_16);
 static_assert(offsetof(QOptionHeader, fields) == 8, qoptionheader_fields_at_offset_8);
@@ -246,6 +259,8 @@ QString *quest_string_get_sub(const QString *s, int64_t start, int64_t len);
 void     quest_string_set_sub(QString *dest, int64_t dest_start, const QString *src, int64_t src_start, int64_t len);
 
 QArray  *quest_array_new(int64_t len, QVal init_val);
+QArrayWideRecord  *quest_array_new_wide_record(int64_t len, QRecordVal init_val);
+QArrayWideVariant *quest_array_new_wide_variant(int64_t len, QVariantVal init_val);
 double   quest_real_pow(double base, double exp);
 const QException *quest_alloc_exception(const char *name);
 void     quest_raise(const QException *exc, QVal payload);
@@ -275,7 +290,8 @@ static inline QVariantVal *quest_variant_box(QVariantVal var) {
     return box;
 }
 
-static inline void quest_check_array_bounds(const QArray *a, int64_t idx) {
+static inline void quest_check_array_bounds(const void *arr_ptr, int64_t idx) {
+    const QArray *a = (const QArray *)arr_ptr;
     if (a == NULL || idx < 0 || idx >= a->length) {
         quest_raise_array_error();
     }

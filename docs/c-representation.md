@@ -266,21 +266,15 @@ As established in `docs/runtime-design.md`, Quest uses the **Evidence Passing** 
      ```
 5. **Storage in Aggregates:**
    - **Tuples:** Tuple fields of record type store `QRecordVal` inline (16 bytes).
-   - **Arrays:** In `QArray` (where slots are uniform 8-byte `QVal` words), `QRecordVal` is boxed into an 8-byte heap
-     pointer (`QRecordVal *`) via `quest_record_box`:
-     ```c
-     static inline QRecordVal *quest_record_box(QRecordVal rec) {
-         QRecordVal *box = (QRecordVal *)GC_MALLOC(sizeof(QRecordVal));
-         *box = rec;
-         return box;
-     }
-     ```
-     Array indexing unwraps `(*((QRecordVal *)arr->data[idx].p))` transparently back into `QRecordVal`.
-   - Subtyped variants in aggregates (`Array`, `Tuple`) are stored via insertion-time tag remapping:
-     when inserting into an aggregate expecting a super-variant type, the compiler upcasts the variant via a
-     zero-allocation compound literal with its tag mapped through the static `tagmap_<Target>_<Source>[]` table.
-     In `Tuple`, the 16-byte `QVariantVal` is stored inline. In `QArray`, it is boxed into `QVal.p` via
-     `quest_variant_box`.
+   - **Flat Stride Arrays:** `Array(Record)` and `Array(Variant)` store 16-byte elements directly in contiguous
+     memory without individual heap boxing using specialized wide array structures (`QArrayWideRecord` and
+     `QArrayWideVariant`). Reading (`arr[i]`) and writing (`arr[i] := val`) operate directly on 16-byte slots
+     in-place. Subtyping coercion (dictionary attachment for records, static tag remapping for variants) is
+     applied at insertion time and stored flat.
+   - **Unspecialized Generic Arrays:** When arrays are manipulated through unspecialized first-class polymorphic
+     closures (`Array(A)` with erased uniform representation), slots use 8-byte `QVal` words in `QArray`,
+     boxing wide elements via `quest_record_box` / `quest_variant_box`. Concrete arrays are specialized to flat
+     stride buffers.
  6. **Bounded Specialization for Records (`A <: Record`):**
     - **Descriptor Retention:** Bounded polymorphic functions retain `const QTypeDescriptor *descriptor_A` in their
       C function signatures to support separate compilation and uniform reflection.
@@ -408,15 +402,47 @@ static_assert(offsetof(QVariantVal, payload) == 8, qvariantval_payload_at_offset
 - **Specialization:** Eliminated entirely when the variant type is statically known.
 
 ### 5.4. Arrays
-Arrays are mutable, length-prefixed buffers of 64-bit words:
-```c
-typedef struct QArray {
-    int64_t length;
-    QVal    data[];
-} QArray;
+Arrays are mutable, length-prefixed contiguous buffers. In Quest, arrays are invariant (`Array(S) <: Array(T)`
+iff `S == T`), allowing the transpiler to statically select the optimal representation without covariance anomalies:
 
-static_assert(offsetof(QArray, data) == 8, qarray_data_at_offset_8);
-```
+1. **Standard Arrays (`QArray`):**
+   Length-prefixed buffer of uniform 64-bit `QVal` words for scalar types (`Int`, `Real`, `Bool`, `Char`, `String`)
+   and pointer types (`Tuple`, `Array`, `Closure`):
+   ```c
+   typedef struct QArray {
+       int64_t length;
+       QVal    data[];
+   } QArray;
+
+   static_assert(offsetof(QArray, data) == 8, qarray_data_at_offset_8);
+   ```
+
+2. **Flat Stride Record Arrays (`QArrayWideRecord`):**
+   Length-prefixed buffer storing 16-byte `QRecordVal` elements directly in contiguous memory. Eliminates per-element
+   heap boxing:
+   ```c
+   typedef struct QArrayWideRecord {
+       int64_t    length;
+       QRecordVal data[];
+   } QArrayWideRecord;
+
+   static_assert(offsetof(QArrayWideRecord, data) == 8, qarray_wide_rec_data_at_offset_8);
+   ```
+
+3. **Flat Stride Variant Arrays (`QArrayWideVariant`):**
+   Length-prefixed buffer storing 16-byte `QVariantVal` elements directly in contiguous memory:
+   ```c
+   typedef struct QArrayWideVariant {
+       int64_t     length;
+       QVariantVal data[];
+   } QArrayWideVariant;
+
+   static_assert(offsetof(QArrayWideVariant, data) == 8, qarray_wide_var_data_at_offset_8);
+   ```
+
+All three array layouts place `length` at offset 0, enabling uniform bounds checking
+(`quest_check_array_bounds(const void *arr_ptr, int64_t idx)`) and length inspection (`arr->length`)
+without pointer type casting overhead.
 
 ### 5.5. Strings
 In Quest, strings are mutable character sequences (supporting Cardelli's `StringOp` interface):

@@ -91,6 +91,34 @@ QArray *quest_array_new(int64_t len, QVal init_val) {
     return arr;
 }
 
+QArrayWideRecord *quest_array_new_wide_record(int64_t len, QRecordVal init_val) {
+    if (len < 0) {
+        quest_raise_array_error();
+    }
+    QArrayWideRecord *arr = (QArrayWideRecord *)quest_alloc(
+        sizeof(QArrayWideRecord) + (size_t)len * sizeof(QRecordVal)
+    );
+    arr->length = len;
+    for (int64_t i = 0; i < len; ++i) {
+        arr->data[i] = init_val;
+    }
+    return arr;
+}
+
+QArrayWideVariant *quest_array_new_wide_variant(int64_t len, QVariantVal init_val) {
+    if (len < 0) {
+        quest_raise_array_error();
+    }
+    QArrayWideVariant *arr = (QArrayWideVariant *)quest_alloc(
+        sizeof(QArrayWideVariant) + (size_t)len * sizeof(QVariantVal)
+    );
+    arr->length = len;
+    for (int64_t i = 0; i < len; ++i) {
+        arr->data[i] = init_val;
+    }
+    return arr;
+}
+
 double quest_real_pow(double base, double exp) {
     if (base == 0.0 && exp <= 0.0) {
         quest_raise_divide_by_zero();

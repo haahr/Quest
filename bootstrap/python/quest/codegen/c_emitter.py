@@ -383,10 +383,10 @@ class CEmitter:
             return f"({c_arr}->data[{c_idx}].i)"
         elif elem_t == REAL_TYPE:
             return f"({c_arr}->data[{c_idx}].r)"
-        elif isinstance(elem_t, QRecordType):
-            return f"(*((QRecordVal *)({c_arr}->data[{c_idx}].p)))"
-        elif isinstance(elem_t, QVariantType):
-            return f"(*((QVariantVal *)({c_arr}->data[{c_idx}].p)))"
+        elif isinstance(elem_t, QRecordType) or resolve_record_bound(elem_t) is not None:
+            return f"({c_arr}->data[{c_idx}])"
+        elif isinstance(elem_t, QVariantType) or resolve_variant_bound(elem_t) is not None:
+            return f"({c_arr}->data[{c_idx}])"
         elif (
             elem_t == STRING_TYPE
             or elem_t == DYNAMIC_TYPE
@@ -1064,18 +1064,27 @@ class CEmitter:
                                 if isinstance(expr.type_val, QArrayType)
                                 else args[1].type_val
                             )
-                            if isinstance(target_elem_t, QRecordType):
+                            if (
+                                isinstance(target_elem_t, QRecordType)
+                                or resolve_record_bound(target_elem_t) is not None
+                            ):
                                 c_init = self._coerce_record_val(c_init, args[1], target_elem_t)
+                                return f"quest_array_new_wide_record({c_sz}, {c_init})"
                             elif (
                                 isinstance(target_elem_t, QVariantType)
-                                and isinstance(args[1].type_val, QVariantType)
-                                and args[1].type_val != target_elem_t
+                                or resolve_variant_bound(target_elem_t) is not None
                             ):
-                                c_init = self._emit_variant_upcast(
-                                    c_init, args[1].type_val, target_elem_t, lines
-                                )
-                            wrap = _qval_wrap(c_init, target_elem_t)
-                            return f"quest_array_new({c_sz}, {wrap})"
+                                if (
+                                    isinstance(args[1].type_val, QVariantType)
+                                    and args[1].type_val != target_elem_t
+                                ):
+                                    c_init = self._emit_variant_upcast(
+                                        c_init, args[1].type_val, target_elem_t, lines
+                                    )
+                                return f"quest_array_new_wide_variant({c_sz}, {c_init})"
+                            else:
+                                wrap = _qval_wrap(c_init, target_elem_t)
+                                return f"quest_array_new({c_sz}, {wrap})"
                         elif fld == "size" and len(args) == 1:
                             c_arr = self.emit_val(args[0], lines)
                             return f"({c_arr}->length)"
@@ -1094,18 +1103,27 @@ class CEmitter:
                                 if isinstance(args[0].type_val, QArrayType)
                                 else args[2].type_val
                             )
-                            if isinstance(target_elem_t, QRecordType):
+                            if (
+                                isinstance(target_elem_t, QRecordType)
+                                or resolve_record_bound(target_elem_t) is not None
+                            ):
                                 c_item = self._coerce_record_val(c_item, args[2], target_elem_t)
+                                lines.append(f"{c_arr}->data[{c_idx}] = {c_item};")
                             elif (
                                 isinstance(target_elem_t, QVariantType)
-                                and isinstance(args[2].type_val, QVariantType)
-                                and args[2].type_val != target_elem_t
+                                or resolve_variant_bound(target_elem_t) is not None
                             ):
-                                c_item = self._emit_variant_upcast(
-                                    c_item, args[2].type_val, target_elem_t, lines
-                                )
-                            wrap = _qval_wrap(c_item, target_elem_t)
-                            lines.append(f"{c_arr}->data[{c_idx}] = {wrap};")
+                                if (
+                                    isinstance(args[2].type_val, QVariantType)
+                                    and args[2].type_val != target_elem_t
+                                ):
+                                    c_item = self._emit_variant_upcast(
+                                        c_item, args[2].type_val, target_elem_t, lines
+                                    )
+                                lines.append(f"{c_arr}->data[{c_idx}] = {c_item};")
+                            else:
+                                wrap = _qval_wrap(c_item, target_elem_t)
+                                lines.append(f"{c_arr}->data[{c_idx}] = {wrap};")
                             return "((void)0)"
                     elif mod_name == "dynamic":
                         if fld == "new" and len(args) == 1 and len(type_args) == 1:
@@ -1240,18 +1258,24 @@ class CEmitter:
                 lines.append(f"quest_check_array_bounds({c_tgt}, {c_idx});")
                 c_val = self.emit_val(val, lines)
                 target_elem_t = tgt.type_val.element_type if isinstance(tgt.type_val, QArrayType) else val.type_val
-                if isinstance(target_elem_t, QRecordType):
+                if isinstance(target_elem_t, QRecordType) or resolve_record_bound(target_elem_t) is not None:
                     c_val = self._coerce_record_val(c_val, val, target_elem_t)
+                    lines.append(f"{c_tgt}->data[{c_idx}] = {c_val};")
                 elif (
                     isinstance(target_elem_t, QVariantType)
-                    and isinstance(val.type_val, QVariantType)
-                    and val.type_val != target_elem_t
+                    or resolve_variant_bound(target_elem_t) is not None
                 ):
-                    c_val = self._emit_variant_upcast(
-                        c_val, val.type_val, target_elem_t, lines
-                    )
-                wrap = _qval_wrap(c_val, target_elem_t)
-                lines.append(f"{c_tgt}->data[{c_idx}] = {wrap};")
+                    if (
+                        isinstance(val.type_val, QVariantType)
+                        and val.type_val != target_elem_t
+                    ):
+                        c_val = self._emit_variant_upcast(
+                            c_val, val.type_val, target_elem_t, lines
+                        )
+                    lines.append(f"{c_tgt}->data[{c_idx}] = {c_val};")
+                else:
+                    wrap = _qval_wrap(c_val, target_elem_t)
+                    lines.append(f"{c_tgt}->data[{c_idx}] = {wrap};")
                 return "((void)0)"
 
             case TypedExit():
@@ -1477,46 +1501,71 @@ class CEmitter:
                 target_dest = dest
                 if target_dest is None:
                     target_dest = self.fresh_tmp("_arr")
-                    lines.append(f"QArray *{target_dest};")
+                    c_type = self.c_type(t)
+                    lines.append(f"{c_type} {target_dest};")
                 n = len(elems)
-                lines.append(
-                    f"{target_dest} = (QArray *)quest_alloc(sizeof(QArray) + (size_t)({n}LL) * sizeof(QVal));"
-                )
-                lines.append(f"{target_dest}->length = {n}LL;")
-                for i, elem in enumerate(elems):
-                    c_elem = self.emit_val(elem, lines)
-                    if isinstance(t.element_type, QRecordType):
-                        c_elem = self._coerce_record_val(c_elem, elem, t.element_type)
-                    elif (
-                        isinstance(t.element_type, QVariantType)
-                        and isinstance(elem.type_val, QVariantType)
-                        and elem.type_val != t.element_type
-                    ):
-                        c_elem = self._emit_variant_upcast(
-                            c_elem, elem.type_val, t.element_type, lines
-                        )
-                    wrap = _qval_wrap(c_elem, t.element_type)
-                    lines.append(f"{target_dest}->data[{i}LL] = {wrap};")
+                elem_t = t.element_type
+                if isinstance(elem_t, QRecordType) or resolve_record_bound(elem_t) is not None:
+                    lines.append(
+                        f"{target_dest} = (QArrayWideRecord *)quest_alloc("
+                        f"sizeof(QArrayWideRecord) + (size_t)({n}LL) * sizeof(QRecordVal));"
+                    )
+                    lines.append(f"{target_dest}->length = {n}LL;")
+                    for i, elem in enumerate(elems):
+                        c_elem = self.emit_val(elem, lines)
+                        c_elem = self._coerce_record_val(c_elem, elem, elem_t)
+                        lines.append(f"{target_dest}->data[{i}LL] = {c_elem};")
+                elif isinstance(elem_t, QVariantType) or resolve_variant_bound(elem_t) is not None:
+                    lines.append(
+                        f"{target_dest} = (QArrayWideVariant *)quest_alloc("
+                        f"sizeof(QArrayWideVariant) + (size_t)({n}LL) * sizeof(QVariantVal));"
+                    )
+                    lines.append(f"{target_dest}->length = {n}LL;")
+                    for i, elem in enumerate(elems):
+                        c_elem = self.emit_val(elem, lines)
+                        if (
+                            isinstance(elem.type_val, QVariantType)
+                            and elem.type_val != elem_t
+                        ):
+                            c_elem = self._emit_variant_upcast(
+                                c_elem, elem.type_val, elem_t, lines
+                            )
+                        lines.append(f"{target_dest}->data[{i}LL] = {c_elem};")
+                else:
+                    lines.append(
+                        f"{target_dest} = (QArray *)quest_alloc("
+                        f"sizeof(QArray) + (size_t)({n}LL) * sizeof(QVal));"
+                    )
+                    lines.append(f"{target_dest}->length = {n}LL;")
+                    for i, elem in enumerate(elems):
+                        c_elem = self.emit_val(elem, lines)
+                        wrap = _qval_wrap(c_elem, elem_t)
+                        lines.append(f"{target_dest}->data[{i}LL] = {wrap};")
 
             case TypedArrayRep(count=cnt, init_val=init_v, type_val=t):
                 c_cnt = self.emit_val(cnt, lines)
                 c_init = self.emit_val(init_v, lines)
-                if isinstance(t.element_type, QRecordType):
-                    c_init = self._coerce_record_val(c_init, init_v, t.element_type)
-                elif (
-                    isinstance(t.element_type, QVariantType)
-                    and isinstance(init_v.type_val, QVariantType)
-                    and init_v.type_val != t.element_type
-                ):
-                    c_init = self._emit_variant_upcast(
-                        c_init, init_v.type_val, t.element_type, lines
-                    )
-                wrap = _qval_wrap(c_init, t.element_type)
                 target_dest = dest
                 if target_dest is None:
                     target_dest = self.fresh_tmp("_arr")
-                    lines.append(f"QArray *{target_dest};")
-                lines.append(f"{target_dest} = quest_array_new({c_cnt}, {wrap});")
+                    c_type = self.c_type(t)
+                    lines.append(f"{c_type} {target_dest};")
+                elem_t = t.element_type
+                if isinstance(elem_t, QRecordType) or resolve_record_bound(elem_t) is not None:
+                    c_init = self._coerce_record_val(c_init, init_v, elem_t)
+                    lines.append(f"{target_dest} = quest_array_new_wide_record({c_cnt}, {c_init});")
+                elif isinstance(elem_t, QVariantType) or resolve_variant_bound(elem_t) is not None:
+                    if (
+                        isinstance(init_v.type_val, QVariantType)
+                        and init_v.type_val != elem_t
+                    ):
+                        c_init = self._emit_variant_upcast(
+                            c_init, init_v.type_val, elem_t, lines
+                        )
+                    lines.append(f"{target_dest} = quest_array_new_wide_variant({c_cnt}, {c_init});")
+                else:
+                    wrap = _qval_wrap(c_init, elem_t)
+                    lines.append(f"{target_dest} = quest_array_new({c_cnt}, {wrap});")
 
             case TypedVariant(tag=tag, payload=payload, type_val=t):
                 tag_idx = self._tag_index(t, tag)

@@ -70,7 +70,7 @@ def type_to_c_tag(t: QType) -> str:
     if isinstance(t, QTypeVar):
         return "QVal"
     if isinstance(t, QArrayType):
-        return "QArray"
+        return f"QArray_{type_to_c_tag(t.element_type)}"
     if isinstance(t, QVariantType):
         tags = []
         for v in t.variants:
@@ -177,6 +177,11 @@ def qtype_to_c_type(t: QType, ctx: Optional[RecordNamingContext] = None) -> str:
     if isinstance(t, (QFunType, QAllType)):
         return "QClosure *"
     if isinstance(t, QArrayType):
+        elem = t.element_type
+        if isinstance(elem, QRecordType) or resolve_record_bound(elem) is not None:
+            return "QArrayWideRecord *"
+        if isinstance(elem, QVariantType) or resolve_variant_bound(elem) is not None:
+            return "QArrayWideVariant *"
         return "QArray *"
     if isinstance(t, QVariantType) or resolve_variant_bound(t) is not None:
         return "QVariantVal"

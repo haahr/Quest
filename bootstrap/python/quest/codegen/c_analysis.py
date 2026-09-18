@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import Any, Optional
 
 from quest.analysis.closure import LambdaAnalysis, analyze_closures
+from quest.env import ValueSymbol
 from quest.typed_ast import (
     TypedApp,
     TypedException,
@@ -175,6 +176,14 @@ def substitute_typed_node(node: Any, subst: dict[int, QType]) -> Any:
         return node
     if isinstance(node, QType):
         return node.substitute(subst)
+    if isinstance(node, ValueSymbol):
+        return ValueSymbol(
+            name=node.name,
+            type_val=node.type_val.substitute(subst),
+            is_var=node.is_var,
+            is_out=node.is_out,
+            symbol_id=node.symbol_id,
+        )
     if isinstance(node, (list, tuple)):
         return type(node)(substitute_typed_node(x, subst) for x in node)
     if isinstance(node, TypedNode):

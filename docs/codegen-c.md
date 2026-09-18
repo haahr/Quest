@@ -522,6 +522,18 @@ arguments:
   (`struct QTuple_<TypeTags>`) with 16-byte inline slots matching caller expectations, eliminating pointer mismatches.
 - **First-Class Fallback:** The canonical unspecialized `QVal` version is retained for indirect calls and closures.
 
+### 10.6. Flat Stride Arrays (Phase 4.12)
+Arrays containing records or variants (`Array(Record)` and `Array(Variant)`) are lowered to specialized wide array
+structures (`QArrayWideRecord` and `QArrayWideVariant`):
+- **Flat 16-Byte Stride Buffers:** Elements are stored directly in contiguous memory buffers without individual
+  heap boxing (`quest_record_box` / `quest_variant_box`).
+- **In-Place Read and Write:** Indexing (`arr[i]`) and assignment (`arr[i] := val`) operate directly on 16-byte
+  slots in-place, passing and returning values in register pairs `(x0, x1)` with zero heap allocation.
+- **Subtyping Coercion at Insertion:** Inserting a subtyped record or variant into an array evaluates evidence
+  dictionary attachment or static tag remapping at insertion time and stores the result flat in the array slot.
+- **Interaction with Call-Site Specialization:** Generic functions operating on `Array(A)` where `A` is a record
+  or variant specialize to concrete clones that access flat wide arrays directly.
+
 ---
 
 ## 11. Host Compiler Runner (`compiler_runner.py`)
@@ -575,6 +587,8 @@ The C code generator is verified by comprehensive unit and integration tests:
   dynamic offset evaluation via evidence dictionaries, caller dictionary restoration, and call-site tag alignment.
 - `tests/python/test_phase4_11_callsite_specialization.py`: Call-site specialization for unbounded quantifiers,
   unboxed QRecordVal/QVariantVal parameters and returns, generic tuple layout alignment, and scalar coexistence.
+- `tests/python/test_phase4_12_flat_stride_arrays.py`: Flat stride arrays for Array(Record) and Array(Variant),
+  in-place mutation, flat dictionary coercion, specialized generic functions, and wide array bounds checks.
 - `tests/source/01_lexer_basics.quest`: Verified end-to-end native compilation and execution of tuple operations.
 - `tests/source/02_expressions_control_flow.quest`: Verified end-to-end native compilation and execution.
 - `tests/source/03_functions_closures.quest`: Verified end-to-end native compilation and execution of closures.
