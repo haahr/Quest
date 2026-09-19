@@ -49,7 +49,7 @@ coordinates on demand:
    - Reserved keywords must be written in exact casing:
       - Level 0/Value/Phrase keywords are lowercase: `let`, `var`, `out`, `fun`, `if`, `then`, `else`, `try`,
         `raise`, `not`, `extent`, `ordinal`, `of`, `for`, `while`, `loop`, `exit`, `case`, `inspect`,
-        `interface`, `module`, `import`, `export`, `unsound`.
+        `interface`, `module`, `import`, `export`, `unsound`, `external`.
      - Level 1/2 capital keywords are capitalized: `Let`, `Rec`, `All`, `Tuple`, `Record`, `Option`, `Variant`,
        `Array`, `Var`, `Out`, `TYPE`, `POWER`, `DEF`, `ALL`.
      - Note the distinction between parameter mode `out` (lowercase) and type operator `Out` (capitalized).
@@ -144,7 +144,14 @@ Option types support both tag-based and ordinal-based operations (Cardelli §4.5
 - **Payload Extraction:** `opt!tag` extracts the payload as a tuple whose first component is the 0-based integer
   ordinal of the option (e.g. `tuple 1 let x=true end : Tuple :Int x:Bool end`).
 
-### 3.8. Initial/Final Keyword Block Disambiguation
+### 3.8. External Types and Value Bindings
+Quest provides `external` syntax for declaring opaque native C data structures and native C symbols:
+- **External Types (`PRIMARY_TYPE`):** `type T = external "C_TYPE"` or `Let T = external "C_TYPE"`.
+  Binds `T` to an opaque C data type (e.g. `external "QWriter *"`).
+- **External Values (`PRIMARY_VALUE`):** `let x: Type = external "C_SYMBOL"`.
+  Binds `x` to a C runtime symbol or constant (e.g. `let stdout: Handle = external "quest_writer_output"`).
+
+### 3.9. Initial/Final Keyword Block Disambiguation
 Complex expressions (conditionals, loops, records, tuples, options) employ explicit terminating keywords:
 - `if ... then ... else ... end`
 - `while ... do ... end`

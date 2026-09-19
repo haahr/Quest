@@ -172,6 +172,18 @@ class TypedOk(TypedExpr):
 
 
 @dataclass(frozen=True)
+class TypedExternal(TypedExpr):
+    """External C symbol reference: external "c_symbol"."""
+    symbol: str
+    type_val: QType
+    inline_template: Optional[str] = None
+    c_val: Optional[str] = None
+
+    def dump_header(self) -> str:
+        return f"'{self.symbol}'"
+
+
+@dataclass(frozen=True)
 class TypedVar(TypedExpr):
     """Reference to a resolved value symbol."""
     name: str
@@ -714,6 +726,19 @@ class TypedLetValue(TypedBinding):
 
 
 @dataclass(frozen=True)
+class TypedNativeBinding(TypedBinding):
+    """Module binding implemented natively in C."""
+    name: str
+    symbol: str
+    inline_template: Optional[str]
+    c_val: Optional[str]
+    type_val: QType
+
+    def dump_header(self) -> str:
+        return f"'{self.name}' -> '{self.symbol}' :type {self.type_val}"
+
+
+@dataclass(frozen=True)
 class TypedLetType(TypedBinding):
     """Type let declaration: Let T = Type."""
     name: str
@@ -763,6 +788,7 @@ class TypedModule(TypedBinding):
     interface_name: str
     bindings: tuple[TypedBinding, ...]
     scope: Scope
+    c_init: Optional[str] = None
 
     def dump_header(self) -> str:
         return f"'{self.name}' implements '{self.interface_name}'"

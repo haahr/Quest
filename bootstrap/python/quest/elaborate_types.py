@@ -42,6 +42,7 @@ from quest.types import (
     QTypeVar,
     QAbstractType,
     QPathType,
+    QExternalType,
     check_kind,
     check_kind_well_formed,
     check_type_contractive,
@@ -481,6 +482,9 @@ def elaborate_type(ast_type: ast.Type, env: Environment) -> QType:
                 bound=sym.kind,
             )
 
+        case ast.TypeExternal(c_type=c_type):
+            return QExternalType(name="", c_type=c_type)
+
         case _:
             raise KindError(f"Unsupported AST type node '{ast_type}' at offset {getattr(ast_type, 'offset', 0)}")
 
@@ -551,6 +555,8 @@ def elaborate_type_binding(
         bound_kind = target_bound
     else:
         qtype_val = elaborate_type(binding.type_val, env)
+        if isinstance(qtype_val, QExternalType) and not qtype_val.name:
+            qtype_val = QExternalType(name=binding.name, c_type=qtype_val.c_type)
         if declared_bound is not None:
             check_kind(qtype_val, declared_bound, env)
             bound_kind = declared_bound

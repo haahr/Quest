@@ -1,4 +1,4 @@
-"""Tests for Phase 3: Bounded Specialization for Records and Variants in Quest."""
+"""Tests for Phase 4.9b: Bounded Specialization for Records and Variants in Quest."""
 
 import subprocess
 import tempfile
@@ -9,7 +9,7 @@ from quest.codegen import compile_c_source, run_binary
 from quest.pipeline import compile_pipeline
 
 
-class TestPhase410BoundedSpecialization(unittest.TestCase):
+class TestPhase49bBoundedSpecialization(unittest.TestCase):
     def compile_quest(self, code: str, nogc: bool = False) -> subprocess.CompletedProcess[str]:
         pipeline = compile_pipeline()
         res = pipeline.execute(code, "<test>")

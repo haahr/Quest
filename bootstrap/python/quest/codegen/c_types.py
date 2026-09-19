@@ -13,6 +13,7 @@ from quest.types import (
     QAllType,
     QArrayType,
     QExceptionType,
+    QExternalType,
     QFunType,
     QOptionField,
     QOptionType,
@@ -58,6 +59,12 @@ def type_to_c_tag(t: QType) -> str:
         return "Ok"
     if t == DYNAMIC_TYPE or (isinstance(t, QTypeVar) and t.name == "Dynamic.T"):
         return "Dynamic"
+    if isinstance(t, QExternalType):
+        return t.name.replace(".", "_") if t.name else t.c_type.replace("*", "").strip()
+    if isinstance(t, QTypeVar) and t.name == "Writer.T":
+        return "QWriter"
+    if isinstance(t, QTypeVar) and t.name == "Reader.T":
+        return "QReader"
     if isinstance(t, QTupleType):
         tags = [type_to_c_tag(f.type_val) for f in t.value_fields]
         return "QTuple_" + ("_".join(tags) if tags else "empty")
@@ -170,6 +177,12 @@ def qtype_to_c_type(t: QType, ctx: Optional[RecordNamingContext] = None) -> str:
         return "void"
     if t == DYNAMIC_TYPE or (isinstance(t, QTypeVar) and t.name == "Dynamic.T"):
         return "QDynamic *"
+    if isinstance(t, QExternalType):
+        return t.c_type
+    if isinstance(t, QTypeVar) and t.name == "Writer.T":
+        return "QWriter *"
+    if isinstance(t, QTypeVar) and t.name == "Reader.T":
+        return "QReader *"
     if isinstance(t, QTupleType):
         return f"{tuple_struct_name(t)} *"
     if isinstance(t, QRecordType) or resolve_record_bound(t) is not None:
@@ -208,6 +221,8 @@ def qtype_to_name_str(t: QType) -> str:
         return "String"
     if t == OK_TYPE:
         return "Ok"
+    if isinstance(t, QExternalType):
+        return t.name or t.c_type
     return str(t)
 
 
@@ -251,35 +266,27 @@ def c_char_literal(ch: str) -> str:
 
 def qval_wrap(expr_str: str, t: QType) -> str:
     """Wraps a scalar or pointer expression into a QVal union initializer."""
-    if t == DYNAMIC_TYPE or (isinstance(t, QTypeVar) and t.name == "Dynamic.T"):
-        return f"((QVal){{ .p = (void *)({expr_str}) }})"
+    if qtype_to_c_type(t) == "QVal":
+        return expr_str
     if resolve_record_bound(t) is not None:
         return f"((QVal){{ .p = (void *)quest_record_box({expr_str}) }})"
     if resolve_variant_bound(t) is not None:
         return f"((QVal){{ .p = (void *)quest_variant_box({expr_str}) }})"
-    if isinstance(t, QTypeVar):
-        return expr_str
     if t == INT_TYPE or t == BOOL_TYPE or t == CHAR_TYPE:
         return f"((QVal){{ .i = (int64_t)({expr_str}) }})"
     if t == REAL_TYPE:
         return f"((QVal){{ .r = (double)({expr_str}) }})"
-    if t == STRING_TYPE or isinstance(
-        t, (QTupleType, QFunType, QAllType, QArrayType, QOptionType, QExceptionType)
-    ):
-        return f"((QVal){{ .p = (void *)({expr_str}) }})"
-    return f"((QVal){{ .u = 0 }})"
+    return f"((QVal){{ .p = (void *)({expr_str}) }})"
 
 
 def qval_unwrap(qval_expr: str, t: QType, ctx: Optional[RecordNamingContext] = None) -> str:
     """Extracts the underlying concrete scalar or pointer from a QVal expression."""
-    if t == DYNAMIC_TYPE or (isinstance(t, QTypeVar) and t.name == "Dynamic.T"):
-        return f"((QDynamic *)({qval_expr}.p))"
+    if qtype_to_c_type(t, ctx) == "QVal":
+        return qval_expr
     if resolve_record_bound(t) is not None:
         return f"(*((QRecordVal *)({qval_expr}.p)))"
     if resolve_variant_bound(t) is not None:
         return f"(*((QVariantVal *)({qval_expr}.p)))"
-    if isinstance(t, QTypeVar):
-        return qval_expr
     if t in (INT_TYPE, BOOL_TYPE, CHAR_TYPE):
         return f"({qval_expr}.i)"
     if t == REAL_TYPE:

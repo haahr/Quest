@@ -712,6 +712,13 @@ def build_quest_grammar() -> None:
         (T(TK.LBRACE), TYPE, T(TK.RBRACE)),
         lambda left_brace, inner_type, right_brace: inner_type,
     )
+    # external "c_type"
+    PRIMARY_TYPE.add_rule(
+        (T(TK.KW_EXTERNAL), T(TK.STRING_LIT)),
+        lambda ext_token, str_token: ast.TypeExternal(
+            c_type=str_token.value, offset=ext_token.offset
+        ),
+    )
 
     # ------------------------------------------------------------------------
     # Signatures
@@ -888,6 +895,12 @@ def build_quest_grammar() -> None:
     PRIMARY_VALUE.add_rule((T(TK.KW_FALSE),), lambda token: ast.ExprBool(value=False, offset=token.offset))
     PRIMARY_VALUE.add_rule((T(TK.KW_OK),), lambda token: ast.ExprOk(offset=token.offset))
     PRIMARY_VALUE.add_rule((T(TK.KW_EXIT),), lambda token: ast.ExprExit(offset=token.offset))
+    PRIMARY_VALUE.add_rule(
+        (T(TK.KW_EXTERNAL), T(TK.STRING_LIT)),
+        lambda ext_token, str_token: ast.ExprExternal(
+            symbol=str_token.value, offset=ext_token.offset
+        ),
+    )
 
     # if Binding [then Binding] {elsif Binding [then Binding]} [else Binding] end
     PRIMARY_VALUE.add_rule(

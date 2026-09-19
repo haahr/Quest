@@ -465,7 +465,8 @@ Phase 4.5 implements Cardelli's structural subtyping across tuples, records, and
   ```
 
 ### 10.2. Evidence-Passing Record Subtyping
-- **Object Header:** Every concrete record structure begins with `QRecordHeader header;` at offset 0 (`header.descriptor = NULL;`).
+- **Object Header:** Every concrete record structure begins with `QRecordHeader header;` at offset 0
+  (`header.descriptor = NULL;`).
 - **First-Class Fat Pointers (`QRecordVal`):** All records are represented uniformly as a 16-byte struct:
   ```c
   typedef struct QRecordVal {
@@ -496,7 +497,7 @@ Phase 4.5 implements Cardelli's structural subtyping across tuples, records, and
 - **Zero-Allocation Upcast:** Coercion emits an unboxed compound literal:
   `((QVariantVal){ .tag = tagmap_Large_Small[src.tag], .payload = src.payload })`.
 
-### 10.4. Bounded Specialization for Records and Variants
+### 10.4. Bounded Specialization for Records and Variants (Phase 4.9b)
 - **Runtime Descriptor Retention:** Bounded polymorphic functions retain `const QTypeDescriptor *descriptor_<T>`
   parameters in their C signatures to facilitate separate compilation and uniform reflection.
 - **Bounded Record Parameters & Field Selection:** Functions expecting `A <: Record` receive `QRecordVal` directly.
@@ -509,7 +510,7 @@ Phase 4.5 implements Cardelli's structural subtyping across tuples, records, and
   static `.rodata` tag tables into an unboxed compound literal, allowing callees to switch directly on `v.tag` without
   runtime translation or heap allocation.
 
-### 10.5. Call-Site Specialization for Unbounded Quantifiers (Phase 4.11)
+### 10.5. Call-Site Specialization for Unbounded Quantifiers (Phase 4.9c)
 When unbounded polymorphic functions (`All(A::TYPE)`) are invoked at call sites with concrete `Record` or `Variant`
 arguments:
 - **Specialization Analysis Pass (`c_analysis.py`):** Scans the AST worklist for call sites where type arguments
@@ -522,7 +523,7 @@ arguments:
   (`struct QTuple_<TypeTags>`) with 16-byte inline slots matching caller expectations, eliminating pointer mismatches.
 - **First-Class Fallback:** The canonical unspecialized `QVal` version is retained for indirect calls and closures.
 
-### 10.6. Flat Stride Arrays (Phase 4.12)
+### 10.6. Flat Stride Arrays (Phase 4.9d)
 Arrays containing records or variants (`Array(Record)` and `Array(Variant)`) are lowered to specialized wide array
 structures (`QArrayWideRecord` and `QArrayWideVariant`):
 - **Flat 16-Byte Stride Buffers:** Elements are stored directly in contiguous memory buffers without individual
@@ -533,6 +534,26 @@ structures (`QArrayWideRecord` and `QArrayWideVariant`):
   dictionary attachment or static tag remapping at insertion time and stores the result flat in the array slot.
 - **Interaction with Call-Site Specialization:** Generic functions operating on `Array(A)` where `A` is a record
   or variant specialize to concrete clones that access flat wide arrays directly.
+
+### 10.7. Unified Native Module Mechanism & Hybrid Modules (Phase 4.11)
+All modules—whether pure Quest, standard library built-ins (`writer`, `reader`, `conv`, `ascii`, `int`, `real`,
+`string`, `system`, `arrayOp`, `dynamic`), or user-defined hybrid modules—are compiled uniformly:
+- **Unified Pipeline (Section 8b Emission):** Legacy Section 8c and ad-hoc string matching
+  (`_builtin_call_c_expr` / `_builtin_val_c_expr`) are eliminated. All modules emit uniform declarations in
+  `c_declarations.py` and module initializers/trampolines in Section 8b of `c_emitter.py`.
+- **Topological Lazy Initializers (`qv_mod_<name>_init`):**
+  - Each module emits an initialization function guarded by `qv_mod_<name>_initialized` for idempotent execution.
+  - Recursively triggers initializers of dependency modules in topological order before executing local bindings.
+  - Allocates the module payload struct (`QT_<Interface>`) and populates all exported fields with **concrete values**:
+    - Native bindings (`TypedNativeBinding`) and pure Quest functions emit static trampolines
+      (`qv_<mod>_<fn>_trampoline`) with `(void)arg_{i}` unused parameter suppression, wrapped in `QClosure *` objects.
+    - Native constants (`TypedExternal`) and evaluated `let` bindings populate fields directly, wrapping in `QVal`
+      (`_qval_wrap`) if the interface field is abstract.
+- **Direct Native Call Lowering:** When selecting a function on a known module (e.g. `writer.putString(w s)`), the
+  compiler resolves the native binding and directly emits `quest_writer_put_string(...)` or expands the inline
+  template, bypassing closure allocation and indirect calls.
+- **External C Types and Values:** `external "C_TYPE"` and `external "C_SYMBOL"` seamlessly bridge C runtime
+  structures (e.g. `QWriter *`, `QReader *`) into Quest's type system without compiler special-casing.
 
 ---
 
@@ -577,18 +598,27 @@ The C code generator is verified by comprehensive unit and integration tests:
   multi-level nested closures, and `--nogc` execution.
 - `tests/python/test_phase4_3_arrays.py`: Mutable arrays, repetition, indexing, element mutation, Real/String elements,
   out-of-bounds error handling, and `--nogc` execution.
-- `tests/python/test_phase4_4_options_variants.py`: Ordered options, tagged variants, tag checks (`?`), tag extractions (`!`),
-  case discrimination, and `--nogc` execution.
-- `tests/python/test_phase4_5_subtyping.py`: Prefix tuple subtyping with static assertions, record width/permutation subtyping,
-  evidence dictionary passing through closures, uniform `QRecordVal` returns, and static variant tag remapping.
-- `tests/python/test_phase4_9_aggregate_subtyping.py`: Arrays of subtyped records, array repetition, element mutation,
+- `tests/python/test_phase4_4_options_variants.py`: Ordered options, tagged variants, tag checks (`?`),
+  tag extractions (`!`), case discrimination, and `--nogc` execution.
+- `tests/python/test_phase4_5_subtyping.py`: Prefix tuple subtyping with static assertions,
+  record width/permutation subtyping, evidence dictionary passing through closures, uniform `QRecordVal` returns,
+  and static variant tag remapping.
+- `tests/python/test_phase4_6_exceptions.py`: Exception values, try-when exception handling, and stack unwinding.
+- `tests/python/test_phase4_7_whole_program_modules.py`: Multi-file compilation, interface checking, and linking.
+- `tests/python/test_phase4_8_quantifier_descriptors.py`: Quantifier calling convention and type descriptors.
+- `tests/python/test_phase4_8_dynamic.py`: Dynamic module lowering, dynamic values, and generic wrappers.
+- `tests/python/test_phase4_9a_aggregate_subtyping.py`: Arrays of subtyped records, array repetition, element mutation,
   tuples with subtyped records, and passing aggregate record elements to functions.
-- `tests/python/test_phase4_10_bounded_specialization.py`: Bounded specialization for records and variants,
+- `tests/python/test_phase4_9b_bounded_specialization.py`: Bounded specialization for records and variants,
   dynamic offset evaluation via evidence dictionaries, caller dictionary restoration, and call-site tag alignment.
-- `tests/python/test_phase4_11_callsite_specialization.py`: Call-site specialization for unbounded quantifiers,
+- `tests/python/test_phase4_9c_callsite_specialization.py`: Call-site specialization for unbounded quantifiers,
   unboxed QRecordVal/QVariantVal parameters and returns, generic tuple layout alignment, and scalar coexistence.
-- `tests/python/test_phase4_12_flat_stride_arrays.py`: Flat stride arrays for Array(Record) and Array(Variant),
+- `tests/python/test_phase4_9d_flat_stride_arrays.py`: Flat stride arrays for Array(Record) and Array(Variant),
   in-place mutation, flat dictionary coercion, specialized generic functions, and wide array bounds checks.
+- `tests/python/test_phase4_10_stdlib_c.py`: Cardelli standard library interfaces in C (Writer, Reader, Conv, Ascii,
+  IntOp, RealOp, StringOp) and System OS extensions.
+- `tests/python/test_phase4_11_native_modules.py`: Unified native module mechanism, external types and values, and
+  hybrid Quest/C modules.
 - `tests/source/01_lexer_basics.quest`: Verified end-to-end native compilation and execution of tuple operations.
 - `tests/source/02_expressions_control_flow.quest`: Verified end-to-end native compilation and execution.
 - `tests/source/03_functions_closures.quest`: Verified end-to-end native compilation and execution of closures.

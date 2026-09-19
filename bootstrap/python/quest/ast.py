@@ -237,6 +237,12 @@ class TypeManifest(Type):
     type_name: str
 
 
+@dataclass(frozen=True)
+class TypeExternal(Type):
+    """external "c_type" — opaque C data structure type."""
+    c_type: str
+
+
 # ============================================================================
 # 4. Level 0: Values and Expressions
 # ============================================================================
@@ -299,6 +305,12 @@ class ExprOk(Expr):
 @dataclass(frozen=True)
 class ExprId(Expr):
     name: str
+
+
+@dataclass(frozen=True)
+class ExprExternal(Expr):
+    """external "c_symbol" — native external C symbol binding."""
+    symbol: str
 
 
 # --- Blocks & Control Flow ---

@@ -108,27 +108,39 @@ typedef struct QString {
 - Runtime functions `quest_string_new(const char *data, size_t len)`, `quest_string_concat(s1, s2)`, and
   `quest_string_equal(s1, s2)` provide safe string manipulation.
 
-### 3.3. Rationale for Uniform 64-Bit Representation vs. Non-64-Bit Alternatives
+### 3.3. Opaque C Data Structures (`QExternalType`)
+Quest allows native C pointer and handle types to be declared directly in source code using the `external` keyword
+(`type Handle = external "QWriter *"`):
+- **Scalar Representation**: In the emitted C code, variables, function parameters, and return types of external
+  types are emitted verbatim as their C type (`QWriter *`, `QReader *`, etc.).
+- **Universal Word Boxing (`QVal`)**: When passed into generic polymorphic parameters (`All(A::TYPE)`), arrays, or
+  abstract interface record fields, external pointer types are boxed into `QVal` via `(QVal){ .p = (void *)(expr) }`
+  and unboxed via `((C_TYPE)(val.p))`.
+- **Runtime Descriptors**: Polymorphic operations and reflection synthesize opaque descriptors for external types:
+  `quest_make_opaque_descriptor("Handle")`.
+
+### 3.4. Rationale for Uniform 64-Bit Representation vs. Non-64-Bit Alternatives
 During C backend design, alternatives such as unboxed 8-bit integers/chars or unboxed heterogenous tuples were
 evaluated:
 1. **Generic Uniformity & Polymorphism:** In Quest, any polymorphic type variable `X <: Any` or higher-order quantifier
    can be instantiated with arbitrary types. Variable-width types (e.g. 1-byte chars or 2-byte ints) would necessitate:
    - Dynamic boxing/unboxing overhead on every generic parameter or aggregate field read.
-   - Extensive monomorphization, which cannot handle polymorphic recursion, existential types, or dynamic typing.
+   - Whole-program whole-type specialization, which cannot handle polymorphic recursion, existential types, or
+     dynamic typing.
    - Fat pointers or runtime layout descriptors.
 2. **Predictable Stride and Alignment:** Uniform 64-bit words guarantee that all aggregate slots are multiples of 8
    bytes, enabling zero-cost prefix tuple subtyping and constant-stride array indexing without struct padding anomalies.
-3. **Monomorphic Scalar Optimization:** While the universal representation is 64-bit `QVal`, the C transpiler emits
+3. **Specialized Scalar Optimization:** While the universal representation is 64-bit `QVal`, the C transpiler emits
    native C scalar types (`QInt`, `QReal`, `QBool`, `QChar`, `QString*`) for statically-known local variables and
    non-generic functions. This preserves register allocation and zero-boxing overhead where types are known at compile
    time.
 
-### 3.4. ABI and Calling Convention Properties
+### 3.5. ABI and Calling Convention Properties
 - Under **AAPCS64** (macOS and Linux AArch64), `QVal` is an 8-byte composite type containing integer/pointer members;
   it is passed in a single **64-bit general-purpose register** (`x0`–`x7`) and returned in `x0`.
 - Under **System V AMD64** (x86-64), `QVal` is classified as `INTEGER` class and passed in `rdi`, `rsi`, `rdx`, etc.,
   and returned in `rax`.
-- For non-generic, monomorphic Quest functions whose types are statically known, the transpiler generates native C
+- For non-generic, specialized Quest functions whose types are statically known, the transpiler generates native C
   signatures (e.g. `QReal qv_add(QReal qv_a, QReal qv_b)`), allowing floats to remain in floating-point registers
   (`d0`–`d7`) without `fmov` overhead.
 
@@ -453,6 +465,26 @@ typedef struct QString {
     char   *data;     /* Null-terminated UTF-8 / ASCII buffer */
 } QString;
 ```
+
+### 5.6. Module Records and Lazy Initialization
+Quest modules compile to first-class record values (`QRecordVal`), allowing modules to be passed as arguments or
+manipulated dynamically:
+- **Module State Variable**: Each compiled module emits a static fat pointer:
+  ```c
+  static QRecordVal qv_<mod>;
+  static bool qv_mod_<mod>_initialized = false;
+  static void qv_mod_<mod>_init(void);
+  ```
+- **Record Struct Shape**: The module interface generates a concrete struct `QT_<Interface>` containing fields
+  for each exported function closure (`QClosure *`) or value (`QVal` or concrete scalar/pointer).
+- **Concrete Value Population**: When `qv_mod_<mod>_init()` executes (lazily on program startup or first import):
+  1. It recursively invokes initializers for all imported modules in topological order.
+  2. It evaluates local bindings and allocates `QT_<Interface>` payload struct via `quest_alloc`.
+  3. All fields are populated with **concrete values**: functions wrap static trampolines
+     (`qv_<mod>_<fn>_trampoline`) in allocated `QClosure` structs; data fields hold evaluated constants or pointers.
+  4. `qv_<mod>` is initialized with `.val = (void *)payload` and `.dict = (const void *)&offsetdict_<I>_<I>`.
+- **Zero-Cost Direct Calls**: Calling a known module function (e.g. `writer.putString(w s)`) directly invokes
+  `quest_writer_put_string(...)`, entirely bypassing record dispatch.
 
 ---
 

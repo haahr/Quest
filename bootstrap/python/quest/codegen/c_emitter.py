@@ -10,6 +10,7 @@ from quest.codegen.c_analysis import (
     CLambdaInfo,
     CProgramAnalysis,
     analyze_program_for_c,
+    collect_fun_quantifiers,
     topological_sort_modules,
 )
 from quest.codegen.c_declarations import CDeclarationEmitter
@@ -46,6 +47,7 @@ from quest.typed_ast import (
     TypedDerefCell,
     TypedException,
     TypedExit,
+    TypedExternal,
     TypedExpr,
     TypedExprStmt,
     TypedFor,
@@ -60,6 +62,7 @@ from quest.typed_ast import (
     TypedLetValue,
     TypedLoop,
     TypedModule,
+    TypedNativeBinding,
     TypedNode,
     TypedOk,
     TypedOption,
@@ -96,6 +99,7 @@ from quest.types import (
     QAllType,
     QArrayType,
     QExceptionType,
+    QExternalType,
     QFunType,
     QOptionType,
     QQuantifier,
@@ -154,6 +158,7 @@ class CEmitter:
         self.top_funs_dict: dict[str, tuple[TypedFun, Any]] = {}
         self.in_scope_type_descriptors: dict[str, str] = {}
         self.specializations: dict[tuple[str, tuple[QType, ...]], tuple[str, TypedFun]] = {}
+        self.all_modules: dict[str, TypedModule] = {}
 
     def c_type(self, t: QType) -> str:
         return qtype_to_c_type(t, self.record_ctx)
@@ -177,7 +182,9 @@ class CEmitter:
         if isinstance(t, QTupleType) and not t.fields:
             return "&quest_type_EmptyTuple"
         if isinstance(t, QTypeVar):
-            return self.in_scope_type_descriptors.get(t.name, f"descriptor_{t.name}")
+            if t.name in self.in_scope_type_descriptors:
+                return self.in_scope_type_descriptors[t.name]
+            return f"quest_make_opaque_descriptor({_c_string_literal(t.name)})"
         if isinstance(t, QAbstractType):
             if t.name in self.in_scope_type_descriptors:
                 return self.in_scope_type_descriptors[t.name]
@@ -185,6 +192,8 @@ class CEmitter:
         if isinstance(t, QArrayType):
             elem_desc = self.c_type_descriptor(t.element_type)
             return f"quest_make_array_descriptor({elem_desc})"
+        if isinstance(t, QExternalType):
+            return f"quest_make_opaque_descriptor({_c_string_literal(t.name or t.c_type)})"
         return "&quest_type_EmptyTuple"
 
     def record_struct_name(self, t: QRecordType) -> str:
@@ -249,6 +258,19 @@ class CEmitter:
         quants, inner_type = self._collect_fun_quantifiers(fun.type_val)
         ret_type = inner_type.result_type if isinstance(inner_type, QFunType) else inner_type
         return quants, list(fun.params), fun.body, ret_type
+
+    def _collect_fun_type_params(
+        self, fun_type: QType
+    ) -> tuple[tuple[QQuantifier, ...], list[tuple[str, QType]], QType]:
+        """Extracts quantifiers, parameters, and return type directly from a QFunType or QAllType."""
+        quants, inner_type = self._collect_fun_quantifiers(fun_type)
+        if isinstance(inner_type, QFunType):
+            params = [(p.name, p.type_val) for p in inner_type.params]
+            ret_type = inner_type.result_type
+        else:
+            params = []
+            ret_type = inner_type
+        return quants, params, ret_type
 
     def _collect_app_args(self, app: TypedApp) -> tuple[TypedExpr, list[TypedExpr]]:
         """Flattens nested curried TypedApp nodes into target function and argument list."""
@@ -341,7 +363,7 @@ class CEmitter:
                 fn_lines.append(f"return {tmp_v};")
             else:
                 fn_lines.append(f"return {ret_val};")
-        elif isinstance(ret_type, QTypeVar):
+        elif self.c_type(ret_type) == "QVal":
             ret_val = self.emit_val(body, fn_lines)
             fn_lines.append(f"return {_qval_wrap(ret_val, body.type_val)};")
         else:
@@ -372,7 +394,7 @@ class CEmitter:
             if isinstance(actual_a.type_val, QVariantType) and actual_a.type_val != var_bound:
                 return self._emit_variant_upcast(c_a, actual_a.type_val, var_bound, lines)
             return c_a
-        elif isinstance(formal_t, QTypeVar):
+        elif self.c_type(formal_t) == "QVal":
             return _qval_wrap(c_a, actual_a.type_val)
         else:
             return c_a
@@ -500,7 +522,7 @@ class CEmitter:
         top_vars = analysis.top_vars
         sorted_modules = analysis.sorted_modules
 
-        all_module_map: dict[str, TypedModule] = {}
+        all_module_map: dict[str, TypedModule] = {m.name: m for m in sorted_modules}
         if loaded_modules:
             for mod in loaded_modules.values():
                 if isinstance(mod, TypedModule):
@@ -508,6 +530,7 @@ class CEmitter:
         for phrase in prog.phrases:
             if isinstance(phrase, TypedModule):
                 all_module_map[phrase.name] = phrase
+        self.all_modules = all_module_map
         # 7. Function definitions for top-level functions
         if top_funs:
             lines.append("/* Function definitions */")
@@ -570,13 +593,16 @@ class CEmitter:
                 lines.append("")
 
         # 8b. Emit module functions and initializers
+        # 8b. Emit module functions and initializers
         if sorted_modules:
             lines.append("/* Compiled module definitions and initializers */")
             for mod in sorted_modules:
                 clean_mod = mod.name.replace(".", "_")
-                # Collect top-level functions and variables in this module
+                # Collect functions, variables, and native bindings in this module
                 mod_funs: list[tuple[str, TypedFun, Any]] = []
                 mod_vars: list[tuple[str, TypedExpr, Any]] = []
+                mod_native_funs: list[TypedNativeBinding] = []
+                mod_native_vals: list[TypedNativeBinding] = []
                 mod_imported_mods: list[str] = []
                 for b in mod.bindings:
                     match b:
@@ -585,6 +611,13 @@ class CEmitter:
                                 mod_funs.append((b_name, b_val, b_sym))
                             else:
                                 mod_vars.append((b_name, b_val, b_sym))
+                        case TypedNativeBinding() as nb:
+                            if nb.c_val is not None:
+                                mod_native_vals.append(nb)
+                            elif isinstance(nb.type_val, (QFunType, QAllType)):
+                                mod_native_funs.append(nb)
+                            else:
+                                mod_native_vals.append(nb)
                         case TypedImport(items=items):
                             for it in items:
                                 for iname in it.names:
@@ -641,11 +674,48 @@ class CEmitter:
                         lines.append(f"    return {m_ident}({args_str});")
                     lines.append("}")
 
+                # Trampolines for native module functions
+                for nb in mod_native_funs:
+                    if not (nb.symbol or nb.inline_template):
+                        continue
+                    tramp_name = f"qv_{clean_mod}_{nb.name}_trampoline"
+                    quants, body_t = collect_fun_quantifiers(nb.type_val)
+                    if isinstance(body_t, QFunType):
+                        params = body_t.params
+                        ret_type = body_t.result_type
+                        ret_c = "void" if ret_type == OK_TYPE else self.c_type(ret_type)
+                        quant_decls = [f"const QTypeDescriptor *descriptor_{q.name}" for q in quants]
+                        param_decls = quant_decls + [
+                            f"{self.c_type(p.type_val)} arg_{i}"
+                            for i, p in enumerate(params)
+                        ]
+                        param_sigs = ["void *env"] + param_decls
+                        sig = ", ".join(param_sigs)
+                        param_names = [f"arg_{i}" for i in range(len(params))]
+                        if nb.inline_template:
+                            call_expr = nb.inline_template.format(*param_names)
+                        else:
+                            call_expr = f"{nb.symbol}({', '.join(param_names)})"
+                        lines.append(f"static {ret_c} {tramp_name}({sig}) {{")
+                        lines.append("    (void)env;")
+                        for q in quants:
+                            lines.append(f"    (void)descriptor_{q.name};")
+                        for i in range(len(params)):
+                            lines.append(f"    (void)arg_{i};")
+                        if ret_type == OK_TYPE:
+                            lines.append(f"    {call_expr};")
+                            lines.append("    return;")
+                        else:
+                            lines.append(f"    return {call_expr};")
+                        lines.append("}")
+                        lines.append("")
+
                 # Function definitions for module functions using module-scoped emitter
                 mod_emitter = CEmitter(echo=False, module_prefix=clean_mod)
                 mod_emitter.top_fun_names = {fname for fname, _, _ in mod_funs}
                 mod_emitter.top_funs_dict = {fname: (ffun, fsym) for fname, ffun, fsym in mod_funs}
                 mod_emitter.record_ctx = self.record_ctx
+                mod_emitter.all_modules = self.all_modules
 
                 for fname, ffun, fsym in mod_funs:
                     m_ident = mangle_module_ident(clean_mod, fname)
@@ -664,7 +734,9 @@ class CEmitter:
                         fn_lines.append(f"(void)descriptor_{q.name};")
                     # Map param names in current_env_vars so they resolve to mangled names
                     prev_env = mod_emitter.current_env_vars
-                    mod_emitter.current_env_vars = {p.name: mangle_module_ident(clean_mod, p.name) for p in params}
+                    mod_emitter.current_env_vars = {
+                        p.name: mangle_module_ident(clean_mod, p.name) for p in params
+                    }
                     for vname, _, _ in mod_vars:
                         mod_emitter.current_env_vars[vname] = mangle_module_ident(clean_mod, vname)
                     mod_emitter._emit_fun_return(body, ret_type, fn_lines)
@@ -682,6 +754,8 @@ class CEmitter:
                 for dep in mod_imported_mods:
                     dep_clean = dep.replace(".", "_")
                     lines.append(f"    qv_mod_{dep_clean}_init();")
+                if mod.c_init:
+                    lines.append(f"    {mod.c_init};")
                 # Evaluate module let values
                 init_lines: list[str] = []
                 mod_emitter.current_env_vars = {
@@ -709,21 +783,54 @@ class CEmitter:
                 mod_rec_t = BuiltinModuleRegistry._build_record_type_from_scope(mod.scope)
                 rec_struct = self.record_struct_name(mod_rec_t)
                 payload_var = f"_{clean_mod}_payload"
-                lines.append(f"    {rec_struct} *{payload_var} = ({rec_struct} *)quest_alloc(sizeof({rec_struct}));")
+                lines.append(
+                    f"    {rec_struct} *{payload_var} = "
+                    f"({rec_struct} *)quest_alloc(sizeof({rec_struct}));"
+                )
                 lines.append(f"    {payload_var}->header.descriptor = NULL;")
                 for fld in sorted(mod_rec_t.fields, key=lambda f: f.name):
-                    # Check if exported field is a function
-                    matching_fun = next((ff for fn, ff, _ in mod_funs if fn == fld.name), None)
-                    if matching_fun is not None:
+                    # Check if exported field is a pure Quest function
+                    if any(fn == fld.name for fn, _, _ in mod_funs):
                         tramp_name = f"{mangle_module_ident(clean_mod, fld.name)}_trampoline"
                         clos_tmp = self.fresh_tmp(f"_{clean_mod}_{fld.name}_clos")
-                        lines.append(f"    QClosure *{clos_tmp} = (QClosure *)quest_alloc(sizeof(QClosure));")
+                        lines.append(
+                            f"    QClosure *{clos_tmp} = "
+                            f"(QClosure *)quest_alloc(sizeof(QClosure));"
+                        )
                         lines.append(f"    {clos_tmp}->fn = (void *){tramp_name};")
                         lines.append(f"    {clos_tmp}->env = NULL;")
                         lines.append(f"    {payload_var}->qf_{fld.name} = {clos_tmp};")
+                    # Check if exported field is a native function
+                    elif (nb := next((b for b in mod_native_funs if b.name == fld.name), None)) is not None:
+                        if nb.symbol or nb.inline_template:
+                            tramp_name = f"qv_{clean_mod}_{fld.name}_trampoline"
+                            clos_tmp = self.fresh_tmp(f"_{clean_mod}_{fld.name}_clos")
+                            lines.append(
+                                f"    QClosure *{clos_tmp} = "
+                                f"(QClosure *)quest_alloc(sizeof(QClosure));"
+                            )
+                            lines.append(f"    {clos_tmp}->fn = (void *){tramp_name};")
+                            lines.append(f"    {clos_tmp}->env = NULL;")
+                            lines.append(f"    {payload_var}->qf_{fld.name} = {clos_tmp};")
+                        else:
+                            lines.append(f"    {payload_var}->qf_{fld.name} = NULL;")
+                    # Check if exported field is a native value
+                    elif (nb := next((b for b in mod_native_vals if b.name == fld.name), None)) is not None:
+                        val_str = nb.c_val
+                        if self.c_type(fld.type_val) == "QVal" and self.c_type(nb.type_val) != "QVal":
+                            val_str = _qval_wrap(val_str, nb.type_val)
+                        lines.append(f"    {payload_var}->qf_{fld.name} = {val_str};")
+                    # Otherwise pure Quest let value
                     else:
                         m_ident = mangle_module_ident(clean_mod, fld.name)
-                        lines.append(f"    {payload_var}->qf_{fld.name} = {m_ident};")
+                        val_b = next((b for b in mod.bindings if getattr(b, "name", None) == fld.name), None)
+                        val_t = getattr(getattr(val_b, "symbol", None), "type_val", None)
+                        if val_t is None:
+                            val_t = getattr(val_b, "type_val", None)
+                        val_str = m_ident
+                        if val_t and self.c_type(fld.type_val) == "QVal" and self.c_type(val_t) != "QVal":
+                            val_str = _qval_wrap(val_str, val_t)
+                        lines.append(f"    {payload_var}->qf_{fld.name} = {val_str};")
                 d_name = self.record_ctx.offset_dict_instance_name(mod_rec_t, mod_rec_t)
                 lines.append(
                     f"    qv_{clean_mod} = (QRecordVal){{ .val = (void *){payload_var}, "
@@ -735,10 +842,17 @@ class CEmitter:
         # 9. Main entrypoint
         lines.extend([
             "int main(int argc, char **argv) {",
-            "    (void)argc; (void)argv;",
             "    quest_gc_init();",
+            "    quest_builtins_init(argc, argv);",
             "",
         ])
+
+        # Initialize all compiled modules topologically
+        if sorted_modules:
+            for mod in sorted_modules:
+                clean_mod = mod.name.replace(".", "_")
+                lines.append(f"    qv_mod_{clean_mod}_init();")
+            lines.append("")
 
         # Initialize all compiled modules topologically
         if sorted_modules:
@@ -1001,12 +1115,14 @@ class CEmitter:
                 return tmp
 
             case TypedSelect(target=tgt, field=fld):
-                if isinstance(tgt, TypedVar) and tgt.name == "arrayOp" and fld == "error":
-                    return "(&quest_exc_arrayOp_error)"
-                if isinstance(tgt, TypedVar) and tgt.name == "string" and fld == "error":
-                    return "(&quest_exc_string_error)"
-                if isinstance(tgt, TypedVar) and tgt.name == "dynamic" and fld == "error":
-                    return "(&quest_exc_dynamic_error)"
+                if isinstance(tgt, TypedVar) and tgt.name in self.all_modules:
+                    mod = self.all_modules[tgt.name]
+                    nb = next(
+                        (b for b in mod.bindings if isinstance(b, TypedNativeBinding) and b.name == fld),
+                        None,
+                    )
+                    if nb is not None and nb.c_val is not None:
+                        return nb.c_val
                 c_tgt = self.emit_val(tgt, lines)
                 if isinstance(tgt.type_val, QTupleType):
                     val_idx = self._tuple_field_index(tgt.type_val, fld)
@@ -1139,6 +1255,23 @@ class CEmitter:
                         elif fld == "copy" and len(args) == 1:
                             c_dyn = self.emit_val(args[0], lines)
                             return f"quest_dynamic_new({c_dyn}->type_desc, {c_dyn}->payload)"
+                    elif mod_name in self.all_modules:
+                        mod = self.all_modules[mod_name]
+                        clean_mod = mod_name.replace(".", "_")
+                        binding = next(
+                            (b for b in mod.bindings if getattr(b, "name", None) == fld),
+                            None,
+                        )
+                        if isinstance(binding, TypedNativeBinding):
+                            c_args = [self.emit_val(a, lines) for a in args]
+                            if binding.inline_template:
+                                return binding.inline_template.format(*c_args)
+                            elif binding.symbol:
+                                call_str = f"{binding.symbol}({', '.join(c_args)})"
+                                if expr.type_val == OK_TYPE:
+                                    lines.append(f"{call_str};")
+                                    return "((void)0)"
+                                return call_str
 
                 # Preceding descriptor arguments from type_args
                 descriptor_args = [self.c_type_descriptor(targ) for targ in type_args]
@@ -1183,7 +1316,10 @@ class CEmitter:
                         c_args.append(self._emit_call_arg(formal_p.type_val, actual_a, lines))
                     args_str = ", ".join(c_args)
                     call_str = f"{c_func}({args_str})"
-                    if isinstance(ret_type, QTypeVar) and expr.type_val != ret_type:
+                    if (
+                        self.c_type(ret_type) == "QVal"
+                        and self.c_type(expr.type_val) != "QVal"
+                    ):
                         if (rec_bound := resolve_record_bound(ret_type)) is not None:
                             if isinstance(expr.type_val, QRecordType):
                                 tmp_ret = self.fresh_tmp("_call_ret")
@@ -1218,7 +1354,11 @@ class CEmitter:
                     args_str = ", ".join(all_c_args)
                     call_str = f"(({fn_ptr_t})({clos_val}->fn))({args_str})"
                     formal_ret = inner_formal.result_type if isinstance(inner_formal, QFunType) else None
-                    if isinstance(formal_ret, QTypeVar) and expr.type_val != formal_ret:
+                    if (
+                        formal_ret is not None
+                        and self.c_type(formal_ret) == "QVal"
+                        and self.c_type(expr.type_val) != "QVal"
+                    ):
                         if (rec_bound := resolve_record_bound(formal_ret)) is not None:
                             if isinstance(expr.type_val, QRecordType):
                                 tmp_ret = self.fresh_tmp("_call_ret")
@@ -1302,6 +1442,9 @@ class CEmitter:
 
             case TypedTypeApp(func=func):
                 return self.emit_val(func, lines)
+
+            case TypedExternal(symbol=symbol):
+                return symbol
 
             case _:
                 raise NotImplementedError(

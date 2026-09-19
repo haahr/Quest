@@ -122,6 +122,7 @@ class TokenKind(Enum):
     KW_EXIT = auto()        # exit
     KW_EXPORT = auto()      # export
     KW_EXTENT = auto()      # extent
+    KW_EXTERNAL = auto()    # external
     KW_FALSE = auto()       # false
     KW_FOR = auto()         # for
     KW_FUN = auto()         # fun
@@ -222,6 +223,7 @@ KEYWORDS: dict[str, TokenKind] = {
     "exit": TokenKind.KW_EXIT,
     "export": TokenKind.KW_EXPORT,
     "extent": TokenKind.KW_EXTENT,
+    "external": TokenKind.KW_EXTERNAL,
     "false": TokenKind.KW_FALSE,
     "for": TokenKind.KW_FOR,
     "fun": TokenKind.KW_FUN,

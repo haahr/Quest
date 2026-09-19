@@ -53,13 +53,10 @@ class CDeclarationEmitter:
         return lines
 
     def emit_module_declarations(self, analysis: CProgramAnalysis) -> list[str]:
-        from quest.builtins import BuiltinModuleRegistry
         lines: list[str] = []
         if analysis.sorted_modules:
             lines.append("/* Forward declarations and state for compiled modules */")
             for mod in analysis.sorted_modules:
-                mod_rec_t = BuiltinModuleRegistry._build_record_type_from_scope(mod.scope)
-                rec_struct = record_struct_name(mod_rec_t, self.record_ctx)
                 clean_mod = mod.name.replace(".", "_")
                 lines.append(f"static QRecordVal qv_{clean_mod};")
                 lines.append(f"static bool qv_mod_{clean_mod}_initialized = false;")

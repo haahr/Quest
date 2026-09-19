@@ -177,42 +177,102 @@ quest compile -I ./lib main.quest -o main_app
 The Quest C compiler's module support is designed in two complementary stages:
 
 ### Stage 1: Whole-Program Compilation (Initial Implementation)
-In Stage 1, the compiler starts from a root source file, processes all explicit and implicit `import` declarations recursively, and builds a complete in-memory typed AST model of the program (`Environment.loaded_modules_ast`). When all imports have been resolved, typechecked, and verified, the compiler emits a single self-contained C translation unit (`.c` file) that compiles directly with standard C99:
+In Stage 1, the compiler starts from a root source file, processes all explicit and implicit `import` declarations
+recursively, and builds a complete in-memory typed AST model of the program (`Environment.loaded_modules_ast`).
+When all imports have been resolved, typechecked, and verified, the compiler emits a single self-contained C
+translation unit (`.c` file) that compiles directly with standard C99:
 
 1. **Acyclic Dependency Enforcement (Cardelli §7.1):**
-   - As Cardelli explicitly specifies (*Typeful Programming* §7.1, p. 55): *"The import dependencies of both modules and interfaces must form a directed acyclic graph; that is, mutually recursive imports are not allowed to guarantee that the linking process is deterministic."*
-   - Neither interfaces nor modules may form cycles. Topological sort order is guaranteed to be unambiguous and deterministic.
-2. **Module Export Representation (Option A - First-Class Records):**
-   - Each module `m : I` compiles to a top-level C record pointer `static QT_I *qv_m;`.
+   - As Cardelli explicitly specifies (*Typeful Programming* §7.1, p. 55): *"The import dependencies of both
+     modules and interfaces must form a directed acyclic graph; that is, mutually recursive imports are not
+     allowed to guarantee that the linking process is deterministic."*
+   - Neither interfaces nor modules may form cycles. Topological sort order is guaranteed to be unambiguous
+     and deterministic.
+2. **Module Export Representation (First-Class `QRecordVal` Fat Pointers):**
+   - Each module `m : I` compiles to a top-level C record variable `static QRecordVal qv_m;`.
    - The interface `I` specifies the record struct shape `QT_I` containing function pointers, closures, and values.
-   - Accessing `m.f(x)` emits `qv_m->qf_f(x)` (or dictionary-based offset lookup if subtyping applies).
+   - `qv_m` stores `.val` pointing to the allocated payload struct and `.dict` pointing to the static identity
+     evidence dictionary `&offsetdict_I_I`.
 3. **Abstract Type Erasure to `QVal`:**
-   - In interface records, abstract types (`T::TYPE`) cannot have known concrete scalar representations across compilation boundaries. Function signatures in the interface record use uniform 64-bit words (`QVal` / `void *`), and concrete implementations adapt/cast as necessary.
+   - In interface records, abstract types (`T::TYPE`) cannot have known concrete scalar representations across
+     compilation boundaries. Field signatures in the interface record use uniform 64-bit words (`QVal` / `void *`),
+     and concrete implementations wrap values into `QVal` (`_qval_wrap`) during module record initialization.
 4. **Manifest Type Erasure:**
-   - Interface records (`QT_<Interface>`) only store value components (`FieldSig`); manifest types (`Def T = ...`) and kinds are erased at runtime and do not generate struct fields.
+   - Interface records (`QT_<Interface>`) only store value components (`FieldSig`); manifest types (`Def T = ...`)
+     and kinds are erased at runtime and do not generate struct fields.
 5. **Topological Module Initialization (`_init`):**
-   - Each module emits an initialization function `static void qv_mod_<name>_init(void)` protected by an idempotent boolean flag `static bool qv_mod_<name>_initialized;`.
-   - The initializer recursively calls the initializers of all its dependencies in topological order, allocates `qv_m`, executes the module's internal statements and `let var` bindings, and writes the exported members into `qv_m`.
-   - `main()` invokes the initializers of all top-level imported modules before executing the main script phrases. This guarantees singleton semantics across diamond dependency graphs.
+   - Each module emits an initialization function `static void qv_mod_<name>_init(void)` protected by an idempotent
+     boolean flag `static bool qv_mod_<name>_initialized;`.
+   - The initializer recursively calls the initializers of all its dependencies in topological order, allocates
+     the payload struct, executes the module's internal statements and `let var` bindings, and writes the exported
+     members into the module record.
+   - `main()` invokes the initializers of all top-level imported modules before executing the main script phrases.
+     This guarantees singleton semantics across diamond dependency graphs.
 6. **Identifier Mangling:**
-   - Internal module variables, lifted lambdas, and closures are prefixed with their module name (`qv_<module>_<name>`), preventing name collisions in the single translation unit.
-7. **C Record Wrappers for Built-in Modules:**
-   - Core built-in modules (`arrayOp`, `string`, etc.) generate C record instances and initializers wrapping the native runtime primitives (`quest_array_new`, `quest_string_new`, etc.), allowing built-ins to be invoked and passed using the exact same record mechanics as user modules.
+   - Internal module variables, lifted lambdas, and closures are prefixed with their module name
+     (`qv_<module>_<name>`), preventing name collisions in the single translation unit.
+7. **Unified Native Module Mechanism (Approach B):**
+   - All standard library modules (`writer`, `reader`, `conv`, `ascii`, `int`, `real`, `string`, `system`,
+     `arrayOp`, `dynamic`) and user-defined hybrid modules are unified under the standard `TypedModule` pipeline.
+   - Builtin functions and constants are annotated with `c_symbol`, `inline_template`, and `c_val`.
+   - Direct calls on known modules inline native calls directly without closure overhead.
+   - First-class module records populate closure trampolines (`qv_<mod>_<name>_trampoline`) and concrete evaluated
+     constants, providing full Cardelli first-class module semantics.
 
-### Stage 2: Separate Compilation (Future Roadmap)
-Stage 2 introduces incremental, on-demand compilation of individual modules and interfaces into reusable disk artifacts without reprocessing the original Quest source files:
+---
 
-1. **Interface Artifacts (`.qi` & `.h`):**
-   - Compiling an interface `I.int.quest` produces:
-     - `I.h`: A C header declaring the C struct shape `QT_I`, function signatures, and exported constants.
-     - `I.qi`: A compiled Quest interface metadata file containing the elaborated type signatures, subtyping bounds, and kinds required by the Quest compiler when typechecking downstream modules without re-reading `I.int.quest`.
-2. **Module Artifacts (`.qm`, `.c`, `.o`):**
-   - Compiling `m.mod.quest` produces:
-     - `m.c` / `m.o`: Native object files defining `qv_mod_m_init()` and the module implementation.
-     - `m.qm`: A compiled Quest module metadata file verifying implementation conformance against `I.qi`.
-3. **Linking and ABI:**
-   - The Quest driver coordinates linking required `.o` files with `clang` or producing static/dynamic libraries.
-   - Record subtyping evidence dictionaries and shape descriptors adopt stable, deterministic external linkage across object boundaries.
+## 8. Unified Native Module Mechanism & Hybrid Quest/C Modules
+
+Rather than treating built-in modules as ad-hoc compiler-internal special cases, Quest unifies all modules
+(pure Quest modules, standard library modules, and user-defined hybrid modules) through a single architectural pipeline:
+
+### 8.1. Declarative Module Architecture
+- Built-in modules are represented as standard `TypedModule` ASTs registered in `BuiltinModuleRegistry`.
+- Member functions can be pure Quest functions, native functions (`TypedNativeBinding` with `c_symbol` or
+  `inline_template`), or external C values (`TypedExternal` with `c_val`).
+
+### 8.2. Dual-Path Code Generation
+The C backend optimizes module member access while preserving full first-class module semantics:
+1. **Direct Call Lowering:**
+   When a function is called directly on a known module (e.g. `writer.putString(w s)` or `conv.int(n)`), the compiler
+   emits the direct C function call (`quest_writer_put_string(...)`) or expands the inline template, entirely bypassing
+   closure allocation and dictionary dispatch.
+2. **First-Class Concrete Value Records:**
+   When a module is referenced as a value (e.g. `let m = writer;` or passed as a parameter), the module's initializer
+   `qv_mod_<name>_init()` allocates the record payload and populates all fields with **concrete values**:
+   - Native and Quest functions are wrapped in allocated `QClosure` structures pointing to static trampolines.
+   - Native constants and evaluated `let` values are stored directly in the record fields.
+   - Once loaded, no field accesses require dynamic getter hooks; all fields are concrete values stored in the record.
+
+### 8.3. Hybrid Quest/C Modules
+Developers can write modules that seamlessly combine Quest code and C implementations:
+```quest
+(* fileio.int.quest *)
+interface FileIO
+export
+    Handle::TYPE
+    stdout: Handle
+    writeHello(h: Handle): Ok
+end;
+
+(* fileio.mod.quest *)
+module fileio : FileIO
+import writer: Writer
+export
+    Let Handle = external "QWriter *";
+    let stdout: Handle = external "quest_writer_output";
+    let writeHello(h: Handle): Ok =
+        writer.putString(h "Hello Native!\n");
+end;
+```
+Inside `fileio`, `writeHello` is a pure Quest function that calls into the native `writer` module, while `Handle`
+and `stdout` bind directly to underlying C runtime types and symbols.
+
+### 8.4. Lazy Loading Semantics
+Following Cardelli's specification, module loading is lazy:
+- Modules initialize on first reference or at the start of the program unit.
+- Initialization is guarded by `qv_mod_<name>_initialized` to guarantee single evaluation.
+- Dependencies are resolved and initialized in topological order prior to evaluating local bindings.
 
 ---
 

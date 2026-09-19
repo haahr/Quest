@@ -1,4 +1,4 @@
-"""Unit tests for Phase 5: Flat Stride Arrays (Array(Record) & Array(Variant)).
+"""Unit tests for Phase 4.9d: Flat Stride Arrays (Array(Record) & Array(Variant)).
 
 Tests flat 16-byte memory buffers for Array(Record) and Array(Variant) using
 QArrayWideRecord and QArrayWideVariant with zero heap boxing.
@@ -15,7 +15,7 @@ from quest.codegen import compile_c_source, run_binary
 from quest.pipeline import compile_pipeline
 
 
-class FlatStrideArraysTest(unittest.TestCase):
+class TestPhase49dFlatStrideArrays(unittest.TestCase):
     """Integration test suite verifying flat stride arrays in generated C code."""
 
     def compile_quest(self, code: str, nogc: bool = False) -> subprocess.CompletedProcess[str]:

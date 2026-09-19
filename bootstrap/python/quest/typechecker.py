@@ -96,6 +96,8 @@ from quest.typed_ast import (
     TypedExit,
     TypedExpr,
     TypedExprStmt,
+    TypedExternal,
+    TypedNativeBinding,
     TypedFor,
     TypedFun,
     TypedIf,
@@ -527,7 +529,11 @@ class TypeElaborator:
             case ast.ExprStmt(expr=inner):
                 return self.check_expr(inner, expected_type, env, loop_depth)
 
-            # 12. Subsumption: synthesize minimal type and check subtyping (S <= T)
+            # 12. External C symbol binding
+            case ast.ExprExternal(symbol=symbol, offset=off):
+                return TypedExternal(symbol=symbol, type_val=expected_type, offset=off)
+
+            # 13. Subsumption: synthesize minimal type and check subtyping (S <= T)
             case _:
                 return self._check_subsumption(expr, expected_type, env, loop_depth)
 
@@ -566,6 +572,12 @@ class TypeElaborator:
                 if loop_depth <= 0:
                     raise TypeError("Exit statement outside of any loop", offset=off)
                 return TypedExit(offset=off)
+
+            case ast.ExprExternal(symbol=symbol, offset=off):
+                raise TypeError(
+                    f"External binding '{symbol}' requires an explicit type annotation",
+                    offset=off,
+                )
 
             # --- Variables & Identifiers ---
             case ast.ExprId(name=name, offset=off):

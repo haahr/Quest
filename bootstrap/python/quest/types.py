@@ -208,6 +208,16 @@ class QExceptionType(QType):
         return f"Exception({self.payload_type})"
 
 
+@dataclass(frozen=True)
+class QExternalType(QType):
+    """Opaque C data structure type (external "c_type")."""
+    name: str
+    c_type: str
+
+    def __str__(self) -> str:
+        return self.name if self.name else f'external "{self.c_type}"'
+
+
 # Canonical singletons for primitive types
 INT_TYPE = QIntType()
 REAL_TYPE = QRealType()
@@ -1209,6 +1219,10 @@ def is_subtype(
                 for sa, ta in zip(s_args, t_args)
             )
 
+        # External Types: structural equality on underlying C type
+        case (QExternalType(c_type=sub_c), QExternalType(c_type=sup_c)):
+            return sub_c.strip() == sup_c.strip()
+
         case _:
             return False
 
@@ -1482,7 +1496,7 @@ def synth_kind(type_val: QType, env: Optional[Any] = None) -> QKind:
     """Synthesizes the most specific minimal kind K for type_val in the given environment."""
     match type_val:
         case (QIntType() | QRealType() | QBoolType() | QCharType() | QStringType()
-              | QOkType() | QDynamicType() | QExceptionType()):
+              | QOkType() | QDynamicType() | QExceptionType() | QExternalType()):
             return TYPE_KIND
 
         case QTupleType(fields=fields):

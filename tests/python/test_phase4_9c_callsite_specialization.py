@@ -1,4 +1,4 @@
-"""Tests for Phase 4: Call-Site Specialization for Unbounded Quantifiers (A::TYPE)."""
+"""Tests for Phase 4.9c: Call-Site Specialization for Unbounded Quantifiers (A::TYPE)."""
 
 import subprocess
 import tempfile
@@ -9,7 +9,7 @@ from quest.codegen import compile_c_source, run_binary
 from quest.pipeline import compile_pipeline
 
 
-class TestPhase411CallsiteSpecialization(unittest.TestCase):
+class TestPhase49cCallsiteSpecialization(unittest.TestCase):
     def compile_quest(self, code: str, nogc: bool = False) -> subprocess.CompletedProcess[str]:
         pipeline = compile_pipeline()
         res = pipeline.execute(code, "<test>")

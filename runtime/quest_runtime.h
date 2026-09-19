@@ -103,6 +103,20 @@ typedef struct QArrayWideVariant {
     QVariantVal data[];
 } QArrayWideVariant;
 
+/* Standard I/O sink and source representations */
+typedef struct QWriter {
+    FILE *file;
+    bool  is_file;
+    bool  is_closed;
+} QWriter;
+
+typedef struct QReader {
+    FILE *file;
+    int   peek_char; /* EOF (-1) if no unread character */
+    bool  is_file;
+    bool  is_closed;
+} QReader;
+
 /* Legacy Variant representation: descriptor, tag and single 64-bit value word */
 typedef struct QVariant {
     const void *descriptor;
@@ -251,12 +265,22 @@ static inline void  quest_gc_init(void)           { GC_INIT(); }
 
 /* Runtime helper prototypes */
 QString *quest_string_new(const char *src, int64_t len);
+QString *quest_string_alloc(int64_t size, QChar init);
+bool     quest_string_is_empty(const QString *s);
 QString *quest_string_concat(const QString *s1, const QString *s2);
 bool     quest_string_equal(const QString *s1, const QString *s2);
 QChar    quest_string_get_char(const QString *s, int64_t idx);
 void     quest_string_set_char(QString *s, int64_t idx, QChar ch);
 QString *quest_string_get_sub(const QString *s, int64_t start, int64_t len);
 void     quest_string_set_sub(QString *dest, int64_t dest_start, const QString *src, int64_t src_start, int64_t len);
+QString *quest_string_cat_sub(const QString *s1, int64_t st1, int64_t sz1,
+                              const QString *s2, int64_t st2, int64_t sz2);
+QString *quest_string_conc(const QArray *strings);
+bool     quest_string_equal_sub(const QString *s1, int64_t st1, int64_t sz1,
+                                const QString *s2, int64_t st2, int64_t sz2);
+bool     quest_string_precedes(const QString *s1, const QString *s2);
+bool     quest_string_precedes_sub(const QString *s1, int64_t st1, int64_t sz1,
+                                   const QString *s2, int64_t st2, int64_t sz2);
 
 QArray  *quest_array_new(int64_t len, QVal init_val);
 QArrayWideRecord  *quest_array_new_wide_record(int64_t len, QRecordVal init_val);
@@ -270,6 +294,95 @@ void     quest_raise_string_error(void);
 void     quest_raise_variant_error(void);
 void     quest_raise_dynamic_error(void);
 void     quest_print_val(QVal val, const char *type_name);
+
+/* Standard library singleton exceptions */
+extern const QException quest_exc_writer_error;
+extern const QException quest_exc_reader_error;
+extern const QException quest_exc_ascii_error;
+extern const QException quest_exc_int_error;
+extern const QException quest_exc_real_error;
+extern const QException quest_exc_system_error;
+
+void quest_raise_writer_error(void);
+void quest_raise_reader_error(void);
+void quest_raise_ascii_error(void);
+void quest_raise_int_error(void);
+void quest_raise_real_error(void);
+void quest_raise_system_error(void);
+
+/* System module primitives */
+extern QArray *quest_system_args;
+void     quest_system_init(int argc, char **argv);
+void     quest_system_exit(int64_t code);
+QString *quest_system_getenv(const QString *var);
+bool     quest_system_file_exists(const QString *path);
+
+/* Writer module primitives */
+extern QWriter quest_writer_output_val;
+extern QWriter quest_writer_err_val;
+#define quest_writer_output (&quest_writer_output_val)
+#define quest_writer_err    (&quest_writer_err_val)
+
+QWriter *quest_writer_file(const QString *name);
+void     quest_writer_put_string(QWriter *w, const QString *s);
+void     quest_writer_put_char(QWriter *w, QChar ch);
+void     quest_writer_put_substring(QWriter *w, const QString *s, int64_t start, int64_t size);
+void     quest_writer_flush(QWriter *w);
+void     quest_writer_close(QWriter *w);
+
+/* Reader module primitives */
+extern QReader quest_reader_input_val;
+#define quest_reader_input (&quest_reader_input_val)
+
+QReader *quest_reader_file(const QString *name);
+bool     quest_reader_more(QReader *r);
+bool     quest_reader_ready(QReader *r);
+QChar    quest_reader_get_char(QReader *r);
+QString *quest_reader_get_string(QReader *r, int64_t size);
+void     quest_reader_get_substring(QReader *r, QString *s, int64_t start, int64_t size);
+void     quest_reader_close(QReader *r);
+
+/* Conv module primitives */
+QString *quest_conv_okay(void);
+QString *quest_conv_bool(bool b);
+QString *quest_conv_int(int64_t n);
+QString *quest_conv_real(double r);
+QString *quest_conv_char(QChar ch);
+QString *quest_conv_string(const QString *s);
+
+/* Ascii module primitives */
+QChar   quest_ascii_char(int64_t n);
+int64_t quest_ascii_val(QChar ch);
+
+/* IntOp constants & primitives */
+#define QUEST_INT_MIN (-9223372036854775807LL - 1LL)
+#define QUEST_INT_MAX (9223372036854775807LL)
+
+static inline int64_t quest_int_abs(int64_t n) {
+    if (n == QUEST_INT_MIN) return QUEST_INT_MIN;
+    return n < 0 ? -n : n;
+}
+static inline int64_t quest_int_min(int64_t a, int64_t b) { return a < b ? a : b; }
+static inline int64_t quest_int_max(int64_t a, int64_t b) { return a > b ? a : b; }
+
+/* RealOp constants & primitives */
+#define QUEST_REAL_MIN (-1.7976931348623157e+308)
+#define QUEST_REAL_MAX (1.7976931348623157e+308)
+#define QUEST_REAL_POS_EPSILON (2.2204460492503131e-16)
+#define QUEST_REAL_NEG_EPSILON (-2.2204460492503131e-16)
+#define QUEST_REAL_E (2.71828182845904523536)
+
+double  quest_real_log(double r);
+int64_t quest_real_floor(double r);
+int64_t quest_real_round(double r);
+static inline double quest_real_abs(double r) { return fabs(r); }
+static inline double quest_real_min(double a, double b) { return a < b ? a : b; }
+static inline double quest_real_max(double a, double b) { return a > b ? a : b; }
+double  quest_real_div(double a, double b);
+double  quest_real_exp(double a, double b);
+
+/* Global standard library initialization */
+void quest_builtins_init(int argc, char **argv);
 
 /* Type descriptor interning and dynamic operations */
 const QTypeDescriptor *quest_intern_type_descriptor(const QTypeDescriptor *desc);

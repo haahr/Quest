@@ -103,24 +103,40 @@ native **AArch64 (ARM64)** machine code and providing a **JIT compiler** for int
   - **Phase 4.2c (Closures & Function Values):** First-class closures, environment capture, lambda lifting,
     and indirect dispatch. — *Complete*
   - **Phase 4.3 (Arrays & Strings):** Fixed-size/dynamic arrays and extended string operations. — *Complete*
-  - **Phase 4.4 (Options & Variants):** Ordered options, tagged variants, tag checks, and case discrimination. — *Complete*
-  - **Phase 4.5 (Subtyping & Dynamic Dispatch):** Prefix tuple subtyping, evidence-passing record dictionaries, object headers, and static variant tag remapping. — *Complete*
-  - **Phase 4.6 (Exceptions & Panics):** Exception values, try-when exception handling, and stack unwinding. — *Complete*
-  - **Phase 4.7 (Whole-Program Modules & Interfaces):** Multi-file compilation, interface checking, module records, and linking. — *Complete*
+  - **Phase 4.4 (Options & Variants):** Ordered options, tagged variants, tag checks, and case
+    discrimination. — *Complete*
+  - **Phase 4.5 (Subtyping & Dynamic Dispatch):** Prefix tuple subtyping, evidence-passing record
+    dictionaries, object headers, and static variant tag remapping. — *Complete*
+  - **Phase 4.6 (Exceptions & Panics):** Exception values, try-when exception handling, and
+    stack unwinding. — *Complete*
+  - **Phase 4.7 (Whole-Program Modules & Interfaces):** Multi-file compilation, interface checking, module records,
+    and linking. — *Complete*
   - **Phase 4.8 (Runtime Type Descriptors & Dynamic Module):**
     - *4.8a:* Runtime `QTypeDescriptor` structures, base descriptors, interning table, and `QDynamic`. — *Complete*
     - *4.8b:* Compiler quantifier calling convention and call-site descriptor synthesis. — *Complete*
-    - *4.8c:* `dynamic` module lowering (`dynamic.new`, `dynamic.be`, `dynamic.copy`, `dynamic.error`) and generic wrappers. — *Complete*
-  - **Phase 4.9 (Fat Pointers, Aggregate Subtyping, Specialization & Flat Stride Arrays):** Uniform 16-byte
-    `QRecordVal` fat pointers, 16-byte `QVariantVal` variants with static tag remapping, bounded specialization
-    (`A <: Record`, `V <: Variant`), call-site specialization for unbounded quantifiers (`All(A::TYPE)`), and flat
-    stride arrays (`Array(Record)`, `Array(Variant)`). — *Complete*
+    - *4.8c:* `dynamic` module lowering (`dynamic.new`, `dynamic.be`, `dynamic.copy`, `dynamic.error`) and generic
+      wrappers. — *Complete*
+  - **Phase 4.9 (Fat Pointers, Aggregate Subtyping, Specialization & Flat Stride Arrays):**
+    - *4.9a:* Uniform 16-byte `QRecordVal` fat pointers and aggregate subtyping across records and tuples. — *Complete*
+    - *4.9b:* Bounded specialization for records (`A <: Record`) and variants (`V <: Variant`). — *Complete*
+    - *4.9c:* Call-site specialization for unbounded quantifiers (`All(A::TYPE)`). — *Complete*
+    - *4.9d:* Flat stride arrays (`Array(Record)`, `Array(Variant)`) with zero heap boxing. — *Complete*
+  - **Phase 4.10 (Standard Library Builtins & OS Primitives):** Cardelli standard library interfaces in C (`Writer`,
+    `Reader`, `Conv`, `Ascii`, `IntOp`, `RealOp`, `StringOp`) and `System` OS extensions (`args`, `sysexit`,
+    `getEnv`, `fileExists`, `error`). — *Complete*
+  - **Phase 4.11 (Unified Native Module Mechanism & Hybrid Modules):** Unified declarative module pipeline,
+    first-class `external` syntax for opaque C data structures (`type T = external "..."`) and native symbols
+    (`let x = external "..."`), elimination of legacy Section 8c, and lazy module loading with concrete value
+    records. — *Complete*
 - **Bootstrap Compiler Completion Prerequisites:**
-  - *Dynamic Subtyping & Compound Type Descriptors:* Structural subtyping in `quest_dynamic_be` (`is_subtype(sub, super)`) across records, variants, and compound types.
-  - *Separate Compilation & Object Linking:* Compiling modules independently to `.o` files with header/interface exports and linking.
-  - *Standard Library Builtins Completeness:* C runtime implementations for remaining Cardelli builtins (`ascii`, `conv`, etc.) and deferred `dynamic.extern`/`intern` text serialization.
+  - *Separate Compilation & Object Linking:* Compiling modules independently to `.o` files with header/interface
+    exports and linking.
+  - *Dynamic Subtyping & Compound Type Descriptors:* Structural subtyping in `quest_dynamic_be`
+    (`is_subtype(sub, super)`) across records, variants, and compound types, alongside deferred `dynamic.extern` /
+    `intern` text serialization (using JSOG format for cycle-safe graph representation).
 - C transpiler architecture in [codegen-c.md](codegen-c.md);
-  C ABI specification in [c-representation.md](c-representation.md).
+  C ABI specification in [c-representation.md](c-representation.md);
+  language extensions specification in [extensions.md](extensions.md).
 
 ### Step 5: Self-Hosted Compiler & Interpreter (Written in Quest)
 - Port the Python implementations of Steps 1–4 into idiomatic Quest.
@@ -153,3 +169,4 @@ native **AArch64 (ARM64)** machine code and providing a **JIT compiler** for int
 - [runtime-design.md](runtime-design.md): Object representation (Evidence Passing vs Fat Pointers) and ABI.
 - [interpreter.md](interpreter.md): Interpreter runtime architecture, value model, and semantic decisions.
 - [step3-interpreter.md](step3-interpreter.md): Step 3 interpreter and REPL implementation plan.
+- [extensions.md](extensions.md): Necessary OS and CLI extensions to the core language.

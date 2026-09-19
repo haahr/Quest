@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Optional
 
 from quest.analysis.closure import LambdaAnalysis, analyze_closures
@@ -82,6 +82,7 @@ class CProgramAnalysis:
     lambda_info_by_id: dict[int, CLambdaInfo]
     top_funs_dict: dict[str, tuple[TypedFun, Any]]
     specializations: dict[tuple[str, tuple[QType, ...]], tuple[str, TypedFun]]
+    needed_builtin_modules: list[str] = field(default_factory=list)
 
 
 def topological_sort_modules(modules: list[TypedModule]) -> list[TypedModule]:
@@ -405,6 +406,56 @@ def analyze_program_for_c(
         if isinstance(phrase, TypedModule):
             all_module_map[phrase.name] = phrase
 
+    known_builtins = {
+        "writer", "reader", "conv", "ascii", "int", "real", "string", "system",
+        "arrayOp", "dynamic", "list",
+    }
+    needed_builtin_modules: list[str] = []
+
+    def _check_import_item(iname: str) -> None:
+        if iname in known_builtins and iname not in needed_builtin_modules:
+            needed_builtin_modules.append(iname)
+
+    def _scan_for_builtin_vars(n: Any) -> None:
+        if isinstance(n, TypedVar) and n.name in known_builtins:
+            if n.name not in needed_builtin_modules:
+                needed_builtin_modules.append(n.name)
+        if hasattr(n, "__dataclass_fields__"):
+            for fld_name in n.__dataclass_fields__:
+                _scan_for_builtin_vars(getattr(n, fld_name))
+        elif isinstance(n, (list, tuple)):
+            for item in n:
+                _scan_for_builtin_vars(item)
+
+    for phrase in prog.phrases:
+        if isinstance(phrase, TypedImport):
+            for it in phrase.items:
+                for iname in it.names:
+                    _check_import_item(iname)
+        _scan_for_builtin_vars(phrase)
+
+    for bmod in needed_builtin_modules:
+        if bmod not in all_module_map:
+            bast = BuiltinModuleRegistry.get_module_ast(bmod)
+            if bast is not None:
+                all_module_map[bmod] = bast
+
+    changed = True
+    while changed:
+        changed = False
+        for mod in list(all_module_map.values()):
+            for b in mod.bindings:
+                if isinstance(b, TypedImport):
+                    for it in b.items:
+                        for iname in it.names:
+                            if iname in known_builtins and iname not in all_module_map:
+                                bast = BuiltinModuleRegistry.get_module_ast(iname)
+                                if bast is not None:
+                                    all_module_map[iname] = bast
+                                    if iname not in needed_builtin_modules:
+                                        needed_builtin_modules.append(iname)
+                                    changed = True
+
     sorted_modules = topological_sort_modules(list(all_module_map.values()))
 
     # 1. Top-level phrases in prog
@@ -486,9 +537,13 @@ def analyze_program_for_c(
                 if v not in variant_types:
                     variant_types.append(v)
         mod_rec_t = BuiltinModuleRegistry._build_record_type_from_scope(mod.scope)
-        rec_tag = record_struct_name(mod_rec_t, record_ctx)
-        if not any(tag == rec_tag for tag, _ in agg_types):
-            agg_types.append((rec_tag, mod_rec_t))
+        rec_agg, rec_var = collect_aggregate_types(mod_rec_t, record_ctx)
+        for item in rec_agg:
+            if item not in agg_types:
+                agg_types.append(item)
+        for v in rec_var:
+            if v not in variant_types:
+                variant_types.append(v)
 
     all_records = [t for _, t in agg_types if isinstance(t, QRecordType)]
     all_tuples = [t for _, t in agg_types if isinstance(t, QTupleType)]
@@ -556,4 +611,5 @@ def analyze_program_for_c(
         lambda_info_by_id=lambda_info_by_id,
         top_funs_dict=top_funs_dict,
         specializations=specializations,
+        needed_builtin_modules=needed_builtin_modules,
     )

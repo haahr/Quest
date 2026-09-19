@@ -1,4 +1,4 @@
-"""Tests for aggregate subtyping (records in arrays, tuples, etc.) in Quest."""
+"""Tests for Phase 4.9a: Uniform 16-byte QRecordVal Fat Pointers & Aggregate Subtyping in Quest."""
 
 import subprocess
 import tempfile
@@ -9,7 +9,7 @@ from quest.codegen import compile_c_source, run_binary
 from quest.pipeline import compile_pipeline
 
 
-class TestPhase49AggregateSubtyping(unittest.TestCase):
+class TestPhase49aAggregateSubtyping(unittest.TestCase):
     def compile_quest(self, code: str, nogc: bool = False) -> subprocess.CompletedProcess[str]:
         pipeline = compile_pipeline()
         res = pipeline.execute(code, "<test>")
