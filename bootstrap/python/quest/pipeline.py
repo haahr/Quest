@@ -59,6 +59,7 @@ class CompilerOptions:
     emit_c: bool = False
     output_path: Optional[Path] = None
     nogc: bool = False
+    print_result: bool = False
 
 
 @dataclass
@@ -318,7 +319,10 @@ class CodegenCPhase(Phase):
         from quest.codegen.c_emitter import CEmitter
 
         try:
-            emitter = CEmitter(echo=ctx.options.echo)
+            emitter = CEmitter(
+                echo=ctx.options.echo,
+                print_result=getattr(ctx.options, "print_result", False),
+            )
             loaded_mods = ctx.env.loaded_modules_ast if ctx.env else None
             match input_data:
                 case TypedProgram():
@@ -334,6 +338,47 @@ class CodegenCPhase(Phase):
 
     def dump(self, output_data: Any, ctx: CompilerContext) -> str:
         return str(output_data) if output_data is not None else ""
+
+
+class RunCCompiledPhase(Phase):
+    """Native binary execution phase: compiles C code and runs the resulting binary."""
+    name = "run_c_compiled"
+    description = "Compile C code to native binary and execute it"
+    artifact_name = "stdout"
+
+    def run(self, input_data: Any, ctx: CompilerContext) -> Optional[str]:
+        import tempfile
+        from quest.codegen.compiler_runner import compile_c_source, run_binary
+
+        if not isinstance(input_data, str):
+            return None
+
+        c_code: str = input_data
+        with tempfile.NamedTemporaryFile(suffix="", delete=False) as tmp_file:
+            bin_path = Path(tmp_file.name)
+
+        try:
+            compile_c_source(c_code, output_path=bin_path, nogc=ctx.options.nogc)
+            proc = run_binary(bin_path)
+            if proc.returncode != 0:
+                msg = proc.stderr.strip() if proc.stderr else f"Binary exited with code {proc.returncode}"
+                ctx.sink.emit(Diagnostic.make_error(msg, 0))
+            return proc.stdout
+        except Exception as error:
+            ctx.sink.emit(Diagnostic.make_error(str(error), 0))
+            return None
+        finally:
+            if bin_path.exists():
+                try:
+                    bin_path.unlink()
+                except OSError:
+                    pass
+
+    def dump(self, output_data: Any, ctx: CompilerContext) -> str:
+        if output_data is None:
+            return ""
+        s = str(output_data)
+        return s[:-1] if s.endswith("\n") else s
 
 
 class PhasePipeline:
@@ -460,4 +505,16 @@ def compile_pipeline() -> PhasePipeline:
     pipeline.register(TypecheckPhase())
     pipeline.register(CodegenCPhase())
     return pipeline
+
+
+def full_pipeline() -> PhasePipeline:
+    """Returns the full C compilation and execution pipeline."""
+    pipeline = PhasePipeline()
+    pipeline.register(TokenizePhase())
+    pipeline.register(ParsePhase())
+    pipeline.register(TypecheckPhase())
+    pipeline.register(CodegenCPhase())
+    pipeline.register(RunCCompiledPhase())
+    return pipeline
+
 

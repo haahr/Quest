@@ -12,12 +12,24 @@ ROOT_DIR = Path(__file__).parent.resolve()
 sys.path.insert(0, str(ROOT_DIR / "bootstrap" / "python"))
 
 from quest.error_testing import run_error_test
-from quest.pipeline import default_pipeline
+from quest.pipeline import PhasePipeline, default_pipeline, full_pipeline
 
 TESTS_SOURCE_DIR = ROOT_DIR / "tests" / "source"
 TESTS_GOLDEN_DIR = ROOT_DIR / "tests" / "golden"
 TESTS_ERRORS_DIR = ROOT_DIR / "tests" / "errors"
 DRIVER_SCRIPT = ROOT_DIR / "bootstrap" / "python" / "quest_driver.py"
+
+
+def golden_dir_for_phase(phase_name: str) -> Path:
+    if phase_name in ("interpret", "run_c_compiled"):
+        return TESTS_GOLDEN_DIR / "run"
+    return TESTS_GOLDEN_DIR / phase_name
+
+
+def pipeline_for_phase(phase_name: str) -> PhasePipeline:
+    if phase_name in ("codegen_c", "run_c_compiled"):
+        return full_pipeline()
+    return default_pipeline()
 
 
 def run_single_golden_test(
@@ -26,7 +38,7 @@ def run_single_golden_test(
     update_golden: bool = False,
     python_executable: str = sys.executable,
 ) -> bool:
-    golden_dir = TESTS_GOLDEN_DIR / phase_name
+    golden_dir = golden_dir_for_phase(phase_name)
     golden_dir.mkdir(parents=True, exist_ok=True)
     out_file = golden_dir / f"{source_file.stem}.out"
     error_file = golden_dir / f"{source_file.stem}.error"
@@ -75,8 +87,8 @@ def run_single_golden_test(
                 diff = difflib.unified_diff(
                     expected_output.splitlines(keepends=True),
                     process.stdout.splitlines(keepends=True),
-                    fromfile=f"golden/{phase_name}/{out_file.name}",
-                    tofile=f"actual/{phase_name}/{out_file.name}",
+                    fromfile=f"golden/{golden_dir.name}/{out_file.name}",
+                    tofile=f"actual/{golden_dir.name}/{out_file.name}",
                 )
                 print("".join(diff))
                 return False
@@ -104,8 +116,8 @@ def run_single_golden_test(
             diff = difflib.unified_diff(
                 expected_error.splitlines(keepends=True),
                 process.stderr.splitlines(keepends=True),
-                fromfile=f"golden/{phase_name}/{error_file.name}",
-                tofile=f"actual/{phase_name}/{error_file.name}",
+                fromfile=f"golden/{golden_dir.name}/{error_file.name}",
+                tofile=f"actual/{golden_dir.name}/{error_file.name}",
             )
             print("".join(diff))
             return False
@@ -121,9 +133,15 @@ def run_single_golden_test(
         return False
 
 
+
 def main() -> int:
-    pipeline = default_pipeline()
-    available_phases = pipeline.phase_names()
+    available_phases = [
+        "tokenize",
+        "parse",
+        "typecheck",
+        "interpret",
+        "run_c_compiled",
+    ]
 
     arg_parser = argparse.ArgumentParser(description="Run Quest compiler tests (golden outputs and error suites).")
     arg_parser.add_argument(
@@ -180,7 +198,8 @@ def main() -> int:
         if source_files:
             print("=== Golden Tests ===")
             for phase in phases_to_run:
-                if not (TESTS_GOLDEN_DIR / phase).exists():
+                golden_dir = golden_dir_for_phase(phase)
+                if not golden_dir.exists():
                     continue
                 print(f"--- Phase: {phase} ---")
                 for source_file in source_files:
@@ -215,6 +234,7 @@ def main() -> int:
                 error_phases_found = True
 
             print(f"--- Phase: {phase} ---")
+            pipeline = pipeline_for_phase(phase)
             precursors = pipeline.precursors_of(phase)
             for error_file in error_files:
                 total_errors += 1

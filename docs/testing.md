@@ -27,6 +27,8 @@ The compiler test suite is organized into three complementary testing tiers:
    - Executes the unified compiler driver (`quest_driver.py --stop-after <phase>`) against
      canonical `.quest` source files.
    - Validates stdout against exact expected outputs in `tests/golden/<phase>/<name>.out`.
+   - Both the `interpret` phase and the `run_c_compiled` phase compare their stdout against
+     the unified `tests/golden/run/` directory.
 
 3. **Diagnostic & Error Tests (`tests/errors/`):**
    - Negative tests for invalid programs containing deliberate syntax, lexical, or type errors.
@@ -55,35 +57,47 @@ tests/
       │   └── 01_lexer_basics.out ... 07_exceptions_dynamic.out
       ├── parse/
       │   └── 01_lexer_basics.out ... 07_exceptions_dynamic.out
-      └── typecheck/
+      ├── typecheck/
+      │   └── 01_lexer_basics.out ... 07_exceptions_dynamic.out
+      └── run/
           └── 01_lexer_basics.out ... 07_exceptions_dynamic.out
 ```
 
-### 2.2. Standard Output and Exit Code Discipline
+### 2.2. Standard Output and Execution Discipline
 - **Valid Programs:** Must complete successfully with exit code 0. Standard output is captured and verified against
   the corresponding `<test>.out` file.
+- **Unified Run Directory (`tests/golden/run`):** Both tree-walking interpretation (`interpret`) and native binary
+  execution (`run_c_compiled`) produce identical Cardelli interactive outputs and compare against `tests/golden/run/`.
+- **`--print-result` Flag:** When invoking `quest_driver.py --stop-after run_c_compiled`, `--print-result` is enabled
+  automatically so that the compiled binary outputs the final phrase result. For standalone compilation
+  (`quest compile`), binaries are silent by default unless `--print-result` is explicitly passed.
 - **Output Streams:**
-  - `stdout`: Used exclusively for valid phase artifacts (e.g. token tables, AST S-expressions, typed AST dumps).
+  - `stdout`: Used exclusively for valid phase artifacts (e.g. token tables, AST S-expressions, typed AST dumps,
+    run output).
   - `stderr`: Reserved exclusively for diagnostic error messages and warnings.
 
 ### 2.3. Test Runner (`run_tests.py`)
-The test runner executes each test source file across all active compiler phases via `quest_driver.py`:
+The test runner executes each test source file across active compiler phases via `quest_driver.py`:
 - `tokenize`: Runs `quest_driver.py --stop-after tokenize <source_file>`.
 - `parse`: Runs `quest_driver.py --stop-after parse <source_file>`.
 - `typecheck`: Runs `quest_driver.py --stop-after typecheck <source_file>`.
+- `interpret`: Runs `quest_driver.py --stop-after interpret <source_file>` (compared against `tests/golden/run/`).
+- `run_c_compiled`: Runs `quest_driver.py --stop-after run_c_compiled <source_file>`
+  (compared against `tests/golden/run/`).
 
 **Commands:**
 ```bash
-# Run all golden tests across all phases
+# Run all golden tests across all phases (tokenize, parse, typecheck, interpret, run_c_compiled)
 python3 run_tests.py
 
 # Run only a specific phase
-python3 run_tests.py --phase typecheck
+python3 run_tests.py --phase run_c_compiled
+python3 run_tests.py --phase interpret
 
 # Run only matching tests
 python3 run_tests.py -k 03_functions
 
-# Update golden files after an intentional AST or grammar change
+# Update golden files after an intentional change
 python3 run_tests.py --update-golden
 ```
 

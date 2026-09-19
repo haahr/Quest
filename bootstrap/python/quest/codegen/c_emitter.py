@@ -44,6 +44,7 @@ from quest.typed_ast import (
     TypedCase,
     TypedCaseBranch,
     TypedChar,
+    TypedDefKind,
     TypedDerefCell,
     TypedException,
     TypedExit,
@@ -140,8 +141,14 @@ def _indent(text: str, spaces: int = 4) -> str:
 class CEmitter:
     """Translates typed Quest AST nodes into standard C99 source code."""
 
-    def __init__(self, echo: bool = False, module_prefix: Optional[str] = None):
+    def __init__(
+        self,
+        echo: bool = False,
+        print_result: bool = False,
+        module_prefix: Optional[str] = None,
+    ):
         self.echo = echo
+        self.print_result = print_result
         self.module_prefix = module_prefix
         self._tmp_id = 0
         self.top_fun_names: set[str] = set()
@@ -884,13 +891,6 @@ class CEmitter:
                 lines.append(f"    qv_mod_{clean_mod}_init();")
             lines.append("")
 
-        # Initialize all compiled modules topologically
-        if sorted_modules:
-            for mod in sorted_modules:
-                clean_mod = mod.name.replace(".", "_")
-                lines.append(f"    qv_mod_{clean_mod}_init();")
-            lines.append("")
-
         total_phrases = len(prog.phrases)
         for i, phrase in enumerate(prog.phrases):
             is_last = (i == total_phrases - 1)
@@ -906,12 +906,18 @@ class CEmitter:
 
     def _emit_phrase(self, phrase: TypedNode, lines: list[str], is_last: bool = False) -> None:
         """Translates a top-level binding or expression phrase."""
+        should_print_result = self.print_result and is_last
         match phrase:
             case TypedLetValue(name=name, value=val, symbol=symbol):
                 if isinstance(val, TypedFun):
                     if self.echo:
                         type_str = _c_string_literal(qtype_to_name_str(symbol.type_val))
                         lines.append(f"    quest_print_val(((QVal){{ .u = 0 }}), {type_str});")
+                    elif should_print_result:
+                        var_str = "var " if symbol.is_var else ""
+                        type_str = str(symbol.type_val)
+                        msg = f"let {var_str}{name}:{type_str} = <fun>"
+                        lines.append(f"    puts({_c_string_literal(msg)});")
                     return
 
                 c_ident = mangle_ident(name)
@@ -958,6 +964,57 @@ class CEmitter:
                     wrap = _qval_wrap(c_ident, symbol.type_val)
                     type_str = _c_string_literal(qtype_to_name_str(symbol.type_val))
                     lines.append(f"    quest_print_val({wrap}, {type_str});")
+                elif should_print_result:
+                    var_str = "var " if symbol.is_var else ""
+                    if symbol.type_val == OK_TYPE:
+                        msg = f"let {var_str}{name}:Ok = ok"
+                        lines.append(f"    puts({_c_string_literal(msg)});")
+                    elif isinstance(symbol.type_val, (QFunType, QAllType)):
+                        type_str = str(symbol.type_val)
+                        msg = f"let {var_str}{name}:{type_str} = <fun>"
+                        lines.append(f"    puts({_c_string_literal(msg)});")
+                    elif symbol.type_val == INT_TYPE:
+                        lines.append(
+                            f'    printf("let {var_str}{name}:Int = %lld\\n", (long long){c_ident});'
+                        )
+                    elif symbol.type_val == REAL_TYPE:
+                        lines.append(
+                            f'    if ({c_ident} == (double)(int64_t){c_ident}) '
+                            f'printf("let {var_str}{name}:Real = %.1f\\n", {c_ident}); '
+                            f'else printf("let {var_str}{name}:Real = %g\\n", {c_ident});'
+                        )
+                    elif symbol.type_val == BOOL_TYPE:
+                        lines.append(
+                            f'    printf("let {var_str}{name}:Bool = %s\\n", {c_ident} ? "true" : "false");'
+                        )
+                    elif symbol.type_val == CHAR_TYPE:
+                        lines.append(
+                            f'    printf("let {var_str}{name}:Char = \'%c\'\\n", (char){c_ident});'
+                        )
+                    elif symbol.type_val == STRING_TYPE:
+                        lines.append(
+                            f'    printf("let {var_str}{name}:String = \\"%s\\"\\n", '
+                            f'{c_ident} ? {c_ident}->data : "");'
+                        )
+                    else:
+                        type_str = str(symbol.type_val)
+                        msg = f"let {var_str}{name}:{type_str} = <val>"
+                        lines.append(f"    puts({_c_string_literal(msg)});")
+
+            case TypedLetType(name=name, symbol=symbol):
+                if should_print_result:
+                    kind_str = str(symbol.kind)
+                    if symbol.definition is not None:
+                        msg = f"Let {name}::{kind_str} = {symbol.definition}"
+                    else:
+                        msg = f"Let {name}::{kind_str}"
+                    lines.append(f"    puts({_c_string_literal(msg)});")
+
+            case TypedDefKind(name=name, symbol=symbol):
+                if should_print_result:
+                    kind_str = str(symbol.kind)
+                    msg = f"DEF {name} = {kind_str}"
+                    lines.append(f"    puts({_c_string_literal(msg)});")
 
             case TypedException(name=name) as exc_node:
                 if name:
@@ -970,6 +1027,8 @@ class CEmitter:
                         wrap = _qval_wrap(c_ident, exc_node.type_val)
                         type_str = _c_string_literal(qtype_to_name_str(exc_node.type_val))
                         lines.append(f"    quest_print_val({wrap}, {type_str});")
+                    elif should_print_result:
+                        lines.append(f"    puts({_c_string_literal(f'exception {name}')});")
                 else:
                     self._emit_expr_phrase(phrase, lines, is_last=is_last)
 

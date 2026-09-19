@@ -40,12 +40,15 @@ The compiler processes Quest programs through a linear sequence of modular passe
                               (Native Binary)
 ```
 
-### 1.1. Dual Pipeline Modes
-The compiler driver exposes two distinct execution pipelines:
+### 1.1. Pipeline Modes
+The compiler driver exposes three execution pipelines:
 - **Default Pipeline (`default_pipeline()`):** `tokenize` $\to$ `parse` $\to$ `typecheck` $\to$ `interpret`.
   Used by default for `quest <file>`, `quest -c "<code>"`, and interactive REPL sessions.
 - **Compilation Pipeline (`compile_pipeline()`):** `tokenize` $\to$ `parse` $\to$ `typecheck` $\to$ `codegen_c`.
   Used by `quest compile <file>`, translating typed AST into C99 source and building native binaries.
+- **Full Execution Pipeline (`full_pipeline()`):** `tokenize` $\to$ `parse` $\to$ `typecheck` $\to$
+  `codegen_c` $\to$ `run_c_compiled`.
+  Used for automated end-to-end compiled testing via `quest --stop-after run_c_compiled <file>`.
 
 ---
 
@@ -59,10 +62,12 @@ All compiler phases are named by their **Verb / Action Form**:
   `QValue`. Output is silent if `ok` (`QOk`), formatted if non-ok. Runtime I/O operations execute as direct
   side effects.
 - `codegen_c`: C code generation (Step 4), translating typed AST into portable C99 source.
+- `run_c_compiled`: Host compilation and execution of generated C code. Runs the binary and captures standard output.
 
 ### Uniform Enforcement Across Interfaces
 1. **CLI Milestones:** `quest --stop-after <phase>` and `quest --dump-after <phase>`.
-2. **Golden Output Directories:** `tests/golden/<phase>/<test>.out`.
+2. **Golden Output Directories:** `tests/golden/<phase>/<test>.out` (with `interpret` and `run_c_compiled` both
+   mapping to `tests/golden/run/<test>.out`).
 3. **Diagnostic Error Directories:** `tests/errors/<phase>/<test>.quest`.
 4. **Pipeline Registries:** Internal registration via `pipeline.register(phase)`.
 
@@ -81,6 +86,7 @@ Encapsulates runtime configuration:
 - `emit_c: bool`: When true, outputs C source code without invoking the host C compiler.
 - `output_path: Optional[Path]`: Output path for binary executable or emitted C source.
 - `nogc: bool`: Forces compilation with `-DQUEST_NOGC`, disabling Boehm GC linkage.
+- `print_result: bool`: When true, compiled binaries print Cardelli-format output for the final top-level phrase.
 
 ### 3.2. `CompilerContext`
 Maintains shared state across phases:
@@ -110,6 +116,8 @@ class Phase(ABC):
 ### 3.4. Pipeline Construction Factories
 - **`default_pipeline() -> PhasePipeline`:** Registers `tokenize` $\to$ `parse` $\to$ `typecheck` $\to$ `interpret`.
 - **`compile_pipeline() -> PhasePipeline`:** Registers `tokenize` $\to$ `parse` $\to$ `typecheck` $\to$ `codegen_c`.
+- **`full_pipeline() -> PhasePipeline`:** Registers `tokenize` $\to$ `parse` $\to$ `typecheck` $\to$
+  `codegen_c` $\to$ `run_c_compiled`.
 
 ---
 
@@ -136,6 +144,7 @@ quest --stop-after tokenize file.quest
 quest --stop-after parse file.quest
 quest --stop-after typecheck file.quest
 quest --stop-after interpret file.quest
+quest --stop-after run_c_compiled file.quest
 
 # Dump intermediate outputs while continuing:
 quest --dump-after parse --stop-after typecheck file.quest
@@ -154,6 +163,9 @@ quest compile file.quest
 
 # Compile with explicit output binary name:
 quest compile file.quest -o my_app
+
+# Compile binary that prints the final phrase result (interactive Cardelli format):
+quest compile file.quest --print-result -o my_app
 
 # Emit C source code to stdout without invoking host compiler:
 quest compile file.quest --emit-c

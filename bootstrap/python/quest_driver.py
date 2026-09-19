@@ -22,6 +22,7 @@ from quest.pipeline import (
     CompilerOptions,
     compile_pipeline,
     default_pipeline,
+    full_pipeline,
 )
 from quest.runtime import QOk, qvalue_to_str
 from quest.tokens import SourceMap
@@ -32,8 +33,7 @@ def run_driver(args: list[str]) -> int:
     if args and args[0] == "compile":
         return run_compile(args[1:])
 
-    pipeline = default_pipeline()
-    available_phases = pipeline.phase_names()
+    all_phases = ["tokenize", "parse", "typecheck", "interpret", "codegen_c", "run_c_compiled"]
 
     arg_parser = argparse.ArgumentParser(
         prog="quest",
@@ -65,16 +65,22 @@ def run_driver(args: list[str]) -> int:
     arg_parser.add_argument(
         "--stop-after", "--stop_after",
         dest="stop_after",
-        choices=available_phases,
+        choices=all_phases,
         help="Stop pipeline execution after specified phase and dump its canonical output.",
     )
     arg_parser.add_argument(
         "--dump-after", "--dump_after",
         dest="dump_after",
         action="append",
-        choices=available_phases,
+        choices=all_phases,
         default=[],
         help="Dump canonical output of specified phase while continuing pipeline execution.",
+    )
+    arg_parser.add_argument(
+        "--print-result", "--print_result",
+        dest="print_result",
+        action="store_true",
+        help="Print Cardelli-format result of the final phrase when compiling C code.",
     )
     arg_parser.add_argument(
         "-I", "--include",
@@ -124,7 +130,15 @@ def run_driver(args: list[str]) -> int:
             sys.stderr.write(f"quest: error reading '{file_path}': {error}\n")
             return 1
 
-    # Configure options
+    # Configure pipeline and options
+    needs_c_pipeline = (
+        parsed_args.stop_after in ("codegen_c", "run_c_compiled")
+        or any(p in ("codegen_c", "run_c_compiled") for p in parsed_args.dump_after)
+    )
+    pipeline = full_pipeline() if needs_c_pipeline else default_pipeline()
+    available_phases = pipeline.phase_names()
+    print_result = parsed_args.print_result or (parsed_args.stop_after == "run_c_compiled")
+
     options = CompilerOptions(
         stop_after=parsed_args.stop_after,
         dump_after=set(parsed_args.dump_after),
@@ -132,6 +146,7 @@ def run_driver(args: list[str]) -> int:
         echo=parsed_args.echo,
         show_offsets=parsed_args.show_offsets,
         show_values=parsed_args.show_values,
+        print_result=print_result,
     )
 
     # Execute pipeline
@@ -242,6 +257,12 @@ def run_compile(args: list[str]) -> int:
         default=[],
         help="Dump canonical output of specified phase while continuing pipeline execution.",
     )
+    arg_parser.add_argument(
+        "--print-result", "--print_result",
+        dest="print_result",
+        action="store_true",
+        help="Print Cardelli-format result of the final phrase when compiling C code.",
+    )
 
     parsed_args = arg_parser.parse_args(args)
 
@@ -288,6 +309,7 @@ def run_compile(args: list[str]) -> int:
         emit_c=parsed_args.emit_c,
         output_path=output_path,
         nogc=parsed_args.nogc,
+        print_result=parsed_args.print_result,
     )
 
     ctx = CompilerContext.create(source_text, file_name, options=options)
