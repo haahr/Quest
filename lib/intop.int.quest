@@ -1,0 +1,14 @@
+interface IntOp export
+    (* Exception raised on integer arithmetic errors *)
+    error: Exception
+    (* Minimum representable 64-bit signed integer value *)
+    minInt: Int
+    (* Maximum representable 64-bit signed integer value *)
+    maxInt: Int
+    (* Absolute value of an integer *)
+    abs(n: Int): Int
+    (* Minimum of two integers *)
+    min(a: Int b: Int): Int
+    (* Maximum of two integers *)
+    max(a: Int b: Int): Int
+end;

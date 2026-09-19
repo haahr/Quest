@@ -1,0 +1,10 @@
+module ascii : Ascii export
+    (* Exception raised on invalid ASCII ordinal conversions *)
+    let error: Exception = external "(&quest_exc_ascii_error)";
+
+    (* Return character corresponding to given ASCII ordinal (0-255) *)
+    let char(n: Int): Char = external "quest_ascii_char";
+
+    (* Return ASCII ordinal value of given character *)
+    let val(c: Char): Int = external "quest_ascii_val";
+end;

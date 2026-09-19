@@ -27,6 +27,7 @@ from quest.types import (
     QVariantType,
     resolve_record_bound,
     resolve_variant_bound,
+    resolve_option_bound,
 )
 
 
@@ -88,9 +89,10 @@ def type_to_c_tag(t: QType) -> str:
         return "QVariant_" + ("_".join(tags) if tags else "empty")
     if isinstance(t, QExceptionType):
         return "QException"
-    if isinstance(t, QOptionType):
+    if isinstance(t, QOptionType) or (opt_bound := resolve_option_bound(t)) is not None:
+        opt_t = t if isinstance(t, QOptionType) else opt_bound
         tags = []
-        for o in t.options:
+        for o in opt_t.options:
             if o.payload_type:
                 tags.append(f"{o.name}_{type_to_c_tag(o.payload_type)}")
             else:
@@ -112,7 +114,7 @@ def record_struct_name(t: QRecordType, ctx: Optional[RecordNamingContext] = None
     return type_to_c_tag(t)
 
 
-def option_struct_name(t: QOptionType) -> str:
+def option_struct_name(t: QType) -> str:
     """Returns the C struct tag name for a given QOptionType."""
     return type_to_c_tag(t)
 
@@ -200,8 +202,9 @@ def qtype_to_c_type(t: QType, ctx: Optional[RecordNamingContext] = None) -> str:
         return "QVariantVal"
     if isinstance(t, QExceptionType):
         return "const QException *"
-    if isinstance(t, QOptionType):
-        return f"{option_struct_name(t)} *"
+    if isinstance(t, QOptionType) or (opt_bound := resolve_option_bound(t)) is not None:
+        opt_t = t if isinstance(t, QOptionType) else opt_bound
+        return f"{option_struct_name(opt_t)} *"
     if isinstance(t, QTypeVar):
         return "QVal"
     return "QVal"
@@ -320,7 +323,16 @@ def closure_fn_ptr_type(fun_type: QType, ctx: Optional[RecordNamingContext] = No
             param_types.append(qtype_to_c_type(p.type_val, ctx))
         sig = ", ".join(param_types)
         return f"{ret_c} (*)({sig})"
-    return "void * (*)(void *, ...)"
+
+    ret_c = "void" if cur_type == OK_TYPE else (
+        "QRecordVal" if isinstance(cur_type, QRecordType)
+        else qtype_to_c_type(cur_type, ctx)
+    )
+    param_types = ["void *"]
+    for _ in quantifiers:
+        param_types.append("const QTypeDescriptor *")
+    sig = ", ".join(param_types)
+    return f"{ret_c} (*)({sig})"
 
 
 def is_record_subtype(s: QType, t: QType) -> bool:

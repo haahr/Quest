@@ -175,19 +175,27 @@ def elaborate_module(
                 if kind_symbol is not None:
                     module_internal_scope.declare_kind(kind_symbol)
                     continue
-                mod_type = BuiltinModuleRegistry.get_module_type(name, env)
-                mod_scope = env.lookup_module(name)
-                if mod_type is None:
+                from quest.module_loader import resolve_module_file, load_module
+                on_disk = resolve_module_file(name, env.current_dir, env.include_paths) is not None
+                if on_disk or name in env.loaded_modules_ast:
                     if name not in env.loaded_modules_ast:
-                        from quest.module_loader import load_module
                         load_module(name, imp.interface_name, env)
                     mod_scope = env.lookup_module(name)
                     if mod_scope is not None:
                         mod_type = BuiltinModuleRegistry._build_record_type_from_scope(mod_scope)
                     else:
-                        mod_type = BuiltinModuleRegistry._build_record_type_from_scope(
-                            source_interface_scope
-                        )
+                        mod_type = BuiltinModuleRegistry._build_record_type_from_scope(source_interface_scope)
+                else:
+                    mod_type = BuiltinModuleRegistry.get_module_type(name, env)
+                    mod_scope = env.lookup_module(name)
+                    if mod_type is None:
+                        if name not in env.loaded_modules_ast:
+                            load_module(name, imp.interface_name, env)
+                        mod_scope = env.lookup_module(name)
+                        if mod_scope is not None:
+                            mod_type = BuiltinModuleRegistry._build_record_type_from_scope(mod_scope)
+                        else:
+                            mod_type = BuiltinModuleRegistry._build_record_type_from_scope(source_interface_scope)
                 registered_scope = mod_scope if mod_scope is not None else source_interface_scope
                 env.register_module(name, registered_scope)
                 module_internal_scope.declare_value(ValueSymbol(name=name, type_val=mod_type))
@@ -351,17 +359,27 @@ def elaborate_import(phrase: ast.ImportPhrase, env: Environment) -> TypedImport:
         else:
             # import mod1, mod2: Interface
             for mod_name in item.names:
-                mod_type = BuiltinModuleRegistry.get_module_type(mod_name, env)
-                mod_scope = env.lookup_module(mod_name)
-                if mod_type is None:
+                from quest.module_loader import resolve_module_file, load_module
+                on_disk = resolve_module_file(mod_name, env.current_dir, env.include_paths) is not None
+                if on_disk or mod_name in env.loaded_modules_ast:
                     if mod_name not in env.loaded_modules_ast:
-                        from quest.module_loader import load_module
                         load_module(mod_name, iface_name, env)
                     mod_scope = env.lookup_module(mod_name)
                     if mod_scope is not None:
                         mod_type = BuiltinModuleRegistry._build_record_type_from_scope(mod_scope)
                     else:
                         mod_type = BuiltinModuleRegistry._build_record_type_from_scope(iface_scope)
+                else:
+                    mod_type = BuiltinModuleRegistry.get_module_type(mod_name, env)
+                    mod_scope = env.lookup_module(mod_name)
+                    if mod_type is None:
+                        if mod_name not in env.loaded_modules_ast:
+                            load_module(mod_name, iface_name, env)
+                        mod_scope = env.lookup_module(mod_name)
+                        if mod_scope is not None:
+                            mod_type = BuiltinModuleRegistry._build_record_type_from_scope(mod_scope)
+                        else:
+                            mod_type = BuiltinModuleRegistry._build_record_type_from_scope(iface_scope)
                 registered_scope = mod_scope if mod_scope is not None else iface_scope
                 env.register_module(mod_name, registered_scope)
                 env.current_scope.declare_value(ValueSymbol(name=mod_name, type_val=mod_type))

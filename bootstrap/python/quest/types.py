@@ -1910,3 +1910,50 @@ def resolve_variant_bound(t: QType, env: Optional[Any] = None) -> Optional[QVari
             return None
 
 
+def resolve_option_bound(t: QType, env: Optional[Any] = None) -> Optional[QOptionType]:
+    """Resolves an option type, unwrapping type applications, recursive types, or bounds."""
+    curr = t
+    visited = set()
+    while True:
+        if isinstance(curr, QOptionType):
+            return curr
+        if isinstance(curr, QRecType):
+            curr = curr.body
+            continue
+        if isinstance(curr, QTypeApp):
+            ctor = curr.constructor
+            if env is not None and isinstance(ctor, (QTypeVar, QAbstractType, QPathType)):
+                ctor = ctor.evaluate_lazily(env)
+            if isinstance(ctor, QTypeFun):
+                subst = {p.symbol_id: arg for p, arg in zip(ctor.params, curr.arguments)}
+                curr = ctor.body.substitute(subst)
+                continue
+            else:
+                try:
+                    curr_lazy = curr.evaluate_lazily(env)
+                    if curr_lazy != curr:
+                        curr = curr_lazy
+                        continue
+                except Exception:
+                    pass
+        if (
+            isinstance(curr, (QTypeVar, QAbstractType, QPathType))
+            and isinstance(curr.bound, QPowerKind)
+        ):
+            sym_id = getattr(curr, "symbol_id", id(curr))
+            if sym_id in visited:
+                return None
+            visited.add(sym_id)
+            curr = curr.bound.bound
+            continue
+        if env is not None:
+            try:
+                curr_lazy = curr.evaluate_lazily(env)
+                if curr_lazy != curr:
+                    curr = curr_lazy
+                    continue
+            except Exception:
+                pass
+        return None
+
+

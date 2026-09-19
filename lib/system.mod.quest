@@ -1,0 +1,19 @@
+module system : System export
+    (* Exception raised on system errors *)
+    let error: Exception = external "(&quest_exc_system_error)";
+
+    (* Command-line argument strings passed to program *)
+    let args: Array(String) = external "quest_system_args";
+
+    (* Terminate program execution with exit code *)
+    let sysexit(code: Int): Ok = external "quest_system_exit";
+
+    (* Alias for sysexit *)
+    let sysExit(code: Int): Ok = external "quest_system_exit";
+
+    (* Retrieve environment variable value by name *)
+    let getEnv(name: String): String = external "quest_system_getenv";
+
+    (* Check if file exists at filesystem path *)
+    let fileExists(path: String): Bool = external "quest_system_file_exists";
+end;

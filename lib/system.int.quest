@@ -1,0 +1,14 @@
+interface System export
+    (* Exception raised on system errors *)
+    error: Exception
+    (* Command-line argument strings passed to program *)
+    args: Array(String)
+    (* Terminate program execution with exit code *)
+    sysexit(code: Int): Ok
+    (* Alias for sysexit *)
+    sysExit(code: Int): Ok
+    (* Retrieve environment variable value by name *)
+    getEnv(name: String): String
+    (* Check if file exists at filesystem path *)
+    fileExists(path: String): Bool
+end;

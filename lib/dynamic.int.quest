@@ -1,0 +1,20 @@
+interface Dynamic
+import
+    reader: Reader
+    writer: Writer
+export
+    (* The dynamic type packaging a value with its runtime type *)
+    T::TYPE
+    (* Exception raised on dynamic type mismatch or conversion failure *)
+    error: Exception
+    (* Package a value of any type into a dynamic object *)
+    new(A::TYPE a: A): T
+    (* Extract value of type A from dynamic object or raise error *)
+    be(A::TYPE d: T): A
+    (* Make a copy of a dynamic object *)
+    copy(d: T): T
+    (* Read a dynamic object from an input reader stream *)
+    intern(rd: reader.T): T
+    (* Write a representation of a dynamic object to an output writer stream *)
+    extern(wr: writer.T d: T): Ok
+end;

@@ -47,8 +47,11 @@ class CDeclarationEmitter:
         lines: list[str] = []
         if agg_types:
             lines.append("/* Forward declarations for aggregate types */")
+            seen: set[str] = set()
             for tag_name, _ in agg_types:
-                lines.append(f"typedef struct {tag_name} {tag_name};")
+                if tag_name not in seen:
+                    seen.add(tag_name)
+                    lines.append(f"typedef struct {tag_name} {tag_name};")
             lines.append("")
         return lines
 
@@ -70,7 +73,11 @@ class CDeclarationEmitter:
             return lines
 
         lines.append("/* Aggregate struct definitions */")
+        seen: set[str] = set()
         for tag_name, t in agg_types:
+            if tag_name in seen:
+                continue
+            seen.add(tag_name)
             lines.append(f"struct {tag_name} {{")
             if isinstance(t, QTupleType):
                 if not t.value_fields:

@@ -80,6 +80,7 @@ from quest.typed_ast import (
     TypedExit,
     TypedExpr,
     TypedExprStmt,
+    TypedExternal,
     TypedFor,
     TypedFun,
     TypedIf,
@@ -473,6 +474,9 @@ def eval_expr(expr: TypedExpr, env: RuntimeEnvironment) -> QValue:
             return QString(val)
         case TypedOk():
             return OK_VALUE
+        case TypedExternal(symbol=symbol):
+            from quest.builtins import BuiltinModuleRegistry
+            return BuiltinModuleRegistry.resolve_external_symbol(symbol)
 
         # 2. Variables & Mutable References
         case TypedVar(name=name, offset=offset):

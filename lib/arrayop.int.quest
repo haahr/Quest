@@ -1,0 +1,12 @@
+interface ArrayOp export
+    (* Exception raised on array indexing or allocation errors *)
+    error: Exception
+    (* Allocate a new array of given size initialized with element init *)
+    new: All(A::TYPE) All(size: Int init: A) Array(A)
+    (* Return the number of elements in an array *)
+    size: All(A::TYPE) All(a: Array(A)) Int
+    (* Extract the element at 0-based index from array *)
+    get: All(A::TYPE) All(a: Array(A) index: Int) A
+    (* Update the element at 0-based index in array with item *)
+    set: All(A::TYPE) All(a: Array(A) index: Int item: A) Ok
+end;

@@ -1,0 +1,19 @@
+module conv : Conv export
+    (* Return the string "ok" *)
+    let okay = fun(): String "ok";
+
+    (* Return "true" or "false" string representation of a boolean *)
+    let bool(b: Bool): String = if b then "true" else "false" end;
+
+    (* Return decimal string representation of an integer *)
+    let int(n: Int): String = external "quest_conv_int";
+
+    (* Return string representation of a real number *)
+    let real(r: Real): String = external "quest_conv_real";
+
+    (* Return single-quoted character representation with escape sequences *)
+    let char(c: Char): String = external "quest_conv_char";
+
+    (* Return double-quoted string representation with escape sequences *)
+    let string(s: String): String = external "quest_conv_string";
+end;

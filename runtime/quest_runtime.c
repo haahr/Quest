@@ -93,6 +93,11 @@ bool quest_string_is_empty(const QString *s) {
     return s == NULL || s->length == 0;
 }
 
+int64_t quest_string_length(const QString *s) {
+    if (s == NULL) return 0;
+    return s->length;
+}
+
 QString *quest_string_cat_sub(const QString *s1, int64_t st1, int64_t sz1,
                               const QString *s2, int64_t st2, int64_t sz2) {
     if (s1 == NULL || s2 == NULL || st1 < 0 || sz1 < 0 || st1 + sz1 > s1->length ||
@@ -208,6 +213,11 @@ QArrayWideVariant *quest_array_new_wide_variant(int64_t len, QVariantVal init_va
         arr->data[i] = init_val;
     }
     return arr;
+}
+
+int64_t quest_array_size(const QArray *a) {
+    if (a == NULL) return 0;
+    return a->length;
 }
 
 double quest_real_pow(double base, double exp) {
@@ -892,6 +902,10 @@ int64_t quest_ascii_val(QChar ch) {
 }
 
 /* RealOp primitives */
+double quest_real_from_int(int64_t n) {
+    return (double)n;
+}
+
 double quest_real_log(double r) {
     if (r <= 0.0) {
         quest_raise_real_error();

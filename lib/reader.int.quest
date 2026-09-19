@@ -1,0 +1,22 @@
+interface Reader export
+    (* Abstract character stream reader type *)
+    T::TYPE
+    (* Exception raised on reader stream errors *)
+    error: Exception
+    (* Standard input stream reader *)
+    input: T
+    (* Open a reader stream for the file with the given name *)
+    file(name: String): T
+    (* Test whether there are more characters available to read *)
+    more(reader: T): Bool
+    (* Number of characters readable without blocking, or 1 for EOF *)
+    ready(reader: T): Int
+    (* Read the next character from the reader stream *)
+    getChar(reader: T): Char
+    (* Read a string of the given length from the reader stream *)
+    getString(reader: T size: Int): String
+    (* Read characters into a destination string buffer at start offset *)
+    getSubString(reader: T string: String start: Int size: Int): Ok
+    (* Close the reader stream *)
+    close(reader: T): Ok
+end;

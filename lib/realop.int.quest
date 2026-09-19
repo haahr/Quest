@@ -1,0 +1,46 @@
+interface RealOp export
+    (* Exception raised on real arithmetic errors *)
+    error: Exception
+    (* Minimum representable double-precision real number *)
+    minReal: Real
+    (* Maximum representable double-precision real number *)
+    maxReal: Real
+    (* Smallest positive real epsilon such that 1.0 + eps != 1.0 *)
+    posEpsilon: Real
+    (* Smallest negative real epsilon such that 1.0 - eps != 1.0 *)
+    negEpsilon: Real
+    (* Base of natural logarithms e *)
+    e: Real
+    (* Convert an integer to a real number *)
+    int(n: Int): Real
+    (* Largest integer not greater than real number r *)
+    floor(r: Real): Int
+    (* Nearest integer to real number r *)
+    round(r: Real): Int
+    (* Absolute value of a real number *)
+    abs(r: Real): Real
+    (* Natural logarithm of a real number *)
+    log(r: Real): Real
+    (* Minimum of two real numbers *)
+    min(a: Real b: Real): Real
+    (* Maximum of two real numbers *)
+    max(a: Real b: Real): Real
+    (* Addition of two real numbers *)
+    plus(a: Real b: Real): Real
+    (* Subtraction of two real numbers *)
+    diff(a: Real b: Real): Real
+    (* Multiplication of two real numbers *)
+    mul(a: Real b: Real): Real
+    (* Division of two real numbers *)
+    div(a: Real b: Real): Real
+    (* Exponential function *)
+    exp(a: Real b: Real): Real
+    (* Test if real number a is strictly less than b *)
+    smaller(a: Real b: Real): Bool
+    (* Test if real number a is strictly greater than b *)
+    greater(a: Real b: Real): Bool
+    (* Test if real number a is less than or equal to b *)
+    smallerEq(a: Real b: Real): Bool
+    (* Test if real number a is greater than or equal to b *)
+    greaterEq(a: Real b: Real): Bool
+end;

@@ -13,6 +13,7 @@ and interpreter:
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import TYPE_CHECKING, Optional
 
@@ -28,13 +29,15 @@ if TYPE_CHECKING:
     from quest.runtime import QValue
     from quest.typed_ast import TypedModule
 
+DEFAULT_LIB_DIR = (Path(__file__).parent.parent.parent.parent / "lib").resolve()
+
 
 def resolve_interface_file(
     name: str,
     current_dir: Optional[Path],
     include_paths: list[Path],
 ) -> Optional[Path]:
-    """Finds <name.lower()>.int.quest in current_dir first, then include_paths."""
+    """Finds <name.lower()>.int.quest in current_dir, include_paths, or DEFAULT_LIB_DIR."""
     filename = f"{name.lower()}.int.quest"
     if current_dir is not None:
         candidate = current_dir / filename
@@ -46,6 +49,17 @@ def resolve_interface_file(
         if candidate.is_file():
             return candidate.resolve()
 
+    env_lib = os.environ.get("QUEST_LIB")
+    if env_lib:
+        candidate = Path(env_lib) / filename
+        if candidate.is_file():
+            return candidate.resolve()
+
+    if DEFAULT_LIB_DIR.is_dir():
+        candidate = DEFAULT_LIB_DIR / filename
+        if candidate.is_file():
+            return candidate.resolve()
+
     return None
 
 
@@ -54,7 +68,7 @@ def resolve_module_file(
     current_dir: Optional[Path],
     include_paths: list[Path],
 ) -> Optional[Path]:
-    """Finds <name.lower()>.mod.quest in current_dir first, then include_paths."""
+    """Finds <name.lower()>.mod.quest in current_dir, include_paths, or DEFAULT_LIB_DIR."""
     filename = f"{name.lower()}.mod.quest"
     if current_dir is not None:
         candidate = current_dir / filename
@@ -63,6 +77,17 @@ def resolve_module_file(
 
     for inc in include_paths:
         candidate = Path(inc) / filename
+        if candidate.is_file():
+            return candidate.resolve()
+
+    env_lib = os.environ.get("QUEST_LIB")
+    if env_lib:
+        candidate = Path(env_lib) / filename
+        if candidate.is_file():
+            return candidate.resolve()
+
+    if DEFAULT_LIB_DIR.is_dir():
+        candidate = DEFAULT_LIB_DIR / filename
         if candidate.is_file():
             return candidate.resolve()
 
@@ -75,12 +100,6 @@ def load_interface(name: str, env: Environment) -> Scope:
     if existing is not None:
         return existing
 
-    from quest.builtins import BuiltinModuleRegistry
-    builtin_iface = BuiltinModuleRegistry.get_interface(name, env)
-    if builtin_iface is not None:
-        env.register_interface(name, builtin_iface)
-        return builtin_iface
-
     # Cycle detection
     norm_name = name.lower()
     if norm_name in [x.lower() for x in env._loading_interfaces]:
@@ -91,10 +110,19 @@ def load_interface(name: str, env: Environment) -> Scope:
 
     file_path = resolve_interface_file(name, env.current_dir, env.include_paths)
     if file_path is None:
+        from quest.builtins import BuiltinModuleRegistry
+        builtin_iface = BuiltinModuleRegistry.get_interface(name, env)
+        if builtin_iface is not None:
+            env.register_interface(name, builtin_iface)
+            return builtin_iface
+
         searched = [str(env.current_dir)] if env.current_dir else []
         searched.extend(str(p) for p in env.include_paths)
+        if DEFAULT_LIB_DIR.is_dir():
+            searched.append(str(DEFAULT_LIB_DIR))
         raise QuestTypeError(
-            f"Undefined interface '{name}': cannot find interface file for '{name}' (looked for '{norm_name}.int.quest' in {searched})"
+            f"Undefined interface '{name}': cannot find interface file for '{name}' "
+            f"(looked for '{norm_name}.int.quest' in {searched})"
         )
 
     try:
@@ -112,7 +140,8 @@ def load_interface(name: str, env: Environment) -> Scope:
 
     if len(prog.phrases) != 1:
         raise QuestTypeError(
-            f"Interface file '{file_path.name}' must contain only a single interface declaration, but found {len(prog.phrases)} phrases"
+            f"Interface file '{file_path.name}' must contain only a single interface declaration, "
+            f"but found {len(prog.phrases)} phrases"
         )
 
     decl = prog.phrases[0]
@@ -156,10 +185,19 @@ def load_module(name: str, expected_interface: str, env: Environment) -> TypedMo
 
     file_path = resolve_module_file(name, env.current_dir, env.include_paths)
     if file_path is None:
+        from quest.builtins import BuiltinModuleRegistry
+        builtin_ast = BuiltinModuleRegistry.get_module_ast(name, env)
+        if builtin_ast is not None:
+            env.loaded_modules_ast[name] = builtin_ast
+            return builtin_ast
+
         searched = [str(env.current_dir)] if env.current_dir else []
         searched.extend(str(p) for p in env.include_paths)
+        if DEFAULT_LIB_DIR.is_dir():
+            searched.append(str(DEFAULT_LIB_DIR))
         raise QuestTypeError(
-            f"Undefined module '{name}': cannot find module file for '{name}' (looked for '{norm_name}.mod.quest' in {searched})"
+            f"Undefined module '{name}': cannot find module file for '{name}' "
+            f"(looked for '{norm_name}.mod.quest' in {searched})"
         )
 
     try:
@@ -177,7 +215,8 @@ def load_module(name: str, expected_interface: str, env: Environment) -> TypedMo
 
     if len(prog.phrases) != 1:
         raise QuestTypeError(
-            f"Module file '{file_path.name}' must contain only a single module definition, but found {len(prog.phrases)} phrases"
+            f"Module file '{file_path.name}' must contain only a single module definition, "
+            f"but found {len(prog.phrases)} phrases"
         )
 
     decl = prog.phrases[0]
@@ -194,7 +233,8 @@ def load_module(name: str, expected_interface: str, env: Environment) -> TypedMo
 
     if decl.interface_name != expected_interface:
         raise QuestTypeError(
-            f"Module '{decl.name}' in '{file_path.name}' implements interface '{decl.interface_name}', expected '{expected_interface}'"
+            f"Module '{decl.name}' in '{file_path.name}' implements interface '{decl.interface_name}', "
+            f"expected '{expected_interface}'"
         )
 
     saved_dir = env.current_dir
@@ -240,6 +280,12 @@ def load_module_for_interpreter(
         type_env.current_dir = r_env.current_dir
         typed_mod = load_module(name, expected_interface, type_env)
         r_env.loaded_modules_ast[name] = typed_mod
+
+    from quest.builtins import BuiltinModuleRegistry
+    builtin_rec = BuiltinModuleRegistry.get_runtime_module(name)
+    if not typed_mod.bindings and builtin_rec is not None:
+        r_env.evaluated_modules[name] = builtin_rec
+        return builtin_rec
 
     from quest.interpreter import eval_binding
     from quest.runtime import QRecord

@@ -1,0 +1,22 @@
+interface Writer export
+    (* Abstract character stream writer type *)
+    T::TYPE
+    (* Exception raised on writer stream errors *)
+    error: Exception
+    (* Standard output stream writer *)
+    output: T
+    (* Standard error stream writer *)
+    err: T
+    (* Open a writer stream for the file with the given name *)
+    file(name: String): T
+    (* Write a string to the writer stream *)
+    putString(writer: T string: String): Ok
+    (* Write a character to the writer stream *)
+    putChar(writer: T char: Char): Ok
+    (* Write a substring of given start offset and length to the writer stream *)
+    putSubString(writer: T string: String start: Int size: Int): Ok
+    (* Flush any buffered characters to the writer destination *)
+    flush(writer: T): Ok
+    (* Close the writer stream *)
+    close(writer: T): Ok
+end;

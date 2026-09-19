@@ -1,0 +1,50 @@
+module string : StringOp export
+    (* Exception raised on string manipulation errors *)
+    let error: Exception = external "(&quest_exc_string_error)";
+
+    (* Allocate a new string of given size initialized with character init *)
+    let new(size: Int init: Char): String = external "quest_string_alloc";
+
+    (* Test whether a string is empty (length 0) *)
+    let isEmpty(string: String): Bool = external "quest_string_is_empty";
+
+    (* Return the byte length of a string *)
+    let length(string: String): Int = external "quest_string_length";
+
+    (* Extract the character at 0-based index from string *)
+    let getChar(string: String index: Int): Char = external "quest_string_get_char";
+
+    (* Update the character at 0-based index in string *)
+    let setChar(string: String index: Int char: Char): Ok = external "quest_string_set_char";
+
+    (* Extract substring starting at start offset of given size *)
+    let getSub(source: String start: Int size: Int): String = external "quest_string_get_sub";
+
+    (* Copy substring from source into dest buffer at destStart *)
+    let setSub(dest: String destStart: Int source: String sourceStart: Int sourceSize: Int): Ok =
+        external "quest_string_set_sub";
+
+    (* Concatenate two strings *)
+    let cat(s1: String s2: String): String = external "quest_string_concat";
+
+    (* Concatenate substrings of two strings *)
+    let catSub(s1: String start1: Int size1: Int s2: String start2: Int size2: Int): String =
+        external "quest_string_cat_sub";
+
+    (* Concatenate an array of strings into a single string *)
+    let conc(a: Array(String)): String = external "quest_string_conc";
+
+    (* Test if two strings have equal contents *)
+    let equal(s1: String s2: String): Bool = external "quest_string_equal";
+
+    (* Test if two substrings have equal contents *)
+    let equalSub(s1: String start1: Int size1: Int s2: String start2: Int size2: Int): Bool =
+        external "quest_string_equal_sub";
+
+    (* Test if string s1 lexicographically precedes or equals s2 *)
+    let precedes(s1: String s2: String): Bool = external "quest_string_precedes";
+
+    (* Test if substring of s1 lexicographically precedes or equals substring of s2 *)
+    let precedesSub(s1: String start1: Int size1: Int s2: String start2: Int size2: Int): Bool =
+        external "quest_string_precedes_sub";
+end;

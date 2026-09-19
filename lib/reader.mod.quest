@@ -1,0 +1,32 @@
+module reader : Reader export
+    (* The underlying C stream reader type *)
+    Let T = external "QReader *";
+
+    (* Exception raised on stream read errors *)
+    let error: Exception = external "(&quest_exc_reader_error)";
+
+    (* Standard input stream *)
+    let input: T = external "quest_reader_input";
+
+    (* Open a reader stream for the file with the given name *)
+    let file(name: String): T = external "quest_reader_file";
+
+    (* Test whether there are more characters available to read *)
+    let more(reader: T): Bool = external "quest_reader_more";
+
+    (* Number of characters readable without blocking *)
+    let ready(reader: T): Int = external "quest_reader_ready";
+
+    (* Read the next character from the reader stream *)
+    let getChar(reader: T): Char = external "quest_reader_get_char";
+
+    (* Read a string of the given length from the reader stream *)
+    let getString(reader: T size: Int): String = external "quest_reader_get_string";
+
+    (* Read characters into a destination string buffer at start offset *)
+    let getSubString(reader: T string: String start: Int size: Int): Ok =
+        external "quest_reader_get_substring";
+
+    (* Close the reader stream *)
+    let close(reader: T): Ok = external "quest_reader_close";
+end;

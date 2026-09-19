@@ -1,0 +1,19 @@
+module int : IntOp export
+    (* Exception raised on integer arithmetic errors *)
+    let error: Exception = external "(&quest_exc_int_error)";
+
+    (* Minimum representable 64-bit signed integer value *)
+    let minInt: Int = external "QUEST_INT_MIN";
+
+    (* Maximum representable 64-bit signed integer value *)
+    let maxInt: Int = external "QUEST_INT_MAX";
+
+    (* Absolute value of an integer *)
+    let abs(n: Int): Int = if n < 0 then 0 - n else n end;
+
+    (* Minimum of two integers *)
+    let min(a: Int b: Int): Int = if a < b then a else b end;
+
+    (* Maximum of two integers *)
+    let max(a: Int b: Int): Int = if a > b then a else b end;
+end;

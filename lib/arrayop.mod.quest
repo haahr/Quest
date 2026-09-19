@@ -1,0 +1,20 @@
+module arrayOp : ArrayOp export
+    (* Exception raised on array indexing or allocation errors *)
+    let error: Exception = external "(&quest_exc_arrayOp_error)";
+
+    (* Allocate a new array of given size initialized with element init *)
+    let new(A::TYPE)(size: Int init: A): Array(A) =
+        array of(size init);
+
+    (* Return the number of elements in an array *)
+    let size: All(A::TYPE) All(a: Array(A)) Int =
+        external "quest_array_size";
+
+    (* Extract the element at 0-based index from array *)
+    let get(A::TYPE)(a: Array(A) index: Int): A =
+        a[index];
+
+    (* Update the element at 0-based index in array with item *)
+    let set(A::TYPE)(a: Array(A) index: Int item: A): Ok =
+        a[index] := item;
+end;

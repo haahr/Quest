@@ -1,0 +1,56 @@
+module list : List
+import arrayOp: ArrayOp
+export
+    (* Recursive option type representation of linked list cells *)
+    Let T = Fun(A::TYPE) Rec(L::TYPE) Option nil cons with head: A tail: L end end;
+
+    (* Exception raised on empty list head or tail operations *)
+    let error: Exception = exception error: Ok end;
+
+    (* Empty list constructor *)
+    let nil(A::TYPE): T(A) =
+        option nil of T(A) end;
+
+    (* Construct a new list cell with head item and tail list *)
+    let cons(A::TYPE)(item: A list: T(A)): T(A) =
+        option cons of T(A) with let head = item; let tail = list; end;
+
+    (* Test whether a list is empty *)
+    let null(A::TYPE)(list: T(A)): Bool =
+        case list
+            when nil then true
+            when cons then false
+        end;
+
+    (* Return head element of list, or raise error if empty *)
+    let head(A::TYPE)(list: T(A)): A =
+        case list
+            when nil then raise error end
+            when cons with c then c.head
+        end;
+
+    (* Return tail of list, or raise error if empty *)
+    let tail(A::TYPE)(list: T(A)): T(A) =
+        case list
+            when nil then raise error end
+            when cons with c then c.tail
+        end;
+
+    (* Recursively compute the length of a list *)
+    let rec length(A::TYPE)(list: T(A)): Int =
+        case list
+            when nil then 0
+            when cons with c then 1 + length(:A c.tail)
+        end;
+
+    (* Convert an array to a list with matching element order *)
+    let enum(A::TYPE)(a: Array(A)): T(A) =
+        begin
+            let var res: T(A) = nil(:A);
+            let n: Int = arrayOp.size(:A a);
+            for i = 0 upto {n - 1} do
+                res := cons(:A a[{n - 1} - i] res);
+            end;
+            res
+        end;
+end;

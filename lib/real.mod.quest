@@ -1,0 +1,67 @@
+module real : RealOp export
+    (* Exception raised on real arithmetic errors *)
+    let error: Exception = external "(&quest_exc_real_error)";
+
+    (* Minimum representable double-precision real number *)
+    let minReal: Real = external "QUEST_REAL_MIN";
+
+    (* Maximum representable double-precision real number *)
+    let maxReal: Real = external "QUEST_REAL_MAX";
+
+    (* Smallest positive real epsilon such that 1.0 + eps != 1.0 *)
+    let posEpsilon: Real = external "QUEST_REAL_POS_EPSILON";
+
+    (* Smallest negative real epsilon such that 1.0 - eps != 1.0 *)
+    let negEpsilon: Real = external "QUEST_REAL_NEG_EPSILON";
+
+    (* Base of natural logarithms e *)
+    let e: Real = external "QUEST_REAL_E";
+
+    (* Convert an integer to a real number *)
+    let int(n: Int): Real = external "quest_real_from_int";
+
+    (* Largest integer not greater than real number r *)
+    let floor(r: Real): Int = external "quest_real_floor";
+
+    (* Nearest integer to real number r *)
+    let round(r: Real): Int = external "quest_real_round";
+
+    (* Absolute value of a real number *)
+    let abs(r: Real): Real = if r << 0.0 then 0.0 -- r else r end;
+
+    (* Natural logarithm of a real number *)
+    let log(r: Real): Real = external "quest_real_log";
+
+    (* Minimum of two real numbers *)
+    let min(a: Real b: Real): Real = if a << b then a else b end;
+
+    (* Maximum of two real numbers *)
+    let max(a: Real b: Real): Real = if a >> b then a else b end;
+
+    (* Addition of two real numbers *)
+    let plus(a: Real b: Real): Real = a ++ b;
+
+    (* Subtraction of two real numbers *)
+    let diff(a: Real b: Real): Real = a -- b;
+
+    (* Multiplication of two real numbers *)
+    let mul(a: Real b: Real): Real = a ** b;
+
+    (* Division of two real numbers *)
+    let div(a: Real b: Real): Real = external "quest_real_div";
+
+    (* Exponential function *)
+    let exp(a: Real b: Real): Real = external "quest_real_exp";
+
+    (* Test if real number a is strictly less than b *)
+    let smaller(a: Real b: Real): Bool = a << b;
+
+    (* Test if real number a is strictly greater than b *)
+    let greater(a: Real b: Real): Bool = a >> b;
+
+    (* Test if real number a is less than or equal to b *)
+    let smallerEq(a: Real b: Real): Bool = a <<= b;
+
+    (* Test if real number a is greater than or equal to b *)
+    let greaterEq(a: Real b: Real): Bool = a >>= b;
+end;

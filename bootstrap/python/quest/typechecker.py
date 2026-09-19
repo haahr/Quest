@@ -804,17 +804,19 @@ class TypeElaborator:
                     )
                     meta_map[q.symbol_id] = QTypeVar(name=q.name, symbol_id=sym_id, bound=q.bound)
                 inner_exp = expected_lazy.body.substitute(meta_map)
-                inner_expr = (
-                    ast.ExprFun(
-                        params=expr.params,
-                        return_type=expr.return_type,
-                        body=expr.body,
-                        type_params=(),
-                        offset=expr.offset,
-                    )
-                    if getattr(expr, "type_params", ())
-                    else expr
-                )
+                if getattr(expr, "type_params", ()):
+                    if expr.params:
+                        inner_expr = ast.ExprFun(
+                            params=expr.params,
+                            return_type=expr.return_type,
+                            body=expr.body,
+                            type_params=(),
+                            offset=expr.offset,
+                        )
+                    else:
+                        inner_expr = expr.body
+                else:
+                    inner_expr = expr
                 inner_typed = self.check_expr(inner_expr, inner_exp, env, loop_depth)
                 return TypedFun(
                     params=inner_typed.params if isinstance(inner_typed, TypedFun) else (),
@@ -2575,6 +2577,49 @@ class TypeElaborator:
                 return TypedExprStmt(expr=typed_e, offset=binding.offset)
 
             case ast.LetValueBinding(params=params, is_rec=is_rec) if params:
+                if isinstance(binding.value, ast.ExprExternal):
+                    if binding.type_annot is None:
+                        raise TypeError(
+                            f"External function '{binding.name}' requires an explicit return type annotation",
+                            offset=binding.offset,
+                        )
+                    for p in params:
+                        if p.type_annot is None:
+                            raise TypeError(
+                                f"Parameter '{p.name}' in external function '{binding.name}' "
+                                f"requires an explicit type annotation",
+                                offset=p.offset,
+                            )
+                    param_types = tuple(
+                        elaborate_type(p.type_annot, env)
+                        for p in params
+                    )
+                    ret_type = elaborate_type(binding.type_annot, env)
+                    q_params = tuple(
+                        QParam(
+                            name=p.name,
+                            type_val=param_types[i],
+                            is_var=(p.mode == ast.ParamMode.VAR),
+                            is_out=(p.mode == ast.ParamMode.OUT),
+                        )
+                        for i, p in enumerate(params)
+                    )
+                    fn_type = QFunType(params=q_params, result_type=ret_type)
+                    sym = ValueSymbol(name=binding.name, type_val=fn_type, is_var=binding.is_var)
+                    env.current_scope.declare_value(sym)
+                    typed_ext = TypedExternal(
+                        symbol=binding.value.symbol,
+                        type_val=fn_type,
+                        offset=binding.value.offset,
+                    )
+                    return TypedLetValue(
+                        name=binding.name,
+                        value=typed_ext,
+                        symbol=sym,
+                        is_rec=False,
+                        offset=binding.offset,
+                    )
+
                 fn_expr = ast.ExprFun(
                     params=params,
                     return_type=binding.type_annot,

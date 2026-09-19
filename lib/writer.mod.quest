@@ -1,0 +1,32 @@
+module writer : Writer export
+    (* The underlying C stream writer type *)
+    Let T = external "QWriter *";
+
+    (* Exception raised on stream write errors *)
+    let error: Exception = external "(&quest_exc_writer_error)";
+
+    (* Standard output stream *)
+    let output: T = external "quest_writer_output";
+
+    (* Standard error stream *)
+    let err: T = external "quest_writer_err";
+
+    (* Open a writer stream for the file with the given name *)
+    let file(name: String): T = external "quest_writer_file";
+
+    (* Write a string to the writer stream *)
+    let putString(writer: T string: String): Ok = external "quest_writer_put_string";
+
+    (* Write a character to the writer stream *)
+    let putChar(writer: T char: Char): Ok = external "quest_writer_put_char";
+
+    (* Write a substring of given start offset and length to the writer stream *)
+    let putSubString(writer: T string: String start: Int size: Int): Ok =
+        external "quest_writer_put_substring";
+
+    (* Flush any buffered characters to the writer destination *)
+    let flush(writer: T): Ok = external "quest_writer_flush";
+
+    (* Close the writer stream *)
+    let close(writer: T): Ok = external "quest_writer_close";
+end;

@@ -267,6 +267,7 @@ static inline void  quest_gc_init(void)           { GC_INIT(); }
 QString *quest_string_new(const char *src, int64_t len);
 QString *quest_string_alloc(int64_t size, QChar init);
 bool     quest_string_is_empty(const QString *s);
+int64_t  quest_string_length(const QString *s);
 QString *quest_string_concat(const QString *s1, const QString *s2);
 bool     quest_string_equal(const QString *s1, const QString *s2);
 QChar    quest_string_get_char(const QString *s, int64_t idx);
@@ -285,6 +286,7 @@ bool     quest_string_precedes_sub(const QString *s1, int64_t st1, int64_t sz1,
 QArray  *quest_array_new(int64_t len, QVal init_val);
 QArrayWideRecord  *quest_array_new_wide_record(int64_t len, QRecordVal init_val);
 QArrayWideVariant *quest_array_new_wide_variant(int64_t len, QVariantVal init_val);
+int64_t  quest_array_size(const QArray *a);
 double   quest_real_pow(double base, double exp);
 const QException *quest_alloc_exception(const char *name);
 void     quest_raise(const QException *exc, QVal payload);
@@ -372,6 +374,7 @@ static inline int64_t quest_int_max(int64_t a, int64_t b) { return a > b ? a : b
 #define QUEST_REAL_NEG_EPSILON (-2.2204460492503131e-16)
 #define QUEST_REAL_E (2.71828182845904523536)
 
+double  quest_real_from_int(int64_t n);
 double  quest_real_log(double r);
 int64_t quest_real_floor(double r);
 int64_t quest_real_round(double r);

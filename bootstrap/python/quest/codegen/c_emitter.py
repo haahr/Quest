@@ -112,6 +112,7 @@ from quest.types import (
     QVariantType,
     resolve_record_bound,
     resolve_variant_bound,
+    resolve_option_bound,
 )
 
 
@@ -394,6 +395,8 @@ class CEmitter:
             if isinstance(actual_a.type_val, QVariantType) and actual_a.type_val != var_bound:
                 return self._emit_variant_upcast(c_a, actual_a.type_val, var_bound, lines)
             return c_a
+        elif resolve_option_bound(formal_t) is not None:
+            return c_a
         elif self.c_type(formal_t) == "QVal":
             return _qval_wrap(c_a, actual_a.type_val)
         else:
@@ -417,6 +420,7 @@ class CEmitter:
                 elem_t,
                 (QTupleType, QFunType, QAllType, QArrayType, QOptionType, QExceptionType),
             )
+            or resolve_option_bound(elem_t) is not None
         ):
             c_elem_t = self.c_type(elem_t)
             return f"(({c_elem_t})({c_arr}->data[{c_idx}].p))"
@@ -427,8 +431,9 @@ class CEmitter:
         """Returns the 0-based integer tag index for an Option or Variant tag."""
         if tag is None:
             return 0
-        if isinstance(t, QOptionType):
-            for i, opt in enumerate(t.options):
+        if isinstance(t, QOptionType) or (opt_bound := resolve_option_bound(t)) is not None:
+            opt_t = t if isinstance(t, QOptionType) else opt_bound
+            for i, opt in enumerate(opt_t.options):
                 if opt.name == tag:
                     return i
         elif isinstance(t, QVariantType):
@@ -609,6 +614,16 @@ class CEmitter:
                         case TypedLetValue(name=b_name, value=b_val, symbol=b_sym):
                             if isinstance(b_val, TypedFun):
                                 mod_funs.append((b_name, b_val, b_sym))
+                            elif isinstance(b_val, TypedExternal) and isinstance(b_sym.type_val, (QFunType, QAllType)):
+                                mod_native_funs.append(
+                                    TypedNativeBinding(
+                                        name=b_name,
+                                        symbol=b_val.symbol,
+                                        inline_template=None,
+                                        c_val=None,
+                                        type_val=b_sym.type_val,
+                                    )
+                                )
                             else:
                                 mod_vars.append((b_name, b_val, b_sym))
                         case TypedNativeBinding() as nb:
@@ -717,6 +732,21 @@ class CEmitter:
                 mod_emitter.record_ctx = self.record_ctx
                 mod_emitter.all_modules = self.all_modules
 
+                # Forward declarations for module static functions
+                for fname, ffun, fsym in mod_funs:
+                    m_ident = mangle_module_ident(clean_mod, fname)
+                    quants, params, _, ret_type = self._collect_fun_params(ffun)
+                    ret_c = "void" if ret_type == OK_TYPE else self.c_type(ret_type)
+                    quant_decls = [f"const QTypeDescriptor *descriptor_{q.name}" for q in quants]
+                    param_decls = quant_decls + [
+                        f"{self.c_type(p.type_val)} {mangle_module_ident(clean_mod, p.name)}"
+                        for p in params
+                    ]
+                    sig = "void" if not param_decls else ", ".join(param_decls)
+                    lines.append(f"static {ret_c} {m_ident}({sig});")
+                if mod_funs:
+                    lines.append("")
+
                 for fname, ffun, fsym in mod_funs:
                     m_ident = mangle_module_ident(clean_mod, fname)
                     quants, params, body, ret_type = self._collect_fun_params(ffun)
@@ -764,14 +794,14 @@ class CEmitter:
                 for b in mod.bindings:
                     match b:
                         case TypedLetValue(name=vname, value=vval, symbol=vsym):
-                            if not isinstance(vval, TypedFun):
+                            if any(vname == mv[0] for mv in mod_vars):
                                 m_ident = mangle_module_ident(clean_mod, vname)
                                 if vsym.type_val == OK_TYPE:
                                     mod_emitter.emit_to(vval, None, init_lines)
                                 else:
                                     mod_emitter.emit_to(vval, m_ident, init_lines)
                         case TypedException(name=ename) as exc_n:
-                            if ename:
+                            if ename and any(ename == mv[0] for mv in mod_vars):
                                 m_ident = mangle_module_ident(clean_mod, ename)
                                 mod_emitter.emit_to(exc_n, m_ident, init_lines)
                         case _:
@@ -1005,7 +1035,7 @@ class CEmitter:
                 if name == "DivideByZero":
                     return "(&quest_exc_DivideByZero)"
                 if name in self.top_fun_names:
-                    return f"(&{mangle_ident(name)}_closure)"
+                    return f"(&{self.mangle_ident(name)}_closure)"
                 if name in self.current_env_vars:
                     return self.current_env_vars[name]
                 return mangle_ident(name)
@@ -1063,6 +1093,8 @@ class CEmitter:
                 target_t = tgt.type_val
                 if (var_bound := resolve_variant_bound(target_t)) is not None:
                     target_t = var_bound
+                elif (opt_bound := resolve_option_bound(target_t)) is not None:
+                    target_t = opt_bound
                 tag_idx = self._tag_index(target_t, tag)
                 if isinstance(target_t, QVariantType):
                     return f"({c_tgt}.tag == {tag_idx}LL)"
@@ -1073,6 +1105,8 @@ class CEmitter:
                 target_t = tgt.type_val
                 if (var_bound := resolve_variant_bound(target_t)) is not None:
                     target_t = var_bound
+                elif (opt_bound := resolve_option_bound(target_t)) is not None:
+                    target_t = opt_bound
                 tag_idx = self._tag_index(target_t, tag)
                 if isinstance(target_t, QOptionType):
                     opt_field = target_t.get_option(tag) if tag is not None else None
@@ -1110,7 +1144,7 @@ class CEmitter:
                     return "((void)0)"
                 tmp = self.fresh_tmp("_case_res")
                 c_type = self.c_type(expr.type_val)
-                lines.append(f"{c_type} {tmp};")
+                lines.append(f"{c_type} {tmp} = ({c_type}){{0}};")
                 self.emit_to(expr, tmp, lines)
                 return tmp
 
@@ -1272,6 +1306,17 @@ class CEmitter:
                                     lines.append(f"{call_str};")
                                     return "((void)0)"
                                 return call_str
+                        elif (
+                            isinstance(binding, TypedLetValue)
+                            and isinstance(binding.value, TypedExternal)
+                            and isinstance(getattr(binding.symbol, "type_val", None), (QFunType, QAllType))
+                        ):
+                            c_args = [self.emit_val(a, lines) for a in args]
+                            call_str = f"{binding.value.symbol}({', '.join(c_args)})"
+                            if expr.type_val == OK_TYPE:
+                                lines.append(f"{call_str};")
+                                return "((void)0)"
+                            return call_str
 
                 # Preceding descriptor arguments from type_args
                 descriptor_args = [self.c_type_descriptor(targ) for targ in type_args]
@@ -1308,7 +1353,7 @@ class CEmitter:
                         return "((void)0)"
                     return call_str
                 elif isinstance(effective_func, TypedVar) and effective_func.name in self.top_fun_names:
-                    c_func = mangle_ident(effective_func.name)
+                    c_func = self.mangle_ident(effective_func.name)
                     c_args = list(descriptor_args)
                     fun, _ = self.top_funs_dict[effective_func.name]
                     _, formal_params, _, ret_type = self._collect_fun_params(fun)
@@ -1440,8 +1485,21 @@ class CEmitter:
                 self.emit_to(expr, tmp, lines)
                 return tmp
 
-            case TypedTypeApp(func=func):
-                return self.emit_val(func, lines)
+            case TypedTypeApp(func=func, type_args=type_args):
+                _, inner_t = self._collect_fun_quantifiers(expr.type_val)
+                if isinstance(inner_t, QFunType):
+                    return self.emit_val(func, lines)
+                descriptor_args = [self.c_type_descriptor(targ) for targ in type_args]
+                if isinstance(func, TypedVar) and func.name in self.top_fun_names:
+                    c_func = self.mangle_ident(func.name)
+                    call_str = f"{c_func}({', '.join(descriptor_args)})"
+                    return call_str
+                else:
+                    fn_ptr_t = _closure_fn_ptr_type(func.type_val, self.record_ctx)
+                    clos_val = self.emit_val(func, lines)
+                    all_c_args = [f"{clos_val}->env"] + descriptor_args
+                    call_str = f"(({fn_ptr_t})({clos_val}->fn))({', '.join(all_c_args)})"
+                    return call_str
 
             case TypedExternal(symbol=symbol):
                 return symbol
@@ -1747,7 +1805,8 @@ class CEmitter:
 
             case TypedOption(tag=tag, payload=payload, ordinal=ordinal, ordinal_expr=ordinal_expr, type_val=t):
                 target_dest = dest
-                s_name = option_struct_name(t)
+                opt_t = t if isinstance(t, QOptionType) else (resolve_option_bound(t) or t)
+                s_name = option_struct_name(opt_t)
                 if target_dest is None:
                     target_dest = self.fresh_tmp("_opt")
                     lines.append(f"{s_name} *{target_dest};")
@@ -1756,16 +1815,23 @@ class CEmitter:
                     c_ord = self.emit_val(ordinal_expr, lines)
                     lines.append(f"{target_dest}->tag = {c_ord};")
                 else:
-                    tag_idx = self._tag_index(t, tag) if tag is not None else ordinal
+                    tag_idx = self._tag_index(opt_t, tag) if tag is not None else ordinal
                     lines.append(f"{target_dest}->tag = {tag_idx}LL;")
 
                 if payload is not None and tag is not None:
-                    opt_field = t.get_option(tag)
+                    opt_field = opt_t.get_option(tag) if hasattr(opt_t, "get_option") else None
                     if opt_field and opt_field.payload_type:
                         pt = opt_field.payload_type
                         if isinstance(pt, QTupleType) and isinstance(payload, TypedTuple):
                             for i, elem in enumerate(payload.elements):
                                 c_elem = self.emit_val(elem, lines)
+                                f_type = (
+                                    pt.value_fields[i].type_val
+                                    if i < len(pt.value_fields)
+                                    else elem.type_val
+                                )
+                                if self.c_type(f_type) == "QVal" and self.c_type(elem.type_val) != "QVal":
+                                    c_elem = _qval_wrap(c_elem, elem.type_val)
                                 lines.append(f"{target_dest}->u.{tag}._{i} = {c_elem};")
                         elif isinstance(pt, QRecordType) and isinstance(payload, TypedRecord):
                             for f in payload.fields:
@@ -1780,6 +1846,8 @@ class CEmitter:
                 target_type = tgt.type_val
                 if (var_bound := resolve_variant_bound(target_type)) is not None:
                     target_type = var_bound
+                elif (opt_bound := resolve_option_bound(target_type)) is not None:
+                    target_type = opt_bound
                 if isinstance(target_type, QVariantType):
                     if not c_tgt.isidentifier():
                         tmp_tgt = self.fresh_tmp("_case_tgt")
@@ -1804,8 +1872,22 @@ class CEmitter:
                             if isinstance(b_type, QTupleType):
                                 s_tup = tuple_struct_name(b_type)
                                 branch_lines.append(f"{b_name} = ({s_tup} *)quest_alloc(sizeof({s_tup}));")
+                                opt_branch = target_type.get_option(branch.tags[0]) if branch.tags else None
+                                opt_pt = opt_branch.payload_type if opt_branch else None
                                 for i, f in enumerate(b_type.value_fields):
-                                    branch_lines.append(f"{b_name}->_{i} = {c_tgt}->u.{branch.tags[0]}._{i};")
+                                    field_src = f"{c_tgt}->u.{branch.tags[0]}._{i}"
+                                    opt_f_t = (
+                                        opt_pt.value_fields[i].type_val
+                                        if isinstance(opt_pt, QTupleType) and i < len(opt_pt.value_fields)
+                                        else None
+                                    )
+                                    if (
+                                        opt_f_t is not None
+                                        and self.c_type(opt_f_t) == "QVal"
+                                        and self.c_type(f.type_val) != "QVal"
+                                    ):
+                                        field_src = _qval_unwrap(field_src, f.type_val, self)
+                                    branch_lines.append(f"{b_name}->_{i} = {field_src};")
                             elif isinstance(b_type, QRecordType):
                                 s_rec = self.record_struct_name(b_type)
                                 branch_lines.append(f"{b_name} = ({s_rec} *)quest_alloc(sizeof({s_rec}));")

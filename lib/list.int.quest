@@ -1,0 +1,20 @@
+interface List export
+    (* The polymorphic list type constructor *)
+    T::ALL(A::TYPE) TYPE
+    (* Exception raised on empty list head or tail operations *)
+    error: Exception
+    (* Empty list constructor *)
+    nil: All(A::TYPE) T(A)
+    (* Construct a new list cell with head item and tail list *)
+    cons: All(A::TYPE) All(item: A list: T(A)) T(A)
+    (* Test whether a list is empty *)
+    null: All(A::TYPE) All(list: T(A)) Bool
+    (* Return head element of list, or raise error if empty *)
+    head: All(A::TYPE) All(list: T(A)) A
+    (* Return tail of list, or raise error if empty *)
+    tail: All(A::TYPE) All(list: T(A)) T(A)
+    (* Return the number of elements in a list *)
+    length: All(A::TYPE) All(list: T(A)) Int
+    (* Convert an array to a list with matching element order *)
+    enum: All(A::TYPE) All(a: Array(A)) T(A)
+end;

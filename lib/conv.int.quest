@@ -1,0 +1,14 @@
+interface Conv export
+    (* Return the string "ok" *)
+    okay(): String
+    (* Return "true" or "false" string representation of a boolean *)
+    bool(b: Bool): String
+    (* Return decimal string representation of an integer *)
+    int(n: Int): String
+    (* Return string representation of a real number *)
+    real(r: Real): String
+    (* Return single-quoted character representation with escape sequences *)
+    char(c: Char): String
+    (* Return double-quoted string representation with escape sequences *)
+    string(s: String): String
+end;

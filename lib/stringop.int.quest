@@ -1,0 +1,32 @@
+interface StringOp export
+    (* Exception raised on string manipulation errors *)
+    error: Exception
+    (* Allocate a new string of given size initialized with character init *)
+    new(size: Int init: Char): String
+    (* Test whether a string is empty (length 0) *)
+    isEmpty(string: String): Bool
+    (* Return the byte length of a string *)
+    length(string: String): Int
+    (* Extract the character at 0-based index from string *)
+    getChar(string: String index: Int): Char
+    (* Update the character at 0-based index in string *)
+    setChar(string: String index: Int char: Char): Ok
+    (* Extract substring starting at start offset of given size *)
+    getSub(source: String start: Int size: Int): String
+    (* Copy substring from source into dest buffer at destStart *)
+    setSub(dest: String destStart: Int source: String sourceStart: Int sourceSize: Int): Ok
+    (* Concatenate two strings *)
+    cat(s1: String s2: String): String
+    (* Concatenate substrings of two strings *)
+    catSub(s1: String start1: Int size1: Int s2: String start2: Int size2: Int): String
+    (* Concatenate an array of strings into a single string *)
+    conc(a: Array(String)): String
+    (* Test if two strings have equal contents *)
+    equal(s1: String s2: String): Bool
+    (* Test if two substrings have equal contents *)
+    equalSub(s1: String start1: Int size1: Int s2: String start2: Int size2: Int): Bool
+    (* Test if string s1 lexicographically precedes or equals s2 *)
+    precedes(s1: String s2: String): Bool
+    (* Test if substring of s1 lexicographically precedes or equals substring of s2 *)
+    precedesSub(s1: String start1: Int size1: Int s2: String start2: Int size2: Int): Bool
+end;

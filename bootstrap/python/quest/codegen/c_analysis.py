@@ -50,6 +50,7 @@ from quest.types import (
     QVariantType,
     resolve_record_bound,
     resolve_variant_bound,
+    resolve_option_bound,
 )
 
 
@@ -162,10 +163,11 @@ def is_specialization_needed(t: QType) -> bool:
         return any(is_specialization_needed(f.type_val) for f in t.value_fields)
     if isinstance(t, QArrayType):
         return is_specialization_needed(t.element_type)
-    if isinstance(t, QOptionType):
+    if isinstance(t, QOptionType) or (opt_bound := resolve_option_bound(t)) is not None:
+        opt_t = t if isinstance(t, QOptionType) else opt_bound
         return any(
             is_specialization_needed(o.payload_type)
-            for o in t.options
+            for o in opt_t.options
             if o.payload_type is not None
         )
     return False
@@ -316,14 +318,15 @@ def collect_aggregate_types(
             if name not in visited_names:
                 visited_names.add(name)
                 result.append((name, t))
-        elif isinstance(t, QOptionType):
-            for o in t.options:
+        elif isinstance(t, QOptionType) or (opt_bound := resolve_option_bound(t)) is not None:
+            opt_t = t if isinstance(t, QOptionType) else opt_bound
+            for o in opt_t.options:
                 if o.payload_type:
                     visit_type(o.payload_type)
-            name = option_struct_name(t)
+            name = option_struct_name(opt_t)
             if name not in visited_names:
                 visited_names.add(name)
-                result.append((name, t))
+                result.append((name, opt_t))
         elif isinstance(t, QVariantType):
             if t not in variant_types:
                 variant_types.append(t)
@@ -518,10 +521,12 @@ def analyze_program_for_c(
     # 3. Aggregate and variant types collection across prog and all specialized functions
     agg_types, variant_types = collect_aggregate_types(prog, record_ctx)
 
+    agg_names: set[str] = {name for name, _ in agg_types}
     for _, sfun, _ in top_funs:
         s_agg, s_var = collect_aggregate_types(sfun, record_ctx)
         for item in s_agg:
-            if item not in agg_types:
+            if item[0] not in agg_names:
+                agg_names.add(item[0])
                 agg_types.append(item)
         for v in s_var:
             if v not in variant_types:
@@ -531,7 +536,8 @@ def analyze_program_for_c(
         for b in mod.bindings:
             b_agg, b_var = collect_aggregate_types(b, record_ctx)
             for item in b_agg:
-                if item not in agg_types:
+                if item[0] not in agg_names:
+                    agg_names.add(item[0])
                     agg_types.append(item)
             for v in b_var:
                 if v not in variant_types:
@@ -539,7 +545,8 @@ def analyze_program_for_c(
         mod_rec_t = BuiltinModuleRegistry._build_record_type_from_scope(mod.scope)
         rec_agg, rec_var = collect_aggregate_types(mod_rec_t, record_ctx)
         for item in rec_agg:
-            if item not in agg_types:
+            if item[0] not in agg_names:
+                agg_names.add(item[0])
                 agg_types.append(item)
         for v in rec_var:
             if v not in variant_types:

@@ -169,6 +169,10 @@ class ModuleBuilder:
         sym = ValueSymbol(name=name, type_val=type_val)
         self.scope.declare_value(sym)
         self.record_dict[name] = runtime_val
+        if c_val:
+            self.registry._symbol_bridge[c_val] = runtime_val
+            clean_c = c_val.strip("(&)").strip()
+            self.registry._symbol_bridge[clean_c] = runtime_val
         self.typed_bindings.append(
             TypedNativeBinding(
                 name=name,
@@ -196,6 +200,8 @@ class ModuleBuilder:
         sym = ValueSymbol(name=name, type_val=fn_type)
         self.scope.declare_value(sym)
         self.record_dict[name] = QBuiltinFun(f"{self.mod_name}.{name}", fn)
+        if c_symbol:
+            self.registry._symbol_bridge[c_symbol] = fn
         self.typed_bindings.append(
             TypedNativeBinding(
                 name=name,
@@ -278,6 +284,19 @@ class BuiltinModuleRegistry:
     _interfaces: dict[str, Scope] = {}
     _module_types: dict[str, QType] = {}
     _module_asts: dict[str, TypedModule] = {}
+    _symbol_bridge: dict[str, Any] = {}
+
+    @classmethod
+    def resolve_external_symbol(cls, symbol: str) -> QValue:
+        """Resolves an external C symbol into a Python QValue for interpreter evaluation."""
+        cls._ensure_initialized()
+        clean = symbol.strip("(&)").strip()
+        val = cls._symbol_bridge.get(symbol) or cls._symbol_bridge.get(clean)
+        if val is None:
+            raise QuestRuntimeError(f"Undefined external symbol '{symbol}' in interpreter")
+        if callable(val) and not isinstance(val, QValue):
+            return QBuiltinFun(symbol, val)
+        return val
 
     @classmethod
     def get_interface(cls, name: str, env: Optional[Environment] = None) -> Optional[Scope]:
@@ -1226,6 +1245,33 @@ class BuiltinModuleRegistry:
             c_symbol="quest_system_file_exists",
         )
         sys_b.finish()
+        cls._symbol_bridge.update({
+            "QUEST_INT_MAX": QInt(9223372036854775807),
+            "QUEST_INT_MIN": QInt(-9223372036854775808),
+            "QUEST_REAL_MIN": QReal(2.2250738585072014e-308),
+            "QUEST_REAL_MAX": QReal(1.7976931348623157e+308),
+            "QUEST_REAL_EPSILON": QReal(2.220446049250313e-16),
+            "QUEST_REAL_E": QReal(math.e),
+            "QUEST_REAL_PI": QReal(math.pi),
+            "sin": lambda r: QReal(math.sin(r.value)),
+            "cos": lambda r: QReal(math.cos(r.value)),
+            "tan": lambda r: QReal(math.tan(r.value)),
+            "asin": lambda r: QReal(math.asin(r.value)),
+            "acos": lambda r: QReal(math.acos(r.value)),
+            "atan": lambda r: QReal(math.atan(r.value)),
+            "atan2": lambda y, x: QReal(math.atan2(y.value, x.value)),
+            "exp": lambda r: QReal(math.exp(r.value)),
+            "log": lambda r: QReal(math.log(r.value)),
+            "sqrt": lambda r: QReal(math.sqrt(r.value)),
+            "pow": lambda x, y: QReal(math.pow(x.value, y.value)),
+            "floor": lambda r: QReal(math.floor(r.value)),
+            "ceil": lambda r: QReal(math.ceil(r.value)),
+            "round": lambda r: QReal(round(r.value)),
+            "trunc": lambda r: QReal(math.trunc(r.value)),
+            "quest_array_size": lambda arr: QInt(len(arr.elements)),
+            "quest_string_length": lambda s: QInt(len(s.value)),
+            "quest_real_from_int": lambda n: QReal(float(n.value)),
+        })
 
     @classmethod
     def _build_record_type_from_scope(cls, scope: Scope) -> QRecordType:
