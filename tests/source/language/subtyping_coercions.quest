@@ -1,0 +1,35 @@
+(* Language: Structural Subtyping, Record Width/Permutation, Coercions *)
+
+import writer: Writer;
+import conv: Conv;
+
+let wOut = writer.output;
+let printInt(x: Int): Ok =
+    begin
+        writer.putString(wOut conv.int(x));
+        writer.putString(wOut "\n")
+    end;
+
+(* 1. Tuple prefix subtyping *)
+Let BigTuple = Tuple x: Int y: Int z: Int end;
+Let SmallTuple = Tuple x: Int y: Int end;
+let getFirstTwo(t: SmallTuple): Int = t.x + t.y;
+let bt: BigTuple = tuple let x = 10 let y = 20 let z = 30 end;
+printInt(getFirstTwo(bt));
+
+(* 2. Record width subtyping *)
+Let BigRec = Record x: Int y: Int z: Int end;
+Let SmallRec = Record x: Int y: Int end;
+let sumXY(r: SmallRec): Int = r.x + r.y;
+let br: BigRec = record x = 100 y = 200 z = 300 end;
+printInt(sumXY(br));
+
+(* 3. Record permutation subtyping *)
+Let OrderedRec = Record a: Int b: Int end;
+let getA(r: OrderedRec): Int = r.a * 10 + r.b;
+let permuted = record b = 4 a = 7 end;
+printInt(getA(permuted));
+
+(* 4. Record passing through HOF / closure *)
+let applyRec(f: All(r: SmallRec) Int r: BigRec): Int = f(r);
+printInt(applyRec(sumXY br));

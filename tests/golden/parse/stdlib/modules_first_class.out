@@ -1,0 +1,93 @@
+(Program
+  :phrases (
+    (ImportPhrase
+      :items (
+        (ImportItem ('writer') 'Writer')
+      )
+    )
+    (LetValueBinding
+      :name 'w'
+      :value (ExprId 'writer')
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'w')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'w')
+            :field 'output'
+          )
+          (ExprString 'First class module record dispatched!\n' '"First class module record dispatched!\\n"')
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'id'
+      :value (ExprFun
+        :params (
+          (FormalParam
+            :name 'a'
+            :type_annot (TypePath ('A'))
+            :mode VALUE
+          )
+        )
+        :return_type (TypePath ('A'))
+        :body (ExprId 'a')
+        :type_params (
+          (TypeFormal
+            :name 'A'
+            :bound (KindType)
+          )
+        )
+      )
+      :type_annot (TypeAll
+        :quantifiers (
+          (Quantifier
+            :name 'A'
+            :bound (KindType)
+            :mode VALUE
+            :is_type True
+          )
+          (Quantifier
+            :name 'a'
+            :bound (KindPower
+              :bound (TypePath ('A'))
+            )
+            :mode VALUE
+          )
+        )
+        :result_type (TypePath ('A'))
+      )
+    )
+    (LetValueBinding
+      :name 'w2'
+      :value (ExprApp
+        :func (ExprId 'id')
+        :args (
+          (TypeArgument
+            :type_val (TypePath ('Writer' 'T'))
+          )
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprId 'w2')
+          (ExprString 'Writer.T passed as generic argument!\n' '"Writer.T passed as generic argument!\\n"')
+        )
+      )
+    )
+  )
+)

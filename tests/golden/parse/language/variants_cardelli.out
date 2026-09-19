@@ -1,0 +1,303 @@
+(Program
+  :phrases (
+    (ImportPhrase
+      :items (
+        (ImportItem ('writer') 'Writer')
+      )
+    )
+    (ImportPhrase
+      :items (
+        (ImportItem ('conv') 'Conv')
+      )
+    )
+    (LetValueBinding
+      :name 'wOut'
+      :value (ExprSelect
+        :target (ExprId 'writer')
+        :field 'output'
+      )
+    )
+    (LetValueBinding
+      :name 'printInt'
+      :value (ExprBlock
+        :bindings (
+          (ExprStmt
+            :expr (ExprApp
+              :func (ExprSelect
+                :target (ExprId 'writer')
+                :field 'putString'
+              )
+              :args (
+                (ExprId 'wOut')
+                (ExprApp
+                  :func (ExprSelect
+                    :target (ExprId 'conv')
+                    :field 'int'
+                  )
+                  :args (
+                    (ExprId 'x')
+                  )
+                )
+              )
+            )
+          )
+          (ExprStmt
+            :expr (ExprApp
+              :func (ExprSelect
+                :target (ExprId 'writer')
+                :field 'putString'
+              )
+              :args (
+                (ExprId 'wOut')
+                (ExprString '\n' '"\\n"')
+              )
+            )
+          )
+        )
+      )
+      :params (
+        (FormalParam
+          :name 'x'
+          :type_annot (TypePath ('Int'))
+          :mode VALUE
+        )
+      )
+      :type_annot (TypePath ('Ok'))
+    )
+    (LetValueBinding
+      :name 'printBool'
+      :value (ExprBlock
+        :bindings (
+          (ExprStmt
+            :expr (ExprApp
+              :func (ExprSelect
+                :target (ExprId 'writer')
+                :field 'putString'
+              )
+              :args (
+                (ExprId 'wOut')
+                (ExprApp
+                  :func (ExprSelect
+                    :target (ExprId 'conv')
+                    :field 'bool'
+                  )
+                  :args (
+                    (ExprId 'b')
+                  )
+                )
+              )
+            )
+          )
+          (ExprStmt
+            :expr (ExprApp
+              :func (ExprSelect
+                :target (ExprId 'writer')
+                :field 'putString'
+              )
+              :args (
+                (ExprId 'wOut')
+                (ExprString '\n' '"\\n"')
+              )
+            )
+          )
+        )
+      )
+      :params (
+        (FormalParam
+          :name 'b'
+          :type_annot (TypePath ('Bool'))
+          :mode VALUE
+        )
+      )
+      :type_annot (TypePath ('Ok'))
+    )
+    (LetTypeBinding
+      :name 'Day'
+      :type_val (TypeVariant
+        :fields (
+          (VariantFieldSig
+            :tag 'mon'
+            :type_sig (TypePath ('Int'))
+          )
+          (VariantFieldSig
+            :tag 'tue'
+            :type_sig (TypePath ('Int'))
+          )
+          (VariantFieldSig
+            :tag 'wed'
+            :type_sig (TypePath ('Int'))
+          )
+          (VariantFieldSig
+            :tag 'thu'
+            :type_sig (TypePath ('Int'))
+          )
+          (VariantFieldSig
+            :tag 'fri'
+            :type_sig (TypePath ('Int'))
+          )
+          (VariantFieldSig
+            :tag 'sat'
+            :type_sig (TypePath ('Int'))
+          )
+          (VariantFieldSig
+            :tag 'sun'
+            :type_sig (TypePath ('Int'))
+          )
+        )
+      )
+    )
+    (LetTypeBinding
+      :name 'WeekDay'
+      :type_val (TypeVariant
+        :fields (
+          (VariantFieldSig
+            :tag 'mon'
+            :type_sig (TypePath ('Int'))
+          )
+          (VariantFieldSig
+            :tag 'tue'
+            :type_sig (TypePath ('Int'))
+          )
+          (VariantFieldSig
+            :tag 'wed'
+            :type_sig (TypePath ('Int'))
+          )
+          (VariantFieldSig
+            :tag 'thu'
+            :type_sig (TypePath ('Int'))
+          )
+          (VariantFieldSig
+            :tag 'fri'
+            :type_sig (TypePath ('Int'))
+          )
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'isMon'
+      :value (ExprVariantCheck
+        :target (ExprId 'd')
+        :tag 'mon'
+      )
+      :params (
+        (FormalParam
+          :name 'd'
+          :type_annot (TypePath ('Day'))
+          :mode VALUE
+        )
+      )
+      :type_annot (TypePath ('Bool'))
+    )
+    (LetValueBinding
+      :name 'w'
+      :value (ExprVariant
+        :tag 'mon'
+        :variant_type (TypePath ('WeekDay'))
+        :payload (ExprInt 1 '1')
+      )
+      :type_annot (TypePath ('WeekDay'))
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printBool')
+        :args (
+          (ExprApp
+            :func (ExprId 'isMon')
+            :args (
+              (ExprId 'w')
+            )
+          )
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'getDayCode'
+      :value (ExprCase
+        :target (ExprId 'd')
+        :branches (
+          (CaseBranch
+            :tags ('mon')
+            :binder 'c'
+            :body (ExprStmt
+              :expr (ExprId 'c')
+            )
+          )
+          (CaseBranch
+            :tags ('tue')
+            :binder 'c'
+            :body (ExprStmt
+              :expr (ExprId 'c')
+            )
+          )
+          (CaseBranch
+            :tags ('wed')
+            :binder 'c'
+            :body (ExprStmt
+              :expr (ExprId 'c')
+            )
+          )
+          (CaseBranch
+            :tags ('thu')
+            :binder 'c'
+            :body (ExprStmt
+              :expr (ExprId 'c')
+            )
+          )
+          (CaseBranch
+            :tags ('fri')
+            :binder 'c'
+            :body (ExprStmt
+              :expr (ExprId 'c')
+            )
+          )
+        )
+        :else_branch (ExprStmt
+          :expr (ExprInt 0 '0')
+        )
+      )
+      :params (
+        (FormalParam
+          :name 'd'
+          :type_annot (TypePath ('Day'))
+          :mode VALUE
+        )
+      )
+      :type_annot (TypePath ('Int'))
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printInt')
+        :args (
+          (ExprApp
+            :func (ExprId 'getDayCode')
+            :args (
+              (ExprId 'w')
+            )
+          )
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'friDay'
+      :value (ExprVariant
+        :tag 'fri'
+        :variant_type (TypePath ('WeekDay'))
+        :payload (ExprInt 5 '5')
+      )
+      :type_annot (TypePath ('WeekDay'))
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printInt')
+        :args (
+          (ExprApp
+            :func (ExprId 'getDayCode')
+            :args (
+              (ExprId 'friDay')
+            )
+          )
+        )
+      )
+    )
+  )
+)

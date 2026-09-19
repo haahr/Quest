@@ -1,0 +1,199 @@
+(Program
+  :phrases (
+    (ImportPhrase
+      :items (
+        (ImportItem ('arrayOp') 'ArrayOp')
+      )
+    )
+    (ImportPhrase
+      :items (
+        (ImportItem ('writer') 'Writer')
+      )
+    )
+    (ImportPhrase
+      :items (
+        (ImportItem ('conv') 'Conv')
+      )
+    )
+    (LetValueBinding
+      :name 'wOut'
+      :value (ExprSelect
+        :target (ExprId 'writer')
+        :field 'output'
+      )
+    )
+    (LetValueBinding
+      :name 'printInt'
+      :value (ExprBlock
+        :bindings (
+          (ExprStmt
+            :expr (ExprApp
+              :func (ExprSelect
+                :target (ExprId 'writer')
+                :field 'putString'
+              )
+              :args (
+                (ExprId 'wOut')
+                (ExprApp
+                  :func (ExprSelect
+                    :target (ExprId 'conv')
+                    :field 'int'
+                  )
+                  :args (
+                    (ExprId 'x')
+                  )
+                )
+              )
+            )
+          )
+          (ExprStmt
+            :expr (ExprApp
+              :func (ExprSelect
+                :target (ExprId 'writer')
+                :field 'putString'
+              )
+              :args (
+                (ExprId 'wOut')
+                (ExprString '\n' '"\\n"')
+              )
+            )
+          )
+        )
+      )
+      :params (
+        (FormalParam
+          :name 'x'
+          :type_annot (TypePath ('Int'))
+          :mode VALUE
+        )
+      )
+      :type_annot (TypePath ('Ok'))
+    )
+    (LetValueBinding
+      :name 'a1'
+      :value (ExprArray
+        :elements (
+          (ExprInt 10 '10')
+          (ExprInt 20 '20')
+          (ExprInt 30 '30')
+          (ExprInt 40 '40')
+          (ExprInt 50 '50')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printInt')
+        :args (
+          (ExprIndex
+            :target (ExprId 'a1')
+            :index (ExprInt 0 '0')
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printInt')
+        :args (
+          (ExprIndex
+            :target (ExprId 'a1')
+            :index (ExprInt 4 '4')
+          )
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'a2'
+      :value (ExprArrayRep
+        :count (ExprInt 5 '5')
+        :init_val (ExprInt 77 '77')
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printInt')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'arrayOp')
+              :field 'size'
+            )
+            :args (
+              (TypeArgument
+                :type_val (TypePath ('Int'))
+              )
+              (ExprId 'a2')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printInt')
+        :args (
+          (ExprIndex
+            :target (ExprId 'a2')
+            :index (ExprInt 2 '2')
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprInfix
+        :left (ExprIndex
+          :target (ExprId 'a1')
+          :index (ExprInt 2 '2')
+        )
+        :op ':='
+        :right (ExprInt 999 '999')
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printInt')
+        :args (
+          (ExprIndex
+            :target (ExprId 'a1')
+            :index (ExprInt 2 '2')
+          )
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'sum'
+      :value (ExprInt 0 '0')
+      :is_var True
+    )
+    (ExprStmt
+      :expr (ExprFor
+        :var_name 'i'
+        :start (ExprInt 0 '0')
+        :stop (ExprInt 4 '4')
+        :body (ExprStmt
+          :expr (ExprInfix
+            :left (ExprId 'sum')
+            :op ':='
+            :right (ExprInfix
+              :left (ExprId 'sum')
+              :op '+'
+              :right (ExprIndex
+                :target (ExprId 'a1')
+                :index (ExprId 'i')
+              )
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printInt')
+        :args (
+          (ExprId 'sum')
+        )
+      )
+    )
+  )
+)

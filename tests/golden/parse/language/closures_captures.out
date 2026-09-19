@@ -1,0 +1,372 @@
+(Program
+  :phrases (
+    (ImportPhrase
+      :items (
+        (ImportItem ('writer') 'Writer')
+      )
+    )
+    (ImportPhrase
+      :items (
+        (ImportItem ('conv') 'Conv')
+      )
+    )
+    (LetValueBinding
+      :name 'wOut'
+      :value (ExprSelect
+        :target (ExprId 'writer')
+        :field 'output'
+      )
+    )
+    (LetValueBinding
+      :name 'printInt'
+      :value (ExprBlock
+        :bindings (
+          (ExprStmt
+            :expr (ExprApp
+              :func (ExprSelect
+                :target (ExprId 'writer')
+                :field 'putString'
+              )
+              :args (
+                (ExprId 'wOut')
+                (ExprApp
+                  :func (ExprSelect
+                    :target (ExprId 'conv')
+                    :field 'int'
+                  )
+                  :args (
+                    (ExprId 'x')
+                  )
+                )
+              )
+            )
+          )
+          (ExprStmt
+            :expr (ExprApp
+              :func (ExprSelect
+                :target (ExprId 'writer')
+                :field 'putString'
+              )
+              :args (
+                (ExprId 'wOut')
+                (ExprString '\n' '"\\n"')
+              )
+            )
+          )
+        )
+      )
+      :params (
+        (FormalParam
+          :name 'x'
+          :type_annot (TypePath ('Int'))
+          :mode VALUE
+        )
+      )
+      :type_annot (TypePath ('Ok'))
+    )
+    (LetValueBinding
+      :name 'apply'
+      :value (ExprApp
+        :func (ExprId 'fn')
+        :args (
+          (ExprId 'x')
+        )
+      )
+      :params (
+        (FormalParam
+          :name 'fn'
+          :type_annot (TypeAll
+            :quantifiers (
+              (Quantifier
+                :name 'x'
+                :bound (KindPower
+                  :bound (TypePath ('Int'))
+                )
+                :mode VALUE
+              )
+            )
+            :result_type (TypePath ('Int'))
+          )
+          :mode VALUE
+        )
+        (FormalParam
+          :name 'x'
+          :type_annot (TypePath ('Int'))
+          :mode VALUE
+        )
+      )
+      :type_annot (TypePath ('Int'))
+    )
+    (LetValueBinding
+      :name 'inc'
+      :value (ExprInfix
+        :left (ExprId 'x')
+        :op '+'
+        :right (ExprInt 1 '1')
+      )
+      :params (
+        (FormalParam
+          :name 'x'
+          :type_annot (TypePath ('Int'))
+          :mode VALUE
+        )
+      )
+      :type_annot (TypePath ('Int'))
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printInt')
+        :args (
+          (ExprApp
+            :func (ExprId 'apply')
+            :args (
+              (ExprId 'inc')
+              (ExprInt 41 '41')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printInt')
+        :args (
+          (ExprApp
+            :func (ExprId 'apply')
+            :args (
+              (ExprFun
+                :params (
+                  (FormalParam
+                    :name 'x'
+                    :type_annot (TypePath ('Int'))
+                    :mode VALUE
+                  )
+                )
+                :return_type (TypePath ('Int'))
+                :body (ExprInfix
+                  :left (ExprId 'x')
+                  :op '*'
+                  :right (ExprInt 3 '3')
+                )
+              )
+              (ExprInt 14 '14')
+            )
+          )
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'makeAdder'
+      :value (ExprFun
+        :params (
+          (FormalParam
+            :name 'x'
+            :type_annot (TypePath ('Int'))
+            :mode VALUE
+          )
+        )
+        :return_type (TypePath ('Int'))
+        :body (ExprInfix
+          :left (ExprId 'base')
+          :op '+'
+          :right (ExprId 'x')
+        )
+      )
+      :params (
+        (FormalParam
+          :name 'base'
+          :type_annot (TypePath ('Int'))
+          :mode VALUE
+        )
+      )
+      :type_annot (TypeAll
+        :quantifiers (
+          (Quantifier
+            :name 'x'
+            :bound (KindPower
+              :bound (TypePath ('Int'))
+            )
+            :mode VALUE
+          )
+        )
+        :result_type (TypePath ('Int'))
+      )
+    )
+    (LetValueBinding
+      :name 'add100'
+      :value (ExprApp
+        :func (ExprId 'makeAdder')
+        :args (
+          (ExprInt 100 '100')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printInt')
+        :args (
+          (ExprApp
+            :func (ExprId 'add100')
+            :args (
+              (ExprInt 42 '42')
+            )
+          )
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'f'
+      :value (ExprFun
+        :params (
+          (FormalParam
+            :name 'b'
+            :type_annot (TypePath ('Int'))
+            :mode VALUE
+          )
+        )
+        :return_type (TypeAll
+          :quantifiers (
+            (Quantifier
+              :name 'c'
+              :bound (KindPower
+                :bound (TypePath ('Int'))
+              )
+              :mode VALUE
+            )
+          )
+          :result_type (TypePath ('Int'))
+        )
+        :body (ExprFun
+          :params (
+            (FormalParam
+              :name 'c'
+              :type_annot (TypePath ('Int'))
+              :mode VALUE
+            )
+          )
+          :return_type (TypePath ('Int'))
+          :body (ExprInfix
+            :left (ExprId 'a')
+            :op '+'
+            :right (ExprInfix
+              :left (ExprId 'b')
+              :op '+'
+              :right (ExprId 'c')
+            )
+          )
+        )
+      )
+      :params (
+        (FormalParam
+          :name 'a'
+          :type_annot (TypePath ('Int'))
+          :mode VALUE
+        )
+      )
+      :type_annot (TypeAll
+        :quantifiers (
+          (Quantifier
+            :name 'b'
+            :bound (KindPower
+              :bound (TypePath ('Int'))
+            )
+            :mode VALUE
+          )
+        )
+        :result_type (TypeAll
+          :quantifiers (
+            (Quantifier
+              :name 'c'
+              :bound (KindPower
+                :bound (TypePath ('Int'))
+              )
+              :mode VALUE
+            )
+          )
+          :result_type (TypePath ('Int'))
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printInt')
+        :args (
+          (ExprApp
+            :func (ExprApp
+              :func (ExprApp
+                :func (ExprId 'f')
+                :args (
+                  (ExprInt 10 '10')
+                )
+              )
+              :args (
+                (ExprInt 20 '20')
+              )
+            )
+            :args (
+              (ExprInt 12 '12')
+            )
+          )
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'count'
+      :value (ExprInt 10 '10')
+      :is_var True
+    )
+    (LetValueBinding
+      :name 'bump'
+      :value (ExprBlock
+        :bindings (
+          (ExprStmt
+            :expr (ExprInfix
+              :left (ExprId 'count')
+              :op ':='
+              :right (ExprInfix
+                :left (ExprId 'count')
+                :op '+'
+                :right (ExprId 'delta')
+              )
+            )
+          )
+          (ExprStmt
+            :expr (ExprOk)
+          )
+        )
+      )
+      :params (
+        (FormalParam
+          :name 'delta'
+          :type_annot (TypePath ('Int'))
+          :mode VALUE
+        )
+      )
+      :type_annot (TypePath ('Ok'))
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'bump')
+        :args (
+          (ExprInt 5 '5')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'bump')
+        :args (
+          (ExprInt 27 '27')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printInt')
+        :args (
+          (ExprId 'count')
+        )
+      )
+    )
+  )
+)

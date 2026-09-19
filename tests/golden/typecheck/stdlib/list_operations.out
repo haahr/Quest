@@ -1,0 +1,176 @@
+(TypedProgram
+  :phrases (
+    (TypedImport
+      :items (
+        (TypedImportItem ('list') : 'List')
+      ))
+    (TypedImport
+      :items (
+        (TypedImportItem ('writer') : 'Writer')
+      ))
+    (TypedImport
+      :items (
+        (TypedImportItem ('conv') : 'Conv')
+      ))
+    (TypedLetValue 'l0' :type list.T(Int)
+      :value (TypedTypeApp [Int] :type list.T(Int)
+        :func (TypedSelect 'nil' :type All(A :: TYPE) list.T(A)
+          :target (TypedVar 'list' :type Record error: Exception nil: All(A :: TYPE) list.T(A) cons: All(A :: TYPE) Fun(item: A list: list.T(A)): list.T(A) null: All(A :: TYPE) Fun(list: list.T(A)): Bool head: All(A :: TYPE) Fun(list: list.T(A)): A tail: All(A :: TYPE) Fun(list: list.T(A)): list.T(A) length: All(A :: TYPE) Fun(list: list.T(A)): Int enum: All(A :: TYPE) Fun(array: Array(A)): list.T(A) end))))
+    (TypedLetValue 'b0' :type Bool
+      :value (TypedApp :type Bool
+        :func (TypedTypeApp [Int] :type Fun(list: list.T(Int)): Bool
+          :func (TypedSelect 'null' :type All(A :: TYPE) Fun(list: list.T(A)): Bool
+            :target (TypedVar 'list' :type Record error: Exception nil: All(A :: TYPE) list.T(A) cons: All(A :: TYPE) Fun(item: A list: list.T(A)): list.T(A) null: All(A :: TYPE) Fun(list: list.T(A)): Bool head: All(A :: TYPE) Fun(list: list.T(A)): A tail: All(A :: TYPE) Fun(list: list.T(A)): list.T(A) length: All(A :: TYPE) Fun(list: list.T(A)): Int enum: All(A :: TYPE) Fun(array: Array(A)): list.T(A) end)))
+        :args (
+          (TypedVar 'l0' :type list.T(Int))
+        )))
+    (TypedLetValue 'l1' :type list.T(Int)
+      :value (TypedApp :type list.T(Int)
+        :func (TypedTypeApp [Int] :type Fun(item: Int list: list.T(Int)): list.T(Int)
+          :func (TypedSelect 'cons' :type All(A :: TYPE) Fun(item: A list: list.T(A)): list.T(A)
+            :target (TypedVar 'list' :type Record error: Exception nil: All(A :: TYPE) list.T(A) cons: All(A :: TYPE) Fun(item: A list: list.T(A)): list.T(A) null: All(A :: TYPE) Fun(list: list.T(A)): Bool head: All(A :: TYPE) Fun(list: list.T(A)): A tail: All(A :: TYPE) Fun(list: list.T(A)): list.T(A) length: All(A :: TYPE) Fun(list: list.T(A)): Int enum: All(A :: TYPE) Fun(array: Array(A)): list.T(A) end)))
+        :args (
+          (TypedInt 10 :type Int)
+          (TypedVar 'l0' :type list.T(Int))
+        )))
+    (TypedLetValue 'l2' :type list.T(Int)
+      :value (TypedApp :type list.T(Int)
+        :func (TypedTypeApp [Int] :type Fun(item: Int list: list.T(Int)): list.T(Int)
+          :func (TypedSelect 'cons' :type All(A :: TYPE) Fun(item: A list: list.T(A)): list.T(A)
+            :target (TypedVar 'list' :type Record error: Exception nil: All(A :: TYPE) list.T(A) cons: All(A :: TYPE) Fun(item: A list: list.T(A)): list.T(A) null: All(A :: TYPE) Fun(list: list.T(A)): Bool head: All(A :: TYPE) Fun(list: list.T(A)): A tail: All(A :: TYPE) Fun(list: list.T(A)): list.T(A) length: All(A :: TYPE) Fun(list: list.T(A)): Int enum: All(A :: TYPE) Fun(array: Array(A)): list.T(A) end)))
+        :args (
+          (TypedInt 20 :type Int)
+          (TypedVar 'l1' :type list.T(Int))
+        )))
+    (TypedLetValue 'l3' :type list.T(Int)
+      :value (TypedApp :type list.T(Int)
+        :func (TypedTypeApp [Int] :type Fun(item: Int list: list.T(Int)): list.T(Int)
+          :func (TypedSelect 'cons' :type All(A :: TYPE) Fun(item: A list: list.T(A)): list.T(A)
+            :target (TypedVar 'list' :type Record error: Exception nil: All(A :: TYPE) list.T(A) cons: All(A :: TYPE) Fun(item: A list: list.T(A)): list.T(A) null: All(A :: TYPE) Fun(list: list.T(A)): Bool head: All(A :: TYPE) Fun(list: list.T(A)): A tail: All(A :: TYPE) Fun(list: list.T(A)): list.T(A) length: All(A :: TYPE) Fun(list: list.T(A)): Int enum: All(A :: TYPE) Fun(array: Array(A)): list.T(A) end)))
+        :args (
+          (TypedInt 30 :type Int)
+          (TypedVar 'l2' :type list.T(Int))
+        )))
+    (TypedLetValue 'len' :type Int
+      :value (TypedApp :type Int
+        :func (TypedTypeApp [Int] :type Fun(list: list.T(Int)): Int
+          :func (TypedSelect 'length' :type All(A :: TYPE) Fun(list: list.T(A)): Int
+            :target (TypedVar 'list' :type Record error: Exception nil: All(A :: TYPE) list.T(A) cons: All(A :: TYPE) Fun(item: A list: list.T(A)): list.T(A) null: All(A :: TYPE) Fun(list: list.T(A)): Bool head: All(A :: TYPE) Fun(list: list.T(A)): A tail: All(A :: TYPE) Fun(list: list.T(A)): list.T(A) length: All(A :: TYPE) Fun(list: list.T(A)): Int enum: All(A :: TYPE) Fun(array: Array(A)): list.T(A) end)))
+        :args (
+          (TypedVar 'l3' :type list.T(Int))
+        )))
+    (TypedLetValue 'h' :type Int
+      :value (TypedApp :type Int
+        :func (TypedTypeApp [Int] :type Fun(list: list.T(Int)): Int
+          :func (TypedSelect 'head' :type All(A :: TYPE) Fun(list: list.T(A)): A
+            :target (TypedVar 'list' :type Record error: Exception nil: All(A :: TYPE) list.T(A) cons: All(A :: TYPE) Fun(item: A list: list.T(A)): list.T(A) null: All(A :: TYPE) Fun(list: list.T(A)): Bool head: All(A :: TYPE) Fun(list: list.T(A)): A tail: All(A :: TYPE) Fun(list: list.T(A)): list.T(A) length: All(A :: TYPE) Fun(list: list.T(A)): Int enum: All(A :: TYPE) Fun(array: Array(A)): list.T(A) end)))
+        :args (
+          (TypedVar 'l3' :type list.T(Int))
+        )))
+    (TypedLetValue 't' :type Int
+      :value (TypedApp :type Int
+        :func (TypedTypeApp [Int] :type Fun(list: list.T(Int)): Int
+          :func (TypedSelect 'head' :type All(A :: TYPE) Fun(list: list.T(A)): A
+            :target (TypedVar 'list' :type Record error: Exception nil: All(A :: TYPE) list.T(A) cons: All(A :: TYPE) Fun(item: A list: list.T(A)): list.T(A) null: All(A :: TYPE) Fun(list: list.T(A)): Bool head: All(A :: TYPE) Fun(list: list.T(A)): A tail: All(A :: TYPE) Fun(list: list.T(A)): list.T(A) length: All(A :: TYPE) Fun(list: list.T(A)): Int enum: All(A :: TYPE) Fun(array: Array(A)): list.T(A) end)))
+        :args (
+          (TypedApp :type list.T(Int)
+            :func (TypedTypeApp [Int] :type Fun(list: list.T(Int)): list.T(Int)
+              :func (TypedSelect 'tail' :type All(A :: TYPE) Fun(list: list.T(A)): list.T(A)
+                :target (TypedVar 'list' :type Record error: Exception nil: All(A :: TYPE) list.T(A) cons: All(A :: TYPE) Fun(item: A list: list.T(A)): list.T(A) null: All(A :: TYPE) Fun(list: list.T(A)): Bool head: All(A :: TYPE) Fun(list: list.T(A)): A tail: All(A :: TYPE) Fun(list: list.T(A)): list.T(A) length: All(A :: TYPE) Fun(list: list.T(A)): Int enum: All(A :: TYPE) Fun(array: Array(A)): list.T(A) end)))
+            :args (
+              (TypedVar 'l3' :type list.T(Int))
+            ))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedSelect 'putString' :type Fun(writer: Writer.T string: String): Ok
+          :target (TypedVar 'writer' :type Record error: Exception output: Writer.T err: Writer.T file: Fun(name: String): Writer.T putString: Fun(writer: Writer.T string: String): Ok putChar: Fun(writer: Writer.T char: Char): Ok putSubString: Fun(writer: Writer.T string: String start: Int size: Int): Ok flush: Fun(writer: Writer.T): Ok close: Fun(writer: Writer.T): Ok end))
+        :args (
+          (TypedSelect 'output' :type Writer.T
+            :target (TypedVar 'writer' :type Record error: Exception output: Writer.T err: Writer.T file: Fun(name: String): Writer.T putString: Fun(writer: Writer.T string: String): Ok putChar: Fun(writer: Writer.T char: Char): Ok putSubString: Fun(writer: Writer.T string: String start: Int size: Int): Ok flush: Fun(writer: Writer.T): Ok close: Fun(writer: Writer.T): Ok end))
+          (TypedApp :type String
+            :func (TypedSelect 'bool' :type Fun(b: Bool): String
+              :target (TypedVar 'conv' :type Record okay: Fun(): String bool: Fun(b: Bool): String int: Fun(n: Int): String real: Fun(r: Real): String char: Fun(c: Char): String string: Fun(s: String): String end))
+            :args (
+              (TypedVar 'b0' :type Bool)
+            ))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedSelect 'putString' :type Fun(writer: Writer.T string: String): Ok
+          :target (TypedVar 'writer' :type Record error: Exception output: Writer.T err: Writer.T file: Fun(name: String): Writer.T putString: Fun(writer: Writer.T string: String): Ok putChar: Fun(writer: Writer.T char: Char): Ok putSubString: Fun(writer: Writer.T string: String start: Int size: Int): Ok flush: Fun(writer: Writer.T): Ok close: Fun(writer: Writer.T): Ok end))
+        :args (
+          (TypedSelect 'output' :type Writer.T
+            :target (TypedVar 'writer' :type Record error: Exception output: Writer.T err: Writer.T file: Fun(name: String): Writer.T putString: Fun(writer: Writer.T string: String): Ok putChar: Fun(writer: Writer.T char: Char): Ok putSubString: Fun(writer: Writer.T string: String start: Int size: Int): Ok flush: Fun(writer: Writer.T): Ok close: Fun(writer: Writer.T): Ok end))
+          (TypedString ' ' :type String)
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedSelect 'putString' :type Fun(writer: Writer.T string: String): Ok
+          :target (TypedVar 'writer' :type Record error: Exception output: Writer.T err: Writer.T file: Fun(name: String): Writer.T putString: Fun(writer: Writer.T string: String): Ok putChar: Fun(writer: Writer.T char: Char): Ok putSubString: Fun(writer: Writer.T string: String start: Int size: Int): Ok flush: Fun(writer: Writer.T): Ok close: Fun(writer: Writer.T): Ok end))
+        :args (
+          (TypedSelect 'output' :type Writer.T
+            :target (TypedVar 'writer' :type Record error: Exception output: Writer.T err: Writer.T file: Fun(name: String): Writer.T putString: Fun(writer: Writer.T string: String): Ok putChar: Fun(writer: Writer.T char: Char): Ok putSubString: Fun(writer: Writer.T string: String start: Int size: Int): Ok flush: Fun(writer: Writer.T): Ok close: Fun(writer: Writer.T): Ok end))
+          (TypedApp :type String
+            :func (TypedSelect 'int' :type Fun(n: Int): String
+              :target (TypedVar 'conv' :type Record okay: Fun(): String bool: Fun(b: Bool): String int: Fun(n: Int): String real: Fun(r: Real): String char: Fun(c: Char): String string: Fun(s: String): String end))
+            :args (
+              (TypedVar 'len' :type Int)
+            ))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedSelect 'putString' :type Fun(writer: Writer.T string: String): Ok
+          :target (TypedVar 'writer' :type Record error: Exception output: Writer.T err: Writer.T file: Fun(name: String): Writer.T putString: Fun(writer: Writer.T string: String): Ok putChar: Fun(writer: Writer.T char: Char): Ok putSubString: Fun(writer: Writer.T string: String start: Int size: Int): Ok flush: Fun(writer: Writer.T): Ok close: Fun(writer: Writer.T): Ok end))
+        :args (
+          (TypedSelect 'output' :type Writer.T
+            :target (TypedVar 'writer' :type Record error: Exception output: Writer.T err: Writer.T file: Fun(name: String): Writer.T putString: Fun(writer: Writer.T string: String): Ok putChar: Fun(writer: Writer.T char: Char): Ok putSubString: Fun(writer: Writer.T string: String start: Int size: Int): Ok flush: Fun(writer: Writer.T): Ok close: Fun(writer: Writer.T): Ok end))
+          (TypedString ' ' :type String)
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedSelect 'putString' :type Fun(writer: Writer.T string: String): Ok
+          :target (TypedVar 'writer' :type Record error: Exception output: Writer.T err: Writer.T file: Fun(name: String): Writer.T putString: Fun(writer: Writer.T string: String): Ok putChar: Fun(writer: Writer.T char: Char): Ok putSubString: Fun(writer: Writer.T string: String start: Int size: Int): Ok flush: Fun(writer: Writer.T): Ok close: Fun(writer: Writer.T): Ok end))
+        :args (
+          (TypedSelect 'output' :type Writer.T
+            :target (TypedVar 'writer' :type Record error: Exception output: Writer.T err: Writer.T file: Fun(name: String): Writer.T putString: Fun(writer: Writer.T string: String): Ok putChar: Fun(writer: Writer.T char: Char): Ok putSubString: Fun(writer: Writer.T string: String start: Int size: Int): Ok flush: Fun(writer: Writer.T): Ok close: Fun(writer: Writer.T): Ok end))
+          (TypedApp :type String
+            :func (TypedSelect 'int' :type Fun(n: Int): String
+              :target (TypedVar 'conv' :type Record okay: Fun(): String bool: Fun(b: Bool): String int: Fun(n: Int): String real: Fun(r: Real): String char: Fun(c: Char): String string: Fun(s: String): String end))
+            :args (
+              (TypedVar 'h' :type Int)
+            ))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedSelect 'putString' :type Fun(writer: Writer.T string: String): Ok
+          :target (TypedVar 'writer' :type Record error: Exception output: Writer.T err: Writer.T file: Fun(name: String): Writer.T putString: Fun(writer: Writer.T string: String): Ok putChar: Fun(writer: Writer.T char: Char): Ok putSubString: Fun(writer: Writer.T string: String start: Int size: Int): Ok flush: Fun(writer: Writer.T): Ok close: Fun(writer: Writer.T): Ok end))
+        :args (
+          (TypedSelect 'output' :type Writer.T
+            :target (TypedVar 'writer' :type Record error: Exception output: Writer.T err: Writer.T file: Fun(name: String): Writer.T putString: Fun(writer: Writer.T string: String): Ok putChar: Fun(writer: Writer.T char: Char): Ok putSubString: Fun(writer: Writer.T string: String start: Int size: Int): Ok flush: Fun(writer: Writer.T): Ok close: Fun(writer: Writer.T): Ok end))
+          (TypedString ' ' :type String)
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedSelect 'putString' :type Fun(writer: Writer.T string: String): Ok
+          :target (TypedVar 'writer' :type Record error: Exception output: Writer.T err: Writer.T file: Fun(name: String): Writer.T putString: Fun(writer: Writer.T string: String): Ok putChar: Fun(writer: Writer.T char: Char): Ok putSubString: Fun(writer: Writer.T string: String start: Int size: Int): Ok flush: Fun(writer: Writer.T): Ok close: Fun(writer: Writer.T): Ok end))
+        :args (
+          (TypedSelect 'output' :type Writer.T
+            :target (TypedVar 'writer' :type Record error: Exception output: Writer.T err: Writer.T file: Fun(name: String): Writer.T putString: Fun(writer: Writer.T string: String): Ok putChar: Fun(writer: Writer.T char: Char): Ok putSubString: Fun(writer: Writer.T string: String start: Int size: Int): Ok flush: Fun(writer: Writer.T): Ok close: Fun(writer: Writer.T): Ok end))
+          (TypedApp :type String
+            :func (TypedSelect 'int' :type Fun(n: Int): String
+              :target (TypedVar 'conv' :type Record okay: Fun(): String bool: Fun(b: Bool): String int: Fun(n: Int): String real: Fun(r: Real): String char: Fun(c: Char): String string: Fun(s: String): String end))
+            :args (
+              (TypedVar 't' :type Int)
+            ))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedSelect 'putString' :type Fun(writer: Writer.T string: String): Ok
+          :target (TypedVar 'writer' :type Record error: Exception output: Writer.T err: Writer.T file: Fun(name: String): Writer.T putString: Fun(writer: Writer.T string: String): Ok putChar: Fun(writer: Writer.T char: Char): Ok putSubString: Fun(writer: Writer.T string: String start: Int size: Int): Ok flush: Fun(writer: Writer.T): Ok close: Fun(writer: Writer.T): Ok end))
+        :args (
+          (TypedSelect 'output' :type Writer.T
+            :target (TypedVar 'writer' :type Record error: Exception output: Writer.T err: Writer.T file: Fun(name: String): Writer.T putString: Fun(writer: Writer.T string: String): Ok putChar: Fun(writer: Writer.T char: Char): Ok putSubString: Fun(writer: Writer.T string: String start: Int size: Int): Ok flush: Fun(writer: Writer.T): Ok close: Fun(writer: Writer.T): Ok end))
+          (TypedString '\n' :type String)
+        )))
+  ))

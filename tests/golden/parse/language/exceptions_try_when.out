@@ -1,0 +1,250 @@
+(Program
+  :phrases (
+    (ImportPhrase
+      :items (
+        (ImportItem ('writer') 'Writer')
+      )
+    )
+    (ImportPhrase
+      :items (
+        (ImportItem ('conv') 'Conv')
+      )
+    )
+    (LetValueBinding
+      :name 'wOut'
+      :value (ExprSelect
+        :target (ExprId 'writer')
+        :field 'output'
+      )
+    )
+    (LetValueBinding
+      :name 'printInt'
+      :value (ExprBlock
+        :bindings (
+          (ExprStmt
+            :expr (ExprApp
+              :func (ExprSelect
+                :target (ExprId 'writer')
+                :field 'putString'
+              )
+              :args (
+                (ExprId 'wOut')
+                (ExprApp
+                  :func (ExprSelect
+                    :target (ExprId 'conv')
+                    :field 'int'
+                  )
+                  :args (
+                    (ExprId 'x')
+                  )
+                )
+              )
+            )
+          )
+          (ExprStmt
+            :expr (ExprApp
+              :func (ExprSelect
+                :target (ExprId 'writer')
+                :field 'putString'
+              )
+              :args (
+                (ExprId 'wOut')
+                (ExprString '\n' '"\\n"')
+              )
+            )
+          )
+        )
+      )
+      :params (
+        (FormalParam
+          :name 'x'
+          :type_annot (TypePath ('Int'))
+          :mode VALUE
+        )
+      )
+      :type_annot (TypePath ('Ok'))
+    )
+    (ExprStmt
+      :expr (ExprException
+        :name 'MyExc'
+        :type_annot (TypePath ('Ok'))
+      )
+    )
+    (LetValueBinding
+      :name 'compute'
+      :value (ExprTry
+        :body (ExprStmt
+          :expr (ExprIf
+            :cond (ExprInfix
+              :left (ExprId 'x')
+              :op '<'
+              :right (ExprInt 0 '0')
+            )
+            :then_branch (ExprStmt
+              :expr (ExprRaise
+                :exc (ExprId 'MyExc')
+              )
+            )
+            :else_branch (ExprStmt
+              :expr (ExprInfix
+                :left (ExprId 'x')
+                :op '*'
+                :right (ExprInt 2 '2')
+              )
+            )
+          )
+        )
+        :branches (
+          (TryBranch
+            :exc_pattern (ExprId 'MyExc')
+            :body (ExprStmt
+              :expr (ExprInt -1 '~1')
+            )
+          )
+        )
+      )
+      :params (
+        (FormalParam
+          :name 'x'
+          :type_annot (TypePath ('Int'))
+          :mode VALUE
+        )
+      )
+      :type_annot (TypePath ('Int'))
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printInt')
+        :args (
+          (ExprApp
+            :func (ExprId 'compute')
+            :args (
+              (ExprInt 5 '5')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printInt')
+        :args (
+          (ExprApp
+            :func (ExprId 'compute')
+            :args (
+              (ExprInt -3 '~3')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprException
+        :name 'Fail'
+        :type_annot (TypePath ('Int'))
+      )
+    )
+    (LetValueBinding
+      :name 'tryWork'
+      :value (ExprTry
+        :body (ExprStmt
+          :expr (ExprIf
+            :cond (ExprInfix
+              :left (ExprId 'code')
+              :op '<'
+              :right (ExprInt 0 '0')
+            )
+            :then_branch (ExprStmt
+              :expr (ExprRaise
+                :exc (ExprId 'Fail')
+                :payload (ExprId 'code')
+              )
+            )
+            :else_branch (ExprStmt
+              :expr (ExprInfix
+                :left (ExprId 'code')
+                :op '*'
+                :right (ExprInt 10 '10')
+              )
+            )
+          )
+        )
+        :branches (
+          (TryBranch
+            :exc_pattern (ExprId 'Fail')
+            :binder 'errCode'
+            :body (ExprStmt
+              :expr (ExprInfix
+                :left (ExprInt 0 '0')
+                :op '-'
+                :right (ExprId 'errCode')
+              )
+            )
+          )
+        )
+      )
+      :params (
+        (FormalParam
+          :name 'code'
+          :type_annot (TypePath ('Int'))
+          :mode VALUE
+        )
+      )
+      :type_annot (TypePath ('Int'))
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printInt')
+        :args (
+          (ExprApp
+            :func (ExprId 'tryWork')
+            :args (
+              (ExprInt 7 '7')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printInt')
+        :args (
+          (ExprApp
+            :func (ExprId 'tryWork')
+            :args (
+              (ExprInt -42 '~42')
+            )
+          )
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'r3'
+      :value (ExprTry
+        :body (ExprStmt
+          :expr (ExprInfix
+            :left (ExprInt 42 '42')
+            :op '/'
+            :right (ExprInt 0 '0')
+          )
+        )
+        :branches (
+          (TryBranch
+            :exc_pattern (ExprId 'DivideByZero')
+            :body (ExprStmt
+              :expr (ExprInt 777 '777')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printInt')
+        :args (
+          (ExprId 'r3')
+        )
+      )
+    )
+  )
+)

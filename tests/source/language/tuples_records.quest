@@ -1,0 +1,43 @@
+(* Language: Tuples, Records, Mutable Fields, and Nested Aggregates *)
+
+import writer: Writer;
+import conv: Conv;
+
+let wOut = writer.output;
+let printInt(x: Int): Ok =
+    begin
+        writer.putString(wOut conv.int(x));
+        writer.putString(wOut "\n")
+    end;
+
+(* 1. Named tuple access *)
+Let T = Tuple x: Int y: Int end;
+let t: T = tuple let x = 10 let y = 20 end;
+printInt(t.x + t.y);
+
+(* 2. Tuple function argument and return *)
+let swap(pair: T): T = tuple
+    let x = pair.y
+    let y = pair.x
+end;
+let swapped = swap(tuple let x = 1 let y = 2 end);
+printInt(swapped.x * 10 + swapped.y);
+
+(* 3. Record construction and selection *)
+Let Point = Record x: Int y: Int end;
+let p = record x = 30 y = 40 end;
+printInt(p.x + p.y);
+
+(* 4. Record mutable field assignment *)
+Let CounterRec = Record var val: Int end;
+let cr = record var val = 100 end;
+cr.val := cr.val + 23;
+printInt(cr.val);
+
+(* 5. Nested aggregates *)
+let nested = record
+    pos = record x = 5 y = 7 end
+    var count = 0
+end;
+nested.count := nested.pos.x * nested.pos.y;
+printInt(nested.count);

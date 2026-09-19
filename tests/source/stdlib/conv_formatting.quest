@@ -1,0 +1,23 @@
+(* Standard library: Conv module formatting and Cardelli ~ tilde *)
+
+import conv: Conv;
+import writer: Writer;
+
+writer.putString(writer.output conv.okay());
+writer.putString(writer.output "\n");
+writer.putString(writer.output conv.bool(true));
+writer.putString(writer.output "\n");
+writer.putString(writer.output conv.bool(false));
+writer.putString(writer.output "\n");
+writer.putString(writer.output conv.int(42));
+writer.putString(writer.output "\n");
+writer.putString(writer.output conv.int(~42));
+writer.putString(writer.output "\n");
+writer.putString(writer.output conv.real(3.14));
+writer.putString(writer.output "\n");
+writer.putString(writer.output conv.real(~2.5));
+writer.putString(writer.output "\n");
+writer.putString(writer.output conv.char('Z'));
+writer.putString(writer.output "\n");
+writer.putString(writer.output conv.string("text"));
+writer.putString(writer.output "\n");

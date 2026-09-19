@@ -1,0 +1,51 @@
+(* Language: User Exceptions, Handlers, Payloads, and Builtin Catches *)
+
+import writer: Writer;
+import conv: Conv;
+
+let wOut = writer.output;
+let printInt(x: Int): Ok =
+    begin
+        writer.putString(wOut conv.int(x));
+        writer.putString(wOut "\n")
+    end;
+
+(* 1. User exception without payload *)
+exception MyExc: Ok end;
+let compute(x: Int): Int =
+    try
+        if x < 0 then
+            raise MyExc end
+        else
+            x * 2
+        end
+    when MyExc then
+        ~1
+    end;
+
+printInt(compute(5));
+printInt(compute(~3));
+
+(* 2. User exception with payload *)
+exception Fail: Int end;
+let tryWork(code: Int): Int =
+    try
+        if code < 0 then
+            raise Fail with code end
+        else
+            code * 10
+        end
+    when Fail with errCode then
+        0 - errCode
+    end;
+
+printInt(tryWork(7));
+printInt(tryWork(~42));
+
+(* 3. Catch builtin divide by zero *)
+let r3 = try
+    42 / 0
+when DivideByZero then
+    777
+end;
+printInt(r3);

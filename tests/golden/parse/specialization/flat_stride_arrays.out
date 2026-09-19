@@ -1,0 +1,231 @@
+(Program
+  :phrases (
+    (ImportPhrase
+      :items (
+        (ImportItem ('writer') 'Writer')
+      )
+    )
+    (ImportPhrase
+      :items (
+        (ImportItem ('conv') 'Conv')
+      )
+    )
+    (LetValueBinding
+      :name 'wOut'
+      :value (ExprSelect
+        :target (ExprId 'writer')
+        :field 'output'
+      )
+    )
+    (LetValueBinding
+      :name 'printInt'
+      :value (ExprBlock
+        :bindings (
+          (ExprStmt
+            :expr (ExprApp
+              :func (ExprSelect
+                :target (ExprId 'writer')
+                :field 'putString'
+              )
+              :args (
+                (ExprId 'wOut')
+                (ExprApp
+                  :func (ExprSelect
+                    :target (ExprId 'conv')
+                    :field 'int'
+                  )
+                  :args (
+                    (ExprId 'x')
+                  )
+                )
+              )
+            )
+          )
+          (ExprStmt
+            :expr (ExprApp
+              :func (ExprSelect
+                :target (ExprId 'writer')
+                :field 'putString'
+              )
+              :args (
+                (ExprId 'wOut')
+                (ExprString '\n' '"\\n"')
+              )
+            )
+          )
+        )
+      )
+      :params (
+        (FormalParam
+          :name 'x'
+          :type_annot (TypePath ('Int'))
+          :mode VALUE
+        )
+      )
+      :type_annot (TypePath ('Ok'))
+    )
+    (LetTypeBinding
+      :name 'Item'
+      :type_val (TypeRecord
+        :fields (
+          (RecordFieldSig
+            :name 'id'
+            :type_sig (TypePath ('Int'))
+          )
+          (RecordFieldSig
+            :name 'val'
+            :type_sig (TypePath ('Int'))
+          )
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'a'
+      :value (ExprArray
+        :elements (
+          (ExprRecord
+            :fields (
+              (RecordBinding
+                :name 'id'
+                :value (ExprInt 1 '1')
+              )
+              (RecordBinding
+                :name 'val'
+                :value (ExprInt 10 '10')
+              )
+            )
+          )
+          (ExprRecord
+            :fields (
+              (RecordBinding
+                :name 'id'
+                :value (ExprInt 2 '2')
+              )
+              (RecordBinding
+                :name 'val'
+                :value (ExprInt 20 '20')
+              )
+            )
+          )
+          (ExprRecord
+            :fields (
+              (RecordBinding
+                :name 'id'
+                :value (ExprInt 3 '3')
+              )
+              (RecordBinding
+                :name 'val'
+                :value (ExprInt 30 '30')
+              )
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printInt')
+        :args (
+          (ExprSelect
+            :target (ExprIndex
+              :target (ExprId 'a')
+              :index (ExprInt 0 '0')
+            )
+            :field 'id'
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printInt')
+        :args (
+          (ExprSelect
+            :target (ExprIndex
+              :target (ExprId 'a')
+              :index (ExprInt 0 '0')
+            )
+            :field 'val'
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printInt')
+        :args (
+          (ExprSelect
+            :target (ExprIndex
+              :target (ExprId 'a')
+              :index (ExprInt 2 '2')
+            )
+            :field 'id'
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printInt')
+        :args (
+          (ExprSelect
+            :target (ExprIndex
+              :target (ExprId 'a')
+              :index (ExprInt 2 '2')
+            )
+            :field 'val'
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprInfix
+        :left (ExprIndex
+          :target (ExprId 'a')
+          :index (ExprInt 1 '1')
+        )
+        :op ':='
+        :right (ExprRecord
+          :fields (
+            (RecordBinding
+              :name 'id'
+              :value (ExprInt 99 '99')
+            )
+            (RecordBinding
+              :name 'val'
+              :value (ExprInt 200 '200')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printInt')
+        :args (
+          (ExprSelect
+            :target (ExprIndex
+              :target (ExprId 'a')
+              :index (ExprInt 1 '1')
+            )
+            :field 'id'
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printInt')
+        :args (
+          (ExprSelect
+            :target (ExprIndex
+              :target (ExprId 'a')
+              :index (ExprInt 1 '1')
+            )
+            :field 'val'
+          )
+        )
+      )
+    )
+  )
+)

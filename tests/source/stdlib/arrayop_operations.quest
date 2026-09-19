@@ -1,0 +1,18 @@
+(* Standard library: ArrayOp module operations *)
+
+import arrayOp: ArrayOp;
+import writer: Writer;
+import conv: Conv;
+
+let a = arrayOp.new(:Int 3 42);
+let sz = arrayOp.size(:Int a);
+let elem0 = arrayOp.get(:Int a 0);
+arrayOp.set(:Int a 1 99);
+let elem1 = arrayOp.get(:Int a 1);
+
+writer.putString(writer.output conv.int(sz));
+writer.putString(writer.output " ");
+writer.putString(writer.output conv.int(elem0));
+writer.putString(writer.output " ");
+writer.putString(writer.output conv.int(elem1));
+writer.putString(writer.output "\n");

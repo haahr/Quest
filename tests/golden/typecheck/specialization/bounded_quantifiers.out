@@ -1,0 +1,105 @@
+(TypedProgram
+  :phrases (
+    (TypedImport
+      :items (
+        (TypedImportItem ('writer') : 'Writer')
+      ))
+    (TypedImport
+      :items (
+        (TypedImportItem ('conv') : 'Conv')
+      ))
+    (TypedLetValue 'wOut' :type Writer.T
+      :value (TypedSelect 'output' :type Writer.T
+        :target (TypedVar 'writer' :type Record error: Exception output: Writer.T err: Writer.T file: Fun(name: String): Writer.T putString: Fun(writer: Writer.T string: String): Ok putChar: Fun(writer: Writer.T char: Char): Ok putSubString: Fun(writer: Writer.T string: String start: Int size: Int): Ok flush: Fun(writer: Writer.T): Ok close: Fun(writer: Writer.T): Ok end)))
+    (TypedLetValue 'printInt' :type Fun(x: Int): Ok
+      :value (TypedFun :params (('x' : Int)) :type Fun(x: Int): Ok
+        :body (TypedBlock :type Ok
+          :bindings (
+            (TypedExprStmt
+              :expr (TypedApp :type Ok
+                :func (TypedSelect 'putString' :type Fun(writer: Writer.T string: String): Ok
+                  :target (TypedVar 'writer' :type Record error: Exception output: Writer.T err: Writer.T file: Fun(name: String): Writer.T putString: Fun(writer: Writer.T string: String): Ok putChar: Fun(writer: Writer.T char: Char): Ok putSubString: Fun(writer: Writer.T string: String start: Int size: Int): Ok flush: Fun(writer: Writer.T): Ok close: Fun(writer: Writer.T): Ok end))
+                :args (
+                  (TypedVar 'wOut' :type Writer.T)
+                  (TypedApp :type String
+                    :func (TypedSelect 'int' :type Fun(n: Int): String
+                      :target (TypedVar 'conv' :type Record okay: Fun(): String bool: Fun(b: Bool): String int: Fun(n: Int): String real: Fun(r: Real): String char: Fun(c: Char): String string: Fun(s: String): String end))
+                    :args (
+                      (TypedVar 'x' :type Int)
+                    ))
+                )))
+          )
+          :result (TypedApp :type Ok
+            :func (TypedSelect 'putString' :type Fun(writer: Writer.T string: String): Ok
+              :target (TypedVar 'writer' :type Record error: Exception output: Writer.T err: Writer.T file: Fun(name: String): Writer.T putString: Fun(writer: Writer.T string: String): Ok putChar: Fun(writer: Writer.T char: Char): Ok putSubString: Fun(writer: Writer.T string: String start: Int size: Int): Ok flush: Fun(writer: Writer.T): Ok close: Fun(writer: Writer.T): Ok end))
+            :args (
+              (TypedVar 'wOut' :type Writer.T)
+              (TypedString '\n' :type String)
+            )))))
+    (TypedLetType 'Point' :kind TYPE)
+    (TypedLetType 'Point3D' :kind TYPE)
+    (TypedLetValue 'getX' :type All(A <: Record x: Int y: Int end) Fun(p: A): Int
+      :value (TypedFun :params (('p' : A)) :type All(A <: Record x: Int y: Int end) Fun(p: A): Int
+        :body (TypedSelect 'x' :type Int
+          :target (TypedVar 'p' :type A))))
+    (TypedLetValue 'getY' :type All(A <: Record x: Int y: Int end) Fun(p: A): Int
+      :value (TypedFun :params (('p' : A)) :type All(A <: Record x: Int y: Int end) Fun(p: A): Int
+        :body (TypedSelect 'y' :type Int
+          :target (TypedVar 'p' :type A))))
+    (TypedLetValue 'p' :type Record x: Int y: Int z: Int end
+      :value (TypedRecord :type Record x: Int y: Int z: Int end
+        :fields (
+          (TypedRecordField 'x'
+            :value (TypedInt 42 :type Int))
+          (TypedRecordField 'y'
+            :value (TypedInt 100 :type Int))
+          (TypedRecordField 'z'
+            :value (TypedInt 999 :type Int))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printInt' :type Fun(x: Int): Ok)
+        :args (
+          (TypedApp :type Int
+            :func (TypedTypeApp [Record x: Int y: Int z: Int end] :type Fun(p: Record x: Int y: Int z: Int end): Int
+              :func (TypedVar 'getX' :type All(A <: Record x: Int y: Int end) Fun(p: A): Int))
+            :args (
+              (TypedVar 'p' :type Record x: Int y: Int z: Int end)
+            ))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printInt' :type Fun(x: Int): Ok)
+        :args (
+          (TypedApp :type Int
+            :func (TypedTypeApp [Record x: Int y: Int z: Int end] :type Fun(p: Record x: Int y: Int z: Int end): Int
+              :func (TypedVar 'getY' :type All(A <: Record x: Int y: Int end) Fun(p: A): Int))
+            :args (
+              (TypedVar 'p' :type Record x: Int y: Int z: Int end)
+            ))
+        )))
+    (TypedLetValue 'identity' :type All(A <: Record x: Int y: Int end) Fun(p: A): A
+      :value (TypedFun :params (('p' : A)) :type All(A <: Record x: Int y: Int end) Fun(p: A): A
+        :body (TypedVar 'p' :type A)))
+    (TypedLetValue 'p2' :type Record x: Int y: Int z: Int end
+      :value (TypedApp :type Record x: Int y: Int z: Int end
+        :func (TypedTypeApp [Record x: Int y: Int z: Int end] :type Fun(p: Record x: Int y: Int z: Int end): Record x: Int y: Int z: Int end
+          :func (TypedVar 'identity' :type All(A <: Record x: Int y: Int end) Fun(p: A): A))
+        :args (
+          (TypedVar 'p' :type Record x: Int y: Int z: Int end)
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printInt' :type Fun(x: Int): Ok)
+        :args (
+          (TypedSelect 'x' :type Int
+            :target (TypedVar 'p2' :type Record x: Int y: Int z: Int end))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printInt' :type Fun(x: Int): Ok)
+        :args (
+          (TypedSelect 'z' :type Int
+            :target (TypedVar 'p2' :type Record x: Int y: Int z: Int end))
+        )))
+  ))

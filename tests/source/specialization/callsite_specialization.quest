@@ -1,0 +1,26 @@
+(* Specialization: Unboxed Call-Site Specialization *)
+
+import writer: Writer;
+import conv: Conv;
+
+let wOut = writer.output;
+let printInt(x: Int): Ok =
+    begin
+        writer.putString(wOut conv.int(x));
+        writer.putString(wOut "\n")
+    end;
+
+Let Point = Record x: Int y: Int end;
+let id(A::TYPE a: A): A = a;
+
+let p = record x = 42 y = 100 end;
+let pRes = id(:Point p);
+printInt(pRes.x);
+printInt(pRes.y);
+
+let pair(A::TYPE B::TYPE a: A b: B): Tuple first: A second: B end =
+    tuple let first = a let second = b end;
+
+let pr = pair(:Int :Point 10 p);
+printInt(pr.first);
+printInt(pr.second.x);

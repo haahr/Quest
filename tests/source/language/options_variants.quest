@@ -1,0 +1,51 @@
+(* Language: Options, Variants, Cases, Tags, and Injections *)
+
+import writer: Writer;
+import conv: Conv;
+
+let wOut = writer.output;
+let printInt(x: Int): Ok =
+    begin
+        writer.putString(wOut conv.int(x));
+        writer.putString(wOut "\n")
+    end;
+
+let printBool(b: Bool): Ok =
+    begin
+        writer.putString(wOut conv.bool(b));
+        writer.putString(wOut "\n")
+    end;
+
+(* 1. Option definition and check *)
+Let Traffic = Option red yellow green end;
+let c = option yellow of Traffic end;
+printBool(c?yellow);
+printBool(c?red);
+
+(* 2. Option case matching *)
+let evalTraffic(t: Traffic): Int =
+    case t
+        when red then 10
+        when yellow then 20
+        when green then 30
+        else 0
+    end;
+printInt(evalTraffic(c));
+
+(* 3. Option with payload *)
+Let Color = Option
+    red
+    green
+    blue with intensity: Int end
+end;
+
+let c2 = option blue of Color with tuple let intensity = 42 end end;
+let unp = c2!blue;
+printInt(unp.intensity);
+
+(* 4. Variant definition, injection, and case *)
+Let Num = Variant int: Int real: Real end;
+let v = variant int of Num with 123 end;
+printBool(v?int);
+printBool(v?real);
+printInt(v!int);

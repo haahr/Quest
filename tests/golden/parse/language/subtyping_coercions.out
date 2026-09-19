@@ -1,0 +1,367 @@
+(Program
+  :phrases (
+    (ImportPhrase
+      :items (
+        (ImportItem ('writer') 'Writer')
+      )
+    )
+    (ImportPhrase
+      :items (
+        (ImportItem ('conv') 'Conv')
+      )
+    )
+    (LetValueBinding
+      :name 'wOut'
+      :value (ExprSelect
+        :target (ExprId 'writer')
+        :field 'output'
+      )
+    )
+    (LetValueBinding
+      :name 'printInt'
+      :value (ExprBlock
+        :bindings (
+          (ExprStmt
+            :expr (ExprApp
+              :func (ExprSelect
+                :target (ExprId 'writer')
+                :field 'putString'
+              )
+              :args (
+                (ExprId 'wOut')
+                (ExprApp
+                  :func (ExprSelect
+                    :target (ExprId 'conv')
+                    :field 'int'
+                  )
+                  :args (
+                    (ExprId 'x')
+                  )
+                )
+              )
+            )
+          )
+          (ExprStmt
+            :expr (ExprApp
+              :func (ExprSelect
+                :target (ExprId 'writer')
+                :field 'putString'
+              )
+              :args (
+                (ExprId 'wOut')
+                (ExprString '\n' '"\\n"')
+              )
+            )
+          )
+        )
+      )
+      :params (
+        (FormalParam
+          :name 'x'
+          :type_annot (TypePath ('Int'))
+          :mode VALUE
+        )
+      )
+      :type_annot (TypePath ('Ok'))
+    )
+    (LetTypeBinding
+      :name 'BigTuple'
+      :type_val (TypeTuple
+        :fields (
+          (FieldSig
+            :name 'x'
+            :type_sig (TypePath ('Int'))
+            :mode VALUE
+          )
+          (FieldSig
+            :name 'y'
+            :type_sig (TypePath ('Int'))
+            :mode VALUE
+          )
+          (FieldSig
+            :name 'z'
+            :type_sig (TypePath ('Int'))
+            :mode VALUE
+          )
+        )
+      )
+    )
+    (LetTypeBinding
+      :name 'SmallTuple'
+      :type_val (TypeTuple
+        :fields (
+          (FieldSig
+            :name 'x'
+            :type_sig (TypePath ('Int'))
+            :mode VALUE
+          )
+          (FieldSig
+            :name 'y'
+            :type_sig (TypePath ('Int'))
+            :mode VALUE
+          )
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'getFirstTwo'
+      :value (ExprInfix
+        :left (ExprSelect
+          :target (ExprId 't')
+          :field 'x'
+        )
+        :op '+'
+        :right (ExprSelect
+          :target (ExprId 't')
+          :field 'y'
+        )
+      )
+      :params (
+        (FormalParam
+          :name 't'
+          :type_annot (TypePath ('SmallTuple'))
+          :mode VALUE
+        )
+      )
+      :type_annot (TypePath ('Int'))
+    )
+    (LetValueBinding
+      :name 'bt'
+      :value (ExprTuple
+        :fields (
+          (TupleBinding
+            :name 'x'
+            :value (ExprInt 10 '10')
+          )
+          (TupleBinding
+            :name 'y'
+            :value (ExprInt 20 '20')
+          )
+          (TupleBinding
+            :name 'z'
+            :value (ExprInt 30 '30')
+          )
+        )
+      )
+      :type_annot (TypePath ('BigTuple'))
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printInt')
+        :args (
+          (ExprApp
+            :func (ExprId 'getFirstTwo')
+            :args (
+              (ExprId 'bt')
+            )
+          )
+        )
+      )
+    )
+    (LetTypeBinding
+      :name 'BigRec'
+      :type_val (TypeRecord
+        :fields (
+          (RecordFieldSig
+            :name 'x'
+            :type_sig (TypePath ('Int'))
+          )
+          (RecordFieldSig
+            :name 'y'
+            :type_sig (TypePath ('Int'))
+          )
+          (RecordFieldSig
+            :name 'z'
+            :type_sig (TypePath ('Int'))
+          )
+        )
+      )
+    )
+    (LetTypeBinding
+      :name 'SmallRec'
+      :type_val (TypeRecord
+        :fields (
+          (RecordFieldSig
+            :name 'x'
+            :type_sig (TypePath ('Int'))
+          )
+          (RecordFieldSig
+            :name 'y'
+            :type_sig (TypePath ('Int'))
+          )
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'sumXY'
+      :value (ExprInfix
+        :left (ExprSelect
+          :target (ExprId 'r')
+          :field 'x'
+        )
+        :op '+'
+        :right (ExprSelect
+          :target (ExprId 'r')
+          :field 'y'
+        )
+      )
+      :params (
+        (FormalParam
+          :name 'r'
+          :type_annot (TypePath ('SmallRec'))
+          :mode VALUE
+        )
+      )
+      :type_annot (TypePath ('Int'))
+    )
+    (LetValueBinding
+      :name 'br'
+      :value (ExprRecord
+        :fields (
+          (RecordBinding
+            :name 'x'
+            :value (ExprInt 100 '100')
+          )
+          (RecordBinding
+            :name 'y'
+            :value (ExprInt 200 '200')
+          )
+          (RecordBinding
+            :name 'z'
+            :value (ExprInt 300 '300')
+          )
+        )
+      )
+      :type_annot (TypePath ('BigRec'))
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printInt')
+        :args (
+          (ExprApp
+            :func (ExprId 'sumXY')
+            :args (
+              (ExprId 'br')
+            )
+          )
+        )
+      )
+    )
+    (LetTypeBinding
+      :name 'OrderedRec'
+      :type_val (TypeRecord
+        :fields (
+          (RecordFieldSig
+            :name 'a'
+            :type_sig (TypePath ('Int'))
+          )
+          (RecordFieldSig
+            :name 'b'
+            :type_sig (TypePath ('Int'))
+          )
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'getA'
+      :value (ExprInfix
+        :left (ExprSelect
+          :target (ExprId 'r')
+          :field 'a'
+        )
+        :op '*'
+        :right (ExprInfix
+          :left (ExprInt 10 '10')
+          :op '+'
+          :right (ExprSelect
+            :target (ExprId 'r')
+            :field 'b'
+          )
+        )
+      )
+      :params (
+        (FormalParam
+          :name 'r'
+          :type_annot (TypePath ('OrderedRec'))
+          :mode VALUE
+        )
+      )
+      :type_annot (TypePath ('Int'))
+    )
+    (LetValueBinding
+      :name 'permuted'
+      :value (ExprRecord
+        :fields (
+          (RecordBinding
+            :name 'b'
+            :value (ExprInt 4 '4')
+          )
+          (RecordBinding
+            :name 'a'
+            :value (ExprInt 7 '7')
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printInt')
+        :args (
+          (ExprApp
+            :func (ExprId 'getA')
+            :args (
+              (ExprId 'permuted')
+            )
+          )
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'applyRec'
+      :value (ExprApp
+        :func (ExprId 'f')
+        :args (
+          (ExprId 'r')
+        )
+      )
+      :params (
+        (FormalParam
+          :name 'f'
+          :type_annot (TypeAll
+            :quantifiers (
+              (Quantifier
+                :name 'r'
+                :bound (KindPower
+                  :bound (TypePath ('SmallRec'))
+                )
+                :mode VALUE
+              )
+            )
+            :result_type (TypePath ('Int'))
+          )
+          :mode VALUE
+        )
+        (FormalParam
+          :name 'r'
+          :type_annot (TypePath ('BigRec'))
+          :mode VALUE
+        )
+      )
+      :type_annot (TypePath ('Int'))
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printInt')
+        :args (
+          (ExprApp
+            :func (ExprId 'applyRec')
+            :args (
+              (ExprId 'sumXY')
+              (ExprId 'br')
+            )
+          )
+        )
+      )
+    )
+  )
+)

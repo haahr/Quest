@@ -1,0 +1,23 @@
+(* Standard library: Pure Quest List module operations *)
+
+import list: List;
+import writer: Writer;
+import conv: Conv;
+
+let l0 = list.nil(:Int);
+let b0 = list.null(:Int l0);
+let l1 = list.cons(:Int 10 l0);
+let l2 = list.cons(:Int 20 l1);
+let l3 = list.cons(:Int 30 l2);
+let len = list.length(:Int l3);
+let h = list.head(:Int l3);
+let t = list.head(:Int list.tail(:Int l3));
+
+writer.putString(writer.output conv.bool(b0));
+writer.putString(writer.output " ");
+writer.putString(writer.output conv.int(len));
+writer.putString(writer.output " ");
+writer.putString(writer.output conv.int(h));
+writer.putString(writer.output " ");
+writer.putString(writer.output conv.int(t));
+writer.putString(writer.output "\n");

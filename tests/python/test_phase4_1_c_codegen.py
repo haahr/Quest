@@ -189,6 +189,37 @@ class TestPhase41Codegen(unittest.TestCase):
         self.assertEqual(proc.returncode, 0)
         self.assertIn("\"Quest C Backend\" : String", proc.stdout)
 
+    def test_nogc_functions(self):
+        """Verifies function code compiles and runs with --nogc."""
+        code = """
+        let f(x: Int): Int = x + 10;
+        f(5)
+        """
+        proc = self.compile_quest(code, nogc=True)
+        self.assertEqual(proc.returncode, 0)
+        self.assertIn("15 : Int", proc.stdout)
+
+    def test_nogc_closures(self):
+        """Verifies closures compile and run cleanly with --nogc."""
+        code = """
+        let makeAdder(x: Int)(y: Int): Int = x + y;
+        let add10 = makeAdder(10);
+        add10(5)
+        """
+        proc = self.compile_quest(code, nogc=True)
+        self.assertEqual(proc.returncode, 0)
+        self.assertIn("15 : Int", proc.stdout)
+
+    def test_nogc_arrays(self):
+        """Tests compiling and running array operations with --nogc."""
+        code = """
+        let arr = array of 1 2 3 end;
+        arr[1]
+        """
+        proc = self.compile_quest(code, nogc=True)
+        self.assertEqual(proc.returncode, 0)
+        self.assertIn("2 : Int", proc.stdout)
+
     def test_divide_by_zero_runtime_error(self):
         """Tests divide by zero raises runtime error with exit code 1."""
         code = """

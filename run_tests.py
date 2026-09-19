@@ -38,10 +38,13 @@ def run_single_golden_test(
     update_golden: bool = False,
     python_executable: str = sys.executable,
 ) -> bool:
-    golden_dir = golden_dir_for_phase(phase_name)
-    golden_dir.mkdir(parents=True, exist_ok=True)
-    out_file = golden_dir / f"{source_file.stem}.out"
-    error_file = golden_dir / f"{source_file.stem}.error"
+    golden_base = golden_dir_for_phase(phase_name)
+    rel_source = source_file.relative_to(TESTS_SOURCE_DIR)
+    target_dir = golden_base / rel_source.parent
+    target_dir.mkdir(parents=True, exist_ok=True)
+    out_file = target_dir / f"{source_file.stem}.out"
+    error_file = target_dir / f"{source_file.stem}.error"
+    test_id = str(rel_source.with_suffix(""))
 
     # Execute driver with --stop-after <phase_name>
     command = [
@@ -67,12 +70,12 @@ def run_single_golden_test(
             out_file.write_text(process.stdout, encoding="utf-8")
             if error_file.exists():
                 error_file.unlink()
-            print(f"  [UPDATED] {phase_name}:{source_file.stem} (.out)")
+            print(f"  [UPDATED] {phase_name}:{test_id} (.out)")
         else:
             error_file.write_text(process.stderr, encoding="utf-8")
             if out_file.exists():
                 out_file.unlink()
-            print(f"  [UPDATED] {phase_name}:{source_file.stem} (.error)")
+            print(f"  [UPDATED] {phase_name}:{test_id} (.error)")
         return True
 
     # Case 1: Process succeeded (returncode == 0)
@@ -80,27 +83,27 @@ def run_single_golden_test(
         if out_file.exists():
             expected_output = out_file.read_text(encoding="utf-8")
             if process.stdout == expected_output:
-                print(f"  [PASS] {phase_name}:{source_file.stem}")
+                print(f"  [PASS] {phase_name}:{test_id}")
                 return True
             else:
-                print(f"  [FAIL] {phase_name}:{source_file.stem} (stdout mismatch)")
+                print(f"  [FAIL] {phase_name}:{test_id} (stdout mismatch)")
                 diff = difflib.unified_diff(
                     expected_output.splitlines(keepends=True),
                     process.stdout.splitlines(keepends=True),
-                    fromfile=f"golden/{golden_dir.name}/{out_file.name}",
-                    tofile=f"actual/{golden_dir.name}/{out_file.name}",
+                    fromfile=f"golden/{golden_base.name}/{rel_source.with_suffix('.out')}",
+                    tofile=f"actual/{golden_base.name}/{rel_source.with_suffix('.out')}",
                 )
                 print("".join(diff))
                 return False
         elif error_file.exists():
             print(
-                f"  [FAIL] {phase_name}:{source_file.stem} "
+                f"  [FAIL] {phase_name}:{test_id} "
                 f"(expected compiler error in {error_file.name}, but command succeeded)"
             )
             return False
         else:
             print(
-                f"  [MISSING GOLDEN] {phase_name}:{source_file.stem} "
+                f"  [MISSING GOLDEN] {phase_name}:{test_id} "
                 f"(expected {out_file.relative_to(ROOT_DIR)})"
             )
             return False
@@ -109,28 +112,29 @@ def run_single_golden_test(
     if error_file.exists():
         expected_error = error_file.read_text(encoding="utf-8")
         if process.stderr == expected_error:
-            print(f"  [PASS] {phase_name}:{source_file.stem} (expected error)")
+            print(f"  [PASS] {phase_name}:{test_id} (expected error)")
             return True
         else:
-            print(f"  [FAIL] {phase_name}:{source_file.stem} (stderr mismatch)")
+            print(f"  [FAIL] {phase_name}:{test_id} (stderr mismatch)")
             diff = difflib.unified_diff(
                 expected_error.splitlines(keepends=True),
                 process.stderr.splitlines(keepends=True),
-                fromfile=f"golden/{golden_dir.name}/{error_file.name}",
-                tofile=f"actual/{golden_dir.name}/{error_file.name}",
+                fromfile=f"golden/{golden_base.name}/{rel_source.with_suffix('.error')}",
+                tofile=f"actual/{golden_base.name}/{rel_source.with_suffix('.error')}",
             )
             print("".join(diff))
             return False
     elif out_file.exists():
-        print(f"  [FAIL] {phase_name}:{source_file.stem} (failed with returncode {process.returncode})")
+        print(f"  [FAIL] {phase_name}:{test_id} (failed with returncode {process.returncode})")
         print(process.stderr)
         return False
     else:
         print(
-            f"  [MISSING GOLDEN] {phase_name}:{source_file.stem} "
+            f"  [MISSING GOLDEN] {phase_name}:{test_id} "
             f"(expected error golden in {error_file.relative_to(ROOT_DIR)})"
         )
         return False
+
 
 
 
@@ -188,11 +192,11 @@ def main() -> int:
 
     # 1. Run Golden Tests (if suite is 'golden' or 'all')
     if suite_mode in ("golden", "all"):
-        source_files = sorted(TESTS_SOURCE_DIR.glob("*.quest"))
+        source_files = sorted(TESTS_SOURCE_DIR.rglob("*.quest"))
         if args.test:
             source_files = [
                 sf for sf in source_files
-                if args.test in sf.stem or args.test in sf.name
+                if args.test in str(sf.relative_to(TESTS_SOURCE_DIR))
             ]
 
         if source_files:

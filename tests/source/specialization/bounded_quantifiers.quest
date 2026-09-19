@@ -1,0 +1,26 @@
+(* Specialization: Bounded Quantifiers and Offset Dictionaries *)
+
+import writer: Writer;
+import conv: Conv;
+
+let wOut = writer.output;
+let printInt(x: Int): Ok =
+    begin
+        writer.putString(wOut conv.int(x));
+        writer.putString(wOut "\n")
+    end;
+
+Let Point = Record x: Int y: Int end;
+Let Point3D = Record x: Int y: Int z: Int end;
+
+let getX(A <: Point p: A): Int = p.x;
+let getY(A <: Point p: A): Int = p.y;
+
+let p = record x = 42 y = 100 z = 999 end;
+printInt(getX(:Point3D p));
+printInt(getY(:Point3D p));
+
+let identity(A <: Point p: A): A = p;
+let p2: Point3D = identity(:Point3D p);
+printInt(p2.x);
+printInt(p2.z);

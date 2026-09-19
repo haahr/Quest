@@ -1,0 +1,88 @@
+(Program
+  :phrases (
+    (ImportPhrase
+      :items (
+        (ImportItem ('dynamic') 'Dynamic')
+      )
+    )
+    (ImportPhrase
+      :items (
+        (ImportItem ('writer') 'Writer')
+      )
+    )
+    (ImportPhrase
+      :items (
+        (ImportItem ('conv') 'Conv')
+      )
+    )
+    (LetValueBinding
+      :name 'd'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'dynamic')
+          :field 'new'
+        )
+        :args (
+          (TypeArgument
+            :type_val (TypePath ('Int'))
+          )
+          (ExprInt 12345 '12345')
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'x'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'dynamic')
+          :field 'be'
+        )
+        :args (
+          (TypeArgument
+            :type_val (TypePath ('Int'))
+          )
+          (ExprId 'd')
+        )
+      )
+      :type_annot (TypePath ('Int'))
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'conv')
+              :field 'int'
+            )
+            :args (
+              (ExprId 'x')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprString '\n' '"\\n"')
+        )
+      )
+    )
+  )
+)

@@ -1,0 +1,42 @@
+(* Language: Closures, Lexical Captures, and Mutating State *)
+
+import writer: Writer;
+import conv: Conv;
+
+let wOut = writer.output;
+let printInt(x: Int): Ok =
+    begin
+        writer.putString(wOut conv.int(x));
+        writer.putString(wOut "\n")
+    end;
+
+(* 1. Top-level function passed as value *)
+let apply(fn: All(x: Int) Int x: Int): Int = fn(x);
+let inc(x: Int): Int = x + 1;
+printInt(apply(inc 41));
+
+(* 2. Non-capturing lambda *)
+printInt(apply(fun(x: Int): Int x * 3 14));
+
+(* 3. Capturing closure *)
+let makeAdder(base: Int): All(x: Int) Int =
+    fun(x: Int): Int base + x;
+let add100 = makeAdder(100);
+printInt(add100(42));
+
+(* 4. Multi-level nested closure *)
+let f(a: Int): All(b: Int) All(c: Int) Int =
+    fun(b: Int): All(c: Int) Int
+        fun(c: Int): Int a + b + c;
+printInt(f(10)(20)(12));
+
+(* 5. Closure capturing and mutating variable *)
+let var count = 10;
+let bump(delta: Int): Ok =
+    begin
+        count := count + delta;
+        ok
+    end;
+bump(5);
+bump(27);
+printInt(count);

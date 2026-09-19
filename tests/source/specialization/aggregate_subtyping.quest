@@ -1,0 +1,26 @@
+(* Specialization: Aggregate Subtyping with Records and Arrays *)
+
+import writer: Writer;
+import conv: Conv;
+
+let wOut = writer.output;
+let printInt(x: Int): Ok =
+    begin
+        writer.putString(wOut conv.int(x));
+        writer.putString(wOut "\n")
+    end;
+
+Let Base = Record x: Int end;
+Let Derived = Record x: Int y: Int end;
+
+let getX(b: Base): Int = b.x;
+
+let d = record x = 100 y = 200 end;
+let a = array of d d end;
+
+printInt(getX(a[0]));
+printInt(getX(a[1]));
+
+let t = tuple let first = d let tag = 1 end;
+printInt(getX(t.first));
+printInt(t.tag);

@@ -1,0 +1,26 @@
+(* Specialization: Quantifier Descriptors and Polymorphic Calls *)
+
+import writer: Writer;
+import conv: Conv;
+
+let wOut = writer.output;
+let printInt(x: Int): Ok =
+    begin
+        writer.putString(wOut conv.int(x));
+        writer.putString(wOut "\n")
+    end;
+
+let id(A::TYPE x: A): A = x;
+printInt(id(:Int 10));
+printInt(id(:Int 20));
+
+let forward(A::TYPE x: A): A = id(:A x);
+printInt(forward(:Int 30));
+
+let nested(A::TYPE B::TYPE x: A y: B): Int =
+    begin
+        let f = id(:A x);
+        let g = id(:B y);
+        42
+    end;
+printInt(nested(:Int :String 1 "test"));

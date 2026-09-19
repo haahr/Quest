@@ -1,0 +1,45 @@
+(* Standard library: Ascii, IntOp, RealOp, Conv, and Writer *)
+
+import ascii: Ascii;
+import int: IntOp;
+import real: RealOp;
+import conv: Conv;
+import writer: Writer;
+
+let ch = ascii.char(66);
+let val = ascii.val(ch);
+let absVal = int.abs(~15);
+let maxVal = int.max(10 25);
+let minVal = int.min(10 25);
+let rFloor = real.floor(4.9);
+let rRound = real.round(4.4);
+let rPlus = real.plus(1.25 2.75);
+let rDiff = real.diff(5.5 1.5);
+let rMul = real.mul(2.5 4.0);
+let rDiv = real.div(9.0 3.0);
+let rSmaller = real.smaller(1.0 2.0);
+
+writer.putString(writer.output conv.char(ch));
+writer.putString(writer.output "\n");
+writer.putString(writer.output conv.int(val));
+writer.putString(writer.output "\n");
+writer.putString(writer.output conv.int(absVal));
+writer.putString(writer.output "\n");
+writer.putString(writer.output conv.int(maxVal));
+writer.putString(writer.output "\n");
+writer.putString(writer.output conv.int(minVal));
+writer.putString(writer.output "\n");
+writer.putString(writer.output conv.int(rFloor));
+writer.putString(writer.output "\n");
+writer.putString(writer.output conv.int(rRound));
+writer.putString(writer.output "\n");
+writer.putString(writer.output conv.real(rPlus));
+writer.putString(writer.output "\n");
+writer.putString(writer.output conv.real(rDiff));
+writer.putString(writer.output "\n");
+writer.putString(writer.output conv.real(rMul));
+writer.putString(writer.output "\n");
+writer.putString(writer.output conv.real(rDiv));
+writer.putString(writer.output "\n");
+writer.putString(writer.output conv.bool(rSmaller));
+writer.putString(writer.output "\n");

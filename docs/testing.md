@@ -45,23 +45,37 @@ The compiler test suite is organized into three complementary testing tiers:
 ```
 tests/
   ├── source/
-  │   ├── 01_lexer_basics.quest
-  │   ├── 02_expressions_control_flow.quest
-  │   ├── 03_functions_closures.quest
-  │   ├── 04_records_variants_options.quest
-  │   ├── 05_types_operators.quest
-  │   ├── 06_interfaces_modules.quest
-  │   └── 07_exceptions_dynamic.quest
+  │   ├── 01_lexer_basics.quest ... 07_exceptions_dynamic.quest
+  │   ├── stdlib/
+  │   │   ├── ascii_int_real.quest
+  │   │   ├── conv_formatting.quest
+  │   │   ├── list_operations.quest
+  │   │   ├── arrayop_operations.quest
+  │   │   ├── dynamic_operations.quest
+  │   │   └── modules_first_class.quest
+  │   ├── language/
+  │   │   ├── functions_recursion.quest
+  │   │   ├── arrays_operations.quest
+  │   │   ├── tuples_records.quest
+  │   │   ├── closures_captures.quest
+  │   │   ├── options_variants.quest
+  │   │   ├── variants_cardelli.quest
+  │   │   ├── subtyping_coercions.quest
+  │   │   └── exceptions_try_when.quest
+  │   └── specialization/
+  │       ├── quantifier_descriptors.quest
+  │       ├── aggregate_subtyping.quest
+  │       ├── bounded_quantifiers.quest
+  │       ├── callsite_specialization.quest
+  │       └── flat_stride_arrays.quest
   └── golden/
-      ├── tokenize/
-      │   └── 01_lexer_basics.out ... 07_exceptions_dynamic.out
-      ├── parse/
-      │   └── 01_lexer_basics.out ... 07_exceptions_dynamic.out
-      ├── typecheck/
-      │   └── 01_lexer_basics.out ... 07_exceptions_dynamic.out
-      └── run/
-          └── 01_lexer_basics.out ... 07_exceptions_dynamic.out
+      ├── tokenize/ (mirrors tests/source hierarchy)
+      ├── parse/    (mirrors tests/source hierarchy)
+      ├── typecheck/(mirrors tests/source hierarchy)
+      └── run/      (mirrors tests/source hierarchy for interpret and run_c_compiled)
 ```
+
+Test sources are discovered recursively (`*.quest`), preserving their relative directory paths in `tests/golden/`.
 
 ### 2.2. Standard Output and Execution Discipline
 - **Valid Programs:** Must complete successfully with exit code 0. Standard output is captured and verified against

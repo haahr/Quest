@@ -1,0 +1,28 @@
+(* Specialization: Flat Stride Arrays of Records *)
+
+import writer: Writer;
+import conv: Conv;
+
+let wOut = writer.output;
+let printInt(x: Int): Ok =
+    begin
+        writer.putString(wOut conv.int(x));
+        writer.putString(wOut "\n")
+    end;
+
+Let Item = Record id: Int val: Int end;
+
+let a = array of
+    record id = 1 val = 10 end
+    record id = 2 val = 20 end
+    record id = 3 val = 30 end
+end;
+
+printInt(a[0].id);
+printInt(a[0].val);
+printInt(a[2].id);
+printInt(a[2].val);
+
+a[1] := record id = 99 val = 200 end;
+printInt(a[1].id);
+printInt(a[1].val);

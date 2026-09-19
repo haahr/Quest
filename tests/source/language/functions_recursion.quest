@@ -1,0 +1,51 @@
+(* Language: Top-level and recursive functions, currying, multiple functions *)
+
+import writer: Writer;
+import conv: Conv;
+
+let wOut = writer.output;
+let printInt(x: Int): Ok =
+    begin
+        writer.putString(wOut conv.int(x));
+        writer.putString(wOut "\n")
+    end;
+
+(* 1. Single and multi-argument functions *)
+let square(x: Int): Int = x * x;
+printInt(square(7));
+
+let add3(a: Int b: Int c: Int): Int = a + b + c;
+printInt(add3(10 20 30));
+
+(* 2. Curried function definition and application *)
+let sub(x: Int)(y: Int): Int = x - y;
+printInt(sub(100)(42));
+
+(* 3. Self recursion: factorial and fibonacci *)
+let rec fact(n: Int): Int =
+    if n <= 1 then 1 else n * fact(n - 1) end;
+printInt(fact(6));
+
+let rec fib(n: Int): Int =
+    if n <= 0 then 0
+    elsif n is 1 then 1
+    else fib(n - 1) + fib(n - 2)
+    end;
+printInt(fib(10));
+
+(* 4. Ok returning function with mutable state *)
+let var count = 0;
+let increment(step: Int): Ok =
+    begin
+        count := count + step;
+        ok
+    end;
+
+increment(5);
+increment(10);
+printInt(count);
+
+(* 5. Top-level functions calling each other *)
+let doubleVal(x: Int): Int = x + x;
+let combine(a: Int b: Int): Int = square(a) + doubleVal(b);
+printInt(combine(5 3));
