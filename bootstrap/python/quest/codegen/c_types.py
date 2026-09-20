@@ -48,6 +48,7 @@ def mangle_module_ident(module_name: str, name: str) -> str:
 
 def type_to_c_tag(t: QType) -> str:
     """Produces a deterministic, valid C identifier component for a QType."""
+    t = t.prune() if hasattr(t, "prune") else t
     if t == INT_TYPE:
         return "Int"
     if t == REAL_TYPE:
@@ -169,6 +170,7 @@ class RecordNamingContext:
 
 def qtype_to_c_type(t: QType, ctx: Optional[RecordNamingContext] = None) -> str:
     """Maps a semantic Quest QType to its corresponding C scalar or pointer type representation."""
+    t = t.prune() if hasattr(t, "prune") else t
     if t == INT_TYPE:
         return "QInt"
     if t == REAL_TYPE:
@@ -218,6 +220,7 @@ def qtype_to_c_type(t: QType, ctx: Optional[RecordNamingContext] = None) -> str:
 
 def qtype_to_name_str(t: QType) -> str:
     """Returns the human-readable Quest type name string for runtime diagnostics and printing."""
+    t = t.prune() if hasattr(t, "prune") else t
     if t == INT_TYPE:
         return "Int"
     if t == REAL_TYPE:
@@ -257,8 +260,8 @@ def c_string_literal(s: str) -> str:
 
 
 def c_char_literal(ch: str) -> str:
-    """Escapes a single character into a safe C character literal."""
-    if ch == "'":
+    """Escapes a single Python character into a C char literal."""
+    if ch == "\'":
         return "'\\''"
     if ch == "\\":
         return "'\\\\'"
@@ -275,6 +278,7 @@ def c_char_literal(ch: str) -> str:
 
 def qval_wrap(expr_str: str, t: QType) -> str:
     """Wraps a scalar or pointer expression into a QVal union initializer."""
+    t = t.prune() if hasattr(t, "prune") else t
     if qtype_to_c_type(t) == "QVal":
         return expr_str
     if resolve_record_bound(t) is not None:
@@ -290,6 +294,7 @@ def qval_wrap(expr_str: str, t: QType) -> str:
 
 def qval_unwrap(qval_expr: str, t: QType, ctx: Optional[RecordNamingContext] = None) -> str:
     """Extracts the underlying concrete scalar or pointer from a QVal expression."""
+    t = t.prune() if hasattr(t, "prune") else t
     if qtype_to_c_type(t, ctx) == "QVal":
         return qval_expr
     if resolve_record_bound(t) is not None:

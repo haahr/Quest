@@ -1,0 +1,65 @@
+(* Language: Prefix Monadic Operators without Parentheses (Cardelli §4.2, §4.3, §4.5) *)
+
+(* 1. Boolean Negation: not *)
+let n1: Bool = not true;
+let n2: Bool = not false;
+let n3: Bool = not not true;
+let n4: Bool = not not false;
+let n5: Bool = not(true);
+let n6: Bool = not(false);
+
+(* Infix precedence: not binds tighter than /\ and \/ *)
+let prec1: Bool = not false /\ true;
+let prec2: Bool = not true \/ true;
+let prec3: Bool = not {true \/ false};
+
+(* 2. Array Extent: extent *)
+let emptyArr = array of :Int end;
+let lenEmpty: Int = extent emptyArr;
+
+let arr = array of 10 20 30 40 50 end;
+let len1: Int = extent arr;
+let len2: Int = extent(arr);
+let lenLiteral: Int = extent array of 1 2 3 end;
+
+(* Infix precedence: extent binds tighter than + and * *)
+let lenPlusOne: Int = extent arr + 1;
+let lenTimesTwo: Int = extent arr * 2;
+
+(* Extent on indexed sub-array *)
+let matrix = array of {array of 1 2 end} {array of 3 4 5 end} end;
+let subLen0: Int = extent matrix[0];
+let subLen1: Int = extent matrix[1];
+
+(* 3. Option Tag Ordinal: ordinal *)
+Let TrafficLight =
+    Option
+        red
+        amber
+        green
+    end;
+
+let cRed = option red of TrafficLight end;
+let cAmber = option amber of TrafficLight end;
+let cGreen = option green of TrafficLight end;
+
+let ord0: Int = ordinal cRed;
+let ord1: Int = ordinal cAmber;
+let ord2: Int = ordinal cGreen;
+let ordParens: Int = ordinal(cAmber);
+let ordLiteral: Int = ordinal option green of TrafficLight end;
+
+(* Infix precedence and mixed arithmetic with extent and ordinal *)
+let ordPlusLen: Int = ordinal cGreen + extent arr;
+let isOrdered: Bool = {ordinal cRed < ordinal cAmber} /\ {ordinal cAmber < ordinal cGreen};
+
+(* 4. Extent in loop upper bound *)
+let sumArr(a: Array(Int)): Int =
+    begin
+        let var total = 0;
+        for i = 0 upto extent a - 1 do
+            total := total + a[i]
+        end;
+        total
+    end;
+let sumResult: Int = sumArr(arr);

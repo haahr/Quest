@@ -1,0 +1,2 @@
+(* Monadic operators cannot be used as first-class values without an operand. *)
+let f = not;

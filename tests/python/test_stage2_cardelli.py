@@ -155,6 +155,60 @@ class TestStage2Cardelli(unittest.TestCase):
         self.assertEqual(proc.returncode, 0)
         self.assertIn("10 : Int", proc.stdout)
 
+    def test_monadic_not_prefix_without_parentheses_interpreter_and_c(self):
+        """Verifies not without parentheses in interpreter and C transpiler."""
+        code = """
+        let a = not true;
+        let b = not false;
+        let c = not not true;
+        let d = not {false \/ true};
+        a orif b
+        """
+        self.assertEqual(eval_test_source(code), QBool(True))
+        proc = self.compile_quest(code)
+        self.assertEqual(proc.returncode, 0)
+        self.assertIn("true : Bool", proc.stdout)
+
+    def test_monadic_extent_prefix_without_parentheses_interpreter_and_c(self):
+        """Verifies extent without parentheses in interpreter and C transpiler."""
+        code = """
+        let arr = array of 10 20 30 40 end;
+        let l1 = extent arr;
+        let l2 = extent array of 1 2 3 end;
+        l1 + l2
+        """
+        self.assertEqual(eval_test_source(code), QInt(7))
+        proc = self.compile_quest(code)
+        self.assertEqual(proc.returncode, 0)
+        self.assertIn("7 : Int", proc.stdout)
+
+    def test_monadic_ordinal_prefix_without_parentheses_interpreter_and_c(self):
+        """Verifies ordinal without parentheses in interpreter and C transpiler."""
+        code = """
+        Let Choice = Option a b c end;
+        let cB = option b of Choice end;
+        let cC = option c of Choice end;
+        let ordB = ordinal cB;
+        let ordC = ordinal cC;
+        ordB + ordC
+        """
+        self.assertEqual(eval_test_source(code), QInt(3))
+        proc = self.compile_quest(code)
+        self.assertEqual(proc.returncode, 0)
+        self.assertIn("3 : Int", proc.stdout)
+
+    def test_monadic_bare_operator_rejected_at_typecheck(self):
+        """Verifies using monadic operator as bare value without operand is rejected."""
+        for op in ("not", "extent", "ordinal"):
+            res, _ = run_pipeline(f"let f = {op};")
+            self.assertFalse(res.success)
+            self.assertTrue(
+                any(
+                    f"Monadic operator '{op}' cannot be used as a value without an operand" in d.message
+                    for d in res.diagnostics
+                )
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

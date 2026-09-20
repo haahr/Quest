@@ -141,8 +141,6 @@ native **AArch64 (ARM64)** machine code and providing a **JIT compiler** for int
     `intern` text serialization in the C runtime (interpreter JSON/JSOG format complete).
   - *Existential Tuples & Dot-Projections (`test_existential_tuples.py`):* packing packages, signature subtyping,
     projecting types and values (`p.T`, `p.v`) across compilation phases including C transpilation.
-  - *Prefix Monadic Operators without Parentheses (`test_stage2_cardelli.py`):* inline emission of `not x`,
-    `extent a`, and `ordinal c` (avoiding emission as undeclared closure variables in C transpilation).
 - C transpiler architecture in [codegen-c.md](codegen-c.md);
   C ABI specification in [c-representation.md](c-representation.md);
   language extensions specification in [extensions.md](extensions.md).

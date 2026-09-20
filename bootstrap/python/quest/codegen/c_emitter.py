@@ -1348,6 +1348,20 @@ class CEmitter:
                     type_args = list(effective_func.type_args) + type_args
                     effective_func = effective_func.func
 
+                # Direct inline lowering for Cardelli prefix monadic operators
+                if isinstance(effective_func, TypedVar) and len(args) == 1:
+                    if effective_func.name == "not":
+                        c_arg = self.emit_val(args[0], lines)
+                        return f"(!({c_arg}))"
+                    elif effective_func.name == "extent":
+                        c_arg = self.emit_val(args[0], lines)
+                        return f"(({c_arg})->length)"
+                    elif effective_func.name == "ordinal":
+                        c_arg = self.emit_val(args[0], lines)
+                        if self.c_type(args[0].type_val) == "QVal":
+                            return f"(((const int64_t *)({c_arg}.p))[0])"
+                        return f"(({c_arg})->tag)"
+
                 # Direct lowering for built-in arrayOp calls
                 if isinstance(effective_func, TypedSelect) and isinstance(effective_func.target, TypedVar):
                     mod_name = effective_func.target.name

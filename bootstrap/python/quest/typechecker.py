@@ -53,6 +53,7 @@ from quest.types import (
     is_type_equal,
     resolve_record_bound,
     resolve_variant_bound,
+    resolve_option_bound,
 )
 from quest.env import (
     Environment,
@@ -555,6 +556,7 @@ class TypeElaborator:
         expr: ast.Expr,
         env: Optional[Environment] = None,
         loop_depth: int = 0,
+        is_callee: bool = False,
     ) -> TypedExpr:
         """Synthesizes the minimal QType and elaborated TypedExpr (Gamma |- e => T)."""
         if env is None:
@@ -593,6 +595,12 @@ class TypeElaborator:
 
             # --- Variables & Identifiers ---
             case ast.ExprId(name=name, offset=off):
+                if not is_callee and name in ("not", "extent", "ordinal"):
+                    raise TypeError(
+                        f"Monadic operator '{name}' cannot be used as a value without an operand",
+                        offset=off,
+                    )
+
                 sym = env.lookup_value(name)
                 if sym is None:
                     raise TypeError(f"Undefined variable '{name}'", offset=off)
@@ -890,12 +898,12 @@ class TypeElaborator:
                 raise TypeError("ordinal expects 1 argument", offset=expr.offset)
             arg_typed = self.synth_expr(expr.args[0], env, loop_depth)
             arg_type_lazy = arg_typed.type_val.evaluate_lazily(env)
-            if not isinstance(arg_type_lazy, QOptionType):
+            if not isinstance(arg_type_lazy, QOptionType) and resolve_option_bound(arg_type_lazy) is None:
                 raise TypeError(
                     f"ordinal requires an Option type, got '{arg_typed.type_val}'",
                     offset=expr.args[0].offset,
                 )
-            func_typed = self.synth_expr(expr.func, env, loop_depth)
+            func_typed = self.synth_expr(expr.func, env, loop_depth, is_callee=True)
             return TypedApp(
                 func=func_typed,
                 args=(arg_typed,),
@@ -903,7 +911,7 @@ class TypeElaborator:
                 offset=expr.offset,
             )
 
-        func_typed = self.synth_expr(expr.func, env, loop_depth)
+        func_typed = self.synth_expr(expr.func, env, loop_depth, is_callee=True)
         fn_type = func_typed.type_val.evaluate_lazily(env)
 
         # 1. Polymorphic function call (QAllType)
@@ -2913,10 +2921,11 @@ def synth_expr(
     expr: ast.Expr,
     env: Optional[Environment] = None,
     loop_depth: int = 0,
+    is_callee: bool = False,
 ) -> TypedExpr:
     """Synthesizes the minimal QType and elaborated TypedExpr (Gamma |- e => T)."""
     return TypeElaborator(env=env, loop_depth=loop_depth).synth_expr(
-        expr, env=env, loop_depth=loop_depth
+        expr, env=env, loop_depth=loop_depth, is_callee=is_callee
     )
 
 

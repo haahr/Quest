@@ -1,0 +1,275 @@
+(TypedProgram
+  :phrases (
+    (TypedLetValue 'n1' :type Bool
+      :value (TypedApp :type Bool
+        :func (TypedVar 'not' :type Fun(b: Bool): Bool)
+        :args (
+          (TypedBool true)
+        )))
+    (TypedLetValue 'n2' :type Bool
+      :value (TypedApp :type Bool
+        :func (TypedVar 'not' :type Fun(b: Bool): Bool)
+        :args (
+          (TypedBool false)
+        )))
+    (TypedLetValue 'n3' :type Bool
+      :value (TypedApp :type Bool
+        :func (TypedVar 'not' :type Fun(b: Bool): Bool)
+        :args (
+          (TypedApp :type Bool
+            :func (TypedVar 'not' :type Fun(b: Bool): Bool)
+            :args (
+              (TypedBool true)
+            ))
+        )))
+    (TypedLetValue 'n4' :type Bool
+      :value (TypedApp :type Bool
+        :func (TypedVar 'not' :type Fun(b: Bool): Bool)
+        :args (
+          (TypedApp :type Bool
+            :func (TypedVar 'not' :type Fun(b: Bool): Bool)
+            :args (
+              (TypedBool false)
+            ))
+        )))
+    (TypedLetValue 'n5' :type Bool
+      :value (TypedApp :type Bool
+        :func (TypedVar 'not' :type Fun(b: Bool): Bool)
+        :args (
+          (TypedBool true)
+        )))
+    (TypedLetValue 'n6' :type Bool
+      :value (TypedApp :type Bool
+        :func (TypedVar 'not' :type Fun(b: Bool): Bool)
+        :args (
+          (TypedBool false)
+        )))
+    (TypedLetValue 'prec1' :type Bool
+      :value (TypedInfix '/\\' :type Bool
+        :left (TypedApp :type Bool
+          :func (TypedVar 'not' :type Fun(b: Bool): Bool)
+          :args (
+            (TypedBool false)
+          ))
+        :right (TypedBool true)))
+    (TypedLetValue 'prec2' :type Bool
+      :value (TypedInfix '\\/' :type Bool
+        :left (TypedApp :type Bool
+          :func (TypedVar 'not' :type Fun(b: Bool): Bool)
+          :args (
+            (TypedBool true)
+          ))
+        :right (TypedBool true)))
+    (TypedLetValue 'prec3' :type Bool
+      :value (TypedApp :type Bool
+        :func (TypedVar 'not' :type Fun(b: Bool): Bool)
+        :args (
+          (TypedInfix '\\/' :type Bool
+            :left (TypedBool true)
+            :right (TypedBool false))
+        )))
+    (TypedLetValue 'emptyArr' :type Array(Int)
+      :value (TypedArray :type Array(Int)
+        :elements ()))
+    (TypedLetValue 'lenEmpty' :type Int
+      :value (TypedApp :type Int
+        :func (TypedTypeApp [Int] :type Fun(a: Array(Int)): Int
+          :func (TypedVar 'extent' :type All(A :: TYPE) Fun(a: Array(A)): Int))
+        :args (
+          (TypedVar 'emptyArr' :type Array(Int))
+        )))
+    (TypedLetValue 'arr' :type Array(Int)
+      :value (TypedArray :type Array(Int)
+        :elements (
+          (TypedInt 10 :type Int)
+          (TypedInt 20 :type Int)
+          (TypedInt 30 :type Int)
+          (TypedInt 40 :type Int)
+          (TypedInt 50 :type Int)
+        )))
+    (TypedLetValue 'len1' :type Int
+      :value (TypedApp :type Int
+        :func (TypedTypeApp [Int] :type Fun(a: Array(Int)): Int
+          :func (TypedVar 'extent' :type All(A :: TYPE) Fun(a: Array(A)): Int))
+        :args (
+          (TypedVar 'arr' :type Array(Int))
+        )))
+    (TypedLetValue 'len2' :type Int
+      :value (TypedApp :type Int
+        :func (TypedTypeApp [Int] :type Fun(a: Array(Int)): Int
+          :func (TypedVar 'extent' :type All(A :: TYPE) Fun(a: Array(A)): Int))
+        :args (
+          (TypedVar 'arr' :type Array(Int))
+        )))
+    (TypedLetValue 'lenLiteral' :type Int
+      :value (TypedApp :type Int
+        :func (TypedTypeApp [Int] :type Fun(a: Array(Int)): Int
+          :func (TypedVar 'extent' :type All(A :: TYPE) Fun(a: Array(A)): Int))
+        :args (
+          (TypedArray :type Array(Int)
+            :elements (
+              (TypedInt 1 :type Int)
+              (TypedInt 2 :type Int)
+              (TypedInt 3 :type Int)
+            ))
+        )))
+    (TypedLetValue 'lenPlusOne' :type Int
+      :value (TypedInfix '+' :type Int
+        :left (TypedApp :type Int
+          :func (TypedTypeApp [Int] :type Fun(a: Array(Int)): Int
+            :func (TypedVar 'extent' :type All(A :: TYPE) Fun(a: Array(A)): Int))
+          :args (
+            (TypedVar 'arr' :type Array(Int))
+          ))
+        :right (TypedInt 1 :type Int)))
+    (TypedLetValue 'lenTimesTwo' :type Int
+      :value (TypedInfix '*' :type Int
+        :left (TypedApp :type Int
+          :func (TypedTypeApp [Int] :type Fun(a: Array(Int)): Int
+            :func (TypedVar 'extent' :type All(A :: TYPE) Fun(a: Array(A)): Int))
+          :args (
+            (TypedVar 'arr' :type Array(Int))
+          ))
+        :right (TypedInt 2 :type Int)))
+    (TypedLetValue 'matrix' :type Array(Array(Int))
+      :value (TypedArray :type Array(Array(Int))
+        :elements (
+          (TypedArray :type Array(Int)
+            :elements (
+              (TypedInt 1 :type Int)
+              (TypedInt 2 :type Int)
+            ))
+          (TypedArray :type Array(Int)
+            :elements (
+              (TypedInt 3 :type Int)
+              (TypedInt 4 :type Int)
+              (TypedInt 5 :type Int)
+            ))
+        )))
+    (TypedLetValue 'subLen0' :type Int
+      :value (TypedApp :type Int
+        :func (TypedTypeApp [Int] :type Fun(a: Array(Int)): Int
+          :func (TypedVar 'extent' :type All(A :: TYPE) Fun(a: Array(A)): Int))
+        :args (
+          (TypedIndex :type Array(Int)
+            :target (TypedVar 'matrix' :type Array(Array(Int)))
+            :index (TypedInt 0 :type Int))
+        )))
+    (TypedLetValue 'subLen1' :type Int
+      :value (TypedApp :type Int
+        :func (TypedTypeApp [Int] :type Fun(a: Array(Int)): Int
+          :func (TypedVar 'extent' :type All(A :: TYPE) Fun(a: Array(A)): Int))
+        :args (
+          (TypedIndex :type Array(Int)
+            :target (TypedVar 'matrix' :type Array(Array(Int)))
+            :index (TypedInt 1 :type Int))
+        )))
+    (TypedLetType 'TrafficLight' :kind TYPE)
+    (TypedLetValue 'cRed' :type Option red amber green end
+      :value (TypedOption 'red' :type Option red amber green end))
+    (TypedLetValue 'cAmber' :type Option red amber green end
+      :value (TypedOption 'amber' :type Option red amber green end))
+    (TypedLetValue 'cGreen' :type Option red amber green end
+      :value (TypedOption 'green' :type Option red amber green end))
+    (TypedLetValue 'ord0' :type Int
+      :value (TypedApp :type Int
+        :func (TypedVar 'ordinal' :type All(A :: TYPE) Fun(o: A): Int)
+        :args (
+          (TypedVar 'cRed' :type Option red amber green end)
+        )))
+    (TypedLetValue 'ord1' :type Int
+      :value (TypedApp :type Int
+        :func (TypedVar 'ordinal' :type All(A :: TYPE) Fun(o: A): Int)
+        :args (
+          (TypedVar 'cAmber' :type Option red amber green end)
+        )))
+    (TypedLetValue 'ord2' :type Int
+      :value (TypedApp :type Int
+        :func (TypedVar 'ordinal' :type All(A :: TYPE) Fun(o: A): Int)
+        :args (
+          (TypedVar 'cGreen' :type Option red amber green end)
+        )))
+    (TypedLetValue 'ordParens' :type Int
+      :value (TypedApp :type Int
+        :func (TypedVar 'ordinal' :type All(A :: TYPE) Fun(o: A): Int)
+        :args (
+          (TypedVar 'cAmber' :type Option red amber green end)
+        )))
+    (TypedLetValue 'ordLiteral' :type Int
+      :value (TypedApp :type Int
+        :func (TypedVar 'ordinal' :type All(A :: TYPE) Fun(o: A): Int)
+        :args (
+          (TypedOption 'green' :type Option red amber green end)
+        )))
+    (TypedLetValue 'ordPlusLen' :type Int
+      :value (TypedInfix '+' :type Int
+        :left (TypedApp :type Int
+          :func (TypedVar 'ordinal' :type All(A :: TYPE) Fun(o: A): Int)
+          :args (
+            (TypedVar 'cGreen' :type Option red amber green end)
+          ))
+        :right (TypedApp :type Int
+          :func (TypedTypeApp [Int] :type Fun(a: Array(Int)): Int
+            :func (TypedVar 'extent' :type All(A :: TYPE) Fun(a: Array(A)): Int))
+          :args (
+            (TypedVar 'arr' :type Array(Int))
+          ))))
+    (TypedLetValue 'isOrdered' :type Bool
+      :value (TypedInfix '/\\' :type Bool
+        :left (TypedInfix '<' :type Bool
+          :left (TypedApp :type Int
+            :func (TypedVar 'ordinal' :type All(A :: TYPE) Fun(o: A): Int)
+            :args (
+              (TypedVar 'cRed' :type Option red amber green end)
+            ))
+          :right (TypedApp :type Int
+            :func (TypedVar 'ordinal' :type All(A :: TYPE) Fun(o: A): Int)
+            :args (
+              (TypedVar 'cAmber' :type Option red amber green end)
+            )))
+        :right (TypedInfix '<' :type Bool
+          :left (TypedApp :type Int
+            :func (TypedVar 'ordinal' :type All(A :: TYPE) Fun(o: A): Int)
+            :args (
+              (TypedVar 'cAmber' :type Option red amber green end)
+            ))
+          :right (TypedApp :type Int
+            :func (TypedVar 'ordinal' :type All(A :: TYPE) Fun(o: A): Int)
+            :args (
+              (TypedVar 'cGreen' :type Option red amber green end)
+            )))))
+    (TypedLetValue 'sumArr' :type Fun(a: Array(Int)): Int
+      :value (TypedFun :params (('a' : Array(Int))) :type Fun(a: Array(Int)): Int
+        :body (TypedBlock :type Int
+          :bindings (
+            (TypedLetValue 'total' :type Int
+              :value (TypedInt 0 :type Int))
+            (TypedExprStmt
+              :expr (TypedFor 'i' :upto
+                :start (TypedInt 0 :type Int)
+                :stop (TypedInfix '-' :type Int
+                  :left (TypedApp :type Int
+                    :func (TypedTypeApp [Int] :type Fun(a: Array(Int)): Int
+                      :func (TypedVar 'extent' :type All(A :: TYPE) Fun(a: Array(A)): Int))
+                    :args (
+                      (TypedVar 'a' :type Array(Int))
+                    ))
+                  :right (TypedInt 1 :type Int))
+                :body (TypedAssign
+                  :target (TypedVar 'total' :type Var(Int))
+                  :value (TypedInfix '+' :type Int
+                    :left (TypedDerefCell :type Int
+                      :target (TypedVar 'total' :type Var(Int)))
+                    :right (TypedIndex :type Int
+                      :target (TypedVar 'a' :type Array(Int))
+                      :index (TypedVar 'i' :type Int))))))
+          )
+          :result (TypedDerefCell :type Int
+            :target (TypedVar 'total' :type Var(Int))))))
+    (TypedLetValue 'sumResult' :type Int
+      :value (TypedApp :type Int
+        :func (TypedVar 'sumArr' :type Fun(a: Array(Int)): Int)
+        :args (
+          (TypedVar 'arr' :type Array(Int))
+        )))
+  ))
