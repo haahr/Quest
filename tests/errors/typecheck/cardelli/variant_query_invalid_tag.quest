@@ -1,0 +1,4 @@
+(* Querying non-existent tag on variant is rejected at typecheck. *)
+Let Day = Variant mon, tue, wed: Ok end;
+let d = variant mon of Day with ok end;
+let bad = d?sun;

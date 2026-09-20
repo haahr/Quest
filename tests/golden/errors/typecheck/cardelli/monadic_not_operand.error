@@ -1,0 +1,1 @@
+error: Type mismatch: synthesized type 'Int' is not a subtype of expected type 'Bool'

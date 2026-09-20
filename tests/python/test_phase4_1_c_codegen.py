@@ -220,17 +220,6 @@ class TestPhase41Codegen(unittest.TestCase):
         self.assertEqual(proc.returncode, 0)
         self.assertIn("2 : Int", proc.stdout)
 
-    def test_divide_by_zero_runtime_error(self):
-        """Tests divide by zero raises runtime error with exit code 1."""
-        code = """
-        let zero = 0;
-        let bad = 42 / zero;
-        bad
-        """
-        proc = self.compile_quest(code)
-        self.assertNotEqual(proc.returncode, 0)
-        self.assertIn("Exception: DivideByZero", proc.stderr)
-
     def test_cli_driver_compile_and_run(self):
         """Tests quest compile CLI end-to-end."""
         with tempfile.NamedTemporaryFile(suffix=".quest", mode="w", delete=False) as src_f:

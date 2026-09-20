@@ -1,0 +1,1 @@
+error: Recursive function 'fib' requires an explicit return type annotation

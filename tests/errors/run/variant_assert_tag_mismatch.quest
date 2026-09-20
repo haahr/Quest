@@ -1,0 +1,4 @@
+(* Variant extraction operator ! tag mismatch raises variant_error. *)
+Let Number = Variant int: Int real: Real end;
+let n = variant int of Number with 42 end;
+let fail = n!real;

@@ -1,0 +1,3 @@
+(* Allocating array with negative size raises arrayOp.error. *)
+let neg = 0 - 1;
+let a = array of(neg 0);

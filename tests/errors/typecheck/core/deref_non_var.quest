@@ -1,0 +1,3 @@
+(* Taking reference @ of non-var location is rejected. *)
+let x = 10;
+let bad = @x;

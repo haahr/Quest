@@ -1,0 +1,2 @@
+(* Arithmetic + is strictly for Int; Real must use ++. *)
+let bad = 1.0 + 2.5;

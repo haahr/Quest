@@ -1,0 +1,7 @@
+(* Non-exhaustive case expression without else is rejected. *)
+Let Color = Option red green blue with intensity: Int end end;
+let col = option red of Color end;
+let bad = case col
+    when red then 1
+    when green then 2
+end;

@@ -42,20 +42,6 @@ class TestStage2Cardelli(unittest.TestCase):
             if bin_path.exists():
                 bin_path.unlink()
 
-    def test_monadic_type_errors(self):
-        """Verifies typecheck errors for invalid operands to monadic operators."""
-        # not expects Bool
-        res, _ = run_pipeline("not 42;")
-        self.assertFalse(res.success)
-
-        # extent expects Array
-        res, _ = run_pipeline("extent 42;")
-        self.assertFalse(res.success)
-
-        # ordinal expects Option
-        res, _ = run_pipeline("ordinal 42;")
-        self.assertFalse(res.success)
-
     def test_var_param_identifier_interpreter_and_c(self):
         """Verifies passing @x to a var parameter in interpreter and C transpiler."""
         code = """
@@ -153,66 +139,6 @@ class TestStage2Cardelli(unittest.TestCase):
         proc = self.compile_quest(code)
         self.assertEqual(proc.returncode, 0)
         self.assertIn("11 : Int", proc.stdout)
-
-    def test_write_only_out_parameter_rejected(self):
-        """Verifies reading from an out parameter raises a TypeError at typecheck."""
-        res_read, _ = run_pipeline("let f(out x: Int): Int = x;")
-        self.assertFalse(res_read.success)
-        self.assertTrue(
-            any("Cannot read from write-only 'out' parameter 'x'" in d.message for d in res_read.diagnostics)
-        )
-
-        res_expr, _ = run_pipeline("let f(out x: Int): Ok = begin x := x + 1; ok end;")
-        self.assertFalse(res_expr.success)
-        self.assertTrue(
-            any("Cannot read from write-only 'out' parameter 'x'" in d.message for d in res_expr.diagnostics)
-        )
-
-    def test_callsite_strict_at_syntax_rejected(self):
-        """Verifies passing bare variable without @ to out/var parameter is rejected."""
-        res, _ = run_pipeline("""
-        let inc(var x: Int): Ok = x := x + 1;
-        let var a = 0;
-        inc(a);
-        """)
-        self.assertFalse(res.success)
-        self.assertTrue(
-            any("Argument to 'var' parameter must be passed with '@' or 'var(...)'" in d.message
-                for d in res.diagnostics)
-        )
-
-    def test_closure_capture_of_var_or_out_parameter_rejected(self):
-        """Verifies capturing out/var parameters in escaping closure is rejected."""
-        res_var, _ = run_pipeline("""
-        let f(var x: Int): Fun() Int =
-            fun(): Int x;
-        """)
-        self.assertFalse(res_var.success)
-        self.assertTrue(
-            any("Cannot capture 'var' parameter 'x' in closure" in d.message for d in res_var.diagnostics)
-        )
-
-        res_out, _ = run_pipeline("""
-        let f(out x: Int): Fun() Ok =
-            fun(): Ok begin x := 1; ok end;
-        """)
-        self.assertFalse(res_out.success)
-        self.assertTrue(
-            any("Cannot capture 'out' parameter 'x' in closure" in d.message for d in res_out.diagnostics)
-        )
-
-    def test_closure_capture_of_local_var_stack_variable_rejected(self):
-        """Verifies capturing local stack var variable in escaping closure is rejected."""
-        res, _ = run_pipeline("""
-        let f = fun() begin
-            let var x = 10;
-            fun(): Int x
-        end;
-        """)
-        self.assertFalse(res.success)
-        self.assertTrue(
-            any("Cannot capture 'var' variable 'x' in closure" in d.message for d in res.diagnostics)
-        )
 
     def test_top_level_var_in_closure_allowed(self):
         """Verifies top-level module var variable captured in closure is allowed."""

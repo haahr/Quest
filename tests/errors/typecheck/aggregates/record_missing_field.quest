@@ -1,0 +1,3 @@
+(* Selecting missing field from record is rejected at typecheck. *)
+let r = record x = 10 y = 20 end;
+let bad = r.z;

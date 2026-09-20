@@ -1,0 +1,3 @@
+(* Passing literal value to var parameter is rejected. *)
+let inc(var x: Int): Ok = x := x + 1;
+inc(5);

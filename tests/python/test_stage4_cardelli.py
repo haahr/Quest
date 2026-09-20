@@ -12,7 +12,7 @@ Tests:
 import io
 import unittest
 
-from tests.python.helpers import assert_pipeline_failure, assert_pipeline_success
+from tests.python.helpers import assert_pipeline_success
 from quest.interpreter import QuestException
 from quest.runtime import (
     FALSE_VALUE,
@@ -60,19 +60,9 @@ class TestStage4Cardelli(unittest.TestCase):
         self.assertEqual(env.lookup("rReady"), QInt(0))
         self.assertEqual(env.lookup("fl"), QInt(3))
 
-    def test_module_isolation_requires_explicit_import(self):
-        """Modules cannot access pre-linked standard modules without explicit import."""
-        # 1. Without import: fails typechecking with undefined identifier
-        bad_code = """
-        interface Counter export get: Int end;
-        module counter: Counter export
-            let get: Int = int.abs(~5);
-        end;
-        """
-        assert_pipeline_failure(bad_code, "Undefined identifier 'int'")
-
-        # 2. With explicit import: succeeds
-        good_code = """
+    def test_module_isolation_with_explicit_import(self):
+        """Modules access standard modules via explicit import."""
+        code = """
         interface Counter export get: Int end;
         module counter: Counter
             import int: IntOp
@@ -81,7 +71,7 @@ class TestStage4Cardelli(unittest.TestCase):
         end;
         let res: Int = counter.get;
         """
-        ctx = assert_pipeline_success(good_code)
+        ctx = assert_pipeline_success(code)
         self.assertEqual(ctx.runtime_env.lookup("res"), QInt(5))
 
     def test_dynamic_new_and_be_type_validation(self):
@@ -105,10 +95,6 @@ class TestStage4Cardelli(unittest.TestCase):
         """
         ctx2 = assert_pipeline_success(mismatch_code)
         self.assertEqual(ctx2.runtime_env.lookup("bad"), FALSE_VALUE)
-
-        # Legacy bare dynamic(42) function is not defined
-        legacy_code = "let d = dynamic(42);"
-        assert_pipeline_failure(legacy_code)
 
     def test_dynamic_intern_and_extern(self):
         """dynamic.extern writes JSON/JSOG representation and dynamic.intern reads it."""

@@ -98,6 +98,25 @@ def golden_dir_for_phase(phase_name: str) -> Path:
     return TESTS_GOLDEN_DIR / phase_name
 
 
+def error_dir_for_phase(phase_name: str) -> Path:
+    if phase_name in ("interpret", "run_c_compiled"):
+        return TESTS_ERRORS_DIR / "run"
+    return TESTS_ERRORS_DIR / phase_name
+
+
+def golden_error_file_for_test(source_file: Path, phase_name: str) -> Path:
+    phase_folder = "run" if phase_name in ("interpret", "run_c_compiled") else phase_name
+    base_dir = TESTS_ERRORS_DIR / phase_folder
+    try:
+        rel_path = source_file.relative_to(base_dir)
+    except ValueError:
+        try:
+            rel_path = source_file.relative_to(TESTS_ERRORS_DIR / phase_name)
+        except ValueError:
+            rel_path = Path(source_file.name)
+    return TESTS_GOLDEN_DIR / "errors" / phase_folder / rel_path.with_suffix(".error")
+
+
 def pipeline_for_phase(phase_name: str) -> PhasePipeline:
     if phase_name in ("codegen_c", "run_c_compiled"):
         return full_pipeline()
@@ -314,18 +333,22 @@ def main() -> int:
                         passed_golden += 1
             print()
 
-    # 2. Run Inline Diagnostic Error Tests (if suite is 'errors' or 'all')
+    # 2. Run Diagnostic Error Tests (if suite is 'errors' or 'all')
     if suite_mode in ("errors", "all"):
         error_phases_found = False
         for phase in phases_to_run:
-            phase_error_dir = TESTS_ERRORS_DIR / phase
+            phase_error_dir = error_dir_for_phase(phase)
             if not phase_error_dir.exists():
-                continue
-            error_files = sorted(phase_error_dir.glob("*.quest"))
+                if phase == "interpret" and (TESTS_ERRORS_DIR / "interpret").exists():
+                    phase_error_dir = TESTS_ERRORS_DIR / "interpret"
+                else:
+                    continue
+
+            error_files = sorted(phase_error_dir.rglob("*.quest"))
             if args.test:
                 error_files = [
                     ef for ef in error_files
-                    if args.test in ef.stem or args.test in ef.name
+                    if args.test in str(ef.relative_to(TESTS_ERRORS_DIR))
                 ]
             if not error_files:
                 continue
@@ -338,19 +361,33 @@ def main() -> int:
             pipeline = pipeline_for_phase(phase)
             precursors = pipeline.precursors_of(phase)
             for error_file in error_files:
+                skipped_phases = parse_skipped_phases(error_file)
+                rel_id = str(error_file.relative_to(phase_error_dir).with_suffix(""))
+                if phase.lower() in skipped_phases:
+                    print(f"  [SKIP] {phase}:{rel_id}")
+                    continue
+
                 total_errors += 1
+                directives = parse_test_directives(error_file)
+                golden_err_file = golden_error_file_for_test(error_file, phase)
                 passed, report = run_error_test(
                     source_file=error_file,
                     target_phase=phase,
                     precursor_phases=precursors,
                     python_executable=python_executable,
                     root_dir=ROOT_DIR,
+                    golden_error_file=golden_err_file,
+                    update_golden=args.update_golden,
+                    extra_args=directives.args,
+                    env_vars=directives.env,
+                    stdin_data=directives.stdin_data,
                 )
                 if passed:
                     passed_errors += 1
-                    print(f"  [PASS] {phase}:{error_file.stem}")
+                    status = "[UPDATED]" if report == "[UPDATED]" else "[PASS]"
+                    print(f"  {status} {phase}:{rel_id}")
                 else:
-                    print(f"  [FAIL] {phase}:{error_file.stem}")
+                    print(f"  [FAIL] {phase}:{rel_id}")
                     print(report)
 
     # Summary report

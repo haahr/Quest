@@ -1,0 +1,7 @@
+(* Passing subtyping-incompatible target location to out parameter is rejected. *)
+Let Animal = Record name: String end;
+Let Dog = Record name: String breed: String end;
+Let Terrier = Record name: String breed: String size: String end;
+let getDog(out x: Dog): Ok = x := record name = "Fido" breed = "Terrier" end;
+let var tiny: Terrier = record name = "Toto" breed = "Cairn" size = "Small" end;
+getDog(@tiny);

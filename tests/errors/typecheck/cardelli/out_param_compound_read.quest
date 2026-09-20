@@ -1,0 +1,5 @@
+(* Reading from write-only out parameter in an expression. *)
+let f(out x: Int): Ok = begin
+    x := x + 1;
+    ok
+end;

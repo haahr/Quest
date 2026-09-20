@@ -1,0 +1,2 @@
+(* Relational < is strictly for Int; Real must use <<. *)
+let bad = 3.0 < 5.0;

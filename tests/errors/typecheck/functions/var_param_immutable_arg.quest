@@ -1,0 +1,4 @@
+(* Passing immutable variable to var parameter is rejected. *)
+let inc(var x: Int): Ok = x := x + 1;
+let imm = 10;
+inc(@imm);

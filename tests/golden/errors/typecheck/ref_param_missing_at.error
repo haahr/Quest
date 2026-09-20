@@ -1,0 +1,1 @@
+error: Argument to 'var' parameter must be passed with '@' or 'var(...)'

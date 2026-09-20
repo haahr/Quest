@@ -1,0 +1,2 @@
+(* Exit statement is illegal outside of a loop construct. *)
+exit;

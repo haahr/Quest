@@ -1,0 +1,3 @@
+(* Mutating immutable record field is rejected at typecheck. *)
+let r = record x = 10 y = 20 end;
+r.y := 42;

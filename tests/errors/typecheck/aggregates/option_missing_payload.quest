@@ -1,0 +1,3 @@
+(* Constructing option tag without required payload is rejected. *)
+Let Color = Option red green blue with intensity: Int end end;
+let bad = option blue of Color end;

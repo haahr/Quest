@@ -14,7 +14,7 @@ from quest.types import (
     QVariantType,
     is_subtype,
 )
-from tests.python.helpers import assert_pipeline_failure, assert_pipeline_success
+from tests.python.helpers import assert_pipeline_success
 
 
 class TestVariants(unittest.TestCase):
@@ -26,9 +26,6 @@ class TestVariants(unittest.TestCase):
 
     def run_source(self, source: str) -> CompilerContext:
         return assert_pipeline_success(source, env=self.env, runtime_env=self.runtime_env)
-
-    def check_failure(self, source: str, expected_substr: str) -> None:
-        assert_pipeline_failure(source, expected_substr, env=self.env, runtime_env=self.runtime_env)
 
     def test_variant_type_elaboration(self) -> None:
         """Cardelli §6.3 Day variant signature elaborates correctly."""
@@ -44,13 +41,6 @@ class TestVariants(unittest.TestCase):
         )
         for v in var_type.variants:
             self.assertEqual(v.type_val, OK_TYPE)
-
-    def test_duplicate_variant_tag_rejected(self) -> None:
-        """Duplicate variant tags are rejected with KindError."""
-        self.check_failure(
-            "Let Bad = Variant a: Int a: Real end;",
-            "Duplicate variant tag 'a'",
-        )
 
     def test_variant_subtyping_cardelli(self) -> None:
         """Cardelli §6.3 variant width subtyping: WeekDay <: Day."""
@@ -100,17 +90,6 @@ class TestVariants(unittest.TestCase):
         self.assertEqual(self.runtime_env.lookup("isMon"), QBool(True))
         self.assertEqual(self.runtime_env.lookup("isTue"), QBool(False))
 
-    def test_variant_query_invalid_tag_rejected(self) -> None:
-        """Querying non-existent variant tag is rejected at typecheck time."""
-        self.check_failure(
-            """
-            Let Day = Variant mon, tue, wed:Ok end;
-            let d = variant mon of Day with ok end;
-            let bad = d?sun;
-            """,
-            "Tag 'sun' is not a valid variant",
-        )
-
     def test_variant_assert_operator(self) -> None:
         """Testing variant tag assertion and extraction operator '!'."""
         self.run_source(
@@ -125,17 +104,6 @@ class TestVariants(unittest.TestCase):
         self.assertEqual(self.runtime_env.lookup("isInt"), QBool(True))
         self.assertEqual(self.runtime_env.lookup("isReal"), QBool(False))
         self.assertEqual(self.runtime_env.lookup("val"), QInt(42))
-
-    def test_variant_assert_tag_mismatch_fails_at_runtime(self) -> None:
-        """Asserting wrong tag with '!' fails at runtime."""
-        self.check_failure(
-            """
-            Let Number = Variant int: Int real: Real end;
-            let n = variant int of Number with 42 end;
-            let fail = n!real;
-            """,
-            "Variant tag mismatch in '!': expected 'real', got 'int'",
-        )
 
     def test_option_query_and_assert_operators(self) -> None:
         """Option types also support '?' and '!' operators."""

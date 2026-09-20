@@ -1,0 +1,1 @@
+error: Cannot read from write-only 'out' parameter 'x'

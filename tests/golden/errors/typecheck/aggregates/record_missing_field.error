@@ -1,0 +1,1 @@
+error: Record type 'Record x: Int y: Int end' has no field named 'z'

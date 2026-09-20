@@ -1,0 +1,5 @@
+(* Module cannot access standard library module without explicit import. *)
+interface Counter export get: Int end;
+module counter: Counter export
+    let get: Int = int.abs(~5);
+end;

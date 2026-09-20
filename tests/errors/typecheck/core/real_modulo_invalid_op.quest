@@ -1,0 +1,2 @@
+(* Modulo operator % is strictly for integers. *)
+let bad = 10.0 % 3.0;

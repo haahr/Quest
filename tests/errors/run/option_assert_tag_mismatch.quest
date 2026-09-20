@@ -1,0 +1,4 @@
+(* Option extraction operator ! tag mismatch raises variant_error. *)
+Let T = Option a b with x: Bool end end;
+let bOption = option b of T with let x = true end;
+let failed = bOption!a;

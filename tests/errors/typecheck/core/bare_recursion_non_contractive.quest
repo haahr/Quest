@@ -1,0 +1,2 @@
+(* Immediate bare recursion in type definition is not contractive. *)
+Let Rec Bad::TYPE = Bad;

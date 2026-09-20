@@ -1,0 +1,2 @@
+(* Mixed Int and Real arithmetic without explicit conversion is rejected. *)
+let bad = 1 + 2.0;

@@ -1,0 +1,2 @@
+(* Parameter in function definition must have type annotation in grammar. *)
+let rec f(n): Int = n;

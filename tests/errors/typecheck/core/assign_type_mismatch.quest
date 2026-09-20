@@ -1,0 +1,3 @@
+(* Assignment with type incompatible with declared variable is rejected. *)
+let var y = 10;
+y := "hello";

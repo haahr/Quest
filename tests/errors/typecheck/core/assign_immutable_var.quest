@@ -1,0 +1,3 @@
+(* Assignment to immutable binding is rejected. *)
+let x = 10;
+x := 42;

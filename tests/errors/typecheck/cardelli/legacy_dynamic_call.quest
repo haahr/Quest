@@ -1,0 +1,2 @@
+(* Bare dynamic(...) constructor is invalid; must use dynamic.new. *)
+let d = dynamic(42);

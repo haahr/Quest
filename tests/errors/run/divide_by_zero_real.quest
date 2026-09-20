@@ -1,0 +1,5 @@
+(* Real divide by zero raises DivideByZero. *)
+(* @skip-phase: codegen_c, run_c_compiled *)
+let zero = 0.0;
+let bad = 1.0 // zero;
+bad;

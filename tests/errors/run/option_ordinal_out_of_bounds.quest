@@ -1,0 +1,4 @@
+(* Constructing option with ordinal out of bounds raises error. *)
+(* @skip-phase: codegen_c, run_c_compiled *)
+Let Light = Option red green end;
+let bad = option ordinal(5) of Light end;

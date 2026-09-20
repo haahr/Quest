@@ -1,0 +1,2 @@
+(* Empty array without type annotation or checking context is rejected. *)
+let bad = array of end;

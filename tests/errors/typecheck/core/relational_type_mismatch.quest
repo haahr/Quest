@@ -1,0 +1,2 @@
+(* Comparing incompatible types with relational operator is rejected. *)
+let bad = 3 < "hello";

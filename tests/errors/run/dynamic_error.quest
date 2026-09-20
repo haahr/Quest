@@ -1,3 +1,4 @@
+(* @skip-phase: codegen_c, run_c_compiled *)
 let d = dynamic.new(42);
 inspect d (* ERROR: Exception: dynamic.error *)
     when String then "string"

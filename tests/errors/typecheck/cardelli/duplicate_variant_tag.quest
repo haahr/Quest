@@ -1,0 +1,2 @@
+(* Duplicate tag in variant type declaration is rejected. *)
+Let Bad = Variant a: Int a: Real end;

@@ -1,0 +1,7 @@
+(* Ordinal option construction requires all branches to have identical signatures. *)
+Let Mixed =
+  Option
+    a with x: Int end
+    b with y: Bool end
+  end;
+let bad = option ordinal(0) of Mixed with 10 end;

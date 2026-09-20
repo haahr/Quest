@@ -1,0 +1,2 @@
+(* Invalid operand to monadic not operator. *)
+not 42;

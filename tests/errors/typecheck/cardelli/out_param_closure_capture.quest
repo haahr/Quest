@@ -1,0 +1,3 @@
+(* Capturing write-only out parameter in an escaping closure. *)
+let f(out x: Int): Fun() Ok =
+    fun(): Ok begin x := 1; ok end;

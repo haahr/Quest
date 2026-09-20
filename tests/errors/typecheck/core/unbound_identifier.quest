@@ -1,0 +1,2 @@
+(* Referencing undeclared identifier is rejected at typecheck. *)
+let bad = undefinedVariable;

@@ -1,0 +1,3 @@
+(* Supplying payload to option tag that takes no payload is rejected. *)
+Let Color = Option red green blue with intensity: Int end end;
+let bad = option red of Color with 1 end;

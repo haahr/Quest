@@ -1,0 +1,1 @@
+error: Option variant 'blue' requires a payload of type 'Tuple intensity: Int end'
