@@ -1,0 +1,1 @@
+let f = fun() begin let var x = 10; fun(): Int x end; (* ERROR: Cannot capture 'var' variable 'x' in closure *)

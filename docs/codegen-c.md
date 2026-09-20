@@ -555,6 +555,22 @@ All modules—whether pure Quest, standard library built-ins (`writer`, `reader`
 - **External C Types and Values:** `external "C_TYPE"` and `external "C_SYMBOL"` seamlessly bridge C runtime
   structures (e.g. `QWriter *`, `QReader *`) into Quest's type system without compiler special-casing.
 
+### 10.8. Mutable Reference Parameters (`out` and `var`) and `@` Lvalues (Phase 4.12)
+Phase 4.12 implements native pointer lowering for Cardelli's mutable reference parameters:
+- **Native Pointer Parameters (`T *`):** Parameters marked `var p: T` or `out p: T` compile directly to
+  `T *qv_p` in C declarations, definitions, and closure trampolines. Reads from `var` parameters dereference the
+  pointer (`*qv_p`), and writes to `var`/`out` parameters assign through the pointer (`*qv_p = val;`).
+- **Callsite Lvalue Emission (`@`):**
+  - Variable references `@x` emit `&qv_x`.
+  - Pointer parameter forwarding `g(@y)` directly passes `qv_y` without taking its address (`&`).
+  - Record field references `@r.f` emit pointers into the heap record buffer
+    (`(({fld_t} *)((char *)rec.val + offset))`).
+  - Array element references `@a[i]` emit pointers into the flat array buffer (`&arr->data[i]`).
+  - Tuple element references `@t.1` emit pointers to tuple components (`&tup->_1`).
+  - Temporary cells `var(e)` evaluate `e` into a stack local and pass its address (`&_var_cell`).
+- **Closure Capture Restrictions:** Closure capture of `out`/`var` parameters or local stack mutable variables
+  is prohibited at compile time, guaranteeing that pointers never outlive their stack frames.
+
 ---
 
 ## 11. Host Compiler Runner (`compiler_runner.py`)
@@ -619,6 +635,8 @@ The C code generator is verified by comprehensive unit and integration tests:
   IntOp, RealOp, StringOp) and System OS extensions.
 - `tests/python/test_phase4_11_native_modules.py`: Unified native module mechanism, external types and values, and
   hybrid Quest/C modules.
+- `tests/python/test_stage2_cardelli.py` & `tests/source/language/lvalues_references.quest`: Mutable reference
+  parameters (`out`, `var`), lvalue address-of generation, pointer forwarding, and compile-time error checks.
 - `tests/source/01_lexer_basics.quest`: Verified end-to-end native compilation and execution of tuple operations.
 - `tests/source/02_expressions_control_flow.quest`: Verified end-to-end native compilation and execution.
 - `tests/source/03_functions_closures.quest`: Verified end-to-end native compilation and execution of closures.

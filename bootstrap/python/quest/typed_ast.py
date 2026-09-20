@@ -422,6 +422,36 @@ class TypedSelectRef(TypedExpr):
 
 
 @dataclass(frozen=True)
+class TypedIndexRef(TypedExpr):
+    """Reference to an array element location (for var/out arguments): @a[i]."""
+    target: TypedExpr
+    index: TypedExpr
+    type_val: QType
+
+    def dump_header(self) -> str:
+        return "[] (ref)"
+
+    def dump_children(self) -> list[tuple[str, Any]]:
+        return [(":target", self.target), (":index", self.index)]
+
+
+@dataclass(frozen=True)
+class TypedTupleSelectRef(TypedExpr):
+    """Reference to a mutable tuple field/element (for var/out arguments): @t.f or @t.1."""
+    target: TypedExpr
+    index: int
+    field: Optional[str]
+    type_val: QType
+
+    def dump_header(self) -> str:
+        fld_desc = f".{self.field}" if self.field else f"._{self.index}"
+        return f"{fld_desc} (ref)"
+
+    def dump_children(self) -> list[tuple[str, Any]]:
+        return [(":target", self.target)]
+
+
+@dataclass(frozen=True)
 class TypedAssign(TypedExpr):
     """Assignment to mutable reference or record field: target := value."""
     target: TypedExpr

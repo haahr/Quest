@@ -1,0 +1,146 @@
+(TypedProgram
+  :phrases (
+    (TypedLetValue 'a' :type Int
+      :value (TypedInt 0 :type Int))
+    (TypedLetValue 'assign' :type Fun(out x: Int y: Int): Ok
+      :value (TypedFun :params (('x' : Int) ('y' : Int)) :type Fun(out x: Int y: Int): Ok
+        :body (TypedAssign
+          :target (TypedVar 'x' :type Var(Int))
+          :value (TypedVar 'y' :type Int))))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'assign' :type Fun(out x: Int y: Int): Ok)
+        :args (
+          (TypedVar 'a' :type Var(Int))
+          (TypedInt 42 :type Int)
+        )))
+    (TypedLetValue 'inc' :type Fun(var x: Int): Ok
+      :value (TypedFun :params (('x' : Int)) :type Fun(var x: Int): Ok
+        :body (TypedAssign
+          :target (TypedVar 'x' :type Var(Int))
+          :value (TypedInfix '+' :type Int
+            :left (TypedDerefCell :type Int
+              :target (TypedVar 'x' :type Var(Int)))
+            :right (TypedInt 1 :type Int)))))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'inc' :type Fun(var x: Int): Ok)
+        :args (
+          (TypedVar 'a' :type Var(Int))
+        )))
+    (TypedLetValue 'r' :type Record var f: Int end
+      :value (TypedRecord :type Record var f: Int end
+        :fields (
+          (TypedRecordField 'f' :var
+            :value (TypedInt 10 :type Int))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'inc' :type Fun(var x: Int): Ok)
+        :args (
+          (TypedSelectRef .f (ref) :type Var(Int)
+            :target (TypedVar 'r' :type Record var f: Int end))
+        )))
+    (TypedLetValue 'arr' :type Array(Int)
+      :value (TypedArray :type Array(Int)
+        :elements (
+          (TypedInt 10 :type Int)
+          (TypedInt 20 :type Int)
+          (TypedInt 30 :type Int)
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'inc' :type Fun(var x: Int): Ok)
+        :args (
+          (TypedIndexRef [] (ref) :type Var(Int)
+            :target (TypedVar 'arr' :type Array(Int))
+            :index (TypedInt 1 :type Int))
+        )))
+    (TypedLetValue 'addFive' :type Fun(var x: Int): Int
+      :value (TypedFun :params (('x' : Int)) :type Fun(var x: Int): Int
+        :body (TypedBlock :type Int
+          :bindings (
+            (TypedExprStmt
+              :expr (TypedAssign
+                :target (TypedVar 'x' :type Var(Int))
+                :value (TypedInfix '+' :type Int
+                  :left (TypedDerefCell :type Int
+                    :target (TypedVar 'x' :type Var(Int)))
+                  :right (TypedInt 5 :type Int))))
+          )
+          :result (TypedDerefCell :type Int
+            :target (TypedVar 'x' :type Var(Int))))))
+    (TypedLetValue 'resVarCell' :type Int
+      :value (TypedApp :type Int
+        :func (TypedVar 'addFive' :type Fun(var x: Int): Int)
+        :args (
+          (TypedVarCell :type Var(Int)
+            :value (TypedInt 10 :type Int))
+        )))
+    (TypedLetValue 'incTwice' :type Fun(var y: Int): Ok
+      :value (TypedFun :params (('y' : Int)) :type Fun(var y: Int): Ok
+        :body (TypedBlock :type Ok
+          :bindings (
+            (TypedExprStmt
+              :expr (TypedApp :type Ok
+                :func (TypedVar 'inc' :type Fun(var x: Int): Ok)
+                :args (
+                  (TypedVar 'y' :type Var(Int))
+                )))
+            (TypedExprStmt
+              :expr (TypedApp :type Ok
+                :func (TypedVar 'inc' :type Fun(var x: Int): Ok)
+                :args (
+                  (TypedVar 'y' :type Var(Int))
+                )))
+          )
+          :result (TypedOk))))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'incTwice' :type Fun(var y: Int): Ok)
+        :args (
+          (TypedVar 'a' :type Var(Int))
+        )))
+    (TypedLetValue 'inner' :type Record var val: Int end
+      :value (TypedRecord :type Record var val: Int end
+        :fields (
+          (TypedRecordField 'val' :var
+            :value (TypedInt 1 :type Int))
+        )))
+    (TypedLetValue 'outer' :type Record var mid: Record var val: Int end end
+      :value (TypedRecord :type Record var mid: Record var val: Int end end
+        :fields (
+          (TypedRecordField 'mid' :var
+            :value (TypedVar 'inner' :type Record var val: Int end))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'inc' :type Fun(var x: Int): Ok)
+        :args (
+          (TypedSelectRef .val (ref) :type Var(Int)
+            :target (TypedSelect 'mid' :type Record var val: Int end
+              :target (TypedVar 'outer' :type Record var mid: Record var val: Int end end)))
+        )))
+    (TypedLetValue 'g' :type Int
+      :value (TypedInt 10 :type Int))
+    (TypedLetValue 'readG' :type Fun(dummy: Int): Int
+      :value (TypedFun :params (('dummy' : Int)) :type Fun(dummy: Int): Int
+        :body (TypedBlock :type Int
+          :bindings (
+            (TypedLetValue 'get' :type Fun(d: Int): Int
+              :value (TypedFun :params (('d' : Int)) :type Fun(d: Int): Int
+                :body (TypedDerefCell :type Int
+                  :target (TypedVar 'g' :type Var(Int)))))
+          )
+          :result (TypedApp :type Int
+            :func (TypedVar 'get' :type Fun(d: Int): Int)
+            :args (
+              (TypedVar 'dummy' :type Int)
+            )))))
+    (TypedLetValue 'resG' :type Int
+      :value (TypedApp :type Int
+        :func (TypedVar 'readG' :type Fun(dummy: Int): Int)
+        :args (
+          (TypedInt 0 :type Int)
+        )))
+  ))

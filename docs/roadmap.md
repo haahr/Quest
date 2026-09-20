@@ -117,7 +117,8 @@ native **AArch64 (ARM64)** machine code and providing a **JIT compiler** for int
     - *4.8c:* `dynamic` module lowering (`dynamic.new`, `dynamic.be`, `dynamic.copy`, `dynamic.error`) and generic
       wrappers. — *Complete*
   - **Phase 4.9 (Fat Pointers, Aggregate Subtyping, Specialization & Flat Stride Arrays):**
-    - *4.9a:* Uniform 16-byte `QRecordVal` fat pointers and aggregate subtyping across records and tuples. — *Complete*
+    - *4.9a:* Uniform 16-byte `QRecordVal` fat pointers and aggregate subtyping across records and tuples. —
+      *Complete*
     - *4.9b:* Bounded specialization for records (`A <: Record`) and variants (`V <: Variant`). — *Complete*
     - *4.9c:* Call-site specialization for unbounded quantifiers (`All(A::TYPE)`). — *Complete*
     - *4.9d:* Flat stride arrays (`Array(Record)`, `Array(Variant)`) with zero heap boxing. — *Complete*
@@ -128,12 +129,20 @@ native **AArch64 (ARM64)** machine code and providing a **JIT compiler** for int
     first-class `external` syntax for opaque C data structures (`type T = external "..."`) and native symbols
     (`let x = external "..."`), elimination of legacy Section 8c, and lazy module loading with concrete value
     records. — *Complete*
+  - **Phase 4.12 (`out` and `var` Parameter Bindings with `@` References):** Passing lvalues and reference locations
+    (`@x`, `@r.f`, `@a[i]`, `@t.1`, `var(e)`, chained paths) to `out` and `var` parameters, strict write-only
+    enforcement for `out`, callsite `@` syntax enforcement, closure capture restrictions, and native pointer lowering
+    (`T *`) with pointer forwarding in C transpilation. — *Complete*
 - **Bootstrap Compiler Completion Prerequisites:**
   - *Separate Compilation & Object Linking:* Compiling modules independently to `.o` files with header/interface
     exports and linking.
   - *Dynamic Subtyping & Compound Type Descriptors:* Structural subtyping in `quest_dynamic_be`
     (`is_subtype(sub, super)`) across records, variants, and compound types, alongside deferred `dynamic.extern` /
-    `intern` text serialization (using JSOG format for cycle-safe graph representation).
+    `intern` text serialization in the C runtime (interpreter JSON/JSOG format complete).
+  - *Existential Tuples & Dot-Projections (`test_existential_tuples.py`):* packing packages, signature subtyping,
+    projecting types and values (`p.T`, `p.v`) across compilation phases including C transpilation.
+  - *Prefix Monadic Operators without Parentheses (`test_stage2_cardelli.py`):* inline emission of `not x`,
+    `extent a`, and `ordinal c` (avoiding emission as undeclared closure variables in C transpilation).
 - C transpiler architecture in [codegen-c.md](codegen-c.md);
   C ABI specification in [c-representation.md](c-representation.md);
   language extensions specification in [extensions.md](extensions.md).

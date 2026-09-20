@@ -237,7 +237,7 @@
         (FormalParam
           :name 'x'
           :type_annot (TypePath ('Int'))
-          :mode OUT
+          :mode VAR
         )
       )
       :type_annot (TypePath ('Ok'))

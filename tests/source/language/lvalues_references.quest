@@ -1,0 +1,48 @@
+(* Language: Out and Var Parameter Bindings with @ References *)
+
+(* 1. Passing mutable variable @x to out and var parameters *)
+let var a = 0;
+let assign(out x: Int y: Int): Ok = x := y;
+assign(@a 42);
+
+let inc(var x: Int): Ok = x := x + 1;
+inc(@a);
+
+(* 2. Passing mutable record field @r.f *)
+let r = record var f = 10 end;
+inc(@r.f);
+
+(* 3. Passing mutable array element @arr[i] *)
+let arr = array of 10 20 30 end;
+inc(@arr[1]);
+
+(* 4. Passing temporary mutable cell var(e) *)
+let addFive(var x: Int): Int =
+    begin
+        x := x + 5;
+        x
+    end;
+let resVarCell = addFive(var(10));
+
+(* 5. Pointer forwarding: forwarding pointer parameter @y to another function *)
+let incTwice(var y: Int): Ok =
+    begin
+        inc(@y);
+        inc(@y);
+        ok
+    end;
+incTwice(@a);
+
+(* 6. Nested chained path expression @outer.mid.val *)
+let inner = record var val = 1 end;
+let outer = record var mid = inner end;
+inc(@outer.mid.val);
+
+(* 7. Top-level module var variable captured in closure is allowed *)
+let var g = 10;
+let readG(dummy: Int): Int =
+    begin
+        let get = fun(d: Int): Int g;
+        get(dummy)
+    end;
+let resG = readG(0);

@@ -46,6 +46,8 @@ class ValueSymbol(Symbol):
     type_val: QType
     is_var: bool = False
     is_out: bool = False
+    is_param: bool = False
+    function_depth: int = 0
     symbol_id: int = 0
 
     _counter: ClassVar[int] = field(default=0, init=False, repr=False)

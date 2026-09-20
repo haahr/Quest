@@ -231,15 +231,36 @@ Term typechecking translates syntactic AST expressions into decorated `TypedExpr
   local inference for numeric constants, record upcasts, existential tuple packing, and function bodies.
 - **Synthesis Mode ($\Gamma \vdash e \Rightarrow T$):** Infers minimal type $T$ from $e$ upward.
 
-### 6.2. Mutability and Assignment
+### 6.2. Mutability, Assignment, and Reference Parameters
 Mutable locations are declared with `var`:
 ```quest
-let var x: Int := 10;
+let var x: Int = 10;
 x := x + 1;
 ```
-- In value positions, mutable locations automatically coerce to their underlying value type.
+- In value positions, mutable locations automatically coerce to their underlying value type (`TypedDerefCell`).
 - In assignment positions (`x := e`), the target must be an explicit mutable location (`is_var=True` or `QVarType`).
 - Path-dependent types cannot be rooted at mutable locations.
+
+#### 6.2.1. Parameter Modes: `var` and `out`
+Following Cardelli (*Typeful Programming* §4.8), function signatures support reference parameters:
+- `var p: T`: Read-write reference parameter. Within the callee body, `p` can be both read and assigned (`p := e`).
+- `out p: T`: Strict write-only parameter. Within the callee body, `p` can only be assigned to (`p := e`).
+  Attempting to read from an `out` parameter triggers a compile-time `TypeError`.
+
+#### 6.2.2. Callsite Reference Syntax (`@` and `var(...)`)
+- Callsites for `var` and `out` parameters strictly require explicit `@` lvalue references or temporary cells `var(e)`.
+  Bare identifiers are rejected with a `TypeError`.
+- Supported `@` targets: mutable variables (`@x`), mutable record fields (`@r.f`), array elements (`@a[i]`),
+  tuple elements (`@t.1`), and arbitrary chained paths ending in a mutable location (`@r.a.b`, `@a[i].f`).
+- Forwarding an existing reference parameter `y` to another callee is written `g(@y)` and forwards the underlying
+  pointer without re-referencing.
+
+#### 6.2.3. Closure Capture Restrictions
+To ensure stack safety and prevent escaping pointer references without requiring boxing every local variable:
+- Capturing `var` or `out` parameters inside closures is prohibited.
+- Capturing local stack-allocated mutable variables (`let var x = ...` inside a function body) inside closures is
+  prohibited.
+- Top-level module-level `var` variables are global module state and may be referenced freely by closures.
 
 ### 6.3. Strict Non-Overloaded Operators and Numeric Non-Coercion
 Quest disallows implicit numeric coercions: `Int` and `Real` are disjoint types. Arithmetic between differing numeric

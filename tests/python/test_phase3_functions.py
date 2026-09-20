@@ -102,12 +102,16 @@ class Phase3FunctionsTest(unittest.TestCase):
         # Immutable variable
         env.current_scope.declare_value(ValueSymbol(name="imm", type_val=INT_TYPE, is_var=False))
 
-        # Passing mutable variable succeeds
-        typed = synth_test_expr("inc(c)", env)
+        # Passing mutable variable with @ succeeds
+        typed = synth_test_expr("inc(@c)", env)
         self.assertIsInstance(typed, TypedApp)
         self.assertEqual(typed.type_val, OK_TYPE)
         # Arg passed as lvalue location TypedVar
         self.assertIsInstance(typed.args[0], TypedVar)
+
+        # Passing mutable variable without @ fails
+        with self.assertRaises(TypeError):
+            synth_test_expr("inc(c)", env)
 
         # Passing immutable variable fails
         with self.assertRaises(TypeError):
@@ -135,15 +139,19 @@ class Phase3FunctionsTest(unittest.TestCase):
         fn_type = QFunType(params=(QParam("x", dog_type, is_out=True),), result_type=OK_TYPE)
         env.current_scope.declare_value(ValueSymbol(name="getDog", type_val=fn_type))
 
+        # Bare argument without @ raises TypeError
+        with self.assertRaises(TypeError):
+            synth_test_expr("getDog(pet)", env)
+
         # Destination variable of type Animal (Dog <= Animal: valid!)
         env.current_scope.declare_value(ValueSymbol(name="pet", type_val=animal_type, is_var=True))
-        typed_ok = synth_test_expr("getDog(pet)", env)
+        typed_ok = synth_test_expr("getDog(@pet)", env)
         self.assertEqual(typed_ok.type_val, OK_TYPE)
 
         # Destination variable of type Terrier (Dog <= Terrier is False: rejected!)
         env.current_scope.declare_value(ValueSymbol(name="tiny", type_val=terrier_type, is_var=True))
         with self.assertRaises(TypeError):
-            synth_test_expr("getDog(tiny)", env)
+            synth_test_expr("getDog(@tiny)", env)
 
     def test_polymorphic_application_inference(self) -> None:
         """Polymorphic call id(42) infers X = Int and wraps in TypedTypeApp."""

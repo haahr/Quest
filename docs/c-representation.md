@@ -623,7 +623,44 @@ struct QTypeDescriptor {
 - **Opaque types (`QTYPE_KIND_OPAQUE`)** represent nominal abstract types (`T::TYPE` in an interface or existential package). They possess unique pointer identity to ensure that `dynamic.be` respects module abstraction barriers.
 - **Manifest types (`Def T = ...`)** are pure compile-time aliases, completely erased at runtime with no separate descriptors or module record fields.
 - **Memoization Cache:** Dynamically constructed compound descriptors are interned in a runtime table (`quest_intern_type_descriptor`) to ensure canonical pointer equality ($T_1 \equiv T_2 \iff \text{desc}_1 == \text{desc}_2$). *(Note: this is an intentional unbounded cache since types in loaded code are bounded).*
-- **Future Value Representation:** With `QTypeDescriptor` carrying `size` and `alignment`, the runtime establishes the foundation to evolve beyond the 64-bit `QVal` restriction, supporting 128-bit fat pointers for subtyped records (`{ void *ptr, const QRecordFieldDict *dict }`) and unboxed polymorphic flat arrays.
+- **Future Value Representation:** With `QTypeDescriptor` carrying `size` and `alignment`, the runtime establishes
+  the foundation to evolve beyond the 64-bit `QVal` restriction, supporting 128-bit fat pointers for subtyped records
+  (`{ void *ptr, const QRecordFieldDict *dict }`) and unboxed polymorphic flat arrays.
+
+### 6.5. Mutable Reference Parameters (`out` and `var`) and `@` Lvalues (Phase 4.12)
+
+Following Cardelli's *Typeful Programming* (§4.8), Quest supports passing mutable memory locations to functions via
+`var` (read-write) and `out` (write-only) parameters:
+
+#### 1. Native C Representation (`T *`)
+- Parameters declared as `var p: T` or `out p: T` compile directly to native C pointers `T *qv_p`.
+- In the function body, writes to `qv_p` dereference the pointer (`*qv_p = val;`).
+- Reads from `var` parameters dereference the pointer (`*qv_p`).
+- Direct reads from `out` parameters are strictly rejected at compile time (strict write-only enforcement).
+- When a function takes polymorphic parameters (`var p: A`), `qv_p` has type `QVal *`.
+
+#### 2. Call Sites and `@` Lvalue Expressions
+- Call sites for `var` and `out` parameters strictly require explicit `@` lvalue references or temporary cells `var(e)`.
+  Passing bare identifiers without `@` is rejected as a type error.
+- Supported lvalue targets for `@`:
+  - Variables: `@x` passes `&qv_x`.
+  - Record fields: `@r.f` passes pointer to the field within the record heap buffer.
+  - Array elements: `@a[i]` passes pointer to the element slot within the flat array buffer.
+  - Tuple elements: `@t.1` passes pointer to the tuple component `&tup->_1`.
+  - Nested chained paths: `@r.a.b` and `@a[i].f` evaluate prefix paths and take the address of the terminal mutable
+    location.
+  - Temporary cells: `var(e)` evaluates expression `e` into a stack cell and passes its address (`&_var_cell`).
+- **Pointer Forwarding:** When forwarding an existing pointer parameter `y` to another callee expecting a reference
+  (`g(@y)`), the compiler detects that `y` is already a pointer and passes `qv_y` directly without taking its
+  address (`&`).
+
+#### 3. Closure Capture Restrictions
+To prevent dangling stack references and escaping pointers without requiring full static lifetime analysis or boxing
+every variable into a heap cell:
+- Capturing `out` or `var` parameters inside local closures is prohibited and rejected with a type error.
+- Capturing local stack-allocated mutable variables (`let var x = ...` inside a function body) inside escaping closures
+  is prohibited and rejected with a type error.
+- Top-level module-level `var` variables are global module state and may be accessed from closures.
 
 ---
 

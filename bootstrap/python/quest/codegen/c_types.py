@@ -23,6 +23,8 @@ from quest.types import (
     QTupleType,
     QType,
     QTypeVar,
+    QVarType,
+    QOutType,
     QVariantField,
     QVariantType,
     resolve_record_bound,
@@ -75,6 +77,8 @@ def type_to_c_tag(t: QType) -> str:
         return "QRecord_" + ("_".join(tags) if tags else "empty")
     if isinstance(t, (QFunType, QAllType)):
         return "QClosure"
+    if isinstance(t, (QVarType, QOutType)):
+        return f"Ref_{type_to_c_tag(t.element_type)}"
     if isinstance(t, QTypeVar):
         return "QVal"
     if isinstance(t, QArrayType):
@@ -205,6 +209,8 @@ def qtype_to_c_type(t: QType, ctx: Optional[RecordNamingContext] = None) -> str:
     if isinstance(t, QOptionType) or (opt_bound := resolve_option_bound(t)) is not None:
         opt_t = t if isinstance(t, QOptionType) else opt_bound
         return f"{option_struct_name(opt_t)} *"
+    if isinstance(t, (QVarType, QOutType)):
+        return f"{qtype_to_c_type(t.element_type, ctx)} *"
     if isinstance(t, QTypeVar):
         return "QVal"
     return "QVal"
@@ -320,7 +326,10 @@ def closure_fn_ptr_type(fun_type: QType, ctx: Optional[RecordNamingContext] = No
         for _ in quantifiers:
             param_types.append("const QTypeDescriptor *")
         for p in cur_type.params:
-            param_types.append(qtype_to_c_type(p.type_val, ctx))
+            if getattr(p, "is_out", False) or getattr(p, "is_var", False):
+                param_types.append(f"{qtype_to_c_type(p.type_val, ctx)} *")
+            else:
+                param_types.append(qtype_to_c_type(p.type_val, ctx))
         sig = ", ".join(param_types)
         return f"{ret_c} (*)({sig})"
 

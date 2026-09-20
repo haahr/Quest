@@ -37,6 +37,8 @@ from quest.runtime import (
     QReal,
     QRecord,
     QRef,
+    QArrayElementRef,
+    QTupleElementRef,
     QString,
     QTuple,
     QTypeValue,
@@ -86,6 +88,7 @@ from quest.typed_ast import (
     TypedIf,
     TypedIndex,
     TypedIndexAssign,
+    TypedIndexRef,
     TypedInfix,
     TypedImport,
     TypedInspect,
@@ -105,6 +108,7 @@ from quest.typed_ast import (
     TypedRecord,
     TypedSelect,
     TypedSelectRef,
+    TypedTupleSelectRef,
     TypedString,
     TypedTry,
     TypedTryBranch,
@@ -491,12 +495,44 @@ def eval_expr(expr: TypedExpr, env: RuntimeEnvironment) -> QValue:
 
         case TypedSelectRef(target=tgt, field=fld, offset=offset):
             rec_val = eval_expr(tgt, env)
+            while isinstance(rec_val, QRef):
+                rec_val = rec_val.deref()
             if not isinstance(rec_val, QRecord):
                 raise QuestRuntimeError("Field selection target must be Record", offset=offset)
             field_cell = rec_val.get(fld)
             if isinstance(field_cell, QRef):
                 return field_cell
             raise QuestRuntimeError(f"Field '{fld}' is not mutable", offset=offset)
+
+        case TypedIndexRef(target=tgt, index=idx, offset=offset):
+            arr_val = eval_expr(tgt, env)
+            while isinstance(arr_val, QRef):
+                arr_val = arr_val.deref()
+            if not isinstance(arr_val, QArray):
+                raise QuestRuntimeError(f"Index target must be Array, got {arr_val.type_name}", offset=offset)
+            idx_val = eval_expr(idx, env)
+            if not isinstance(idx_val, QInt):
+                raise QuestRuntimeError(f"Array index must be Int, got {idx_val.type_name}", offset=offset)
+            i = idx_val.value
+            if i < 0 or i >= arr_val.size():
+                raise QuestException(ARRAY_OP_ERROR_EXC, offset=offset)
+            return QArrayElementRef(arr_val, i)
+
+        case TypedTupleSelectRef(target=tgt, index=idx, field=fld, offset=offset):
+            tup_val = eval_expr(tgt, env)
+            while isinstance(tup_val, QRef):
+                tup_val = tup_val.deref()
+            if not isinstance(tup_val, QTuple):
+                raise QuestRuntimeError(f"Tuple select target must be Tuple, got {tup_val.type_name}", offset=offset)
+            val_idx = idx
+            if val_idx < 0 and fld is not None:
+                val_idx = tup_val._name_to_index.get(fld, -1)
+            if val_idx < 0 or val_idx >= len(tup_val.elements):
+                raise QuestRuntimeError("Tuple component out of bounds", offset=offset)
+            elem = tup_val.get_by_index(val_idx)
+            if isinstance(elem, QRef):
+                return elem
+            return QTupleElementRef(tup_val, val_idx)
 
         case TypedAssign(target=tgt, value=val, offset=offset):
             rhs_val = eval_expr(val, env)
@@ -510,6 +546,8 @@ def eval_expr(expr: TypedExpr, env: RuntimeEnvironment) -> QValue:
                     return OK_VALUE
                 case TypedSelect(target=rec_expr, field=field):
                     rec_val = eval_expr(rec_expr, env)
+                    while isinstance(rec_val, QRef):
+                        rec_val = rec_val.deref()
                     if not isinstance(rec_val, QRecord):
                         raise QuestRuntimeError("Field assignment target must be Record", offset=offset)
                     field_cell = rec_val.get(field)
@@ -749,6 +787,8 @@ def eval_expr(expr: TypedExpr, env: RuntimeEnvironment) -> QValue:
 
         case TypedSelect(target=target, field=field, offset=offset):
             target_val = eval_expr(target, env)
+            while isinstance(target_val, QRef):
+                target_val = target_val.deref()
             match target_val:
                 case QRecord():
                     field_val = target_val.get(field)

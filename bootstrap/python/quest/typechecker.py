@@ -103,6 +103,7 @@ from quest.typed_ast import (
     TypedIf,
     TypedIndex,
     TypedIndexAssign,
+    TypedIndexRef,
     TypedInfix,
     TypedImport,
     TypedImportItem,
@@ -128,6 +129,7 @@ from quest.typed_ast import (
     TypedTry,
     TypedTryBranch,
     TypedTuple,
+    TypedTupleSelectRef,
     TypedTypeApp,
     TypedTypeWitness,
     TypedVar,
@@ -179,6 +181,7 @@ class TypeElaborator:
     def __init__(self, env: Optional[Environment] = None, loop_depth: int = 0) -> None:
         self.env: Environment = env if env is not None else Environment()
         self.loop_depth: int = loop_depth
+        self.function_depth: int = 0
 
     @contextmanager
     def scope(self, name: str = "local") -> Iterator[Scope]:
@@ -200,10 +203,12 @@ class TypeElaborator:
         """RAII scope isolation for function bodies (loops inside cannot exit outer loops)."""
         saved_depth = self.loop_depth
         self.loop_depth = 0
+        self.function_depth += 1
         try:
             yield
         finally:
             self.loop_depth = saved_depth
+            self.function_depth -= 1
 
     def _join_types(
         self,
@@ -363,7 +368,14 @@ class TypeElaborator:
                     f"Parameter '{p.name}' requires a type annotation in synthesis mode",
                     offset=p.offset,
                 )
-            p_sym = ValueSymbol(name=p.name, type_val=p_type, is_var=is_var, is_out=is_out)
+            p_sym = ValueSymbol(
+                name=p.name,
+                type_val=p_type,
+                is_var=is_var,
+                is_out=is_out,
+                is_param=True,
+                function_depth=self.function_depth + 1,
+            )
             env.current_scope.declare_value(p_sym)
             formal_params.append(
                 TypedParam(
@@ -585,8 +597,22 @@ class TypeElaborator:
                 if sym is None:
                     raise TypeError(f"Undefined variable '{name}'", offset=off)
 
+                # Disallow capturing out or var parameters / local mutable variables in nested closures
+                sym_depth = getattr(sym, "function_depth", 0)
+                if (sym.is_out or sym.is_var) and sym_depth > 0 and self.function_depth > sym_depth:
+                    kind_str = (
+                        "'out' parameter"
+                        if sym.is_out
+                        else ("'var' parameter" if getattr(sym, "is_param", False) else "'var' variable")
+                    )
+                    raise TypeError(f"Cannot capture {kind_str} '{sym.name}' in closure", offset=off)
+
+                # Strict write-only enforcement for out parameters
+                if sym.is_out:
+                    raise TypeError(f"Cannot read from write-only 'out' parameter '{sym.name}'", offset=off)
+
                 # Implicit dereferencing: mutable variables in value positions yield element type
-                if sym.is_var or sym.is_out:
+                if sym.is_var:
                     var_node = TypedVar(
                         name=sym.name,
                         symbol=sym,
@@ -930,8 +956,12 @@ class TypeElaborator:
             val_typed = self.check_expr(arg.value, param_type, env, loop_depth)
             return TypedVarCell(value=val_typed, type_val=QVarType(param_type), offset=arg.offset)
 
-        # Case 3: Bare identifier or field selection
-        return self._check_lvalue_target(arg, param_type, env, loop_depth, is_out, arg.offset)
+        # Case 3: Bare identifier or expression without @ or var(...) -> REJECT
+        mode_name = "out" if is_out else "var"
+        raise TypeError(
+            f"Argument to '{mode_name}' parameter must be passed with '@' or 'var(...)'",
+            offset=arg.offset,
+        )
 
     def _check_lvalue_target(
         self,
@@ -947,11 +977,26 @@ class TypeElaborator:
             sym = env.lookup_value(target.name)
             if sym is None:
                 raise TypeError(f"Undefined variable '{target.name}'", offset=offset)
-            if not sym.is_var and not isinstance(sym.type_val, (QVarType, QOutType)):
-                raise TypeError(
-                    f"Argument to '{mode_name}' parameter '{target.name}' must be a mutable variable",
-                    offset=offset,
+            sym_depth = getattr(sym, "function_depth", 0)
+            if (sym.is_out or sym.is_var) and sym_depth > 0 and self.function_depth > sym_depth:
+                kind_str = (
+                    "'out' parameter"
+                    if sym.is_out
+                    else ("'var' parameter" if getattr(sym, "is_param", False) else "'var' variable")
                 )
+                raise TypeError(f"Cannot capture {kind_str} '{sym.name}' in closure", offset=offset)
+            if is_out:
+                if not sym.is_var and not sym.is_out and not isinstance(sym.type_val, (QVarType, QOutType)):
+                    raise TypeError(
+                        f"Argument to 'out' parameter '{target.name}' must be a mutable variable or out parameter",
+                        offset=offset,
+                    )
+            else:
+                if not sym.is_var and not isinstance(sym.type_val, QVarType):
+                    raise TypeError(
+                        f"Argument to 'var' parameter '{target.name}' must be a mutable variable",
+                        offset=offset,
+                    )
             dest_type = self._check_lvalue_mode_type(
                 param_type, sym.type_val, is_out, "variable", offset, env
             )
@@ -965,13 +1010,48 @@ class TypeElaborator:
         if isinstance(target, ast.ExprSelect):
             rec_typed = self.synth_expr(target.target, env, loop_depth)
             rec_type = rec_typed.type_val.evaluate_lazily(env)
-            if not isinstance(rec_type, QRecordType):
+
+            # Check for mutable tuple component: @t.f or @t.1
+            if isinstance(rec_type, QTupleType):
+                val_idx = -1
+                field_type = None
+                is_field_var = False
+                for i, f in enumerate(rec_type.value_fields):
+                    if f.name == target.field or str(i) == target.field:
+                        val_idx = i
+                        field_type = f.type_val
+                        is_field_var = getattr(f, "is_var", False) or isinstance(f.type_val, (QVarType, QOutType))
+                        break
+                if val_idx == -1 or field_type is None:
+                    raise TypeError(
+                        f"Tuple type '{rec_type}' has no component matching '{target.field}'",
+                        offset=offset,
+                    )
+                if not is_field_var:
+                    raise TypeError(
+                        f"Tuple component '{target.field}' is not mutable",
+                        offset=offset,
+                    )
+                dest_type = self._check_lvalue_mode_type(
+                    param_type, field_type, is_out, "tuple component", offset, env
+                )
+                fld_name = target.field if not target.field.isdigit() else None
+                return TypedTupleSelectRef(
+                    target=rec_typed,
+                    index=val_idx,
+                    field=fld_name,
+                    type_val=QVarType(dest_type),
+                    offset=offset,
+                )
+
+            rec_bound = resolve_record_bound(rec_type, env)
+            if rec_bound is None:
                 raise TypeError(
-                    f"Target of field selection in '{mode_name}' argument must be a Record, "
+                    f"Target of field selection in '{mode_name}' argument must be a Record or Tuple, "
                     f"got '{rec_type}'",
                     offset=offset,
                 )
-            field = rec_type.get_field(target.field)
+            field = rec_bound.get_field(target.field)
             if field is None:
                 raise TypeError(
                     f"Record type '{rec_type}' has no field '{target.field}'",
@@ -992,8 +1072,28 @@ class TypeElaborator:
                 offset=offset,
             )
 
+        if isinstance(target, ast.ExprIndex):
+            arr_typed = self.synth_expr(target.target, env, loop_depth)
+            arr_type = arr_typed.type_val.evaluate_lazily(env)
+            if not isinstance(arr_type, QArrayType):
+                raise TypeError(
+                    f"Target of array indexing in '{mode_name}' argument must be an Array, "
+                    f"got '{arr_type}'",
+                    offset=offset,
+                )
+            idx_typed = self.check_expr(target.index, INT_TYPE, env, loop_depth)
+            dest_type = self._check_lvalue_mode_type(
+                param_type, arr_type.element_type, is_out, "array element", offset, env
+            )
+            return TypedIndexRef(
+                target=arr_typed,
+                index=idx_typed,
+                type_val=QVarType(dest_type),
+                offset=offset,
+            )
+
         raise TypeError(
-            f"Argument to '{mode_name}' parameter must be a mutable variable, field, or var(e)",
+            f"Argument to '{mode_name}' parameter must be a mutable variable, field, or array element",
             offset=offset,
         )
 
@@ -1252,7 +1352,11 @@ class TypeElaborator:
                     q_fields.append(QTupleField(name=b.name, type_val=val_typed.type_val))
                     if b.name is not None:
                         env.current_scope.declare_value(
-                            ValueSymbol(name=b.name, type_val=val_typed.type_val)
+                            ValueSymbol(
+                                name=b.name,
+                                type_val=val_typed.type_val,
+                                function_depth=self.function_depth,
+                            )
                         )
                 else:
                     raise TypeError(
@@ -1373,7 +1477,11 @@ class TypeElaborator:
                         elem_typeds.append(val_typed)
                         if field_name is not None:
                             env.current_scope.declare_value(
-                                ValueSymbol(name=field_name, type_val=expected_field_type)
+                                ValueSymbol(
+                                    name=field_name,
+                                    type_val=expected_field_type,
+                                    function_depth=self.function_depth,
+                                )
                             )
 
             return TypedTuple(elements=tuple(elem_typeds), type_val=expected_lazy, offset=expr.offset)
@@ -1774,7 +1882,12 @@ class TypeElaborator:
                     binder_t = first_payload
 
                 with env.scoped(f"case_{branch.binder}"):
-                    binder_sym = ValueSymbol(name=branch.binder, type_val=binder_t, is_var=False)
+                    binder_sym = ValueSymbol(
+                        name=branch.binder,
+                        type_val=binder_t,
+                        is_var=False,
+                        function_depth=self.function_depth,
+                    )
                     env.current_scope.declare_value(binder_sym)
                     body_typed = self._elaborate_subexpr(branch.body, expected_type, env, loop_depth)
                     if expected_type is None:
@@ -1959,7 +2072,12 @@ class TypeElaborator:
         """Synthesizes an exception constructor: exception Name [: PayloadType] end."""
         payload_type = elaborate_type(expr.type_annot, env) if expr.type_annot else OK_TYPE
         exc_type = QExceptionType(payload_type=payload_type)
-        sym = ValueSymbol(name=expr.name, type_val=exc_type, is_var=False)
+        sym = ValueSymbol(
+            name=expr.name,
+            type_val=exc_type,
+            is_var=False,
+            function_depth=self.function_depth,
+        )
         env.current_scope.declare_value(sym)
         return TypedException(
             name=expr.name,
@@ -2038,7 +2156,12 @@ class TypeElaborator:
 
             if branch.binder is not None:
                 with env.scoped(f"try_{branch.binder}"):
-                    binder_sym = ValueSymbol(name=branch.binder, type_val=exc_type.payload_type, is_var=False)
+                    binder_sym = ValueSymbol(
+                        name=branch.binder,
+                        type_val=exc_type.payload_type,
+                        is_var=False,
+                        function_depth=self.function_depth,
+                    )
                     env.current_scope.declare_value(binder_sym)
                     h_body = self._elaborate_subexpr(branch.body, expected_type, env, loop_depth)
             else:
@@ -2122,7 +2245,12 @@ class TypeElaborator:
                 with env.scoped("inspect_branch"):
                     b_syms: list[ValueSymbol] = []
                     for name, _ in branch.binders:
-                        b_sym = ValueSymbol(name=name, type_val=match_t, is_var=False)
+                        b_sym = ValueSymbol(
+                            name=name,
+                            type_val=match_t,
+                            is_var=False,
+                            function_depth=self.function_depth,
+                        )
                         env.current_scope.declare_value(b_sym)
                         b_syms.append(b_sym)
                     h_body = self._elaborate_subexpr(branch.body, expected_type, env, loop_depth)
@@ -2333,6 +2461,14 @@ class TypeElaborator:
                 sym = env.lookup_value(name)
                 if sym is None:
                     raise TypeError(f"Undefined variable '{name}'", offset=id_off)
+                sym_depth = getattr(sym, "function_depth", 0)
+                if (sym.is_out or sym.is_var) and sym_depth > 0 and self.function_depth > sym_depth:
+                    kind_str = (
+                        "'out' parameter"
+                        if sym.is_out
+                        else ("'var' parameter" if getattr(sym, "is_param", False) else "'var' variable")
+                    )
+                    raise TypeError(f"Cannot capture {kind_str} '{sym.name}' in closure", offset=id_off)
                 if not sym.is_var and not sym.is_out:
                     raise TypeError(f"Cannot assign to immutable variable '{name}'", offset=id_off)
 
@@ -2467,7 +2603,12 @@ class TypeElaborator:
         stop_typed = self.check_expr(expr.stop, INT_TYPE, env, loop_depth)
 
         with env.scoped(f"for_{expr.var_name}"):
-            loop_var_sym = ValueSymbol(name=expr.var_name, type_val=INT_TYPE, is_var=False)
+            loop_var_sym = ValueSymbol(
+                name=expr.var_name,
+                type_val=INT_TYPE,
+                is_var=False,
+                function_depth=self.function_depth,
+            )
             env.current_scope.declare_value(loop_var_sym)
             self.loop_depth = loop_depth
             with self.in_loop():
@@ -2605,7 +2746,12 @@ class TypeElaborator:
                         for i, p in enumerate(params)
                     )
                     fn_type = QFunType(params=q_params, result_type=ret_type)
-                    sym = ValueSymbol(name=binding.name, type_val=fn_type, is_var=binding.is_var)
+                    sym = ValueSymbol(
+                        name=binding.name,
+                        type_val=fn_type,
+                        is_var=binding.is_var,
+                        function_depth=self.function_depth,
+                    )
                     env.current_scope.declare_value(sym)
                     typed_ext = TypedExternal(
                         symbol=binding.value.symbol,
@@ -2654,7 +2800,11 @@ class TypeElaborator:
                         for i, p in enumerate(params)
                     )
                     rec_fn_type = QFunType(params=q_params, result_type=ret_type)
-                    rec_sym = ValueSymbol(name=binding.name, type_val=rec_fn_type)
+                    rec_sym = ValueSymbol(
+                        name=binding.name,
+                        type_val=rec_fn_type,
+                        function_depth=self.function_depth,
+                    )
                     env.current_scope.declare_value(rec_sym)
 
                     typed_val = self.check_expr(fn_expr, rec_fn_type, env, loop_depth=0)
@@ -2669,7 +2819,12 @@ class TypeElaborator:
                     typed_val = self.synth_expr(fn_expr, env, loop_depth)
                     val_type = typed_val.type_val
 
-                    sym = ValueSymbol(name=binding.name, type_val=val_type, is_var=binding.is_var)
+                    sym = ValueSymbol(
+                        name=binding.name,
+                        type_val=val_type,
+                        is_var=binding.is_var,
+                        function_depth=self.function_depth,
+                    )
                     env.current_scope.declare_value(sym)
                     return TypedLetValue(
                         name=binding.name,
@@ -2686,7 +2841,12 @@ class TypeElaborator:
                         offset=binding.offset,
                     )
                 expected = elaborate_type(binding.type_annot, env)
-                sym = ValueSymbol(name=binding.name, type_val=expected, is_var=binding.is_var)
+                sym = ValueSymbol(
+                    name=binding.name,
+                    type_val=expected,
+                    is_var=binding.is_var,
+                    function_depth=self.function_depth,
+                )
                 env.current_scope.declare_value(sym)
                 typed_val = self.check_expr(binding.value, expected, env, loop_depth)
                 return TypedLetValue(
@@ -2706,7 +2866,12 @@ class TypeElaborator:
                     typed_val = self.synth_expr(binding.value, env, loop_depth)
                     val_type = typed_val.type_val
 
-                sym = ValueSymbol(name=binding.name, type_val=val_type, is_var=binding.is_var)
+                sym = ValueSymbol(
+                    name=binding.name,
+                    type_val=val_type,
+                    is_var=binding.is_var,
+                    function_depth=self.function_depth,
+                )
                 env.current_scope.declare_value(sym)
                 return TypedLetValue(
                     name=binding.name,

@@ -14,7 +14,7 @@ let assign(out x: Int y: Int): Ok = x := y;
 assign(@a 7);
 
 let t = record var a = 10 end;
-let inc(out x: Int): Ok = x := x + 1;
+let inc(var x: Int): Ok = x := x + 1;
 inc(@t.a);
 
 let addFive(var x: Int): Int =

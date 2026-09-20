@@ -1,0 +1,298 @@
+(Program
+  :phrases (
+    (LetValueBinding
+      :name 'a'
+      :value (ExprInt 0 '0')
+      :is_var True
+    )
+    (LetValueBinding
+      :name 'assign'
+      :value (ExprInfix
+        :left (ExprId 'x')
+        :op ':='
+        :right (ExprId 'y')
+      )
+      :params (
+        (FormalParam
+          :name 'x'
+          :type_annot (TypePath ('Int'))
+          :mode OUT
+        )
+        (FormalParam
+          :name 'y'
+          :type_annot (TypePath ('Int'))
+          :mode VALUE
+        )
+      )
+      :type_annot (TypePath ('Ok'))
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'assign')
+        :args (
+          (ExprDerefCell
+            :target (ExprId 'a')
+          )
+          (ExprInt 42 '42')
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'inc'
+      :value (ExprInfix
+        :left (ExprId 'x')
+        :op ':='
+        :right (ExprInfix
+          :left (ExprId 'x')
+          :op '+'
+          :right (ExprInt 1 '1')
+        )
+      )
+      :params (
+        (FormalParam
+          :name 'x'
+          :type_annot (TypePath ('Int'))
+          :mode VAR
+        )
+      )
+      :type_annot (TypePath ('Ok'))
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'inc')
+        :args (
+          (ExprDerefCell
+            :target (ExprId 'a')
+          )
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'r'
+      :value (ExprRecord
+        :fields (
+          (RecordBinding
+            :name 'f'
+            :value (ExprInt 10 '10')
+            :is_var True
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'inc')
+        :args (
+          (ExprDerefCell
+            :target (ExprSelect
+              :target (ExprId 'r')
+              :field 'f'
+            )
+          )
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'arr'
+      :value (ExprArray
+        :elements (
+          (ExprInt 10 '10')
+          (ExprInt 20 '20')
+          (ExprInt 30 '30')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'inc')
+        :args (
+          (ExprDerefCell
+            :target (ExprIndex
+              :target (ExprId 'arr')
+              :index (ExprInt 1 '1')
+            )
+          )
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'addFive'
+      :value (ExprBlock
+        :bindings (
+          (ExprStmt
+            :expr (ExprInfix
+              :left (ExprId 'x')
+              :op ':='
+              :right (ExprInfix
+                :left (ExprId 'x')
+                :op '+'
+                :right (ExprInt 5 '5')
+              )
+            )
+          )
+          (ExprStmt
+            :expr (ExprId 'x')
+          )
+        )
+      )
+      :params (
+        (FormalParam
+          :name 'x'
+          :type_annot (TypePath ('Int'))
+          :mode VAR
+        )
+      )
+      :type_annot (TypePath ('Int'))
+    )
+    (LetValueBinding
+      :name 'resVarCell'
+      :value (ExprApp
+        :func (ExprId 'addFive')
+        :args (
+          (ExprVarCell
+            :value (ExprInt 10 '10')
+          )
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'incTwice'
+      :value (ExprBlock
+        :bindings (
+          (ExprStmt
+            :expr (ExprApp
+              :func (ExprId 'inc')
+              :args (
+                (ExprDerefCell
+                  :target (ExprId 'y')
+                )
+              )
+            )
+          )
+          (ExprStmt
+            :expr (ExprApp
+              :func (ExprId 'inc')
+              :args (
+                (ExprDerefCell
+                  :target (ExprId 'y')
+                )
+              )
+            )
+          )
+          (ExprStmt
+            :expr (ExprOk)
+          )
+        )
+      )
+      :params (
+        (FormalParam
+          :name 'y'
+          :type_annot (TypePath ('Int'))
+          :mode VAR
+        )
+      )
+      :type_annot (TypePath ('Ok'))
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'incTwice')
+        :args (
+          (ExprDerefCell
+            :target (ExprId 'a')
+          )
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'inner'
+      :value (ExprRecord
+        :fields (
+          (RecordBinding
+            :name 'val'
+            :value (ExprInt 1 '1')
+            :is_var True
+          )
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'outer'
+      :value (ExprRecord
+        :fields (
+          (RecordBinding
+            :name 'mid'
+            :value (ExprId 'inner')
+            :is_var True
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'inc')
+        :args (
+          (ExprDerefCell
+            :target (ExprSelect
+              :target (ExprSelect
+                :target (ExprId 'outer')
+                :field 'mid'
+              )
+              :field 'val'
+            )
+          )
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'g'
+      :value (ExprInt 10 '10')
+      :is_var True
+    )
+    (LetValueBinding
+      :name 'readG'
+      :value (ExprBlock
+        :bindings (
+          (LetValueBinding
+            :name 'get'
+            :value (ExprFun
+              :params (
+                (FormalParam
+                  :name 'd'
+                  :type_annot (TypePath ('Int'))
+                  :mode VALUE
+                )
+              )
+              :return_type (TypePath ('Int'))
+              :body (ExprId 'g')
+            )
+          )
+          (ExprStmt
+            :expr (ExprApp
+              :func (ExprId 'get')
+              :args (
+                (ExprId 'dummy')
+              )
+            )
+          )
+        )
+      )
+      :params (
+        (FormalParam
+          :name 'dummy'
+          :type_annot (TypePath ('Int'))
+          :mode VALUE
+        )
+      )
+      :type_annot (TypePath ('Int'))
+    )
+    (LetValueBinding
+      :name 'resG'
+      :value (ExprApp
+        :func (ExprId 'readG')
+        :args (
+          (ExprInt 0 '0')
+        )
+      )
+    )
+  )
+)

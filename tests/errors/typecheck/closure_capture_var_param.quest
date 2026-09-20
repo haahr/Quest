@@ -1,0 +1,1 @@
+let f(var x: Int): Fun() Int = fun(): Int x; (* ERROR: Cannot capture 'var' parameter 'x' in closure *)

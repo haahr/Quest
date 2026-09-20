@@ -52,8 +52,8 @@
           (TypedRecordField 'a' :var
             :value (TypedInt 10 :type Int))
         )))
-    (TypedLetValue 'inc' :type Fun(out x: Int): Ok
-      :value (TypedFun :params (('x' : Int)) :type Fun(out x: Int): Ok
+    (TypedLetValue 'inc' :type Fun(var x: Int): Ok
+      :value (TypedFun :params (('x' : Int)) :type Fun(var x: Int): Ok
         :body (TypedAssign
           :target (TypedVar 'x' :type Var(Int))
           :value (TypedInfix '+' :type Int
@@ -62,7 +62,7 @@
             :right (TypedInt 1 :type Int)))))
     (TypedExprStmt
       :expr (TypedApp :type Ok
-        :func (TypedVar 'inc' :type Fun(out x: Int): Ok)
+        :func (TypedVar 'inc' :type Fun(var x: Int): Ok)
         :args (
           (TypedSelectRef .a (ref) :type Var(Int)
             :target (TypedVar 't' :type Record var a: Int end))

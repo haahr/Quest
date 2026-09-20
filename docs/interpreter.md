@@ -100,9 +100,13 @@ a human-readable `type_name` and a `to_str(visited)` method supporting cycle det
 - **`QBuiltinFun(name, fn, doc=None)`:**
   - Wraps host Python callables for primitive operations and standard library modules. Formats as `"<builtin:name>"`.
 - **`QRef(value: QValue)`:**
-  - Represents mutable heap cells allocated for `let var` bindings, assignable record fields (`r.a := v`), and
+  - Represents mutable cells allocated for `let var` bindings, assignable record fields (`r.a := v`), and
     variable parameters (`:var`).
   - Supports `deref() -> QValue` and `assign(new_value: QValue)`. Formats as `ref(<val>)`.
+  - **`QArrayElementRef(array: QArray, index: int)`:** A specialized `QRef` subclass pointing to an element of a
+    `QArray`, updating `array.elements[index]` in place upon assignment.
+  - **`QTupleElementRef(tuple_val: QTuple, index: int)`:** A specialized `QRef` subclass pointing to a component of a
+    `QTuple`, updating the underlying element in place upon assignment.
 - **`QDynamicVal(value: QValue, type_val: Any)` & `QExceptionVal(name: str, payload: Optional[QValue])`:**
   - Envelopes for dynamic typing (`dynamic.new(:T v)`) and runtime exception tagging.
 
@@ -130,10 +134,13 @@ The evaluator in `quest/interpreter.py` evaluates typed expressions and bindings
 ### 3.2. Evaluation Rules
 
 - **Literals:** Directly construct corresponding primitive `QValue` objects.
-- **Variables & Dereferencing:**
+- **Variables, References & Dereferencing:**
   - `TypedVar(name, symbol)`: Evaluates to the symbol's value (or `QRef` cell) in `env`.
   - `TypedDerefCell(target)`: Evaluates `target`; if a `QRef`, extracts `ref.deref()`.
   - `TypedVarCell(value)`: Allocates a new heap reference cell `QRef(eval_expr(value))`.
+  - `TypedSelectRef(target, field)`: Evaluates `target` (unwrapping `QRef` if nested) and returns the field's `QRef`.
+  - `TypedIndexRef(target, index)`: Evaluates `target` array and index, returning a `QArrayElementRef`.
+  - `TypedTupleSelectRef(target, index, field)`: Evaluates `target` tuple, returning `QTupleElementRef` or inner `QRef`.
   - `TypedAssign(target, value)`: Evaluates `value`, mutates the target reference cell, and returns `OK_VALUE`.
 - **Arithmetic & Modulo:**
   - Evaluates integer operators (`+`, `-`, `*`, `/`, `mod`, `%`) and real operators (`++`, `--`, `**`, `//`, `^^`).

@@ -526,6 +526,57 @@ class QRef(QValue):
             visited.remove(id(self))
 
 
+class QArrayElementRef(QRef):
+    """Mutable reference cell into an array element."""
+
+    def __init__(self, array: Any, index: int):
+        self.array = array
+        self.index = index
+
+    @property
+    def value(self) -> QValue:
+        return self.array.get(self.index)
+
+    @value.setter
+    def value(self, new_val: QValue) -> None:
+        self.array.set(self.index, new_val)
+
+    def deref(self) -> QValue:
+        return self.array.get(self.index)
+
+    def assign(self, new_value: QValue) -> None:
+        self.array.set(self.index, new_value)
+
+
+class QTupleElementRef(QRef):
+    """Mutable reference cell into a tuple component."""
+
+    def __init__(self, tup: Any, index: int):
+        self.tup = tup
+        self.index = index
+
+    @property
+    def value(self) -> QValue:
+        elem = self.tup.get_by_index(self.index)
+        return elem.deref() if isinstance(elem, QRef) else elem
+
+    @value.setter
+    def value(self, new_val: QValue) -> None:
+        elem = self.tup.get_by_index(self.index)
+        if isinstance(elem, QRef):
+            elem.assign(new_val)
+        else:
+            elems = list(self.tup.elements)
+            elems[self.index] = new_val
+            self.tup.elements = tuple(elems)
+
+    def deref(self) -> QValue:
+        return self.value
+
+    def assign(self, new_value: QValue) -> None:
+        self.value = new_value
+
+
 # ============================================================================
 # 7. Dynamic & Exception Envelopes
 # ============================================================================

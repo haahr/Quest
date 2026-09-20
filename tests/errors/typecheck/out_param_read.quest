@@ -1,0 +1,1 @@
+let f(out x: Int): Int = x; (* ERROR: Cannot read from write-only 'out' parameter 'x' *)

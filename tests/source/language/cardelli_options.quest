@@ -1,5 +1,4 @@
 (* Language: Cardelli Stage 3 Option Alignment (Inspection, Extraction, Ordinals) *)
-(* @skip-phase: run_c_compiled *)
 
 Let T =
     Option
