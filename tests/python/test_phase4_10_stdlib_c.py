@@ -6,7 +6,6 @@ alongside OS primitives (System interface) in the C code generator.
 
 from __future__ import annotations
 
-import os
 import subprocess
 import tempfile
 import unittest
@@ -39,63 +38,6 @@ class TestPhase410StdlibC(unittest.TestCase):
         finally:
             if bin_path.exists():
                 bin_path.unlink()
-
-    def test_system_args_and_sysexit(self) -> None:
-        """Tests system.args length / contents and system.sysexit exit code."""
-        code = """
-        import system: System;
-        import writer: Writer;
-        import conv: Conv;
-
-        let numArgs = arrayOp.size(system.args);
-        writer.putString(writer.output conv.int(numArgs));
-        writer.putString(writer.output "\n");
-        let firstArg = arrayOp.get(:String system.args 1);
-        writer.putString(writer.output firstArg);
-        writer.putString(writer.output "\n");
-        system.sysexit(42);
-        """
-        proc = self.compile_and_run(code, args=["hello", "world"])
-        self.assertEqual(proc.returncode, 42)
-        lines = proc.stdout.strip().split("\n")
-        self.assertEqual(lines[0], "3")
-        self.assertEqual(lines[1], "hello")
-
-    def test_system_getenv_and_file_exists(self) -> None:
-        """Tests system.getEnv (empty string if undefined) and system.fileExists."""
-        os.environ["QUEST_TEST_ENV_VAR"] = "quest_success_value"
-        try:
-            code = """
-            import system: System;
-            import writer: Writer;
-            import conv: Conv;
-
-            let val = system.getEnv("QUEST_TEST_ENV_VAR");
-            writer.putString(writer.output val);
-            writer.putString(writer.output "\n");
-
-            let missing = system.getEnv("NON_EXISTENT_VAR_ABCXYZ");
-            let lenMissing = string.length(missing);
-            writer.putString(writer.output conv.int(lenMissing));
-            writer.putString(writer.output "\n");
-
-            let hasRuntime = system.fileExists("runtime/quest_runtime.h");
-            writer.putString(writer.output conv.bool(hasRuntime));
-            writer.putString(writer.output "\n");
-
-            let noFile = system.fileExists("does_not_exist_file_987654.txt");
-            writer.putString(writer.output conv.bool(noFile));
-            writer.putString(writer.output "\n");
-            """
-            proc = self.compile_and_run(code)
-            self.assertEqual(proc.returncode, 0)
-            lines = proc.stdout.strip().split("\n")
-            self.assertEqual(lines[0], "quest_success_value")
-            self.assertEqual(lines[1], "0")
-            self.assertEqual(lines[2], "true")
-            self.assertEqual(lines[3], "false")
-        finally:
-            os.environ.pop("QUEST_TEST_ENV_VAR", None)
 
     def test_writer_and_reader_file_roundtrip(self) -> None:
         """Tests file creation with Writer and reading back with Reader."""

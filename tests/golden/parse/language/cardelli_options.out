@@ -1,0 +1,225 @@
+(Program
+  :phrases (
+    (LetTypeBinding
+      :name 'T'
+      :type_val (TypeOption
+        :variants (
+          (OptionFieldSig 'a' ())
+          (OptionFieldSig
+            :tag 'b'
+            :payload_sig (
+              (FieldSig
+                :name 'x'
+                :type_sig (TypePath ('Bool'))
+                :mode VALUE
+              )
+            )
+          )
+          (OptionFieldSig
+            :tag 'c'
+            :payload_sig (
+              (FieldSig
+                :name 'x'
+                :type_sig (TypePath ('String'))
+                :mode VALUE
+              )
+              (FieldSig
+                :name 'y'
+                :type_sig (TypePath ('String'))
+                :mode VALUE
+              )
+            )
+          )
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'aOption'
+      :value (ExprOption
+        :tag 'a'
+        :option_type (TypePath ('T'))
+      )
+    )
+    (LetValueBinding
+      :name 'bOption'
+      :value (ExprOption
+        :tag 'b'
+        :option_type (TypePath ('T'))
+        :payload (ExprTuple
+          :fields (
+            (TupleBinding
+              :name 'x'
+              :value (ExprBool True)
+            )
+          )
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'cOption'
+      :value (ExprOption
+        :tag 'c'
+        :option_type (TypePath ('T'))
+        :payload (ExprTuple
+          :fields (
+            (TupleBinding
+              :value (ExprString 'xString' '"xString"')
+            )
+            (TupleBinding
+              :value (ExprString 'yString' '"yString"')
+            )
+          )
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'checkAa'
+      :value (ExprVariantCheck
+        :target (ExprId 'aOption')
+        :tag 'a'
+      )
+      :type_annot (TypePath ('Bool'))
+    )
+    (LetValueBinding
+      :name 'checkBa'
+      :value (ExprVariantCheck
+        :target (ExprId 'bOption')
+        :tag 'a'
+      )
+      :type_annot (TypePath ('Bool'))
+    )
+    (LetValueBinding
+      :name 'checkBb'
+      :value (ExprVariantCheck
+        :target (ExprId 'bOption')
+        :tag 'b'
+      )
+      :type_annot (TypePath ('Bool'))
+    )
+    (LetValueBinding
+      :name 'extractB'
+      :value (ExprVariantAssert
+        :target (ExprId 'bOption')
+        :tag 'b'
+      )
+    )
+    (LetValueBinding
+      :name 'extractBx'
+      :value (ExprSelect
+        :target (ExprVariantAssert
+          :target (ExprId 'bOption')
+          :tag 'b'
+        )
+        :field 'x'
+      )
+      :type_annot (TypePath ('Bool'))
+    )
+    (LetValueBinding
+      :name 'extractA'
+      :value (ExprVariantAssert
+        :target (ExprId 'aOption')
+        :tag 'a'
+      )
+    )
+    (LetValueBinding
+      :name 'extractC'
+      :value (ExprVariantAssert
+        :target (ExprId 'cOption')
+        :tag 'c'
+      )
+    )
+    (LetValueBinding
+      :name 'extractCx'
+      :value (ExprSelect
+        :target (ExprId 'extractC')
+        :field 'x'
+      )
+      :type_annot (TypePath ('String'))
+    )
+    (LetValueBinding
+      :name 'extractCy'
+      :value (ExprSelect
+        :target (ExprId 'extractC')
+        :field 'y'
+      )
+      :type_annot (TypePath ('String'))
+    )
+    (LetTypeBinding
+      :name 'TO'
+      :type_val (TypeOption
+        :variants (
+          (OptionFieldSig
+            :tag 'first'
+            :payload_sig (
+              (FieldSig
+                :name 'val'
+                :type_sig (TypePath ('Int'))
+                :mode VALUE
+              )
+            )
+          )
+          (OptionFieldSig
+            :tag 'second'
+            :payload_sig (
+              (FieldSig
+                :name 'val'
+                :type_sig (TypePath ('Int'))
+                :mode VALUE
+              )
+            )
+          )
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'o0'
+      :value (ExprOption
+        :option_type (TypePath ('TO'))
+        :payload (ExprTuple
+          :fields (
+            (TupleBinding
+              :value (ExprInt 10 '10')
+            )
+          )
+        )
+        :ordinal_expr (ExprInt 0 '0')
+      )
+    )
+    (LetValueBinding
+      :name 'o1'
+      :value (ExprOption
+        :option_type (TypePath ('TO'))
+        :payload (ExprTuple
+          :fields (
+            (TupleBinding
+              :value (ExprInt 20 '20')
+            )
+          )
+        )
+        :ordinal_expr (ExprInt 1 '1')
+      )
+    )
+    (LetValueBinding
+      :name 'val0'
+      :value (ExprSelect
+        :target (ExprVariantAssert
+          :target (ExprId 'o0')
+          :tag 'first'
+        )
+        :field 'val'
+      )
+      :type_annot (TypePath ('Int'))
+    )
+    (LetValueBinding
+      :name 'val1'
+      :value (ExprSelect
+        :target (ExprVariantAssert
+          :target (ExprId 'o1')
+          :tag 'second'
+        )
+        :field 'val'
+      )
+      :type_annot (TypePath ('Int'))
+    )
+  )
+)

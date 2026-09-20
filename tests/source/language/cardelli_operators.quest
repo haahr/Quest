@@ -1,0 +1,31 @@
+(* Language: Cardelli Stage 1 Operator & Syntax Alignment *)
+(* @skip-phase: run_c_compiled *)
+
+(* 1. Prefix and standalone symbolic operators *)
+let a = +(10 20);
+let plus = {+};
+let b = plus(1 2);
+
+(* 2. Custom symbolic infix operator *)
+let <+>(x: Int y: Int): Int = x + y + 100;
+let customRes = 10 <+> 20;
+
+(* 3. Symbolic type operator and application *)
+Let #(A, B::TYPE)::TYPE = Tuple fst: A snd: B end;
+Let PairIntStr = #(Int String);
+let p: PairIntStr = tuple 1 "one" end;
+
+(* 4. Anonymous tuple signatures *)
+Let Pair = Tuple :Int :String end;
+let pAnon = tuple 42 "hello" end;
+Let MutTup1 = Tuple :Var(Int) :Out(String) end;
+Let MutTup2 = Tuple var :Int out :String end;
+
+(* 5. Out parameter modes and Out type operator *)
+let f(o: Out(Int)): Ok = ok;
+let g(x: Int out y: Int): Ok = ok;
+
+(* 6. Curried higher-order function *)
+let double(fn(x: Int): Int)(x: Int): Int = fn(fn(x));
+let inc(x: Int): Int = x + 1;
+let curriedRes = double(inc)(5);

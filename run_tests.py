@@ -3,9 +3,13 @@
 import argparse
 import difflib
 import os
+import re
+import shlex
 import subprocess
 import sys
+from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Optional
 
 # Ensure bootstrap/python is importable
 ROOT_DIR = Path(__file__).parent.resolve()
@@ -18,6 +22,74 @@ TESTS_SOURCE_DIR = ROOT_DIR / "tests" / "source"
 TESTS_GOLDEN_DIR = ROOT_DIR / "tests" / "golden"
 TESTS_ERRORS_DIR = ROOT_DIR / "tests" / "errors"
 DRIVER_SCRIPT = ROOT_DIR / "bootstrap" / "python" / "quest_driver.py"
+
+SKIP_PHASE_PATTERN = re.compile(r"\(\*\s*@skip-phase:\s*([^*]+?)\s*\*\)", re.IGNORECASE)
+ARGS_PATTERN = re.compile(r"\(\*\s*@args:\s*([^*]+?)\s*\*\)", re.IGNORECASE)
+ENV_PATTERN = re.compile(r"\(\*\s*@env:\s*([^*]+?)\s*\*\)", re.IGNORECASE)
+EXIT_PATTERN = re.compile(r"\(\*\s*@exit:\s*([0-9]+)\s*\*\)", re.IGNORECASE)
+STDIN_PATTERN = re.compile(r"\(\*\s*@stdin:(?:[ \t]*\r?\n)?(.*?)\*\)", re.DOTALL | re.IGNORECASE)
+
+
+@dataclass
+class TestDirectives:
+    """Directives extracted from test source comments."""
+    skipped_phases: set[str] = field(default_factory=set)
+    args: list[str] = field(default_factory=list)
+    env: dict[str, str] = field(default_factory=dict)
+    exit_code: int = 0
+    stdin_data: Optional[str] = None
+
+
+def parse_test_directives(source_file: Path) -> TestDirectives:
+    """Extracts test directives (@skip-phase, @args, @env, @exit, @stdin) from comments."""
+    text = source_file.read_text(encoding="utf-8")
+
+    skipped: set[str] = set()
+    for match in SKIP_PHASE_PATTERN.finditer(text):
+        raw = match.group(1)
+        for part in re.split(r"[,;\s]+", raw):
+            cleaned = part.strip().lower()
+            if cleaned:
+                skipped.add(cleaned)
+
+    args: list[str] = []
+    for match in ARGS_PATTERN.finditer(text):
+        raw_args = match.group(1).strip()
+        if raw_args:
+            args.extend(shlex.split(raw_args))
+
+    env: dict[str, str] = {}
+    for match in ENV_PATTERN.finditer(text):
+        raw_env = match.group(1).strip()
+        if raw_env:
+            for item in shlex.split(raw_env):
+                if "=" in item:
+                    k, v = item.split("=", 1)
+                    env[k] = v
+                else:
+                    env[item] = ""
+
+    exit_code = 0
+    for match in EXIT_PATTERN.finditer(text):
+        exit_code = int(match.group(1))
+
+    stdin_chunks: list[str] = []
+    for match in STDIN_PATTERN.finditer(text):
+        stdin_chunks.append(match.group(1))
+    stdin_data = "".join(stdin_chunks) if stdin_chunks else None
+
+    return TestDirectives(
+        skipped_phases=skipped,
+        args=args,
+        env=env,
+        exit_code=exit_code,
+        stdin_data=stdin_data,
+    )
+
+
+def parse_skipped_phases(source_file: Path) -> set[str]:
+    """Extracts skipped phase names from (* @skip-phase: ... *) comments."""
+    return parse_test_directives(source_file).skipped_phases
 
 
 def golden_dir_for_phase(phase_name: str) -> Path:
@@ -46,27 +118,40 @@ def run_single_golden_test(
     error_file = target_dir / f"{source_file.stem}.error"
     test_id = str(rel_source.with_suffix(""))
 
-    # Execute driver with --stop-after <phase_name>
+    directives = parse_test_directives(source_file)
+    expected_exit = directives.exit_code if phase_name in ("interpret", "run_c_compiled") else 0
+
     command = [
         python_executable,
         str(DRIVER_SCRIPT),
         "--stop-after",
         phase_name,
-        str(source_file),
     ]
+    if expected_exit != 0:
+        command.extend(["--expected-exit", str(expected_exit)])
+
+    command.append(str(source_file))
+
+    if directives.args and phase_name in ("interpret", "run_c_compiled"):
+        command.append("--")
+        command.extend(directives.args)
+
     environment = os.environ.copy()
     environment["PYTHONPATH"] = str(ROOT_DIR / "bootstrap" / "python")
+    if directives.env and phase_name in ("interpret", "run_c_compiled"):
+        environment.update(directives.env)
 
     process = subprocess.run(
         command,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,
+        input=directives.stdin_data if phase_name in ("interpret", "run_c_compiled") else None,
         env=environment,
     )
 
     if update_golden:
-        if process.returncode == 0:
+        if process.returncode == expected_exit:
             out_file.write_text(process.stdout, encoding="utf-8")
             if error_file.exists():
                 error_file.unlink()
@@ -78,8 +163,8 @@ def run_single_golden_test(
             print(f"  [UPDATED] {phase_name}:{test_id} (.error)")
         return True
 
-    # Case 1: Process succeeded (returncode == 0)
-    if process.returncode == 0:
+    # Case 1: Process exit code matches expected_exit
+    if process.returncode == expected_exit:
         if out_file.exists():
             expected_output = out_file.read_text(encoding="utf-8")
             if process.stdout == expected_output:
@@ -108,7 +193,7 @@ def run_single_golden_test(
             )
             return False
 
-    # Case 2: Process failed (returncode != 0)
+    # Case 2: Process return code mismatch
     if error_file.exists():
         expected_error = error_file.read_text(encoding="utf-8")
         if process.stderr == expected_error:
@@ -125,8 +210,12 @@ def run_single_golden_test(
             print("".join(diff))
             return False
     elif out_file.exists():
-        print(f"  [FAIL] {phase_name}:{test_id} (failed with returncode {process.returncode})")
-        print(process.stderr)
+        print(
+            f"  [FAIL] {phase_name}:{test_id} "
+            f"(failed with returncode {process.returncode}, expected {expected_exit})"
+        )
+        if process.stderr:
+            print(process.stderr)
         return False
     else:
         print(
@@ -184,6 +273,7 @@ def main() -> int:
 
     total_golden = 0
     passed_golden = 0
+    skipped_golden = 0
     total_errors = 0
     passed_errors = 0
 
@@ -207,6 +297,13 @@ def main() -> int:
                     continue
                 print(f"--- Phase: {phase} ---")
                 for source_file in source_files:
+                    skipped_phases = parse_skipped_phases(source_file)
+                    rel_source = source_file.relative_to(TESTS_SOURCE_DIR)
+                    test_id = str(rel_source.with_suffix(""))
+                    if phase.lower() in skipped_phases:
+                        skipped_golden += 1
+                        print(f"  [SKIP] {phase}:{test_id}")
+                        continue
                     total_golden += 1
                     if run_single_golden_test(
                         source_file,
@@ -260,9 +357,10 @@ def main() -> int:
     total_tests = total_golden + total_errors
     total_passed = passed_golden + passed_errors
 
-    print(f"\nSummary: {total_passed}/{total_tests} tests passed.")
+    skip_str = f" ({skipped_golden} skipped)" if skipped_golden > 0 else ""
+    print(f"\nSummary: {total_passed}/{total_tests} tests passed{skip_str}.")
     if suite_mode == "all":
-        print(f"  Golden tests: {passed_golden}/{total_golden} passed")
+        print(f"  Golden tests: {passed_golden}/{total_golden} passed{skip_str}")
         print(f"  Error tests:  {passed_errors}/{total_errors} passed")
 
     return 0 if total_passed == total_tests else 1

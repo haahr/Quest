@@ -1,0 +1,19 @@
+(* @stdin:
+Hello from Stdin!
+Second line
+*)
+import reader: Reader;
+import writer: Writer;
+import conv: Conv;
+
+let r = reader.input;
+let m = reader.more(r);
+writer.putString(writer.output conv.bool(m));
+writer.putString(writer.output "\n");
+
+let line = reader.getString(r 18);
+writer.putString(writer.output line);
+
+let ch = reader.getChar(r);
+writer.putString(writer.output conv.char(ch));
+writer.putString(writer.output "\n");

@@ -1,0 +1,13 @@
+(* @args: hello world *)
+(* @exit: 42 *)
+import system: System;
+import writer: Writer;
+import conv: Conv;
+
+let numArgs = arrayOp.size(system.args);
+writer.putString(writer.output conv.int(numArgs));
+writer.putString(writer.output "\n");
+let firstArg = arrayOp.get(:String system.args 1);
+writer.putString(writer.output firstArg);
+writer.putString(writer.output "\n");
+system.sysexit(42);

@@ -331,20 +331,6 @@ class TestExistentialTuplesPhase4(unittest.TestCase):
     def check_failure(self, source: str, expected_substr: str) -> None:
         assert_pipeline_failure(source, expected_substr, env=self.env, runtime_env=self.runtime_env)
 
-    def test_cardelli_section_5_3_end_to_end(self) -> None:
-        """Cardelli §5.3: packing, dot-projection, path-type annotation, and application."""
-        source = """
-        Let T = Tuple A::TYPE a:A f(x:A):Int end;
-        let t1: T = tuple Let A::TYPE = Int let a = 0 let f(x: A): Int = x + 1 end;
-        let a1: t1.A = t1.a;
-        let res: Int = t1.f(a1);
-        """
-        _, val = self.run_source(source)
-        res_val = self.runtime_env.lookup("res")
-        self.assertIsNotNone(res_val)
-        self.assertIsInstance(res_val, QInt)
-        self.assertEqual(res_val.value, 1)
-
     def test_distinct_package_abstraction_incompatibility(self) -> None:
         """Two packages with identical signatures have distinct abstract types t1.A != t2.A."""
         source = """
@@ -363,19 +349,6 @@ class TestExistentialTuplesPhase4(unittest.TestCase):
         let bad = t1.a + 1;
         """
         self.check_failure(source, "synthesized type 't1.A' is not a subtype of expected type 'Int'")
-
-    def test_bounded_path_dependent_subtyping(self) -> None:
-        """Type formal with POWER bound allows subtyping: tb.A <: Int."""
-        source = """
-        Let TB = Tuple A::POWER(Int) a:A end;
-        let tb: TB = tuple Let A::POWER(Int) = Int let a = 42 end;
-        let res: Int = tb.a + 1;
-        """
-        self.run_source(source)
-        res_val = self.runtime_env.lookup("res")
-        self.assertIsNotNone(res_val)
-        self.assertIsInstance(res_val, QInt)
-        self.assertEqual(res_val.value, 43)
 
     def test_projection_from_anonymous_tuple_rejected(self) -> None:
         """Selecting dependent member from anonymous existential tuple is rejected."""

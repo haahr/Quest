@@ -1,0 +1,70 @@
+(TypedProgram
+  :phrases (
+    (TypedLetType 'T' :kind TYPE)
+    (TypedLetValue 'aOption' :type Option a b with Tuple x: Bool end c with Tuple x: String y: String end end
+      :value (TypedOption 'a' :type Option a b with Tuple x: Bool end c with Tuple x: String y: String end end))
+    (TypedLetValue 'bOption' :type Option a b with Tuple x: Bool end c with Tuple x: String y: String end end
+      :value (TypedOption 'b' :type Option a b with Tuple x: Bool end c with Tuple x: String y: String end end
+        :payload (TypedTuple :type Tuple x: Bool end
+          :elements (
+            (TypedBool true)
+          ))))
+    (TypedLetValue 'cOption' :type Option a b with Tuple x: Bool end c with Tuple x: String y: String end end
+      :value (TypedOption 'c' :type Option a b with Tuple x: Bool end c with Tuple x: String y: String end end
+        :payload (TypedTuple :type Tuple x: String y: String end
+          :elements (
+            (TypedString 'xString' :type String)
+            (TypedString 'yString' :type String)
+          ))))
+    (TypedLetValue 'checkAa' :type Bool
+      :value (TypedVariantCheck 'a' :type Bool
+        :target (TypedVar 'aOption' :type Option a b with Tuple x: Bool end c with Tuple x: String y: String end end)))
+    (TypedLetValue 'checkBa' :type Bool
+      :value (TypedVariantCheck 'a' :type Bool
+        :target (TypedVar 'bOption' :type Option a b with Tuple x: Bool end c with Tuple x: String y: String end end)))
+    (TypedLetValue 'checkBb' :type Bool
+      :value (TypedVariantCheck 'b' :type Bool
+        :target (TypedVar 'bOption' :type Option a b with Tuple x: Bool end c with Tuple x: String y: String end end)))
+    (TypedLetValue 'extractB' :type Tuple :Int x: Bool end
+      :value (TypedVariantAssert 'b' :type Tuple :Int x: Bool end
+        :target (TypedVar 'bOption' :type Option a b with Tuple x: Bool end c with Tuple x: String y: String end end)))
+    (TypedLetValue 'extractBx' :type Bool
+      :value (TypedSelect 'x' :type Bool
+        :target (TypedVariantAssert 'b' :type Tuple :Int x: Bool end
+          :target (TypedVar 'bOption' :type Option a b with Tuple x: Bool end c with Tuple x: String y: String end end))))
+    (TypedLetValue 'extractA' :type Tuple :Int end
+      :value (TypedVariantAssert 'a' :type Tuple :Int end
+        :target (TypedVar 'aOption' :type Option a b with Tuple x: Bool end c with Tuple x: String y: String end end)))
+    (TypedLetValue 'extractC' :type Tuple :Int x: String y: String end
+      :value (TypedVariantAssert 'c' :type Tuple :Int x: String y: String end
+        :target (TypedVar 'cOption' :type Option a b with Tuple x: Bool end c with Tuple x: String y: String end end)))
+    (TypedLetValue 'extractCx' :type String
+      :value (TypedSelect 'x' :type String
+        :target (TypedVar 'extractC' :type Tuple :Int x: String y: String end)))
+    (TypedLetValue 'extractCy' :type String
+      :value (TypedSelect 'y' :type String
+        :target (TypedVar 'extractC' :type Tuple :Int x: String y: String end)))
+    (TypedLetType 'TO' :kind TYPE)
+    (TypedLetValue 'o0' :type Option first with Tuple val: Int end second with Tuple val: Int end end
+      :value (TypedOption ordinal :type Option first with Tuple val: Int end second with Tuple val: Int end end
+        :ordinal (TypedInt 0 :type Int)
+        :payload (TypedTuple :type Tuple val: Int end
+          :elements (
+            (TypedInt 10 :type Int)
+          ))))
+    (TypedLetValue 'o1' :type Option first with Tuple val: Int end second with Tuple val: Int end end
+      :value (TypedOption ordinal :type Option first with Tuple val: Int end second with Tuple val: Int end end
+        :ordinal (TypedInt 1 :type Int)
+        :payload (TypedTuple :type Tuple val: Int end
+          :elements (
+            (TypedInt 20 :type Int)
+          ))))
+    (TypedLetValue 'val0' :type Int
+      :value (TypedSelect 'val' :type Int
+        :target (TypedVariantAssert 'first' :type Tuple :Int val: Int end
+          :target (TypedVar 'o0' :type Option first with Tuple val: Int end second with Tuple val: Int end end))))
+    (TypedLetValue 'val1' :type Int
+      :value (TypedSelect 'val' :type Int
+        :target (TypedVariantAssert 'second' :type Tuple :Int val: Int end
+          :target (TypedVar 'o1' :type Option first with Tuple val: Int end second with Tuple val: Int end end))))
+  ))

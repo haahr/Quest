@@ -1,0 +1,132 @@
+(Program
+  :phrases (
+    (ImportPhrase
+      :items (
+        (ImportItem ('system') 'System')
+      )
+    )
+    (ImportPhrase
+      :items (
+        (ImportItem ('writer') 'Writer')
+      )
+    )
+    (ImportPhrase
+      :items (
+        (ImportItem ('conv') 'Conv')
+      )
+    )
+    (LetValueBinding
+      :name 'numArgs'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'arrayOp')
+          :field 'size'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'system')
+            :field 'args'
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'conv')
+              :field 'int'
+            )
+            :args (
+              (ExprId 'numArgs')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprString '\n' '"\\n"')
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'firstArg'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'arrayOp')
+          :field 'get'
+        )
+        :args (
+          (TypeArgument
+            :type_val (TypePath ('String'))
+          )
+          (ExprSelect
+            :target (ExprId 'system')
+            :field 'args'
+          )
+          (ExprInt 1 '1')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprId 'firstArg')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprString '\n' '"\\n"')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'system')
+          :field 'sysexit'
+        )
+        :args (
+          (ExprInt 42 '42')
+        )
+      )
+    )
+  )
+)

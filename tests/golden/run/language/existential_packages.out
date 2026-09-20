@@ -1,0 +1,1 @@
+let t2:Tuple A::TYPE a: A end = tuple <Hidden>::TYPE a=<hidden> end

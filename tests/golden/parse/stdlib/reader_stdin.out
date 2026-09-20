@@ -1,0 +1,154 @@
+(Program
+  :phrases (
+    (ImportPhrase
+      :items (
+        (ImportItem ('reader') 'Reader')
+      )
+    )
+    (ImportPhrase
+      :items (
+        (ImportItem ('writer') 'Writer')
+      )
+    )
+    (ImportPhrase
+      :items (
+        (ImportItem ('conv') 'Conv')
+      )
+    )
+    (LetValueBinding
+      :name 'r'
+      :value (ExprSelect
+        :target (ExprId 'reader')
+        :field 'input'
+      )
+    )
+    (LetValueBinding
+      :name 'm'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'reader')
+          :field 'more'
+        )
+        :args (
+          (ExprId 'r')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'conv')
+              :field 'bool'
+            )
+            :args (
+              (ExprId 'm')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprString '\n' '"\\n"')
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'line'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'reader')
+          :field 'getString'
+        )
+        :args (
+          (ExprId 'r')
+          (ExprInt 18 '18')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprId 'line')
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'ch'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'reader')
+          :field 'getChar'
+        )
+        :args (
+          (ExprId 'r')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'conv')
+              :field 'char'
+            )
+            :args (
+              (ExprId 'ch')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprString '\n' '"\\n"')
+        )
+      )
+    )
+  )
+)

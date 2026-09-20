@@ -1,0 +1,21 @@
+(* @env: QUEST_TEST_ENV_VAR=quest_success_value *)
+import system: System;
+import writer: Writer;
+import conv: Conv;
+
+let val = system.getEnv("QUEST_TEST_ENV_VAR");
+writer.putString(writer.output val);
+writer.putString(writer.output "\n");
+
+let missing = system.getEnv("NON_EXISTENT_VAR_ABCXYZ");
+let lenMissing = string.length(missing);
+writer.putString(writer.output conv.int(lenMissing));
+writer.putString(writer.output "\n");
+
+let hasRuntime = system.fileExists("runtime/quest_runtime.h");
+writer.putString(writer.output conv.bool(hasRuntime));
+writer.putString(writer.output "\n");
+
+let noFile = system.fileExists("does_not_exist_file_987654.txt");
+writer.putString(writer.output conv.bool(noFile));
+writer.putString(writer.output "\n");

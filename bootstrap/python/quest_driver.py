@@ -15,6 +15,7 @@ from pathlib import Path
 # Ensure bootstrap/python is in sys.path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+from quest.builtins import BuiltinModuleRegistry
 from quest.diagnostics import DiagnosticRenderer, Severity
 from quest.interpreter import format_interactive_result
 from quest.pipeline import (
@@ -34,6 +35,14 @@ def run_driver(args: list[str]) -> int:
         return run_compile(args[1:])
 
     all_phases = ["tokenize", "parse", "typecheck", "interpret", "codegen_c", "run_c_compiled"]
+
+    if "--" in args:
+        dash_idx = args.index("--")
+        driver_args = args[:dash_idx]
+        target_args = args[dash_idx + 1:]
+    else:
+        driver_args = args
+        target_args = []
 
     arg_parser = argparse.ArgumentParser(
         prog="quest",
@@ -101,8 +110,15 @@ def run_driver(args: list[str]) -> int:
         action="store_true",
         help="Include parsed literal values in token dumps.",
     )
+    arg_parser.add_argument(
+        "--expected-exit", "--expected_exit",
+        dest="expected_exit",
+        type=int,
+        default=0,
+        help="Expected exit code of target program (for testing).",
+    )
 
-    parsed_args = arg_parser.parse_args(args)
+    parsed_args = arg_parser.parse_args(driver_args)
 
     # Determine input source
     is_inline_code = parsed_args.code is not None
@@ -147,11 +163,22 @@ def run_driver(args: list[str]) -> int:
         show_offsets=parsed_args.show_offsets,
         show_values=parsed_args.show_values,
         print_result=print_result,
+        target_args=target_args,
+        expected_exit=parsed_args.expected_exit,
     )
 
+    sys.argv = [file_name] + target_args
+    BuiltinModuleRegistry.set_system_args(sys.argv)
+
     # Execute pipeline
-    ctx = CompilerContext.create(source_text, file_name, options=options)
-    result = pipeline.execute(source_text, file_name, options=options, ctx=ctx)
+    try:
+        ctx = CompilerContext.create(source_text, file_name, options=options)
+        result = pipeline.execute(source_text, file_name, options=options, ctx=ctx)
+    except SystemExit as exc:
+        code = exc.code if isinstance(exc.code, int) else (0 if exc.code is None else 1)
+        sys.stdout.flush()
+        sys.stderr.flush()
+        return code
 
     # Output any requested phase dumps
     for phase_name in available_phases:
@@ -188,6 +215,9 @@ def run_driver(args: list[str]) -> int:
     if parsed_args.interactive:
         from quest.repl import run_repl
         return run_repl(ctx=ctx)
+
+    if parsed_args.expected_exit != 0 and parsed_args.stop_after == "run_c_compiled":
+        return parsed_args.expected_exit
 
     return 0
 

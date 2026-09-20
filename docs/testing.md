@@ -61,7 +61,11 @@ tests/
   │   │   ├── options_variants.quest
   │   │   ├── variants_cardelli.quest
   │   │   ├── subtyping_coercions.quest
-  │   │   └── exceptions_try_when.quest
+  │   │   ├── exceptions_try_when.quest
+  │   │   ├── existential_packages.quest
+  │   │   ├── cardelli_syntax.quest
+  │   │   ├── cardelli_options.quest
+  │   │   └── cardelli_operators.quest
   │   └── specialization/
   │       ├── quantifier_descriptors.quest
   │       ├── aggregate_subtyping.quest
@@ -116,6 +120,59 @@ python3 run_tests.py --update-golden
 ```
 
 If stdout does not match the golden file, `run_tests.py` prints a unified diff detailing the exact mismatch.
+
+### 2.4. Phase Skipping Directives (`(* @skip-phase: ... *)`)
+For language features that are fully supported in the tree-walking Python interpreter but not yet implemented in the
+C compilation backend (or for tests specific to certain phases), tests can include in-file phase skipping directives:
+
+```quest
+(* @skip-phase: run_c_compiled *)
+```
+
+- **Multiple Phases**: Even though `@skip-phase:` is singular, multiple phases can be omitted using comma- or
+  whitespace-separated names (e.g. `(* @skip-phase: run_c_compiled, interpret *)`) or multiple comment directives.
+- **Reporting**: Skipped phases are explicitly noted during test execution (`[SKIP] phase:test_name`) and counted in
+  the test summary without being counted as failures.
+- **Golden Management**: When updating goldens with `--update-golden`, skipped phases are ignored and will not
+  generate unexpected `.out` or `.error` files.
+
+### 2.5. Host-Environment Directives (`@args`, `@env`, `@exit`, `@stdin`)
+Tests that interact with host OS primitives (command-line arguments, environment variables, exit codes, and standard
+input) can specify host execution requirements via top-level comment directives:
+
+- **Command-Line Arguments (`(* @args: ... *)`)**:
+  Specifies arguments passed to the program when executing `interpret` or `run_c_compiled`:
+  ```quest
+  (* @args: hello "world with spaces" *)
+  ```
+  Arguments are tokenized with standard shell quoting rules and passed after the `--` separator to `quest_driver.py`.
+  Available in Quest via `system.args`.
+
+- **Environment Variables (`(* @env: ... *)`)**:
+  Sets environment variables for the test process:
+  ```quest
+  (* @env: QUEST_TEST_ENV_VAR=quest_success_value DEBUG=1 *)
+  ```
+  Available in Quest via `system.getEnv(...)`.
+
+- **Expected Process Exit Code (`(* @exit: ... *)`)**:
+  Specifies the non-zero exit code expected from program execution:
+  ```quest
+  (* @exit: 42 *)
+  ```
+  Applies exclusively to execution phases (`interpret` and `run_c_compiled`); earlier phases (`tokenize`, `parse`,
+  `typecheck`) must still exit with `0`. The test runner validates that the process exits with the specified code,
+  while verifying standard output against `<test>.out`.
+
+- **Standard Input (`(* @stdin: ... *)`)**:
+  Supplies standard input data to the running program using a multi-line comment block:
+  ```quest
+  (* @stdin:
+  First input line
+  Second input line
+  *)
+  ```
+  Available in Quest via `reader.input`.
 
 ---
 

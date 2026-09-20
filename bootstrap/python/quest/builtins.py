@@ -305,6 +305,16 @@ class BuiltinModuleRegistry:
         return cls._interfaces.get(name)
 
     @classmethod
+    def set_system_args(cls, args: list[str]) -> None:
+        """Updates system.args with the provided argument list."""
+        cls._ensure_initialized()
+        sys_args_elements = tuple(QString(a) for a in args)
+        sys_args_val = QArray(sys_args_elements)
+        if "system" in cls._modules:
+            cls._modules["system"].fields["args"] = sys_args_val
+        cls._symbol_bridge["quest_system_args"] = sys_args_val
+
+    @classmethod
     def get_runtime_module(cls, name: str) -> Optional[QRecord]:
         """Returns the runtime QRecord representing the requested module instance."""
         cls._ensure_initialized()

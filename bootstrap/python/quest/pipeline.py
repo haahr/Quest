@@ -60,6 +60,10 @@ class CompilerOptions:
     output_path: Optional[Path] = None
     nogc: bool = False
     print_result: bool = False
+    target_args: list[str] = field(default_factory=list)
+    expected_exit: int = 0
+    target_env: Optional[dict[str, str]] = None
+    target_stdin: Optional[str] = None
 
 
 @dataclass
@@ -359,8 +363,13 @@ class RunCCompiledPhase(Phase):
 
         try:
             compile_c_source(c_code, output_path=bin_path, nogc=ctx.options.nogc)
-            proc = run_binary(bin_path)
-            if proc.returncode != 0:
+            proc = run_binary(
+                bin_path,
+                args=ctx.options.target_args,
+                env=ctx.options.target_env,
+                input_data=ctx.options.target_stdin,
+            )
+            if proc.returncode != ctx.options.expected_exit:
                 msg = proc.stderr.strip() if proc.stderr else f"Binary exited with code {proc.returncode}"
                 ctx.sink.emit(Diagnostic.make_error(msg, 0))
             return proc.stdout

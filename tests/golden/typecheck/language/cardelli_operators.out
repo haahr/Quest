@@ -1,0 +1,83 @@
+(TypedProgram
+  :phrases (
+    (TypedLetValue 'a' :type Int
+      :value (TypedApp :type Int
+        :func (TypedVar '+' :type Fun(a: Int b: Int): Int)
+        :args (
+          (TypedInt 10 :type Int)
+          (TypedInt 20 :type Int)
+        )))
+    (TypedLetValue 'plus' :type Fun(a: Int b: Int): Int
+      :value (TypedVar '+' :type Fun(a: Int b: Int): Int))
+    (TypedLetValue 'b' :type Int
+      :value (TypedApp :type Int
+        :func (TypedVar 'plus' :type Fun(a: Int b: Int): Int)
+        :args (
+          (TypedInt 1 :type Int)
+          (TypedInt 2 :type Int)
+        )))
+    (TypedLetValue '<+>' :type Fun(x: Int y: Int): Int
+      :value (TypedFun :params (('x' : Int) ('y' : Int)) :type Fun(x: Int y: Int): Int
+        :body (TypedInfix '+' :type Int
+          :left (TypedVar 'x' :type Int)
+          :right (TypedInfix '+' :type Int
+            :left (TypedVar 'y' :type Int)
+            :right (TypedInt 100 :type Int)))))
+    (TypedLetValue 'customRes' :type Int
+      :value (TypedApp :type Int
+        :func (TypedVar '<+>' :type Fun(x: Int y: Int): Int)
+        :args (
+          (TypedInt 10 :type Int)
+          (TypedInt 20 :type Int)
+        )))
+    (TypedLetType '#' :kind ALL(A :: TYPE) ALL(B :: TYPE) TYPE)
+    (TypedLetType 'PairIntStr' :kind TYPE)
+    (TypedLetValue 'p' :type Fun(A :: TYPE B :: TYPE) Tuple fst: A snd: B end(Int String)
+      :value (TypedTuple :type Tuple fst: Int snd: String end
+        :elements (
+          (TypedInt 1 :type Int)
+          (TypedString 'one' :type String)
+        )))
+    (TypedLetType 'Pair' :kind TYPE)
+    (TypedLetValue 'pAnon' :type Tuple :Int :String end
+      :value (TypedTuple :type Tuple :Int :String end
+        :elements (
+          (TypedInt 42 :type Int)
+          (TypedString 'hello' :type String)
+        )))
+    (TypedLetType 'MutTup1' :kind TYPE)
+    (TypedLetType 'MutTup2' :kind TYPE)
+    (TypedLetValue 'f' :type Fun(o: Out(Int)): Ok
+      :value (TypedFun :params (('o' : Out(Int))) :type Fun(o: Out(Int)): Ok
+        :body (TypedOk)))
+    (TypedLetValue 'g' :type Fun(x: Int out y: Int): Ok
+      :value (TypedFun :params (('x' : Int) ('y' : Int)) :type Fun(x: Int out y: Int): Ok
+        :body (TypedOk)))
+    (TypedLetValue 'double' :type Fun(fn: Fun(x: Int): Int): Fun(x: Int): Int
+      :value (TypedFun :params (('fn' : Fun(x: Int): Int)) :type Fun(fn: Fun(x: Int): Int): Fun(x: Int): Int
+        :body (TypedFun :params (('x' : Int)) :type Fun(x: Int): Int
+          :body (TypedApp :type Int
+            :func (TypedVar 'fn' :type Fun(x: Int): Int)
+            :args (
+              (TypedApp :type Int
+                :func (TypedVar 'fn' :type Fun(x: Int): Int)
+                :args (
+                  (TypedVar 'x' :type Int)
+                ))
+            )))))
+    (TypedLetValue 'inc' :type Fun(x: Int): Int
+      :value (TypedFun :params (('x' : Int)) :type Fun(x: Int): Int
+        :body (TypedInfix '+' :type Int
+          :left (TypedVar 'x' :type Int)
+          :right (TypedInt 1 :type Int))))
+    (TypedLetValue 'curriedRes' :type Int
+      :value (TypedApp :type Int
+        :func (TypedApp :type Fun(x: Int): Int
+          :func (TypedVar 'double' :type Fun(fn: Fun(x: Int): Int): Fun(x: Int): Int)
+          :args (
+            (TypedVar 'inc' :type Fun(x: Int): Int)
+          ))
+        :args (
+          (TypedInt 5 :type Int)
+        )))
+  ))

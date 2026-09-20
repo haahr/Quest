@@ -109,6 +109,8 @@ def compile_c_source(
 def run_binary(
     binary_path: Path,
     args: Optional[list[str]] = None,
+    env: Optional[dict[str, str]] = None,
+    input_data: Optional[str] = None,
     timeout: float = 10.0,
 ) -> subprocess.CompletedProcess[str]:
     """Executes a compiled binary and returns stdout/stderr/returncode."""
@@ -118,5 +120,8 @@ def run_binary(
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,
+        env=env,
+        input=input_data,
         timeout=timeout,
     )
+

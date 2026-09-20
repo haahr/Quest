@@ -1,0 +1,60 @@
+(* Language: Cardelli Stage 2 Alignment (Monadic Operators, Lvalues, Listfix) *)
+(* @skip-phase: run_c_compiled *)
+
+(* 1. Explicit polymorphic type arguments and anonymous tuples *)
+let id(A::TYPE a: A): A = a;
+let v1 = id(:Int 42);
+let v2 = id(:Int)(43);
+let pair(A::TYPE B::TYPE a: A b: B): Tuple :A :B end = tuple a b end;
+let p = pair(:Int :String 100 "test");
+
+(* 2. Lvalues and out references (@a, @t.a, var(e)) *)
+let var a = 0;
+let assign(out x: Int y: Int): Ok = x := y;
+assign(@a 7);
+
+let t = record var a = 10 end;
+let inc(out x: Int): Ok = x := x + 1;
+inc(@t.a);
+
+let addFive(var x: Int): Int =
+    begin
+        x := x + 5;
+        x
+    end;
+let r = addFive(var(10));
+
+let assignPoly(A::TYPE out x: A y: A): Ok = x := y;
+assignPoly(:Int @a 99);
+
+(* 3. Prefix monadic operators: not, extent, ordinal *)
+let notA = not true;
+let notB = not false;
+let notC = not(true);
+let notD = not not true;
+
+let arr = array of 10 20 30 40 end;
+let len1 = extent arr;
+let len2 = extent(arr);
+
+Let Color = Option red green blue end;
+let c0 = option red of Color end;
+let c1 = option green of Color end;
+let c2 = option blue of Color end;
+let ord0 = ordinal c0;
+let ord1 = ordinal(c1);
+let ord2 = ordinal c2;
+
+(* 4. Listfix function application *)
+let sum(arrVal: Array(Int)): Int =
+    begin
+        let var total = 0;
+        for i = 0 upto extent(arrVal) - 1 do
+            total := total + arrVal[i]
+        end;
+        total
+    end;
+
+let s1 = sum of 0 1 2 3 4 end;
+let s2 = sum of(5 1);
+let s3 = sum of :Int 10 20 30 end;

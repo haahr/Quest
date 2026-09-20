@@ -1,0 +1,37 @@
+(* Language: Cardelli Stage 3 Option Alignment (Inspection, Extraction, Ordinals) *)
+(* @skip-phase: run_c_compiled *)
+
+Let T =
+    Option
+        a
+        b with x: Bool end
+        c with x, y: String end
+    end;
+
+let aOption = option a of T end;
+let bOption = option b of T with let x = true end;
+let cOption = option c of T with "xString" "yString" end;
+
+(* 1. Option tag inspection (?) *)
+let checkAa: Bool = aOption?a;
+let checkBa: Bool = bOption?a;
+let checkBb: Bool = bOption?b;
+
+(* 2. Option payload extraction (!) *)
+let extractB = bOption!b;
+let extractBx: Bool = bOption!b.x;
+let extractA = aOption!a;
+let extractC = cOption!c;
+let extractCx: String = extractC.x;
+let extractCy: String = extractC.y;
+
+(* 3. Option creation by ordinal *)
+Let TO =
+    Option
+        first with val: Int end
+        second with val: Int end
+    end;
+let o0 = option ordinal(0) of TO with 10 end;
+let o1 = option ordinal(1) of TO with 20 end;
+let val0: Int = o0!first.val;
+let val1: Int = o1!second.val;

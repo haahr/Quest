@@ -1,0 +1,179 @@
+(Program
+  :phrases (
+    (LetTypeBinding
+      :name 'T'
+      :type_val (TypeTuple
+        :fields (
+          (TypeFormal
+            :name 'A'
+            :bound (KindType)
+          )
+          (FieldSig
+            :name 'a'
+            :type_sig (TypePath ('A'))
+            :mode VALUE
+          )
+          (FieldSig
+            :name 'f'
+            :type_sig (TypeAll
+              :quantifiers (
+                (Quantifier
+                  :name 'x'
+                  :bound (KindPower
+                    :bound (TypePath ('A'))
+                  )
+                  :mode VALUE
+                )
+              )
+              :result_type (TypePath ('Int'))
+            )
+            :mode VALUE
+          )
+        )
+      )
+    )
+    (LetValueBinding
+      :name 't1'
+      :value (ExprTuple
+        :fields (
+          (LetTypeBinding
+            :name 'A'
+            :type_val (TypePath ('Int'))
+            :bound (KindType)
+          )
+          (TupleBinding
+            :name 'a'
+            :value (ExprInt 0 '0')
+          )
+          (TupleBinding
+            :name 'f'
+            :value (ExprFun
+              :params (
+                (FormalParam
+                  :name 'x'
+                  :type_annot (TypePath ('A'))
+                  :mode VALUE
+                )
+              )
+              :return_type (TypePath ('Int'))
+              :body (ExprInfix
+                :left (ExprId 'x')
+                :op '+'
+                :right (ExprInt 1 '1')
+              )
+            )
+          )
+        )
+      )
+      :type_annot (TypePath ('T'))
+    )
+    (LetValueBinding
+      :name 'a1'
+      :value (ExprSelect
+        :target (ExprId 't1')
+        :field 'a'
+      )
+      :type_annot (TypePath ('t1' 'A'))
+    )
+    (LetValueBinding
+      :name 'res1'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 't1')
+          :field 'f'
+        )
+        :args (
+          (ExprId 'a1')
+        )
+      )
+      :type_annot (TypePath ('Int'))
+    )
+    (LetTypeBinding
+      :name 'TB'
+      :type_val (TypeTuple
+        :fields (
+          (TypeFormal
+            :name 'A'
+            :bound (KindPower
+              :bound (TypePath ('Int'))
+            )
+          )
+          (FieldSig
+            :name 'a'
+            :type_sig (TypePath ('A'))
+            :mode VALUE
+          )
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'tb'
+      :value (ExprTuple
+        :fields (
+          (LetTypeBinding
+            :name 'A'
+            :type_val (TypePath ('Int'))
+            :bound (KindPower
+              :bound (TypePath ('Int'))
+            )
+          )
+          (TupleBinding
+            :name 'a'
+            :value (ExprInt 42 '42')
+          )
+        )
+      )
+      :type_annot (TypePath ('TB'))
+    )
+    (LetValueBinding
+      :name 'res2'
+      :value (ExprInfix
+        :left (ExprSelect
+          :target (ExprId 'tb')
+          :field 'a'
+        )
+        :op '+'
+        :right (ExprInt 1 '1')
+      )
+      :type_annot (TypePath ('Int'))
+    )
+    (LetValueBinding
+      :name 'tTrans'
+      :value (ExprTuple
+        :fields (
+          (LetTypeBinding
+            :name 'A'
+            :type_val (TypePath ('Int'))
+            :bound (KindType)
+          )
+          (TupleBinding
+            :name 'a'
+            :value (ExprInt 100 '100')
+            :type_annot (TypePath ('A'))
+          )
+        )
+      )
+    )
+    (LetTypeBinding
+      :name 'SimpleT'
+      :type_val (TypeTuple
+        :fields (
+          (TypeFormal
+            :name 'A'
+            :bound (KindType)
+          )
+          (FieldSig
+            :name 'a'
+            :type_sig (TypePath ('A'))
+            :mode VALUE
+          )
+        )
+      )
+    )
+    (LetValueBinding
+      :name 't2'
+      :value (ExprId 'tTrans')
+      :type_annot (TypePath ('SimpleT'))
+    )
+  )
+)

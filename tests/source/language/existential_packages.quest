@@ -1,0 +1,18 @@
+(* Language: Cardelli §5.3 Existential Packages *)
+(* @skip-phase: run_c_compiled *)
+
+(* 1. Cardelli §5.3 packing, dot-projection, and path-type annotation *)
+Let T = Tuple A::TYPE a: A f(x: A): Int end;
+let t1: T = tuple Let A::TYPE = Int let a = 0 let f(x: A): Int = x + 1 end;
+let a1: t1.A = t1.a;
+let res1: Int = t1.f(a1);
+
+(* 2. Bounded path-dependent subtyping *)
+Let TB = Tuple A::POWER(Int) a: A end;
+let tb: TB = tuple Let A::POWER(Int) = Int let a = 42 end;
+let res2: Int = tb.a + 1;
+
+(* 3. Coercion from transparent tuple to existential signature *)
+let tTrans = tuple Let A::TYPE = Int let a: A = 100 end;
+Let SimpleT = Tuple A::TYPE a: A end;
+let t2: SimpleT = tTrans;

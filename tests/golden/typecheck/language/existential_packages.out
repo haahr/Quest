@@ -1,0 +1,45 @@
+(TypedProgram
+  :phrases (
+    (TypedLetType 'T' :kind TYPE)
+    (TypedLetValue 't1' :type Tuple A::TYPE a: A f: Fun(x: A): Int end
+      :value (TypedTuple :type Tuple A::TYPE a: A f: Fun(x: A): Int end
+        :elements (
+          (TypedTypeWitness 'A' = Int)
+          (TypedInt 0 :type Int)
+          (TypedFun :params (('x' : Int)) :type Fun(x: Int): Int
+            :body (TypedInfix '+' :type Int
+              :left (TypedVar 'x' :type Int)
+              :right (TypedInt 1 :type Int)))
+        )))
+    (TypedLetValue 'a1' :type t1.A
+      :value (TypedSelect 'a' :type t1.A
+        :target (TypedVar 't1' :type Tuple A::TYPE a: A f: Fun(x: A): Int end)))
+    (TypedLetValue 'res1' :type Int
+      :value (TypedApp :type Int
+        :func (TypedSelect 'f' :type Fun(x: t1.A): Int
+          :target (TypedVar 't1' :type Tuple A::TYPE a: A f: Fun(x: A): Int end))
+        :args (
+          (TypedVar 'a1' :type t1.A)
+        )))
+    (TypedLetType 'TB' :kind TYPE)
+    (TypedLetValue 'tb' :type Tuple A::<: Int a: A end
+      :value (TypedTuple :type Tuple A::<: Int a: A end
+        :elements (
+          (TypedTypeWitness 'A' = Int)
+          (TypedInt 42 :type Int)
+        )))
+    (TypedLetValue 'res2' :type Int
+      :value (TypedInfix '+' :type Int
+        :left (TypedSelect 'a' :type tb.A
+          :target (TypedVar 'tb' :type Tuple A::<: Int a: A end))
+        :right (TypedInt 1 :type Int)))
+    (TypedLetValue 'tTrans' :type Tuple Let A::TYPE = Int a: Int end
+      :value (TypedTuple :type Tuple Let A::TYPE = Int a: Int end
+        :elements (
+          (TypedTypeWitness 'A' = Int)
+          (TypedInt 100 :type Int)
+        )))
+    (TypedLetType 'SimpleT' :kind TYPE)
+    (TypedLetValue 't2' :type Tuple A::TYPE a: A end
+      :value (TypedVar 'tTrans' :type Tuple Let A::TYPE = Int a: Int end))
+  ))
