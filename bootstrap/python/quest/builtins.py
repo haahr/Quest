@@ -1054,8 +1054,13 @@ class BuiltinModuleRegistry:
         def _dynamic_extern(wr: QWriter, d: QDynamicVal) -> QOk:
             if wr.is_closed:
                 raise QuestException(DYNAMIC_ERROR_EXC)
-            wr.stream.write(d.to_str())
-            return OK_VALUE
+            from quest.dynamic_json import jsog_encode
+            json_text = jsog_encode(d)
+            try:
+                wr.stream.write(json_text)
+                return OK_VALUE
+            except OSError:
+                raise QuestException(DYNAMIC_ERROR_EXC)
 
         @qchecked(DYNAMIC_ERROR_EXC, QReader)
         def _dynamic_intern(rd: QReader) -> QDynamicVal:
@@ -1075,38 +1080,8 @@ class BuiltinModuleRegistry:
             raw = "".join(buf).strip()
             if not raw:
                 raise QuestException(DYNAMIC_ERROR_EXC)
-            if raw.startswith("dynamic(") and raw.endswith(")"):
-                inner = raw[len("dynamic(") : -1].strip()
-                if ":" in inner:
-                    val_s, type_s = inner.rsplit(":", 1)
-                    val_s = val_s.strip()
-                    type_s = type_s.strip()
-                    if type_s == "Int":
-                        return QDynamicVal(value=QInt(int(val_s)), type_val=INT_TYPE)
-                    if type_s == "Real":
-                        return QDynamicVal(value=QReal(float(val_s)), type_val=REAL_TYPE)
-                    if type_s == "Bool":
-                        return QDynamicVal(
-                            value=TRUE_VALUE if val_s == "true" else FALSE_VALUE,
-                            type_val=BOOL_TYPE,
-                        )
-                    if (
-                        type_s == "Char"
-                        and len(val_s) >= 2
-                        and val_s[0] == "'"
-                        and val_s[-1] == "'"
-                    ):
-                        return QDynamicVal(value=QChar(val_s[1:-1]), type_val=CHAR_TYPE)
-                    if (
-                        type_s == "String"
-                        and len(val_s) >= 2
-                        and val_s[0] == '"'
-                        and val_s[-1] == '"'
-                    ):
-                        return QDynamicVal(value=QString(val_s[1:-1]), type_val=STRING_TYPE)
-                    if type_s == "Ok" and val_s == "ok":
-                        return QDynamicVal(value=OK_VALUE, type_val=OK_TYPE)
-            raise QuestException(DYNAMIC_ERROR_EXC)
+            from quest.dynamic_json import jsog_decode
+            return jsog_decode(raw)
 
         dyn_b.def_poly_fn("new", "A", dyn_a_id, [("a", dyn_a)], dyn_t, _dynamic_new)
         dyn_b.def_poly_fn("be", "A", dyn_a_id, [("d", dyn_t)], dyn_a, _dynamic_be)

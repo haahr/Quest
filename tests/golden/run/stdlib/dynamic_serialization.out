@@ -1,0 +1,5 @@
+{"@type":"Record x: Int y: Int end","@value":{"x":10,"y":20}}
+{"@type":"Variant success: Ok error: Int end","@value":{"error":404}}
+{"@type":"Variant success: Ok error: Int end","@value":"success"}
+{"@type":"Record id: Int var next: Dynamic end","@value":{"@id":"1","id":1,"next":{"@type":"Record id: Int var next: Dynamic end","@value":{"id":2,"next":{"@type":"Record id: Int var next: Dynamic end","@value":{"@ref":"1"}}}}}}
+42 hello 1 2 3

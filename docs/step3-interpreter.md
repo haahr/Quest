@@ -143,7 +143,8 @@ pre-linked modules and interfaces in the root environment:
   - `real: RealOp`: IEEE-754 properties `minReal`, `maxReal`, `posEpsilon`, `negEpsilon`, `e`, arithmetic & comparisons.
   - `string: StringOp`: mutable operations `length`, `getChar`, `setChar`, `getSub`, `setSub`, `cat`, `conc`, `equal`.
   - `arrayOp: ArrayOp`: polymorphic operations (`new`, `size`, `get`, `set`) operating on native `QArray`.
-  - `dynamic: Dynamic`: `new`, `be`, `copy`, `extern` operating on dynamic envelopes.
+  - `dynamic: Dynamic`: `new`, `be`, `copy`, `extern`, `intern` operating on dynamic envelopes with JSON/JSOG
+    cycle-safe serialization (see [docs/dynamic.md](dynamic.md)).
 - Top-level `import` statements: `import mod: Interface` and `import : Interface` via `BuiltinModuleRegistry`.
 
 ### Phase 3.6: Pipeline Integration, CLI & Interactive REPL (`quest/repl.py`) [COMPLETE]

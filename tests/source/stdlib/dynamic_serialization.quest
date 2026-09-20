@@ -1,0 +1,51 @@
+(* Standard library: Dynamic serialization (JSON / JSOG) operations *)
+(* @skip-phase: run_c_compiled *)
+(* @stdin:
+{"@type":"Record a: Int b: String c: Array(Int) end","@value":{"a":42,"b":"hello","c":[1,2,3]}}
+*)
+
+import dynamic: Dynamic;
+import reader: Reader;
+import writer: Writer;
+import conv: Conv;
+import arrayOp: ArrayOp;
+
+(* 1. Extern record *)
+Let Point = Record x: Int y: Int end;
+let p = record x = 10 y = 20 end;
+let dPt = dynamic.new(:Point p);
+dynamic.extern(writer.output dPt);
+writer.putString(writer.output "\n");
+
+(* 2. Extern variant with payload and unit *)
+Let Status = Variant success: Ok error: Int end;
+let s1 = dynamic.new(:Status variant error of Status with 404 end);
+let s2 = dynamic.new(:Status variant success of Status with ok end);
+dynamic.extern(writer.output s1);
+writer.putString(writer.output "\n");
+dynamic.extern(writer.output s2);
+writer.putString(writer.output "\n");
+
+(* 3. Extern cyclic structure *)
+Let Node = Record id: Int var next: Dynamic.T end;
+let n1 = record id = 1 var next = dynamic.new(:Ok ok) end;
+let n2 = record id = 2 var next = dynamic.new(:Node n1) end;
+n1.next := dynamic.new(:Node n2);
+let dNode = dynamic.new(:Node n1);
+dynamic.extern(writer.output dNode);
+writer.putString(writer.output "\n");
+
+(* 4. Intern from stdin and verify values *)
+Let InRec = Record a: Int b: String c: Array(Int) end;
+let dIn = dynamic.intern(reader.input);
+let rIn = dynamic.be(:InRec dIn);
+writer.putString(writer.output conv.int(rIn.a));
+writer.putString(writer.output " ");
+writer.putString(writer.output rIn.b);
+writer.putString(writer.output " ");
+writer.putString(writer.output conv.int(arrayOp.get(:Int rIn.c 0)));
+writer.putString(writer.output " ");
+writer.putString(writer.output conv.int(arrayOp.get(:Int rIn.c 1)));
+writer.putString(writer.output " ");
+writer.putString(writer.output conv.int(arrayOp.get(:Int rIn.c 2)));
+writer.putString(writer.output "\n");

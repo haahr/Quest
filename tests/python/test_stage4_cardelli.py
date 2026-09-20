@@ -17,13 +17,16 @@ from quest.interpreter import QuestException
 from quest.runtime import (
     FALSE_VALUE,
     TRUE_VALUE,
+    QArray,
     QBool,
     QDynamicVal,
     QInt,
     QList,
     QReader,
+    QRecord,
     QString,
     QTuple,
+    QVariant,
     QWriter,
     qvalue_to_str,
 )
@@ -108,27 +111,151 @@ class TestStage4Cardelli(unittest.TestCase):
         assert_pipeline_failure(legacy_code)
 
     def test_dynamic_intern_and_extern(self):
-        """dynamic.extern writes serialized representation and dynamic.intern reads it."""
+        """dynamic.extern writes JSON/JSOG representation and dynamic.intern reads it."""
         from quest.builtins import BuiltinModuleRegistry
+        from quest.interpreter import DYNAMIC_ERROR_EXC, QuestException
 
         dyn_mod = BuiltinModuleRegistry.get_runtime_module("dynamic")
         new_fn = dyn_mod.fields["new"].fn
         extern_fn = dyn_mod.fields["extern"].fn
         intern_fn = dyn_mod.fields["intern"].fn
 
-        # Create a dynamic value
+        # 1. Primitive dynamic value
         d = new_fn(QInt(42))
         str_out = io.StringIO()
         wr = QWriter(stream=str_out, is_file=False)
         extern_fn(wr, d)
+        self.assertEqual(str_out.getvalue(), '{"@type":"Int","@value":42}')
 
-        # Read back using reader
         str_in = io.StringIO(str_out.getvalue())
         rd = QReader(stream=str_in, is_file=False)
         d_interned = intern_fn(rd)
-
         self.assertIsInstance(d_interned, QDynamicVal)
         self.assertEqual(d_interned.value, QInt(42))
+
+        # 2. Cyclic record
+        cyc_rec = QRecord({"name": QString("loop")})
+        cyc_rec.fields["next"] = cyc_rec
+        d_cyc = QDynamicVal(cyc_rec, "Record name: String next: Any end")
+        s_out = io.StringIO()
+        extern_fn(QWriter(stream=s_out, is_file=False), d_cyc)
+        json_cyc = s_out.getvalue()
+        self.assertIn('"@id":"1"', json_cyc)
+        self.assertIn('"@ref":"1"', json_cyc)
+
+        d_cyc_in = intern_fn(QReader(stream=io.StringIO(json_cyc), is_file=False))
+        self.assertIsInstance(d_cyc_in.value, QRecord)
+        self.assertEqual(d_cyc_in.value.fields["name"], QString("loop"))
+        self.assertIs(d_cyc_in.value.fields["next"], d_cyc_in.value)
+
+        # 3. Cyclic array
+        cyc_arr = QArray([QInt(100)])
+        cyc_arr.elements.append(cyc_arr)
+        d_arr = QDynamicVal(cyc_arr, "Array(Any)")
+        s_arr_out = io.StringIO()
+        extern_fn(QWriter(stream=s_arr_out, is_file=False), d_arr)
+        json_arr = s_arr_out.getvalue()
+        self.assertIn('"@array"', json_arr)
+        self.assertIn('"@ref":"1"', json_arr)
+
+        d_arr_in = intern_fn(QReader(stream=io.StringIO(json_arr), is_file=False))
+        self.assertIsInstance(d_arr_in.value, QArray)
+        self.assertEqual(d_arr_in.value.elements[0], QInt(100))
+        self.assertIs(d_arr_in.value.elements[1], d_arr_in.value)
+
+        # 4. Serde-style variant
+        v = QVariant("red", QInt(255))
+        d_var = QDynamicVal(v, "Variant red: Int green: Ok end")
+        s_var_out = io.StringIO()
+        extern_fn(QWriter(stream=s_var_out, is_file=False), d_var)
+        self.assertEqual(
+            s_var_out.getvalue(),
+            '{"@type":"Variant red: Int green: Ok end","@value":{"red":255}}',
+        )
+        d_var_in = intern_fn(QReader(stream=io.StringIO(s_var_out.getvalue()), is_file=False))
+        self.assertIsInstance(d_var_in.value, QVariant)
+        self.assertEqual(d_var_in.value.tag, "red")
+        self.assertEqual(d_var_in.value.payload, QInt(255))
+
+        # 5. Non-externable type raises error
+        with self.assertRaises(QuestException) as cm:
+            extern_fn(wr, QDynamicVal(wr, "Writer.T"))
+        self.assertEqual(cm.exception.exc_val, DYNAMIC_ERROR_EXC)
+
+        # 6. Malformed JSON raises error on intern
+        with self.assertRaises(QuestException) as cm2:
+            intern_fn(QReader(stream=io.StringIO("{not valid json"), is_file=False))
+        self.assertEqual(cm2.exception.exc_val, DYNAMIC_ERROR_EXC)
+
+    def test_dynamic_extern_intern_in_quest(self):
+        """Quest program can extern and intern a dynamic value through a file."""
+        import tempfile
+        from pathlib import Path
+        with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as f:
+            tmp_path = f.name
+        try:
+            code = f"""
+            import dynamic: Dynamic;
+            import writer: Writer;
+            import reader: Reader;
+            import conv: Conv;
+
+            let w = writer.file("{tmp_path}");
+            let dOut = dynamic.new(:Int 12345);
+            dynamic.extern(w dOut);
+            writer.close(w);
+
+            let r = reader.file("{tmp_path}");
+            let dIn = dynamic.intern(r);
+            reader.close(r);
+
+            let val: Int = dynamic.be(:Int dIn);
+            let s: String = conv.int(val);
+            """
+            ctx = assert_pipeline_success(code)
+            self.assertEqual(ctx.runtime_env.lookup("s"), QString("12345"))
+        finally:
+            Path(tmp_path).unlink(missing_ok=True)
+
+    def test_dynamic_extern_intern_cyclic_record_in_quest(self):
+        """Quest program can extern and intern a cyclic record through a file."""
+        import tempfile
+        from pathlib import Path
+        with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as f:
+            tmp_path = f.name
+        try:
+            code = f"""
+            import dynamic: Dynamic;
+            import writer: Writer;
+            import reader: Reader;
+
+            Let Node = Record
+                name: String
+                var next: Dynamic.T
+            end;
+
+            let node = record
+                name = "cycle"
+                var next = dynamic.new(:Ok ok)
+            end;
+            node.next := dynamic.new(:Node node);
+
+            let w = writer.file("{tmp_path}");
+            dynamic.extern(w dynamic.new(:Node node));
+            writer.close(w);
+
+            let r = reader.file("{tmp_path}");
+            let dIn = dynamic.intern(r);
+            reader.close(r);
+
+            let n: Node = dynamic.be(:Node dIn);
+            let nNext: Node = dynamic.be(:Node n.next);
+            let s: String = nNext.name;
+            """
+            ctx = assert_pipeline_success(code)
+            self.assertEqual(ctx.runtime_env.lookup("s"), QString("cycle"))
+        finally:
+            Path(tmp_path).unlink(missing_ok=True)
 
     def test_list_operations(self):
         """list module provides nil, cons, null, head, tail, length, enum."""
