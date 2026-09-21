@@ -1,0 +1,1 @@
+error: Type mismatch: synthesized type 't2.A' is not a subtype of expected type 't1.A'

@@ -1,0 +1,1 @@
+error: Abstract type 't.A' cannot escape its scope in type 't.A'

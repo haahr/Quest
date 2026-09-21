@@ -1,0 +1,3 @@
+(* Tuple packing with missing component is rejected with arity mismatch. *)
+Let T = Tuple A::TYPE a:A end;
+let t1: T = tuple Let A::TYPE = Int end;

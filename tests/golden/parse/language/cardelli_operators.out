@@ -11,6 +11,16 @@
       )
     )
     (LetValueBinding
+      :name 'prefixMul'
+      :value (ExprApp
+        :func (ExprId '*')
+        :args (
+          (ExprId 'a')
+          (ExprInt 3 '3')
+        )
+      )
+    )
+    (LetValueBinding
       :name 'plus'
       :value (ExprId '+')
     )
@@ -21,6 +31,77 @@
         :args (
           (ExprInt 1 '1')
           (ExprInt 2 '2')
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'apply'
+      :value (ExprApp
+        :func (ExprId 'op')
+        :args (
+          (ExprId 'x')
+          (ExprId 'y')
+        )
+      )
+      :params (
+        (FormalParam
+          :name 'op'
+          :type_annot (TypeAll
+            :quantifiers (
+              (Quantifier
+                :name 'x'
+                :bound (KindPower
+                  :bound (TypePath ('Int'))
+                )
+                :mode VALUE
+              )
+              (Quantifier
+                :name 'y'
+                :bound (KindPower
+                  :bound (TypePath ('Int'))
+                )
+                :mode VALUE
+              )
+            )
+            :result_type (TypePath ('Int'))
+          )
+          :mode VALUE
+        )
+        (FormalParam
+          :name 'x'
+          :type_annot (TypePath ('Int'))
+          :mode VALUE
+        )
+        (FormalParam
+          :name 'y'
+          :type_annot (TypePath ('Int'))
+          :mode VALUE
+        )
+      )
+      :type_annot (TypePath ('Int'))
+    )
+    (LetValueBinding
+      :name 'applyPlus'
+      :value (ExprApp
+        :func (ExprId 'apply')
+        :args (
+          (ExprId 'plus')
+          (ExprInt 15 '15')
+          (ExprInt 25 '25')
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'less'
+      :value (ExprId '<')
+    )
+    (LetValueBinding
+      :name 'lessRes'
+      :value (ExprApp
+        :func (ExprId 'less')
+        :args (
+          (ExprInt 10 '10')
+          (ExprInt 20 '20')
         )
       )
     )
@@ -102,14 +183,21 @@
       :value (ExprTuple
         :fields (
           (TupleBinding
-            :value (ExprInt 1 '1')
+            :value (ExprInt 42 '42')
           )
           (TupleBinding
-            :value (ExprString 'one' '"one"')
+            :value (ExprString 'hello' '"hello"')
           )
         )
       )
       :type_annot (TypePath ('PairIntStr'))
+    )
+    (LetValueBinding
+      :name 'pFst'
+      :value (ExprSelect
+        :target (ExprId 'p')
+        :field 'fst'
+      )
     )
     (LetTypeBinding
       :name 'Pair'
@@ -307,6 +395,67 @@
           (ExprInt 5 '5')
         )
       )
+    )
+    (LetValueBinding
+      :name 'allPassed'
+      :value (ExprInfix
+        :left (ExprInfix
+          :left (ExprId 'a')
+          :op 'is'
+          :right (ExprInt 30 '30')
+        )
+        :op '/\\'
+        :right (ExprInfix
+          :left (ExprInfix
+            :left (ExprId 'prefixMul')
+            :op 'is'
+            :right (ExprInt 90 '90')
+          )
+          :op '/\\'
+          :right (ExprInfix
+            :left (ExprInfix
+              :left (ExprId 'b')
+              :op 'is'
+              :right (ExprInt 3 '3')
+            )
+            :op '/\\'
+            :right (ExprInfix
+              :left (ExprInfix
+                :left (ExprId 'applyPlus')
+                :op 'is'
+                :right (ExprInt 40 '40')
+              )
+              :op '/\\'
+              :right (ExprInfix
+                :left (ExprId 'lessRes')
+                :op '/\\'
+                :right (ExprInfix
+                  :left (ExprInfix
+                    :left (ExprId 'customRes')
+                    :op 'is'
+                    :right (ExprInt 130 '130')
+                  )
+                  :op '/\\'
+                  :right (ExprInfix
+                    :left (ExprInfix
+                      :left (ExprId 'pFst')
+                      :op 'is'
+                      :right (ExprInt 42 '42')
+                    )
+                    :op '/\\'
+                    :right (ExprInfix
+                      :left (ExprId 'curriedRes')
+                      :op 'is'
+                      :right (ExprInt 7 '7')
+                    )
+                  )
+                )
+              )
+            )
+          )
+        )
+      )
+      :type_annot (TypePath ('Bool'))
     )
   )
 )

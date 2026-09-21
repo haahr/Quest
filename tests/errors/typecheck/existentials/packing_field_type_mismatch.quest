@@ -1,0 +1,3 @@
+(* Field value violating witness-substituted type is rejected with TypeError. *)
+Let T = Tuple A::TYPE a:A end;
+let t1: T = tuple Let A::TYPE = Int let a = "hello" end;

@@ -1,0 +1,4 @@
+(* Abstract type t1.A cannot be treated as concrete witness Int without bound. *)
+Let T = Tuple A::TYPE a:A end;
+let t1: T = tuple Let A::TYPE = Int let a = 0 end;
+let bad = t1.a + 1;

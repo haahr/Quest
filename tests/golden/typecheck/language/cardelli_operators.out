@@ -7,6 +7,13 @@
           (TypedInt 10 :type Int)
           (TypedInt 20 :type Int)
         )))
+    (TypedLetValue 'prefixMul' :type Int
+      :value (TypedApp :type Int
+        :func (TypedVar '*' :type Fun(a: Int b: Int): Int)
+        :args (
+          (TypedVar 'a' :type Int)
+          (TypedInt 3 :type Int)
+        )))
     (TypedLetValue 'plus' :type Fun(a: Int b: Int): Int
       :value (TypedVar '+' :type Fun(a: Int b: Int): Int))
     (TypedLetValue 'b' :type Int
@@ -15,6 +22,31 @@
         :args (
           (TypedInt 1 :type Int)
           (TypedInt 2 :type Int)
+        )))
+    (TypedLetValue 'apply' :type Fun(op: Fun(x: Int y: Int): Int x: Int y: Int): Int
+      :value (TypedFun :params (('op' : Fun(x: Int y: Int): Int) ('x' : Int) ('y' : Int)) :type Fun(op: Fun(x: Int y: Int): Int x: Int y: Int): Int
+        :body (TypedApp :type Int
+          :func (TypedVar 'op' :type Fun(x: Int y: Int): Int)
+          :args (
+            (TypedVar 'x' :type Int)
+            (TypedVar 'y' :type Int)
+          ))))
+    (TypedLetValue 'applyPlus' :type Int
+      :value (TypedApp :type Int
+        :func (TypedVar 'apply' :type Fun(op: Fun(x: Int y: Int): Int x: Int y: Int): Int)
+        :args (
+          (TypedVar 'plus' :type Fun(a: Int b: Int): Int)
+          (TypedInt 15 :type Int)
+          (TypedInt 25 :type Int)
+        )))
+    (TypedLetValue 'less' :type Fun(a: Int b: Int): Bool
+      :value (TypedVar '<' :type Fun(a: Int b: Int): Bool))
+    (TypedLetValue 'lessRes' :type Bool
+      :value (TypedApp :type Bool
+        :func (TypedVar 'less' :type Fun(a: Int b: Int): Bool)
+        :args (
+          (TypedInt 10 :type Int)
+          (TypedInt 20 :type Int)
         )))
     (TypedLetValue '<+>' :type Fun(x: Int y: Int): Int
       :value (TypedFun :params (('x' : Int) ('y' : Int)) :type Fun(x: Int y: Int): Int
@@ -35,9 +67,12 @@
     (TypedLetValue 'p' :type Fun(A :: TYPE B :: TYPE) Tuple fst: A snd: B end(Int String)
       :value (TypedTuple :type Tuple fst: Int snd: String end
         :elements (
-          (TypedInt 1 :type Int)
-          (TypedString 'one' :type String)
+          (TypedInt 42 :type Int)
+          (TypedString 'hello' :type String)
         )))
+    (TypedLetValue 'pFst' :type Int
+      :value (TypedSelect 'fst' :type Int
+        :target (TypedVar 'p' :type Fun(A :: TYPE B :: TYPE) Tuple fst: A snd: B end(Int String))))
     (TypedLetType 'Pair' :kind TYPE)
     (TypedLetValue 'pAnon' :type Tuple :Int :String end
       :value (TypedTuple :type Tuple :Int :String end
@@ -80,4 +115,34 @@
         :args (
           (TypedInt 5 :type Int)
         )))
+    (TypedLetValue 'allPassed' :type Bool
+      :value (TypedInfix '/\\' :type Bool
+        :left (TypedInfix 'is' :type Bool
+          :left (TypedVar 'a' :type Int)
+          :right (TypedInt 30 :type Int))
+        :right (TypedInfix '/\\' :type Bool
+          :left (TypedInfix 'is' :type Bool
+            :left (TypedVar 'prefixMul' :type Int)
+            :right (TypedInt 90 :type Int))
+          :right (TypedInfix '/\\' :type Bool
+            :left (TypedInfix 'is' :type Bool
+              :left (TypedVar 'b' :type Int)
+              :right (TypedInt 3 :type Int))
+            :right (TypedInfix '/\\' :type Bool
+              :left (TypedInfix 'is' :type Bool
+                :left (TypedVar 'applyPlus' :type Int)
+                :right (TypedInt 40 :type Int))
+              :right (TypedInfix '/\\' :type Bool
+                :left (TypedVar 'lessRes' :type Bool)
+                :right (TypedInfix '/\\' :type Bool
+                  :left (TypedInfix 'is' :type Bool
+                    :left (TypedVar 'customRes' :type Int)
+                    :right (TypedInt 130 :type Int))
+                  :right (TypedInfix '/\\' :type Bool
+                    :left (TypedInfix 'is' :type Bool
+                      :left (TypedVar 'pFst' :type Int)
+                      :right (TypedInt 42 :type Int))
+                    :right (TypedInfix 'is' :type Bool
+                      :left (TypedVar 'curriedRes' :type Int)
+                      :right (TypedInt 7 :type Int))))))))))
   ))

@@ -1,0 +1,4 @@
+(* Projecting type t.A from mutable variable t is rejected during kind elaboration. *)
+Let T = Tuple A::TYPE a:A end;
+let var t: T = tuple Let A::TYPE = Int let a = 0 end;
+let x: t.A = 0;

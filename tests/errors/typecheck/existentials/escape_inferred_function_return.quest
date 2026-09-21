@@ -1,0 +1,3 @@
+(* Function body returning t.a where return type is inferred is rejected for escaping scope. *)
+Let T = Tuple A::TYPE a:A end;
+let geta(t: T) = t.a;

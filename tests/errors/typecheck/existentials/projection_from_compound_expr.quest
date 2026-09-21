@@ -1,0 +1,4 @@
+(* Selecting dependent member from anonymous existential tuple is rejected. *)
+Let T = Tuple A::TYPE a:A end;
+let make(u: Ok): T = tuple Let A::TYPE = Int let a = 0 end;
+let bad = make(ok).a;

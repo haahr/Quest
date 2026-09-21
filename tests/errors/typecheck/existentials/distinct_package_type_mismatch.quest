@@ -1,0 +1,5 @@
+(* Two packages with identical signatures have distinct abstract types t1.A != t2.A. *)
+Let T = Tuple A::TYPE a:A f(x:A):Int end;
+let t1: T = tuple Let A::TYPE = Int let a = 0 let f(x: A): Int = x + 1 end;
+let t2: T = tuple Let A::TYPE = Int let a = 0 let f(x: A): Int = x + 1 end;
+let bad = t1.f(t2.a);

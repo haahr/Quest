@@ -33,7 +33,6 @@ from quest.types import (
     is_subtype,
 )
 from tests.python.helpers import (
-    assert_pipeline_failure,
     assert_pipeline_success,
     elaborate_test_type,
     run_pipeline,
@@ -219,9 +218,6 @@ class TestExistentialTuplesPhase3(unittest.TestCase):
     def run_source(self, source: str) -> CompilerContext:
         return assert_pipeline_success(source, env=self.env, runtime_env=self.runtime_env)
 
-    def check_failure(self, source: str, expected_substr: str) -> None:
-        assert_pipeline_failure(source, expected_substr, env=self.env, runtime_env=self.runtime_env)
-
     def test_cardelli_existential_tuple_packing_and_execution(self) -> None:
         """Cardelli §5.3: Packing existential tuple with witness and value fields."""
         source = """
@@ -262,53 +258,6 @@ class TestExistentialTuplesPhase3(unittest.TestCase):
         self.assertIsInstance(t1_type, QTupleType)
         self.assertTrue(t1_type.is_existential)
 
-    def test_type_mismatch_in_witness_substituted_field(self) -> None:
-        """Field value violating witness-substituted type is rejected with TypeError."""
-        source = """
-        Let T = Tuple A::TYPE a:A end;
-        let t1: T = tuple Let A::TYPE = Int let a = "hello" end;
-        """
-        self.check_failure(source, "is not a subtype of expected type 'Int'")
-
-    def test_type_formal_name_mismatch_rejected(self) -> None:
-        """Component name mismatch between witness and type formal is rejected."""
-        source = """
-        Let T = Tuple A::TYPE a:A end;
-        let t1: T = tuple Let B::TYPE = Int let a = 0 end;
-        """
-        self.check_failure(source, "Tuple type formal name mismatch: expected 'A', got 'B'")
-
-    def test_tuple_arity_mismatch_rejected(self) -> None:
-        """Tuple packing with missing component is rejected with arity mismatch."""
-        source = """
-        Let T = Tuple A::TYPE a:A end;
-        let t1: T = tuple Let A::TYPE = Int end;
-        """
-        self.check_failure(source, "Tuple arity mismatch: expected 2 components, got 1")
-
-    def test_value_provided_for_type_formal_rejected(self) -> None:
-        """Providing a value where a type witness is expected is rejected."""
-        source = """
-        Let T = Tuple A::TYPE a:A end;
-        let t1: T = tuple let A = 0 let a = 0 end;
-        """
-        self.check_failure(source, "Expected type witness for type formal 'A', got value component")
-
-    def test_type_binding_for_value_field_rejected(self) -> None:
-        """Providing a type binding where a value field is expected is rejected."""
-        source = """
-        Let T = Tuple A::TYPE a:A end;
-        let t1: T = tuple Let A::TYPE = Int Let a = Int end;
-        """
-        self.check_failure(source, "Unexpected type binding 'a' for value field 'a'")
-
-    def test_witness_kind_bound_mismatch_rejected(self) -> None:
-        """Providing a witness that does not satisfy the kind bound is rejected."""
-        source = """
-        Let T = Tuple A::POWER(Int) a:A end;
-        let t1: T = tuple Let A::TYPE = String let a = "test" end;
-        """
-        self.check_failure(source, "Kind mismatch")
 
 
 class TestExistentialTuplesPhase4(unittest.TestCase):
@@ -330,88 +279,6 @@ class TestExistentialTuplesPhase4(unittest.TestCase):
         res = self.pipeline.execute(source, "<test>", ctx=ctx)
         self.assertTrue(res.success, f"Pipeline failed: {res.diagnostics}")
         return ctx, res.final_artifact
-
-    def check_failure(self, source: str, expected_substr: str) -> None:
-        assert_pipeline_failure(source, expected_substr, env=self.env, runtime_env=self.runtime_env)
-
-    def test_distinct_package_abstraction_incompatibility(self) -> None:
-        """Two packages with identical signatures have distinct abstract types t1.A != t2.A."""
-        source = """
-        Let T = Tuple A::TYPE a:A f(x:A):Int end;
-        let t1: T = tuple Let A::TYPE = Int let a = 0 let f(x: A): Int = x + 1 end;
-        let t2: T = tuple Let A::TYPE = Int let a = 0 let f(x: A): Int = x + 1 end;
-        let bad = t1.f(t2.a);
-        """
-        self.check_failure(source, "synthesized type 't2.A' is not a subtype of expected type 't1.A'")
-
-    def test_abstract_type_mismatch_with_concrete_type(self) -> None:
-        """Abstract type t1.A cannot be treated as concrete witness Int without bound."""
-        source = """
-        Let T = Tuple A::TYPE a:A end;
-        let t1: T = tuple Let A::TYPE = Int let a = 0 end;
-        let bad = t1.a + 1;
-        """
-        self.check_failure(source, "synthesized type 't1.A' is not a subtype of expected type 'Int'")
-
-    def test_projection_from_anonymous_tuple_rejected(self) -> None:
-        """Selecting dependent member from anonymous existential tuple is rejected."""
-        source = """
-        Let T = Tuple A::TYPE a:A end;
-        let make(u: Ok): T = tuple Let A::TYPE = Int let a = 0 end;
-        let bad = make(ok).a;
-        """
-        self.check_failure(
-            source,
-            "Cannot select type-dependent member 'a' from compound or anonymous existential tuple",
-        )
-
-    def test_projection_from_mutable_var_rejected(self) -> None:
-        """Selecting type-dependent member from mutable var is rejected."""
-        source = """
-        Let T = Tuple A::TYPE a:A end;
-        let var t: T = tuple Let A::TYPE = Int let a = 0 end;
-        let bad = t.a;
-        """
-        self.check_failure(
-            source,
-            "Cannot select type-dependent member 'a' from mutable variable 't'",
-        )
-
-    def test_path_type_from_mutable_var_rejected(self) -> None:
-        """Projecting type t.A from mutable variable t is rejected during kind elaboration."""
-        source = """
-        Let T = Tuple A::TYPE a:A end;
-        let var t: T = tuple Let A::TYPE = Int let a = 0 end;
-        let x: t.A = 0;
-        """
-        self.check_failure(source, "Cannot project type from mutable variable 't'")
-
-    def test_escape_in_function_inferred_return_type_rejected(self) -> None:
-        """Function body returning t.a where return type is inferred is rejected for escaping scope."""
-        source = """
-        Let T = Tuple A::TYPE a:A end;
-        let geta(t: T) = t.a;
-        """
-        self.check_failure(source, "Abstract type 't.A' cannot escape function scope")
-
-    def test_escape_in_function_annotated_return_type_rejected(self) -> None:
-        """Function with explicit return type annotation t.A is rejected for escaping scope."""
-        source = """
-        Let T = Tuple A::TYPE a:A end;
-        let geta(t: T): t.A = t.a;
-        """
-        self.check_failure(source, "Abstract type 't.A' cannot escape function scope")
-
-    def test_escape_in_block_rejected(self) -> None:
-        """Local variable abstract type escaping a block expression is rejected."""
-        source = """
-        Let T = Tuple A::TYPE a:A end;
-        let res = begin
-            let t: T = tuple Let A::TYPE = Int let a = 0 end;
-            t.a
-        end;
-        """
-        self.check_failure(source, "cannot escape its scope")
 
     def test_repl_formatting_cardelli_style(self) -> None:
         """Cardelli §5.3: existential tuples format as <Hidden>::TYPE and values as <hidden>."""

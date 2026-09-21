@@ -1,0 +1,3 @@
+(* Component name mismatch between witness and type formal is rejected. *)
+Let T = Tuple A::TYPE a:A end;
+let t1: T = tuple Let B::TYPE = Int let a = 0 end;

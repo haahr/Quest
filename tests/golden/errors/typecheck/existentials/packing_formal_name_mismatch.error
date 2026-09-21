@@ -1,0 +1,1 @@
+error: Tuple type formal name mismatch: expected 'A', got 'B'

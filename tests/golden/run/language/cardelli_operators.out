@@ -1,1 +1,1 @@
-let curriedRes:Int = 7
+let allPassed:Bool = true

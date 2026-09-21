@@ -2,8 +2,13 @@
 
 (* 1. Prefix and standalone symbolic operators *)
 let a = +(10 20);
+let prefixMul = *(a 3);
 let plus = {+};
 let b = plus(1 2);
+let apply(op(x: Int y: Int): Int x: Int y: Int): Int = op(x y);
+let applyPlus = apply(plus 15 25);
+let less = {<};
+let lessRes = less(10 20);
 
 (* 2. Custom symbolic infix operator *)
 let <+>(x: Int y: Int): Int = x + y + 100;
@@ -12,7 +17,8 @@ let customRes = 10 <+> 20;
 (* 3. Symbolic type operator and application *)
 Let #(A, B::TYPE)::TYPE = Tuple fst: A snd: B end;
 Let PairIntStr = #(Int String);
-let p: PairIntStr = tuple 1 "one" end;
+let p: PairIntStr = tuple 42 "hello" end;
+let pFst = p.fst;
 
 (* 4. Anonymous tuple signatures *)
 Let Pair = Tuple :Int :String end;
@@ -28,3 +34,15 @@ let g(x: Int out y: Int): Ok = ok;
 let double(fn(x: Int): Int)(x: Int): Int = fn(fn(x));
 let inc(x: Int): Int = x + 1;
 let curriedRes = double(inc)(5);
+
+(* 7. Aggregate result check *)
+let allPassed: Bool =
+    {a is 30}
+    /\ {prefixMul is 90}
+    /\ {b is 3}
+    /\ {applyPlus is 40}
+    /\ lessRes
+    /\ {customRes is 130}
+    /\ {pFst is 42}
+    /\ {curriedRes is 7};
+

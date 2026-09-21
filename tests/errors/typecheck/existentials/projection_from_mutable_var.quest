@@ -1,0 +1,4 @@
+(* Selecting type-dependent member from mutable var is rejected. *)
+Let T = Tuple A::TYPE a:A end;
+let var t: T = tuple Let A::TYPE = Int let a = 0 end;
+let bad = t.a;

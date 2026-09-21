@@ -1,0 +1,3 @@
+(* Providing a type binding where a value field is expected is rejected. *)
+Let T = Tuple A::TYPE a:A end;
+let t1: T = tuple Let A::TYPE = Int Let a = Int end;

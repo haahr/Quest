@@ -1,0 +1,3 @@
+(* Function with explicit return type annotation t.A is rejected for escaping scope. *)
+Let T = Tuple A::TYPE a:A end;
+let geta(t: T): t.A = t.a;

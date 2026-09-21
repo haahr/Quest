@@ -1,0 +1,6 @@
+(* Local variable abstract type escaping a block expression is rejected. *)
+Let T = Tuple A::TYPE a:A end;
+let res = begin
+    let t: T = tuple Let A::TYPE = Int let a = 0 end;
+    t.a
+end;
