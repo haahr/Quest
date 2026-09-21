@@ -1,0 +1,250 @@
+(TypedProgram
+  :phrases (
+    (TypedLetType 'Point' :kind TYPE)
+    (TypedLetType 'Point3D' :kind TYPE)
+    (TypedLetValue 'updatePoint' :type All(A :: TYPE) Fun(out dest: A src: A): Ok
+      :value (TypedFun :params (('dest' : A) ('src' : A)) :type All(A :: TYPE) Fun(out dest: A src: A): Ok
+        :body (TypedAssign
+          :target (TypedVar 'dest' :type Var(A))
+          :value (TypedVar 'src' :type A))))
+    (TypedLetValue 'p1' :type Record x: Int y: Int end
+      :value (TypedRecord :type Record x: Int y: Int end
+        :fields (
+          (TypedRecordField 'x'
+            :value (TypedInt 10 :type Int))
+          (TypedRecordField 'y'
+            :value (TypedInt 20 :type Int))
+        )))
+    (TypedLetValue 'p2' :type Record x: Int y: Int end
+      :value (TypedRecord :type Record x: Int y: Int end
+        :fields (
+          (TypedRecordField 'x'
+            :value (TypedInt 30 :type Int))
+          (TypedRecordField 'y'
+            :value (TypedInt 40 :type Int))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedTypeApp [Record x: Int y: Int end] :type Fun(out dest: Record x: Int y: Int end src: Record x: Int y: Int end): Ok
+          :func (TypedVar 'updatePoint' :type All(A :: TYPE) Fun(out dest: A src: A): Ok))
+        :args (
+          (TypedVar 'p1' :type Var(Record x: Int y: Int end))
+          (TypedVar 'p2' :type Record x: Int y: Int end)
+        )))
+    (TypedLetValue 'p1x' :type Int
+      :value (TypedSelect 'x' :type Int
+        :target (TypedDerefCell :type Record x: Int y: Int end
+          :target (TypedVar 'p1' :type Var(Record x: Int y: Int end)))))
+    (TypedLetValue 'p1y' :type Int
+      :value (TypedSelect 'y' :type Int
+        :target (TypedDerefCell :type Record x: Int y: Int end
+          :target (TypedVar 'p1' :type Var(Record x: Int y: Int end)))))
+    (TypedLetValue 'swapPoly' :type All(A :: TYPE) Fun(var a: A var b: A): Ok
+      :value (TypedFun :params (('a' : A) ('b' : A)) :type All(A :: TYPE) Fun(var a: A var b: A): Ok
+        :body (TypedBlock :type Ok
+          :bindings (
+            (TypedLetValue 'tmp' :type A
+              :value (TypedDerefCell :type A
+                :target (TypedVar 'a' :type Var(A))))
+            (TypedExprStmt
+              :expr (TypedAssign
+                :target (TypedVar 'a' :type Var(A))
+                :value (TypedDerefCell :type A
+                  :target (TypedVar 'b' :type Var(A)))))
+          )
+          :result (TypedAssign
+            :target (TypedVar 'b' :type Var(A))
+            :value (TypedVar 'tmp' :type A)))))
+    (TypedLetValue 'r1' :type Record x: Int y: Int end
+      :value (TypedRecord :type Record x: Int y: Int end
+        :fields (
+          (TypedRecordField 'x'
+            :value (TypedInt 1 :type Int))
+          (TypedRecordField 'y'
+            :value (TypedInt 2 :type Int))
+        )))
+    (TypedLetValue 'r2' :type Record x: Int y: Int end
+      :value (TypedRecord :type Record x: Int y: Int end
+        :fields (
+          (TypedRecordField 'x'
+            :value (TypedInt 8 :type Int))
+          (TypedRecordField 'y'
+            :value (TypedInt 9 :type Int))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedTypeApp [Record x: Int y: Int end] :type Fun(var a: Record x: Int y: Int end var b: Record x: Int y: Int end): Ok
+          :func (TypedVar 'swapPoly' :type All(A :: TYPE) Fun(var a: A var b: A): Ok))
+        :args (
+          (TypedVar 'r1' :type Var(Record x: Int y: Int end))
+          (TypedVar 'r2' :type Var(Record x: Int y: Int end))
+        )))
+    (TypedLetValue 'r1x' :type Int
+      :value (TypedSelect 'x' :type Int
+        :target (TypedDerefCell :type Record x: Int y: Int end
+          :target (TypedVar 'r1' :type Var(Record x: Int y: Int end)))))
+    (TypedLetValue 'r2x' :type Int
+      :value (TypedSelect 'x' :type Int
+        :target (TypedDerefCell :type Record x: Int y: Int end
+          :target (TypedVar 'r2' :type Var(Record x: Int y: Int end)))))
+    (TypedLetValue 'assignClosure' :type All(A :: TYPE) Fun(out dest: A src: A): Ok
+      :value (TypedVar 'updatePoint' :type All(A :: TYPE) Fun(out dest: A src: A): Ok))
+    (TypedLetValue 'p3' :type Record x: Int y: Int end
+      :value (TypedRecord :type Record x: Int y: Int end
+        :fields (
+          (TypedRecordField 'x'
+            :value (TypedInt 100 :type Int))
+          (TypedRecordField 'y'
+            :value (TypedInt 200 :type Int))
+        )))
+    (TypedLetValue 'p4' :type Record x: Int y: Int end
+      :value (TypedRecord :type Record x: Int y: Int end
+        :fields (
+          (TypedRecordField 'x'
+            :value (TypedInt 500 :type Int))
+          (TypedRecordField 'y'
+            :value (TypedInt 600 :type Int))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedTypeApp [Record x: Int y: Int end] :type Fun(out dest: Record x: Int y: Int end src: Record x: Int y: Int end): Ok
+          :func (TypedVar 'assignClosure' :type All(A :: TYPE) Fun(out dest: A src: A): Ok))
+        :args (
+          (TypedVar 'p3' :type Var(Record x: Int y: Int end))
+          (TypedVar 'p4' :type Record x: Int y: Int end)
+        )))
+    (TypedLetValue 'p3x' :type Int
+      :value (TypedSelect 'x' :type Int
+        :target (TypedDerefCell :type Record x: Int y: Int end
+          :target (TypedVar 'p3' :type Var(Record x: Int y: Int end)))))
+    (TypedLetValue 'p3y' :type Int
+      :value (TypedSelect 'y' :type Int
+        :target (TypedDerefCell :type Record x: Int y: Int end
+          :target (TypedVar 'p3' :type Var(Record x: Int y: Int end)))))
+    (TypedLetValue 'swapClosure' :type All(A :: TYPE) Fun(var a: A var b: A): Ok
+      :value (TypedVar 'swapPoly' :type All(A :: TYPE) Fun(var a: A var b: A): Ok))
+    (TypedLetValue 's1' :type Record x: Int y: Int end
+      :value (TypedRecord :type Record x: Int y: Int end
+        :fields (
+          (TypedRecordField 'x'
+            :value (TypedInt 111 :type Int))
+          (TypedRecordField 'y'
+            :value (TypedInt 222 :type Int))
+        )))
+    (TypedLetValue 's2' :type Record x: Int y: Int end
+      :value (TypedRecord :type Record x: Int y: Int end
+        :fields (
+          (TypedRecordField 'x'
+            :value (TypedInt 333 :type Int))
+          (TypedRecordField 'y'
+            :value (TypedInt 444 :type Int))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedTypeApp [Record x: Int y: Int end] :type Fun(var a: Record x: Int y: Int end var b: Record x: Int y: Int end): Ok
+          :func (TypedVar 'swapClosure' :type All(A :: TYPE) Fun(var a: A var b: A): Ok))
+        :args (
+          (TypedVar 's1' :type Var(Record x: Int y: Int end))
+          (TypedVar 's2' :type Var(Record x: Int y: Int end))
+        )))
+    (TypedLetValue 's1x' :type Int
+      :value (TypedSelect 'x' :type Int
+        :target (TypedDerefCell :type Record x: Int y: Int end
+          :target (TypedVar 's1' :type Var(Record x: Int y: Int end)))))
+    (TypedLetValue 's2x' :type Int
+      :value (TypedSelect 'x' :type Int
+        :target (TypedDerefCell :type Record x: Int y: Int end
+          :target (TypedVar 's2' :type Var(Record x: Int y: Int end)))))
+    (TypedLetValue 'makePair' :type All(A :: TYPE B :: TYPE) Fun(a: A b: B): Tuple first: A second: B end
+      :value (TypedFun :params (('a' : A) ('b' : B)) :type All(A :: TYPE B :: TYPE) Fun(a: A b: B): Tuple first: A second: B end
+        :body (TypedTuple :type Tuple first: A second: B end
+          :elements (
+            (TypedVar 'a' :type A)
+            (TypedVar 'b' :type B)
+          ))))
+    (TypedLetValue 'pt1' :type Record x: Int y: Int end
+      :value (TypedRecord :type Record x: Int y: Int end
+        :fields (
+          (TypedRecordField 'x'
+            :value (TypedInt 77 :type Int))
+          (TypedRecordField 'y'
+            :value (TypedInt 88 :type Int))
+        )))
+    (TypedLetValue 'directPair' :type Tuple first: Record x: Int y: Int end second: String end
+      :value (TypedApp :type Tuple first: Record x: Int y: Int end second: String end
+        :func (TypedTypeApp [Record x: Int y: Int end String] :type Fun(a: Record x: Int y: Int end b: String): Tuple first: Record x: Int y: Int end second: String end
+          :func (TypedVar 'makePair' :type All(A :: TYPE B :: TYPE) Fun(a: A b: B): Tuple first: A second: B end))
+        :args (
+          (TypedVar 'pt1' :type Record x: Int y: Int end)
+          (TypedString 'hello' :type String)
+        )))
+    (TypedLetValue 'dpx' :type Int
+      :value (TypedSelect 'x' :type Int
+        :target (TypedSelect 'first' :type Record x: Int y: Int end
+          :target (TypedVar 'directPair' :type Tuple first: Record x: Int y: Int end second: String end))))
+    (TypedLetValue 'dpy' :type Int
+      :value (TypedSelect 'y' :type Int
+        :target (TypedSelect 'first' :type Record x: Int y: Int end
+          :target (TypedVar 'directPair' :type Tuple first: Record x: Int y: Int end second: String end))))
+    (TypedLetValue 'dps' :type String
+      :value (TypedSelect 'second' :type String
+        :target (TypedVar 'directPair' :type Tuple first: Record x: Int y: Int end second: String end)))
+    (TypedLetValue 'pairClosure' :type All(A :: TYPE B :: TYPE) Fun(a: A b: B): Tuple first: A second: B end
+      :value (TypedVar 'makePair' :type All(A :: TYPE B :: TYPE) Fun(a: A b: B): Tuple first: A second: B end))
+    (TypedLetValue 'pt2' :type Record x: Int y: Int end
+      :value (TypedRecord :type Record x: Int y: Int end
+        :fields (
+          (TypedRecordField 'x'
+            :value (TypedInt 99 :type Int))
+          (TypedRecordField 'y'
+            :value (TypedInt 101 :type Int))
+        )))
+    (TypedLetValue 'closPair' :type Tuple first: Record x: Int y: Int end second: Int end
+      :value (TypedApp :type Tuple first: Record x: Int y: Int end second: Int end
+        :func (TypedTypeApp [Record x: Int y: Int end Int] :type Fun(a: Record x: Int y: Int end b: Int): Tuple first: Record x: Int y: Int end second: Int end
+          :func (TypedVar 'pairClosure' :type All(A :: TYPE B :: TYPE) Fun(a: A b: B): Tuple first: A second: B end))
+        :args (
+          (TypedVar 'pt2' :type Record x: Int y: Int end)
+          (TypedInt 42 :type Int)
+        )))
+    (TypedLetValue 'cpx' :type Int
+      :value (TypedSelect 'x' :type Int
+        :target (TypedSelect 'first' :type Record x: Int y: Int end
+          :target (TypedVar 'closPair' :type Tuple first: Record x: Int y: Int end second: Int end))))
+    (TypedLetValue 'cpy' :type Int
+      :value (TypedSelect 'y' :type Int
+        :target (TypedSelect 'first' :type Record x: Int y: Int end
+          :target (TypedVar 'closPair' :type Tuple first: Record x: Int y: Int end second: Int end))))
+    (TypedLetValue 'cpi' :type Int
+      :value (TypedSelect 'second' :type Int
+        :target (TypedVar 'closPair' :type Tuple first: Record x: Int y: Int end second: Int end)))
+    (TypedLetValue 'p3d' :type Record x: Int y: Int z: Int end
+      :value (TypedRecord :type Record x: Int y: Int z: Int end
+        :fields (
+          (TypedRecordField 'x'
+            :value (TypedInt 1 :type Int))
+          (TypedRecordField 'y'
+            :value (TypedInt 2 :type Int))
+          (TypedRecordField 'z'
+            :value (TypedInt 3 :type Int))
+        )))
+    (TypedLetValue 't3d' :type Tuple pt: Record x: Int y: Int z: Int end tag: String end
+      :value (TypedTuple :type Tuple pt: Record x: Int y: Int z: Int end tag: String end
+        :elements (
+          (TypedVar 'p3d' :type Record x: Int y: Int z: Int end)
+          (TypedString '3D' :type String)
+        )))
+    (TypedLetValue 't2d' :type Tuple pt: Record x: Int y: Int end tag: String end
+      :value (TypedVar 't3d' :type Tuple pt: Record x: Int y: Int z: Int end tag: String end))
+    (TypedLetValue 't2dx' :type Int
+      :value (TypedSelect 'x' :type Int
+        :target (TypedSelect 'pt' :type Record x: Int y: Int end
+          :target (TypedVar 't2d' :type Tuple pt: Record x: Int y: Int end tag: String end))))
+    (TypedLetValue 't2dy' :type Int
+      :value (TypedSelect 'y' :type Int
+        :target (TypedSelect 'pt' :type Record x: Int y: Int end
+          :target (TypedVar 't2d' :type Tuple pt: Record x: Int y: Int end tag: String end))))
+    (TypedLetValue 't2dtag' :type String
+      :value (TypedSelect 'tag' :type String
+        :target (TypedVar 't2d' :type Tuple pt: Record x: Int y: Int end tag: String end)))
+  ))

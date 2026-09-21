@@ -210,5 +210,60 @@ class TestStage2Cardelli(unittest.TestCase):
             )
 
 
+    def test_polymorphic_out_var_specialization_c(self):
+        """Verifies polymorphic out and var parameters with scalars and records in C."""
+        code = """
+        Let Point = Record x: Int y: Int end;
+        let setVal(A::TYPE out dest: A src: A): Ok = dest := src;
+        let var a = 0;
+        setVal(:Int @a 42);
+
+        let var p = record x = 1 y = 2 end;
+        let pt = record x = 100 y = 200 end;
+        setVal(:Point @p pt);
+        a + p.x + p.y
+        """
+        self.assertEqual(eval_test_source(code), QInt(342))
+        proc = self.compile_quest(code)
+        self.assertEqual(proc.returncode, 0)
+        self.assertIn("342 : Int", proc.stdout)
+
+    def test_polymorphic_out_var_fallback_closure_c(self):
+        """Verifies polymorphic out and var through closures using shadow cell writeback."""
+        code = """
+        Let Point = Record x: Int y: Int end;
+        let swapPoly(A::TYPE var a: A var b: A): Ok =
+            begin
+                let tmp = a;
+                a := b;
+                b := tmp;
+            end;
+        let swapClo = swapPoly;
+        let var r1 = record x = 10 y = 20 end;
+        let var r2 = record x = 70 y = 80 end;
+        swapClo(:Point @r1 @r2);
+        r1.x + r2.x
+        """
+        self.assertEqual(eval_test_source(code), QInt(80))
+        proc = self.compile_quest(code)
+        self.assertEqual(proc.returncode, 0)
+        self.assertIn("80 : Int", proc.stdout)
+
+    def test_generic_tuple_return_with_record_c(self):
+        """Verifies generic tuple returning 16-byte record fat pointer."""
+        code = """
+        Let Point = Record x: Int y: Int end;
+        let pair(A::TYPE B::TYPE a: A b: B): Tuple first: A second: B end =
+            tuple let first = a let second = b end;
+        let pt = record x = 25 y = 35 end;
+        let p = pair(:Point :Int pt 10);
+        p.first.x + p.first.y + p.second
+        """
+        self.assertEqual(eval_test_source(code), QInt(70))
+        proc = self.compile_quest(code)
+        self.assertEqual(proc.returncode, 0)
+        self.assertIn("70 : Int", proc.stdout)
+
+
 if __name__ == "__main__":
     unittest.main()

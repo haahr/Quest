@@ -1,5 +1,4 @@
 (* Language: Cardelli §5.3 Existential Packages *)
-(* @skip-phase: run_c_compiled *)
 
 (* 1. Cardelli §5.3 packing, dot-projection, and path-type annotation *)
 Let T = Tuple A::TYPE a: A f(x: A): Int end;

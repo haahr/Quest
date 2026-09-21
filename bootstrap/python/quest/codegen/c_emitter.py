@@ -108,8 +108,11 @@ from quest.types import (
     QQuantifier,
     QRecordField,
     QRecordType,
+    QPathType,
     QTupleField,
     QTupleType,
+    QTupleTypeBinding,
+    QTupleTypeFormal,
     QType,
     QTypeVar,
     QVarType,
@@ -172,6 +175,8 @@ class CEmitter:
         self.specializations: dict[tuple[str, tuple[QType, ...]], tuple[str, TypedFun]] = {}
         self.all_modules: dict[str, TypedModule] = {}
         self.pointer_params: set[str] = set()
+        self.adapter_defs: list[str] = []
+        self.adapter_cache: dict[tuple[QType, QType], str] = {}
 
     def c_type(self, t: QType) -> str:
         return qtype_to_c_type(t, self.record_ctx)
@@ -344,6 +349,188 @@ class CEmitter:
             )
         return tmp_v
 
+    def _emit_closure_adaptation(
+        self,
+        c_closure: str,
+        orig_t: QType,
+        target_t: QType,
+        lines: list[str],
+    ) -> str:
+        """Emits an adaptation thunk closure if orig_t and target_t closure signatures differ."""
+        orig_fn_ptr = _closure_fn_ptr_type(orig_t, self.record_ctx)
+        target_fn_ptr = _closure_fn_ptr_type(target_t, self.record_ctx)
+        if orig_fn_ptr == target_fn_ptr:
+            return c_closure
+
+        cache_key = (orig_t, target_t)
+        if cache_key in self.adapter_cache:
+            adapt_fn_name = self.adapter_cache[cache_key]
+        else:
+            adapt_fn_name = self.fresh_tmp("qv_adapt")
+            self.adapter_cache[cache_key] = adapt_fn_name
+
+            _, inner_tgt = self._collect_fun_quantifiers(target_t)
+            _, inner_orig = self._collect_fun_quantifiers(orig_t)
+
+            tgt_params = inner_tgt.params if isinstance(inner_tgt, QFunType) else ()
+            orig_params = inner_orig.params if isinstance(inner_orig, QFunType) else ()
+            tgt_ret_t = inner_tgt.result_type if isinstance(inner_tgt, QFunType) else OK_TYPE
+            orig_ret_t = inner_orig.result_type if isinstance(inner_orig, QFunType) else OK_TYPE
+
+            ret_c = "void" if tgt_ret_t == OK_TYPE else self.c_type(tgt_ret_t)
+
+            param_decls = ["void *_raw_env"]
+            call_args = []
+            for idx, tp in enumerate(tgt_params):
+                op = orig_params[idx] if idx < len(orig_params) else tp
+                arg_name = f"qv_arg_{idx}"
+                tp_c = self.c_type(tp.type_val)
+                param_decls.append(f"{tp_c} {arg_name}")
+
+                tp_tag = qtype_to_c_type(tp.type_val, self.record_ctx)
+                op_tag = qtype_to_c_type(op.type_val, self.record_ctx)
+                if tp_tag == "QVal" and op_tag != "QVal":
+                    call_args.append(_qval_unwrap(arg_name, op.type_val, self))
+                elif tp_tag != "QVal" and op_tag == "QVal":
+                    call_args.append(_qval_wrap(arg_name, tp.type_val))
+                else:
+                    call_args.append(arg_name)
+
+            sig = ", ".join(param_decls)
+            fn_body: list[str] = [
+                f"static Q_UNUSED {ret_c} {adapt_fn_name}({sig}) {{",
+                "    QClosure *orig = (QClosure *)_raw_env;",
+            ]
+            args_str = ", ".join(["orig->env"] + call_args)
+            call_expr = f"(({orig_fn_ptr})(orig->fn))({args_str})"
+
+            tgt_ret_tag = qtype_to_c_type(tgt_ret_t, self.record_ctx)
+            orig_ret_tag = qtype_to_c_type(orig_ret_t, self.record_ctx)
+
+            if tgt_ret_t == OK_TYPE:
+                fn_body.append(f"    {call_expr};")
+                fn_body.append("    return;")
+            elif tgt_ret_tag == "QVal" and orig_ret_tag != "QVal":
+                wrapped = _qval_wrap(call_expr, orig_ret_t)
+                fn_body.append(f"    return {wrapped};")
+            elif tgt_ret_tag != "QVal" and orig_ret_tag == "QVal":
+                unwrapped = _qval_unwrap(call_expr, tgt_ret_t, self)
+                fn_body.append(f"    return {unwrapped};")
+            else:
+                fn_body.append(f"    return {call_expr};")
+            fn_body.append("}")
+            fn_body.append("")
+            self.adapter_defs.extend(fn_body)
+
+        clo_tmp = self.fresh_tmp("_adapt_clo")
+        lines.append(f"QClosure *{clo_tmp} = (QClosure *)quest_alloc(sizeof(QClosure));")
+        lines.append(f"{clo_tmp}->fn = (void *){adapt_fn_name};")
+        lines.append(f"{clo_tmp}->env = (void *)({c_closure});")
+        return clo_tmp
+
+    def _coerce_tuple_val(
+        self,
+        c_val: str,
+        source_t: QTupleType,
+        target_t: QTupleType,
+        lines: list[str],
+        dest: Optional[str] = None,
+    ) -> str:
+        """Coerces source_t tuple to target_t, copying and wrapping fields if representations differ."""
+        target_struct = tuple_struct_name(target_t)
+        source_struct = tuple_struct_name(source_t)
+
+        def _field_can_direct_cast(sf: QType, tf: QType) -> bool:
+            if qtype_to_c_type(sf, self.record_ctx) != qtype_to_c_type(tf, self.record_ctx):
+                return False
+            if isinstance(tf, QRecordType) and isinstance(sf, QRecordType) and sf != tf:
+                return False
+            if isinstance(tf, QVariantType) and isinstance(sf, QVariantType) and sf != tf:
+                return False
+            if isinstance(tf, (QFunType, QAllType)) and isinstance(sf, (QFunType, QAllType)):
+                if _closure_fn_ptr_type(tf, self.record_ctx) != _closure_fn_ptr_type(sf, self.record_ctx):
+                    return False
+            return True
+
+        fields_match = len(source_t.value_fields) >= len(target_t.value_fields) and all(
+            _field_can_direct_cast(
+                source_t.value_fields[i].type_val, target_t.value_fields[i].type_val
+            )
+            for i in range(len(target_t.value_fields))
+        )
+        if fields_match:
+            cast_expr = f"(({target_struct} *){c_val})"
+            if dest is not None:
+                lines.append(f"{dest} = {cast_expr};")
+                return dest
+            return cast_expr
+
+        res_tmp = dest if dest is not None else self.fresh_tmp("_tup_up")
+        alloc_expr = f"({target_struct} *)quest_alloc(sizeof({target_struct}))"
+        if dest is None:
+            lines.append(f"{target_struct} *{res_tmp} = {alloc_expr};")
+        else:
+            lines.append(f"{res_tmp} = {alloc_expr};")
+
+        tmp_src = self.fresh_tmp("_tsrc")
+        lines.append(f"{source_struct} *{tmp_src} = {c_val};")
+
+        for i, tgt_vf in enumerate(target_t.value_fields):
+            src_vf = source_t.value_fields[i]
+            src_field_access = f"{tmp_src}->_{i}"
+            tgt_field_c_t = qtype_to_c_type(tgt_vf.type_val, self.record_ctx)
+            src_field_c_t = qtype_to_c_type(src_vf.type_val, self.record_ctx)
+
+            if tgt_field_c_t == "QVal" and src_field_c_t != "QVal":
+                wrapped = _qval_wrap(src_field_access, src_vf.type_val)
+                lines.append(f"{res_tmp}->_{i} = {wrapped};")
+            elif tgt_field_c_t != "QVal" and src_field_c_t == "QVal":
+                unwrapped = _qval_unwrap(src_field_access, tgt_vf.type_val, self)
+                lines.append(f"{res_tmp}->_{i} = {unwrapped};")
+            elif (
+                isinstance(tgt_vf.type_val, (QFunType, QAllType))
+                and isinstance(src_vf.type_val, (QFunType, QAllType))
+                and _closure_fn_ptr_type(tgt_vf.type_val, self.record_ctx)
+                != _closure_fn_ptr_type(src_vf.type_val, self.record_ctx)
+            ):
+                adapted = self._emit_closure_adaptation(
+                    src_field_access, src_vf.type_val, tgt_vf.type_val, lines
+                )
+                lines.append(f"{res_tmp}->_{i} = {adapted};")
+            elif (
+                isinstance(tgt_vf.type_val, QTupleType)
+                and isinstance(src_vf.type_val, QTupleType)
+                and src_vf.type_val != tgt_vf.type_val
+            ):
+                coerced = self._coerce_tuple_val(
+                    src_field_access, src_vf.type_val, tgt_vf.type_val, lines
+                )
+                lines.append(f"{res_tmp}->_{i} = {coerced};")
+            elif (
+                isinstance(tgt_vf.type_val, QRecordType)
+                and isinstance(src_vf.type_val, QRecordType)
+                and src_vf.type_val != tgt_vf.type_val
+            ):
+                d_name = self.record_ctx.offset_dict_instance_name(
+                    tgt_vf.type_val, src_vf.type_val
+                )
+                lines.append(
+                    f"{res_tmp}->_{i} = ((QRecordVal){{ .val = {src_field_access}.val, "
+                    f".dict = (const void *)&{d_name} }});"
+                )
+            elif (
+                isinstance(tgt_vf.type_val, QVariantType)
+                and isinstance(src_vf.type_val, QVariantType)
+                and src_vf.type_val != tgt_vf.type_val
+            ):
+                v_up = self._emit_variant_upcast(
+                    src_field_access, src_vf.type_val, tgt_vf.type_val, lines
+                )
+                lines.append(f"{res_tmp}->_{i} = {v_up};")
+            else:
+                lines.append(f"{res_tmp}->_{i} = {src_field_access};")
+        return res_tmp
+
     def _emit_fun_return(self, body: TypedExpr, ret_type: QType, fn_lines: list[str]) -> None:
         """Emits function return handling with appropriate subtyping coercions."""
         if ret_type == OK_TYPE:
@@ -363,8 +550,8 @@ class CEmitter:
             and body.type_val != ret_type
         ):
             ret_val = self.emit_val(body, fn_lines)
-            cast_t = self.c_type(ret_type)
-            fn_lines.append(f"return ({cast_t}){ret_val};")
+            coerced = self._coerce_tuple_val(ret_val, body.type_val, ret_type, fn_lines)
+            fn_lines.append(f"return {coerced};")
         elif (
             isinstance(ret_type, QVariantType)
             and isinstance(body.type_val, QVariantType)
@@ -393,6 +580,8 @@ class CEmitter:
         actual_a: TypedExpr,
         lines: list[str],
         is_ref: bool = False,
+        is_out: bool = False,
+        writebacks: Optional[list[str]] = None,
     ) -> str:
         """Emits and coerces an argument at a function or closure call site."""
         is_ref = (
@@ -404,6 +593,43 @@ class CEmitter:
             )
         )
         if is_ref:
+            formal_c = qtype_to_c_type(formal_t, self.record_ctx)
+            actual_elem_t = actual_a.type_val
+            if isinstance(actual_elem_t, (QVarType, QOutType)):
+                actual_elem_t = actual_elem_t.element_type
+            actual_c = qtype_to_c_type(actual_elem_t, self.record_ctx)
+
+            if formal_c == "QVal" and actual_c != "QVal" and writebacks is not None:
+                if isinstance(actual_a, TypedVar):
+                    c_name = self.current_env_vars.get(
+                        actual_a.name, self.mangle_ident(actual_a.name)
+                    )
+                    loc_ptr = c_name if actual_a.name in self.pointer_params else f"(&{c_name})"
+                elif isinstance(actual_a, TypedVarCell):
+                    tmp = self.fresh_tmp("_var_cell")
+                    c_t = self.c_type(actual_a.value.type_val)
+                    c_v = self.emit_val(actual_a.value, lines)
+                    lines.append(f"{c_t} {tmp} = {c_v};")
+                    loc_ptr = f"(&{tmp})"
+                elif isinstance(actual_a, (TypedIndexRef, TypedTupleSelectRef, TypedSelectRef)):
+                    loc_ptr = self.emit_val(actual_a, lines)
+                else:
+                    loc_ptr = self.emit_val(actual_a, lines)
+
+                ptr_tmp = self.fresh_tmp("_loc_ptr")
+                lines.append(f"{actual_c} *{ptr_tmp} = {loc_ptr};")
+
+                shadow_tmp = self.fresh_tmp("_shadow_cell")
+                lines.append(f"QVal {shadow_tmp};")
+
+                if not is_out:
+                    wrapped = _qval_wrap(f"(*{ptr_tmp})", actual_elem_t)
+                    lines.append(f"{shadow_tmp} = {wrapped};")
+
+                unwrapped = _qval_unwrap(shadow_tmp, actual_elem_t, self)
+                writebacks.append(f"(*{ptr_tmp}) = {unwrapped};")
+                return f"(&{shadow_tmp})"
+
             if isinstance(actual_a, TypedVar):
                 c_name = self.current_env_vars.get(
                     actual_a.name, self.mangle_ident(actual_a.name)
@@ -430,8 +656,7 @@ class CEmitter:
             and isinstance(actual_a.type_val, QTupleType)
             and actual_a.type_val != formal_t
         ):
-            cast_t = self.c_type(formal_t)
-            return f"(({cast_t}){c_a})"
+            return self._coerce_tuple_val(c_a, actual_a.type_val, formal_t, lines)
         elif (
             isinstance(formal_t, QVariantType)
             and isinstance(actual_a.type_val, QVariantType)
@@ -931,32 +1156,59 @@ class CEmitter:
                 lines.append("")
 
         # 9. Main entrypoint
-        lines.extend([
+        main_lines: list[str] = [
             "int main(int argc, char **argv) {",
             "    quest_gc_init();",
             "    quest_builtins_init(argc, argv);",
             "",
-        ])
+        ]
 
         # Initialize all compiled modules topologically
         if sorted_modules:
             for mod in sorted_modules:
                 clean_mod = mod.name.replace(".", "_")
-                lines.append(f"    qv_mod_{clean_mod}_init();")
-            lines.append("")
+                main_lines.append(f"    qv_mod_{clean_mod}_init();")
+            main_lines.append("")
 
         total_phrases = len(prog.phrases)
         for i, phrase in enumerate(prog.phrases):
             is_last = (i == total_phrases - 1)
-            self._emit_phrase(phrase, lines, is_last=is_last)
+            self._emit_phrase(phrase, main_lines, is_last=is_last)
 
-        lines.extend([
+        main_lines.extend([
             "",
             "    return 0;",
             "}",
             "",
         ])
+
+        if self.adapter_defs:
+            lines.append("/* Closure adaptation thunks for existential packages */")
+            lines.extend(self.adapter_defs)
+
+        lines.extend(main_lines)
         return "\n".join(lines)
+
+    def _format_existential_tuple_val(self, typ: QTupleType) -> str:
+        """Formats the hidden representation of an existential tuple value for interactive output."""
+        parts: list[str] = []
+        for comp in typ.components:
+            if isinstance(comp, QTupleTypeFormal):
+                parts.append(f"<Hidden>::{comp.bound}")
+            elif isinstance(comp, QTupleTypeBinding):
+                parts.append(f"Let {comp.name} = {comp.type_val}")
+            elif isinstance(comp, QTupleField):
+                if isinstance(comp.type_val, (QPathType, QTypeVar)):
+                    elem_str = "<hidden>"
+                elif isinstance(comp.type_val, (QFunType, QAllType)):
+                    elem_str = "<fun>"
+                else:
+                    elem_str = "<val>"
+                if comp.name:
+                    parts.append(f"{comp.name}={elem_str}")
+                else:
+                    parts.append(elem_str)
+        return f"tuple {' '.join(parts)} end" if parts else "tuple end"
 
     def _emit_phrase(self, phrase: TypedNode, lines: list[str], is_last: bool = False) -> None:
         """Translates a top-level binding or expression phrase."""
@@ -995,8 +1247,9 @@ class CEmitter:
                 ):
                     phrase_lines = []
                     val_c = self.emit_val(val, phrase_lines)
-                    cast_t = self.c_type(symbol.type_val)
-                    phrase_lines.append(f"{c_ident} = ({cast_t}){val_c};")
+                    self._coerce_tuple_val(
+                        val_c, val.type_val, symbol.type_val, phrase_lines, dest=c_ident
+                    )
                     for s in phrase_lines:
                         lines.append(f"    {s}" if s.strip() else s)
                 elif (
@@ -1050,6 +1303,11 @@ class CEmitter:
                             f'    printf("let {var_str}{name}:String = \\"%s\\"\\n", '
                             f'{c_ident} ? {c_ident}->data : "");'
                         )
+                    elif isinstance(symbol.type_val, QTupleType) and symbol.type_val.is_existential:
+                        type_str = str(symbol.type_val)
+                        val_str = self._format_existential_tuple_val(symbol.type_val)
+                        msg = f"let {var_str}{name}:{type_str} = {val_str}"
+                        lines.append(f"    puts({_c_string_literal(msg)});")
                     else:
                         type_str = str(symbol.type_val)
                         msg = f"let {var_str}{name}:{type_str} = <val>"
@@ -1507,7 +1765,12 @@ class CEmitter:
                     c_args = [self.c_type_descriptor(q) for q in spec_quants]
                     for formal_p, actual_a in zip(formal_params, args):
                         is_r = getattr(formal_p, "is_out", False) or getattr(formal_p, "is_var", False)
-                        c_args.append(self._emit_call_arg(formal_p.type_val, actual_a, lines, is_ref=is_r))
+                        is_o = getattr(formal_p, "is_out", False)
+                        c_args.append(
+                            self._emit_call_arg(
+                                formal_p.type_val, actual_a, lines, is_ref=is_r, is_out=is_o
+                            )
+                        )
                     args_str = ", ".join(c_args)
                     call_str = f"{c_func}({args_str})"
                     if ret_type == OK_TYPE:
@@ -1519,9 +1782,20 @@ class CEmitter:
                     c_args = list(descriptor_args)
                     fun, _ = self.top_funs_dict[effective_func.name]
                     _, formal_params, _, ret_type = self._collect_fun_params(fun)
+                    writebacks: list[str] = []
                     for formal_p, actual_a in zip(formal_params, args):
                         is_r = getattr(formal_p, "is_out", False) or getattr(formal_p, "is_var", False)
-                        c_args.append(self._emit_call_arg(formal_p.type_val, actual_a, lines, is_ref=is_r))
+                        is_o = getattr(formal_p, "is_out", False)
+                        c_args.append(
+                            self._emit_call_arg(
+                                formal_p.type_val,
+                                actual_a,
+                                lines,
+                                is_ref=is_r,
+                                is_out=is_o,
+                                writebacks=writebacks,
+                            )
+                        )
                     args_str = ", ".join(c_args)
                     call_str = f"{c_func}({args_str})"
                     if (
@@ -1543,6 +1817,25 @@ class CEmitter:
                             pass
                         else:
                             call_str = _qval_unwrap(call_str, expr.type_val, self)
+                    elif (
+                        isinstance(ret_type, QTupleType)
+                        and isinstance(expr.type_val, QTupleType)
+                        and ret_type != expr.type_val
+                    ):
+                        call_str = self._coerce_tuple_val(call_str, ret_type, expr.type_val, lines)
+                    if writebacks:
+                        if expr.type_val == OK_TYPE:
+                            lines.append(f"{call_str};")
+                            for wb in writebacks:
+                                lines.append(wb)
+                            return "((void)0)"
+                        else:
+                            ret_c = self.c_type(expr.type_val)
+                            ret_tmp = self.fresh_tmp("_call_res")
+                            lines.append(f"{ret_c} {ret_tmp} = {call_str};")
+                            for wb in writebacks:
+                                lines.append(wb)
+                            return ret_tmp
                     if expr.type_val == OK_TYPE:
                         lines.append(f"{call_str};")
                         return "((void)0)"
@@ -1553,11 +1846,22 @@ class CEmitter:
                     _, inner_formal = self._collect_fun_quantifiers(effective_func.type_val)
                     formal_params = inner_formal.params if isinstance(inner_formal, QFunType) else None
                     c_args = list(descriptor_args)
+                    writebacks = []
                     for i, actual_a in enumerate(args):
                         if formal_params and i < len(formal_params):
                             fp = formal_params[i]
                             is_r = getattr(fp, "is_out", False) or getattr(fp, "is_var", False)
-                            c_args.append(self._emit_call_arg(fp.type_val, actual_a, lines, is_ref=is_r))
+                            is_o = getattr(fp, "is_out", False)
+                            c_args.append(
+                                self._emit_call_arg(
+                                    fp.type_val,
+                                    actual_a,
+                                    lines,
+                                    is_ref=is_r,
+                                    is_out=is_o,
+                                    writebacks=writebacks,
+                                )
+                            )
                         else:
                             c_args.append(self._emit_call_arg(actual_a.type_val, actual_a, lines))
                     all_c_args = [f"{clos_val}->env"] + c_args
@@ -1584,6 +1888,26 @@ class CEmitter:
                             pass
                         else:
                             call_str = _qval_unwrap(call_str, expr.type_val, self)
+                    elif (
+                        formal_ret is not None
+                        and isinstance(formal_ret, QTupleType)
+                        and isinstance(expr.type_val, QTupleType)
+                        and formal_ret != expr.type_val
+                    ):
+                        call_str = self._coerce_tuple_val(call_str, formal_ret, expr.type_val, lines)
+                    if writebacks:
+                        if expr.type_val == OK_TYPE:
+                            lines.append(f"{call_str};")
+                            for wb in writebacks:
+                                lines.append(wb)
+                            return "((void)0)"
+                        else:
+                            ret_c = self.c_type(expr.type_val)
+                            ret_tmp = self.fresh_tmp("_call_res")
+                            lines.append(f"{ret_c} {ret_tmp} = {call_str};")
+                            for wb in writebacks:
+                                lines.append(wb)
+                            return ret_tmp
                     if expr.type_val == OK_TYPE:
                         lines.append(f"{call_str};")
                         return "((void)0)"
@@ -1714,7 +2038,9 @@ class CEmitter:
                                 c_type = self.c_type(symbol.type_val)
                                 block_lines.append(f"{c_type} {c_ident};")
                                 val_c = self.emit_val(val, block_lines)
-                                block_lines.append(f"{c_ident} = ({c_type}){val_c};")
+                                self._coerce_tuple_val(
+                                    val_c, val.type_val, symbol.type_val, block_lines, dest=c_ident
+                                )
                             elif (
                                 isinstance(symbol.type_val, QVariantType)
                                 and isinstance(val.type_val, QVariantType)
@@ -1802,7 +2128,34 @@ class CEmitter:
                     if isinstance(elem, TypedTypeWitness):
                         continue
                     expected_fld_t = t.value_fields[val_idx].type_val
-                    if isinstance(expected_fld_t, QRecordType):
+                    expected_fld_c = qtype_to_c_type(expected_fld_t, self.record_ctx)
+                    elem_c_t = qtype_to_c_type(elem.type_val, self.record_ctx)
+                    if expected_fld_c == "QVal" and elem_c_t != "QVal":
+                        val_c = self.emit_val(elem, lines)
+                        wrapped = _qval_wrap(val_c, elem.type_val)
+                        lines.append(f"{target_dest}->_{val_idx} = {wrapped};")
+                    elif (
+                        isinstance(expected_fld_t, (QFunType, QAllType))
+                        and isinstance(elem.type_val, (QFunType, QAllType))
+                        and _closure_fn_ptr_type(expected_fld_t, self.record_ctx)
+                        != _closure_fn_ptr_type(elem.type_val, self.record_ctx)
+                    ):
+                        val_c = self.emit_val(elem, lines)
+                        adapted = self._emit_closure_adaptation(
+                            val_c, elem.type_val, expected_fld_t, lines
+                        )
+                        lines.append(f"{target_dest}->_{val_idx} = {adapted};")
+                    elif (
+                        isinstance(expected_fld_t, QTupleType)
+                        and isinstance(elem.type_val, QTupleType)
+                        and elem.type_val != expected_fld_t
+                    ):
+                        val_c = self.emit_val(elem, lines)
+                        coerced = self._coerce_tuple_val(
+                            val_c, elem.type_val, expected_fld_t, lines
+                        )
+                        lines.append(f"{target_dest}->_{val_idx} = {coerced};")
+                    elif isinstance(expected_fld_t, QRecordType):
                         val_c = self.emit_val(elem, lines)
                         coerced = self._coerce_record_val(val_c, elem, expected_fld_t)
                         lines.append(f"{target_dest}->_{val_idx} = {coerced};")

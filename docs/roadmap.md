@@ -133,14 +133,15 @@ native **AArch64 (ARM64)** machine code and providing a **JIT compiler** for int
     (`@x`, `@r.f`, `@a[i]`, `@t.1`, `var(e)`, chained paths) to `out` and `var` parameters, strict write-only
     enforcement for `out`, callsite `@` syntax enforcement, closure capture restrictions, and native pointer lowering
     (`T *`) with pointer forwarding in C transpilation. — *Complete*
+  - **Phase 4.13 (Existential Tuples & Dot-Projections):** Packing packages (weak sums `Tuple A::TYPE ... end`),
+    path-type projection (`p.T`), member projection (`p.v`), closure adaptation thunks for abstract signatures,
+    native unboxing for bounded path-types (`A <: T`), and structural tuple coercion in C transpilation. — *Complete*
 - **Bootstrap Compiler Completion Prerequisites:**
   - *Separate Compilation & Object Linking:* Compiling modules independently to `.o` files with header/interface
     exports and linking.
   - *Dynamic Subtyping & Compound Type Descriptors:* Structural subtyping in `quest_dynamic_be`
     (`is_subtype(sub, super)`) across records, variants, and compound types, alongside deferred `dynamic.extern` /
     `intern` text serialization in the C runtime (interpreter JSON/JSOG format complete).
-  - *Existential Tuples & Dot-Projections (`test_existential_tuples.py`):* packing packages, signature subtyping,
-    projecting types and values (`p.T`, `p.v`) across compilation phases including C transpilation.
 - C transpiler architecture in [codegen-c.md](codegen-c.md);
   C ABI specification in [c-representation.md](c-representation.md);
   language extensions specification in [extensions.md](extensions.md).

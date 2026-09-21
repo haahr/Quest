@@ -1,0 +1,50 @@
+(TypedProgram
+  :phrases (
+    (TypedLetType 'CounterPackage' :kind TYPE)
+    (TypedLetValue 'counterModule' :type Tuple Counter::TYPE new: Fun(init: Int): Counter inc: Fun(c: Counter): Counter add: Fun(c: Counter n: Int): Counter get: Fun(c: Counter): Int end
+      :value (TypedTuple :type Tuple Counter::TYPE new: Fun(init: Int): Counter inc: Fun(c: Counter): Counter add: Fun(c: Counter n: Int): Counter get: Fun(c: Counter): Int end
+        :elements (
+          (TypedTypeWitness 'Counter' = Int)
+          (TypedFun :params (('init' : Int)) :type Fun(init: Int): Int
+            :body (TypedVar 'init' :type Int))
+          (TypedFun :params (('c' : Int)) :type Fun(c: Int): Int
+            :body (TypedInfix '+' :type Int
+              :left (TypedVar 'c' :type Int)
+              :right (TypedInt 1 :type Int)))
+          (TypedFun :params (('c' : Int) ('n' : Int)) :type Fun(c: Int n: Int): Int
+            :body (TypedInfix '+' :type Int
+              :left (TypedVar 'c' :type Int)
+              :right (TypedVar 'n' :type Int)))
+          (TypedFun :params (('c' : Int)) :type Fun(c: Int): Int
+            :body (TypedVar 'c' :type Int))
+        )))
+    (TypedLetValue 'c0' :type counterModule.Counter
+      :value (TypedApp :type counterModule.Counter
+        :func (TypedSelect 'new' :type Fun(init: Int): counterModule.Counter
+          :target (TypedVar 'counterModule' :type Tuple Counter::TYPE new: Fun(init: Int): Counter inc: Fun(c: Counter): Counter add: Fun(c: Counter n: Int): Counter get: Fun(c: Counter): Int end))
+        :args (
+          (TypedInt 0 :type Int)
+        )))
+    (TypedLetValue 'c1' :type counterModule.Counter
+      :value (TypedApp :type counterModule.Counter
+        :func (TypedSelect 'inc' :type Fun(c: counterModule.Counter): counterModule.Counter
+          :target (TypedVar 'counterModule' :type Tuple Counter::TYPE new: Fun(init: Int): Counter inc: Fun(c: Counter): Counter add: Fun(c: Counter n: Int): Counter get: Fun(c: Counter): Int end))
+        :args (
+          (TypedVar 'c0' :type counterModule.Counter)
+        )))
+    (TypedLetValue 'c2' :type counterModule.Counter
+      :value (TypedApp :type counterModule.Counter
+        :func (TypedSelect 'add' :type Fun(c: counterModule.Counter n: Int): counterModule.Counter
+          :target (TypedVar 'counterModule' :type Tuple Counter::TYPE new: Fun(init: Int): Counter inc: Fun(c: Counter): Counter add: Fun(c: Counter n: Int): Counter get: Fun(c: Counter): Int end))
+        :args (
+          (TypedVar 'c1' :type counterModule.Counter)
+          (TypedInt 10 :type Int)
+        )))
+    (TypedLetValue 'total' :type Int
+      :value (TypedApp :type Int
+        :func (TypedSelect 'get' :type Fun(c: counterModule.Counter): Int
+          :target (TypedVar 'counterModule' :type Tuple Counter::TYPE new: Fun(init: Int): Counter inc: Fun(c: Counter): Counter add: Fun(c: Counter n: Int): Counter get: Fun(c: Counter): Int end))
+        :args (
+          (TypedVar 'c2' :type counterModule.Counter)
+        )))
+  ))

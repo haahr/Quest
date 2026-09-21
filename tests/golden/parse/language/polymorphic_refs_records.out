@@ -1,0 +1,723 @@
+(Program
+  :phrases (
+    (LetTypeBinding
+      :name 'Point'
+      :type_val (TypeRecord
+        :fields (
+          (RecordFieldSig
+            :name 'x'
+            :type_sig (TypePath ('Int'))
+          )
+          (RecordFieldSig
+            :name 'y'
+            :type_sig (TypePath ('Int'))
+          )
+        )
+      )
+    )
+    (LetTypeBinding
+      :name 'Point3D'
+      :type_val (TypeRecord
+        :fields (
+          (RecordFieldSig
+            :name 'x'
+            :type_sig (TypePath ('Int'))
+          )
+          (RecordFieldSig
+            :name 'y'
+            :type_sig (TypePath ('Int'))
+          )
+          (RecordFieldSig
+            :name 'z'
+            :type_sig (TypePath ('Int'))
+          )
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'updatePoint'
+      :value (ExprFun
+        :params (
+          (FormalParam
+            :name 'dest'
+            :type_annot (TypePath ('A'))
+            :mode OUT
+          )
+          (FormalParam
+            :name 'src'
+            :type_annot (TypePath ('A'))
+            :mode VALUE
+          )
+        )
+        :return_type (TypePath ('Ok'))
+        :body (ExprInfix
+          :left (ExprId 'dest')
+          :op ':='
+          :right (ExprId 'src')
+        )
+        :type_params (
+          (TypeFormal
+            :name 'A'
+            :bound (KindType)
+          )
+        )
+      )
+      :type_annot (TypeAll
+        :quantifiers (
+          (Quantifier
+            :name 'A'
+            :bound (KindType)
+            :mode VALUE
+            :is_type True
+          )
+          (Quantifier
+            :name 'dest'
+            :bound (KindPower
+              :bound (TypePath ('A'))
+            )
+            :mode OUT
+          )
+          (Quantifier
+            :name 'src'
+            :bound (KindPower
+              :bound (TypePath ('A'))
+            )
+            :mode VALUE
+          )
+        )
+        :result_type (TypePath ('Ok'))
+      )
+    )
+    (LetValueBinding
+      :name 'p1'
+      :value (ExprRecord
+        :fields (
+          (RecordBinding
+            :name 'x'
+            :value (ExprInt 10 '10')
+          )
+          (RecordBinding
+            :name 'y'
+            :value (ExprInt 20 '20')
+          )
+        )
+      )
+      :is_var True
+    )
+    (LetValueBinding
+      :name 'p2'
+      :value (ExprRecord
+        :fields (
+          (RecordBinding
+            :name 'x'
+            :value (ExprInt 30 '30')
+          )
+          (RecordBinding
+            :name 'y'
+            :value (ExprInt 40 '40')
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'updatePoint')
+        :args (
+          (TypeArgument
+            :type_val (TypePath ('Point'))
+          )
+          (ExprDerefCell
+            :target (ExprId 'p1')
+          )
+          (ExprId 'p2')
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'p1x'
+      :value (ExprSelect
+        :target (ExprId 'p1')
+        :field 'x'
+      )
+    )
+    (LetValueBinding
+      :name 'p1y'
+      :value (ExprSelect
+        :target (ExprId 'p1')
+        :field 'y'
+      )
+    )
+    (LetValueBinding
+      :name 'swapPoly'
+      :value (ExprFun
+        :params (
+          (FormalParam
+            :name 'a'
+            :type_annot (TypePath ('A'))
+            :mode VAR
+          )
+          (FormalParam
+            :name 'b'
+            :type_annot (TypePath ('A'))
+            :mode VAR
+          )
+        )
+        :return_type (TypePath ('Ok'))
+        :body (ExprBlock
+          :bindings (
+            (LetValueBinding
+              :name 'tmp'
+              :value (ExprId 'a')
+            )
+            (ExprStmt
+              :expr (ExprInfix
+                :left (ExprId 'a')
+                :op ':='
+                :right (ExprId 'b')
+              )
+            )
+            (ExprStmt
+              :expr (ExprInfix
+                :left (ExprId 'b')
+                :op ':='
+                :right (ExprId 'tmp')
+              )
+            )
+          )
+        )
+        :type_params (
+          (TypeFormal
+            :name 'A'
+            :bound (KindType)
+          )
+        )
+      )
+      :type_annot (TypeAll
+        :quantifiers (
+          (Quantifier
+            :name 'A'
+            :bound (KindType)
+            :mode VALUE
+            :is_type True
+          )
+          (Quantifier
+            :name 'a'
+            :bound (KindPower
+              :bound (TypePath ('A'))
+            )
+            :mode VAR
+          )
+          (Quantifier
+            :name 'b'
+            :bound (KindPower
+              :bound (TypePath ('A'))
+            )
+            :mode VAR
+          )
+        )
+        :result_type (TypePath ('Ok'))
+      )
+    )
+    (LetValueBinding
+      :name 'r1'
+      :value (ExprRecord
+        :fields (
+          (RecordBinding
+            :name 'x'
+            :value (ExprInt 1 '1')
+          )
+          (RecordBinding
+            :name 'y'
+            :value (ExprInt 2 '2')
+          )
+        )
+      )
+      :is_var True
+    )
+    (LetValueBinding
+      :name 'r2'
+      :value (ExprRecord
+        :fields (
+          (RecordBinding
+            :name 'x'
+            :value (ExprInt 8 '8')
+          )
+          (RecordBinding
+            :name 'y'
+            :value (ExprInt 9 '9')
+          )
+        )
+      )
+      :is_var True
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'swapPoly')
+        :args (
+          (TypeArgument
+            :type_val (TypePath ('Point'))
+          )
+          (ExprDerefCell
+            :target (ExprId 'r1')
+          )
+          (ExprDerefCell
+            :target (ExprId 'r2')
+          )
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'r1x'
+      :value (ExprSelect
+        :target (ExprId 'r1')
+        :field 'x'
+      )
+    )
+    (LetValueBinding
+      :name 'r2x'
+      :value (ExprSelect
+        :target (ExprId 'r2')
+        :field 'x'
+      )
+    )
+    (LetValueBinding
+      :name 'assignClosure'
+      :value (ExprId 'updatePoint')
+    )
+    (LetValueBinding
+      :name 'p3'
+      :value (ExprRecord
+        :fields (
+          (RecordBinding
+            :name 'x'
+            :value (ExprInt 100 '100')
+          )
+          (RecordBinding
+            :name 'y'
+            :value (ExprInt 200 '200')
+          )
+        )
+      )
+      :is_var True
+    )
+    (LetValueBinding
+      :name 'p4'
+      :value (ExprRecord
+        :fields (
+          (RecordBinding
+            :name 'x'
+            :value (ExprInt 500 '500')
+          )
+          (RecordBinding
+            :name 'y'
+            :value (ExprInt 600 '600')
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'assignClosure')
+        :args (
+          (TypeArgument
+            :type_val (TypePath ('Point'))
+          )
+          (ExprDerefCell
+            :target (ExprId 'p3')
+          )
+          (ExprId 'p4')
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'p3x'
+      :value (ExprSelect
+        :target (ExprId 'p3')
+        :field 'x'
+      )
+    )
+    (LetValueBinding
+      :name 'p3y'
+      :value (ExprSelect
+        :target (ExprId 'p3')
+        :field 'y'
+      )
+    )
+    (LetValueBinding
+      :name 'swapClosure'
+      :value (ExprId 'swapPoly')
+    )
+    (LetValueBinding
+      :name 's1'
+      :value (ExprRecord
+        :fields (
+          (RecordBinding
+            :name 'x'
+            :value (ExprInt 111 '111')
+          )
+          (RecordBinding
+            :name 'y'
+            :value (ExprInt 222 '222')
+          )
+        )
+      )
+      :is_var True
+    )
+    (LetValueBinding
+      :name 's2'
+      :value (ExprRecord
+        :fields (
+          (RecordBinding
+            :name 'x'
+            :value (ExprInt 333 '333')
+          )
+          (RecordBinding
+            :name 'y'
+            :value (ExprInt 444 '444')
+          )
+        )
+      )
+      :is_var True
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'swapClosure')
+        :args (
+          (TypeArgument
+            :type_val (TypePath ('Point'))
+          )
+          (ExprDerefCell
+            :target (ExprId 's1')
+          )
+          (ExprDerefCell
+            :target (ExprId 's2')
+          )
+        )
+      )
+    )
+    (LetValueBinding
+      :name 's1x'
+      :value (ExprSelect
+        :target (ExprId 's1')
+        :field 'x'
+      )
+    )
+    (LetValueBinding
+      :name 's2x'
+      :value (ExprSelect
+        :target (ExprId 's2')
+        :field 'x'
+      )
+    )
+    (LetValueBinding
+      :name 'makePair'
+      :value (ExprFun
+        :params (
+          (FormalParam
+            :name 'a'
+            :type_annot (TypePath ('A'))
+            :mode VALUE
+          )
+          (FormalParam
+            :name 'b'
+            :type_annot (TypePath ('B'))
+            :mode VALUE
+          )
+        )
+        :return_type (TypeTuple
+          :fields (
+            (FieldSig
+              :name 'first'
+              :type_sig (TypePath ('A'))
+              :mode VALUE
+            )
+            (FieldSig
+              :name 'second'
+              :type_sig (TypePath ('B'))
+              :mode VALUE
+            )
+          )
+        )
+        :body (ExprTuple
+          :fields (
+            (TupleBinding
+              :name 'first'
+              :value (ExprId 'a')
+            )
+            (TupleBinding
+              :name 'second'
+              :value (ExprId 'b')
+            )
+          )
+        )
+        :type_params (
+          (TypeFormal
+            :name 'A'
+            :bound (KindType)
+          )
+          (TypeFormal
+            :name 'B'
+            :bound (KindType)
+          )
+        )
+      )
+      :type_annot (TypeAll
+        :quantifiers (
+          (Quantifier
+            :name 'A'
+            :bound (KindType)
+            :mode VALUE
+            :is_type True
+          )
+          (Quantifier
+            :name 'B'
+            :bound (KindType)
+            :mode VALUE
+            :is_type True
+          )
+          (Quantifier
+            :name 'a'
+            :bound (KindPower
+              :bound (TypePath ('A'))
+            )
+            :mode VALUE
+          )
+          (Quantifier
+            :name 'b'
+            :bound (KindPower
+              :bound (TypePath ('B'))
+            )
+            :mode VALUE
+          )
+        )
+        :result_type (TypeTuple
+          :fields (
+            (FieldSig
+              :name 'first'
+              :type_sig (TypePath ('A'))
+              :mode VALUE
+            )
+            (FieldSig
+              :name 'second'
+              :type_sig (TypePath ('B'))
+              :mode VALUE
+            )
+          )
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'pt1'
+      :value (ExprRecord
+        :fields (
+          (RecordBinding
+            :name 'x'
+            :value (ExprInt 77 '77')
+          )
+          (RecordBinding
+            :name 'y'
+            :value (ExprInt 88 '88')
+          )
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'directPair'
+      :value (ExprApp
+        :func (ExprId 'makePair')
+        :args (
+          (TypeArgument
+            :type_val (TypePath ('Point'))
+          )
+          (TypeArgument
+            :type_val (TypePath ('String'))
+          )
+          (ExprId 'pt1')
+          (ExprString 'hello' '"hello"')
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'dpx'
+      :value (ExprSelect
+        :target (ExprSelect
+          :target (ExprId 'directPair')
+          :field 'first'
+        )
+        :field 'x'
+      )
+    )
+    (LetValueBinding
+      :name 'dpy'
+      :value (ExprSelect
+        :target (ExprSelect
+          :target (ExprId 'directPair')
+          :field 'first'
+        )
+        :field 'y'
+      )
+    )
+    (LetValueBinding
+      :name 'dps'
+      :value (ExprSelect
+        :target (ExprId 'directPair')
+        :field 'second'
+      )
+    )
+    (LetValueBinding
+      :name 'pairClosure'
+      :value (ExprId 'makePair')
+    )
+    (LetValueBinding
+      :name 'pt2'
+      :value (ExprRecord
+        :fields (
+          (RecordBinding
+            :name 'x'
+            :value (ExprInt 99 '99')
+          )
+          (RecordBinding
+            :name 'y'
+            :value (ExprInt 101 '101')
+          )
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'closPair'
+      :value (ExprApp
+        :func (ExprId 'pairClosure')
+        :args (
+          (TypeArgument
+            :type_val (TypePath ('Point'))
+          )
+          (TypeArgument
+            :type_val (TypePath ('Int'))
+          )
+          (ExprId 'pt2')
+          (ExprInt 42 '42')
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'cpx'
+      :value (ExprSelect
+        :target (ExprSelect
+          :target (ExprId 'closPair')
+          :field 'first'
+        )
+        :field 'x'
+      )
+    )
+    (LetValueBinding
+      :name 'cpy'
+      :value (ExprSelect
+        :target (ExprSelect
+          :target (ExprId 'closPair')
+          :field 'first'
+        )
+        :field 'y'
+      )
+    )
+    (LetValueBinding
+      :name 'cpi'
+      :value (ExprSelect
+        :target (ExprId 'closPair')
+        :field 'second'
+      )
+    )
+    (LetValueBinding
+      :name 'p3d'
+      :value (ExprRecord
+        :fields (
+          (RecordBinding
+            :name 'x'
+            :value (ExprInt 1 '1')
+          )
+          (RecordBinding
+            :name 'y'
+            :value (ExprInt 2 '2')
+          )
+          (RecordBinding
+            :name 'z'
+            :value (ExprInt 3 '3')
+          )
+        )
+      )
+    )
+    (LetValueBinding
+      :name 't3d'
+      :value (ExprTuple
+        :fields (
+          (TupleBinding
+            :name 'pt'
+            :value (ExprId 'p3d')
+          )
+          (TupleBinding
+            :name 'tag'
+            :value (ExprString '3D' '"3D"')
+          )
+        )
+      )
+      :type_annot (TypeTuple
+        :fields (
+          (FieldSig
+            :name 'pt'
+            :type_sig (TypePath ('Point3D'))
+            :mode VALUE
+          )
+          (FieldSig
+            :name 'tag'
+            :type_sig (TypePath ('String'))
+            :mode VALUE
+          )
+        )
+      )
+    )
+    (LetValueBinding
+      :name 't2d'
+      :value (ExprId 't3d')
+      :type_annot (TypeTuple
+        :fields (
+          (FieldSig
+            :name 'pt'
+            :type_sig (TypePath ('Point'))
+            :mode VALUE
+          )
+          (FieldSig
+            :name 'tag'
+            :type_sig (TypePath ('String'))
+            :mode VALUE
+          )
+        )
+      )
+    )
+    (LetValueBinding
+      :name 't2dx'
+      :value (ExprSelect
+        :target (ExprSelect
+          :target (ExprId 't2d')
+          :field 'pt'
+        )
+        :field 'x'
+      )
+    )
+    (LetValueBinding
+      :name 't2dy'
+      :value (ExprSelect
+        :target (ExprSelect
+          :target (ExprId 't2d')
+          :field 'pt'
+        )
+        :field 'y'
+      )
+    )
+    (LetValueBinding
+      :name 't2dtag'
+      :value (ExprSelect
+        :target (ExprId 't2d')
+        :field 'tag'
+      )
+    )
+  )
+)

@@ -233,6 +233,42 @@ Tuples are ordered collections of 64-bit values. In Quest, tuple components can 
   ```
   If field padding or struct alignment ever differs between the two types, compilation fails immediately.
 
+- **Existential Tuples & Erasure of Type Formals:**
+  In existential tuple types (`Tuple A::TYPE a: A end`, `Tuple T::POWER(Int) value: T end`), type formal components
+  are erased from the physical C struct in static compilation. Only value components occupy struct fields
+  (`_0`, `_1`, etc.). Runtime type descriptors for existential witnesses will be incorporated when `Dynamic.intern`
+  and `Dynamic.extern` serialization is implemented.
+
+- **Unbounded vs. Bounded Path-Type Lowering:**
+  - Unbounded type variables and path-types (`A::TYPE`, `p.T`) map to uniform 64-bit `QVal`. Concrete scalar values
+    assigned to abstract slots are boxed via `qval_wrap`, and extracted abstract values are unboxed via `qval_unwrap`.
+  - Bounded type variables and path-types (`A::POWER(T)`, `p.T` where `p.T <: T`) resolve directly to the bound's
+    native C type (e.g. `A <: Int` resolves to `QInt`, `A <: Real` to `QReal`), enabling unboxed, zero-overhead access.
+
+- **Closure Adaptation Thunks:**
+  When a tuple with concrete function signatures (e.g. `create: Int -> Counter` where `Counter = Int`) is coerced or
+  packed into an existential tuple with abstract signatures (e.g. `create: Int -> A`), the underlying C function
+  pointer types differ (`QInt (*)(void *, QInt)` vs `QVal (*)(void *, QInt)`). The transpiler synthesizes a static
+  adaptation thunk (`qv_adapt_<id>`) that forwards the environment, unwraps any `QVal` arguments, calls the concrete
+  function, and wraps abstract return values with `qval_wrap`.
+
+- **Tuple Structural Coercion & Generic Returns:**
+  When field types between source and target tuples differ in C representation (due to scalar-to-QVal boxing, closure
+  signature adaptation, generic function returns, or nested tuple coercion), the transpiler allocates a new target
+  tuple struct and maps each field via `_coerce_tuple_val`:
+  - **Generic Tuple Returns (`QVal` to Concrete):** Generic functions returning tuples (e.g.
+    `let pair(A::TYPE B::TYPE a: A b: B): Tuple :A :B end = tuple a b end`) construct tuples whose fields are `QVal`.
+    When instantiated at concrete types (e.g., `pair(:Point :Int pt 1)`), the caller coerces the returned tuple to the
+    concrete tuple struct. For each field where the source is `QVal` and the target is concrete, `_qval_unwrap` unboxes
+    the value. If the target field is a 16-byte record fat pointer (`QRecordVal`), `_qval_unwrap` unboxes it from the
+    heap cell (`quest_record_unbox`); if a 16-byte variant, it unboxes the `QVariantVal`.
+  - **Record Width Subtyping in Tuples:** When a tuple field contains a record subtype whose field dictionary differs
+    from the target tuple field, the compiler synthesizes the new fat pointer by attaching the target evidence
+    dictionary (`(QRecordVal){ .val = src._i.val, .dict = &... }`) rather than an unsafe pointer cast.
+  - **Variant Tag Remapping in Tuples:** When tuple fields contain variants upcast across subtyping boundaries, static
+    tag remapping lookup tables are applied to align the tag space to the target variant type.
+  - **Zero-Cost Pointer Cast:** If all field C types match identically, zero-cost pointer casting is preserved.
+
 ### 5.2. Records and Subtyping (Evidence Passing)
 Under Cardelli's structural subtyping with multiple inheritance, field offsets cannot be assigned globally.
 As established in `docs/runtime-design.md`, Quest uses the **Evidence Passing** model:
@@ -558,7 +594,10 @@ While monomorphic functions pass values directly, polymorphic functions (`All(A:
 - Higher-Order Quantifier Subtyping:
   Because every quantifier corresponds to exactly one pointer parameter `const QTypeDescriptor *` in C regardless of its subkinding bound (`TYPE` vs `POWER(Point)`), a general polymorphic function $\text{All}(A::\text{TYPE}) (A \to \text{Ok})$ has the exact same C signature and calling convention as a bounded function $\text{All}(A <: \text{Point}) (A \to \text{Ok})$, requiring zero adaptation thunks.
 - Existential Packages (Weak Sums):
-  In runtime tuples (`struct QTuple`), each existential type formal `X::K` occupies a pointer-sized slot storing `const QTypeDescriptor *descriptor_X`.
+  In static compilation, type formal components `X::K` are erased from runtime tuple structs (`struct QTuple`),
+  allocating only for value fields. Path-types `p.X` resolve to `QVal` (if unbounded) or to the native C type of
+  `K`'s bound (if `K = POWER(T)`). Full runtime type descriptors for existential witnesses will be incorporated
+  when `Dynamic.intern` and `Dynamic.extern` are implemented.
 
 #### 2. Types of Polymorphic Instantiation Call Sites
 In Cardelli's formal terminology (*Typeful Programming* §3 & §5), applying a polymorphic value to a type argument is **polymorphic instantiation** (or **type application**):
@@ -637,9 +676,29 @@ Following Cardelli's *Typeful Programming* (§4.8), Quest supports passing mutab
 - In the function body, writes to `qv_p` dereference the pointer (`*qv_p = val;`).
 - Reads from `var` parameters dereference the pointer (`*qv_p`).
 - Direct reads from `out` parameters are strictly rejected at compile time (strict write-only enforcement).
-- When a function takes polymorphic parameters (`var p: A`), `qv_p` has type `QVal *`.
+- When a function takes polymorphic parameters (`var p: A`), the unspecialized signature uses `QVal *qv_p`.
 
-#### 2. Call Sites and `@` Lvalue Expressions
+#### 2. Polymorphic `out` and `var` Parameters: Two-Tier Invocation Model
+When calling a generic function with polymorphic reference parameters (e.g. `assignPoly(:A @x val)` where `x: T`):
+- **Tier 1 (Direct Call Specialization):** Within the same compilation unit, calls with concrete type arguments
+  specialize the function. The specialized function receives a direct native pointer `T *qv_p`, passing the address of
+  the native memory location without any boxing or intermediate allocation.
+- **Tier 2 (Shadow Cell Fallback Mode):** When calling an unspecialized polymorphic function (such as across separate
+  compilation boundaries or through first-class generic closures):
+  - The caller allocates a stack-allocated shadow cell: `QVal _shadow_cell;`.
+  - **Copy-in (`var` only):** For `var` parameters, the caller wraps the current native value into the shadow cell:
+    `_shadow_cell = _qval_wrap(*_loc_ptr, T);`. If `T` is a 16-byte record fat pointer (`QRecordVal`), it is heap-boxed
+    via `quest_record_box`; if `T` is a 16-byte `QVariantVal`, it is boxed via `quest_variant_box`. For `out`
+    parameters, copy-in is skipped because the callee cannot read the parameter.
+  - **Callee Invocation:** Callee receives `&_shadow_cell` (`QVal *`).
+  - **Copy-out Writeback (`var` and `out`):** Immediately after the callee returns, the caller executes the writeback:
+    `*_loc_ptr = _qval_unwrap(_shadow_cell, T);`. If `T` is a record, `_qval_unwrap` unboxes the `QRecordVal` fat
+    pointer; if a variant, it unboxes the `QVariantVal`.
+  - **Writeback Semantics:** In fallback mode, writes made by the callee are buffered in the shadow cell and committed
+    to the target location only upon function return. If the target location is aliased by another reference or accessed
+    by another thread during callee execution, in-flight mutations are not visible until the writeback executes.
+
+#### 3. Call Sites and `@` Lvalue Expressions
 - Call sites for `var` and `out` parameters strictly require explicit `@` lvalue references or temporary cells `var(e)`.
   Passing bare identifiers without `@` is rejected as a type error.
 - Supported lvalue targets for `@`:
@@ -654,7 +713,7 @@ Following Cardelli's *Typeful Programming* (§4.8), Quest supports passing mutab
   (`g(@y)`), the compiler detects that `y` is already a pointer and passes `qv_y` directly without taking its
   address (`&`).
 
-#### 3. Closure Capture Restrictions
+#### 4. Closure Capture Restrictions
 To prevent dangling stack references and escaping pointers without requiring full static lifetime analysis or boxing
 every variable into a heap cell:
 - Capturing `out` or `var` parameters inside local closures is prohibited and rejected with a type error.

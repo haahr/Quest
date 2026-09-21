@@ -1,0 +1,67 @@
+(* Language: Polymorphic out/var references and generic tuple returns with records and fat pointers *)
+
+Let Point = Record x: Int y: Int end;
+Let Point3D = Record x: Int y: Int z: Int end;
+
+(* 1. Direct specialization of polymorphic out and var with 16-byte records *)
+let updatePoint(A::TYPE out dest: A src: A): Ok =
+    dest := src;
+
+let var p1 = record x = 10 y = 20 end;
+let p2 = record x = 30 y = 40 end;
+updatePoint(:Point @p1 p2);
+let p1x = p1.x;
+let p1y = p1.y;
+
+let swapPoly(A::TYPE var a: A var b: A): Ok =
+    begin
+        let tmp = a;
+        a := b;
+        b := tmp;
+    end;
+
+let var r1 = record x = 1 y = 2 end;
+let var r2 = record x = 8 y = 9 end;
+swapPoly(:Point @r1 @r2);
+let r1x = r1.x;
+let r2x = r2.x;
+
+(* 2. Fallback shadow-cell execution: calling polymorphic out/var through first-class closures *)
+let assignClosure = updatePoint;
+let var p3 = record x = 100 y = 200 end;
+let p4 = record x = 500 y = 600 end;
+assignClosure(:Point @p3 p4);
+let p3x = p3.x;
+let p3y = p3.y;
+
+let swapClosure = swapPoly;
+let var s1 = record x = 111 y = 222 end;
+let var s2 = record x = 333 y = 444 end;
+swapClosure(:Point @s1 @s2);
+let s1x = s1.x;
+let s2x = s2.x;
+
+(* 3. Generic tuple returning 16-byte record fat pointers (direct and fallback closure) *)
+let makePair(A::TYPE B::TYPE a: A b: B): Tuple first: A second: B end =
+    tuple let first = a let second = b end;
+
+let pt1 = record x = 77 y = 88 end;
+let directPair = makePair(:Point :String pt1 "hello");
+let dpx = directPair.first.x;
+let dpy = directPair.first.y;
+let dps = directPair.second;
+
+let pairClosure = makePair;
+let pt2 = record x = 99 y = 101 end;
+let closPair = pairClosure(:Point :Int pt2 42);
+let cpx = closPair.first.x;
+let cpy = closPair.first.y;
+let cpi = closPair.second;
+
+(* 4. Record width subtyping in tuples *)
+let p3d = record x = 1 y = 2 z = 3 end;
+let t3d: Tuple pt: Point3D tag: String end = tuple let pt = p3d let tag = "3D" end;
+let t2d: Tuple pt: Point tag: String end = t3d;
+let t2dx = t2d.pt.x;
+let t2dy = t2d.pt.y;
+let t2dtag = t2d.tag;

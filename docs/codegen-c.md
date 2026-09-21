@@ -568,8 +568,43 @@ Phase 4.12 implements native pointer lowering for Cardelli's mutable reference p
   - Array element references `@a[i]` emit pointers into the flat array buffer (`&arr->data[i]`).
   - Tuple element references `@t.1` emit pointers to tuple components (`&tup->_1`).
   - Temporary cells `var(e)` evaluate `e` into a stack local and pass its address (`&_var_cell`).
+- **Polymorphic Reference Invocations (Two-Tier Model):**
+  - **Tier 1 (Specialization):** Direct calls in the compilation unit trigger AST specialization in `c_analysis.py`.
+    The specialized function takes native `T *qv_p` parameters, passing lvalue pointers directly without overhead.
+  - **Tier 2 (Shadow Cell Fallback):** When calling unspecialized polymorphic functions (`var p: A` where `qv_p` is
+    `QVal *`), the caller generates a stack shadow cell `QVal _shadow_cell`. For `var` parameters, it performs copy-in
+    via `_qval_wrap(*_loc_ptr, T)` (boxing 16-byte `QRecordVal` fat pointers and `QVariantVal`), passes `&_shadow_cell`
+    to the callee, and performs copy-out writeback `*_loc_ptr = _qval_unwrap(_shadow_cell, T)` after return.
 - **Closure Capture Restrictions:** Closure capture of `out`/`var` parameters or local stack mutable variables
   is prohibited at compile time, guaranteeing that pointers never outlive their stack frames.
+
+### 10.9. Existential Tuples & Dot-Projections (Phase 4.13)
+Phase 4.13 implements existential tuples (weak sums `Tuple A::TYPE ... end`), path-type projection (`p.T`),
+and member projection (`p.v`):
+- **Struct Layout & Type Formal Erasure:** In static compilation, type formal components (`A::TYPE`, `A <: T`) are
+  erased from the physical C struct layout. Positional value indices (`_0`, `_1`, etc.) correspond strictly to the
+  tuple's value components.
+- **Bounded Path-Type Native Lowering (`resolve_type_bound`):**
+  - Unbounded type variables and path-types (`A::TYPE`, `p.T`) map to uniform 64-bit `QVal`. Scalar values are boxed
+    via `qval_wrap` and unboxed via `qval_unwrap`.
+  - Bounded type variables and path-types (`A::POWER(T)`, `p.T <: T`) unbox directly to the bound's native C type
+    (e.g., `QInt`, `QReal`), eliminating dynamic boxing and preserving full native performance.
+- **Closure Adaptation Thunks (`_emit_closure_adaptation`):** When packaging or coercing a tuple containing closures
+  whose concrete signatures differ from the abstract interface signature (e.g., `create(init: Int): Counter` where
+  `Counter = Int` coerced to `create(init: Int): A`), the transpiler synthesizes static adaptation thunks
+  (`qv_adapt_<id>`). The thunk unpacks/forwards the original closure's environment, unwraps any `QVal` arguments with
+  `qval_unwrap`, invokes the underlying native function, and wraps any abstract return value with `qval_wrap`.
+- **Tuple Structural Coercion & Generic Returns (`_coerce_tuple_val`):** Coercions between tuples whose field C types
+  differ (e.g., concrete scalar to `QVal`, closure adaptation, nested tuple structural conversions, or generic tuple
+  returns where `QVal` fields are unwrapped into concrete types) allocate a new target tuple and map each field.
+  - **Fat Pointer & Variant Support:** Unwrapping `QVal` fields into concrete record fat pointers (`QRecordVal`) or
+    variants (`QVariantVal`) invokes `quest_record_unbox` or `quest_variant_unbox`.
+  - **Record Subtyping & Tag Remapping:** Coercions attach evidence dictionaries for subtyped records and apply static
+    tag remapping arrays for variants across subtyping boundaries.
+  - If all field C types match identically, zero-cost pointer casting is retained.
+- **End-to-End Golden Verification:** Verified across all phases (`tokenize`, `parse`, `typecheck`, `interpret`,
+  `run_c_compiled`) via `existential_packages.quest`, `existential_adt.quest`, `cardelli_syntax.quest`, and
+  `polymorphic_refs_records.quest`.
 
 ---
 
@@ -602,11 +637,11 @@ The compiler runner manages external C compiler toolchain discovery, Boehm GC fl
 
 ---
 
-## 12. Testing & Verification
+## 12. Verification & Test Suite
 
-The C code generator is verified by comprehensive unit and integration tests:
-- `tests/python/test_phase4_1_c_codegen.py`: Scalar operations, control flow, memory modes, and runtime panic tests.
-- `tests/python/test_phase4_2a_functions.py`: Top-level and recursive functions, direct C calling conventions,
+The C code generator is verified through comprehensive unit, integration, and end-to-end tests:
+- `tests/python/test_phase4_1_runtime.py`: Runtime macros, tag operations, error exits, and `--nogc` execution.
+- `tests/python/test_phase4_2a_functions.py`: Direct function calls, uncurrying, mutual recursion,
   curried application flattening, mutable top-level variables, and `--nogc` execution.
 - `tests/python/test_phase4_2b_aggregates.py`: Tuples, concrete records, heap allocation via `quest_alloc`,
   named/indexed field selection, mutable field assignment, and nested aggregates.
@@ -637,6 +672,9 @@ The C code generator is verified by comprehensive unit and integration tests:
   hybrid Quest/C modules.
 - `tests/python/test_stage2_cardelli.py` & `tests/source/language/lvalues_references.quest`: Mutable reference
   parameters (`out`, `var`), lvalue address-of generation, pointer forwarding, and compile-time error checks.
+- `tests/python/test_existential_tuples.py` & `tests/source/language/existential_{packages,adt}.quest`: Existential
+  tuples, package packing, signature adaptation thunks, bounded path-type unboxing, and dot-projections across
+  interpreter and native C execution.
 - `tests/source/01_lexer_basics.quest`: Verified end-to-end native compilation and execution of tuple operations.
 - `tests/source/02_expressions_control_flow.quest`: Verified end-to-end native compilation and execution.
 - `tests/source/03_functions_closures.quest`: Verified end-to-end native compilation and execution of closures.

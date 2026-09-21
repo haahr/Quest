@@ -40,6 +40,7 @@ from quest.types import (
     QArrayType,
     QFunType,
     QOptionType,
+    QOutType,
     QParam,
     QQuantifier,
     QRecordField,
@@ -48,6 +49,7 @@ from quest.types import (
     QType,
     QTypeVar,
     QVariantType,
+    QVarType,
     resolve_record_bound,
     resolve_variant_bound,
     resolve_option_bound,
@@ -250,7 +252,58 @@ def specialize_typed_fun(
     return spec_ident, cloned_fun
 
 
-def find_specialization_calls(node: Any) -> list[tuple[str, tuple[QType, ...]]]:
+def _should_specialize_call(
+    func_name: str,
+    type_args: tuple[QType, ...],
+    funs_dict: Optional[dict[str, Any]] = None,
+) -> bool:
+    """Determines whether a call to func_name with type_args should be specialized."""
+    if any(is_specialization_needed(t) for t in type_args):
+        return True
+    if not funs_dict or func_name not in funs_dict:
+        return False
+    orig = funs_dict[func_name]
+    orig_fun, _ = orig
+    if not isinstance(orig_fun, TypedFun):
+        return False
+    quants, inner_t = collect_fun_quantifiers(orig_fun.type_val)
+    if not quants:
+        return False
+    quant_names = {q.name for q in quants}
+    quant_ids = {getattr(q, "symbol_id", None) for q in quants}
+
+    def type_contains_quant(t: Any) -> bool:
+        if t is None:
+            return False
+        if isinstance(t, QTypeVar):
+            return t.name in quant_names or getattr(t, "symbol_id", None) in quant_ids
+        if isinstance(t, QTupleType):
+            return any(type_contains_quant(f.type_val) for f in t.value_fields)
+        if isinstance(t, QArrayType):
+            return type_contains_quant(t.element_type)
+        if isinstance(t, (QVarType, QOutType)):
+            return type_contains_quant(t.element_type)
+        return False
+
+    for p in orig_fun.params:
+        is_ref = getattr(p, "is_out", False) or getattr(p, "is_var", False)
+        if is_ref and type_contains_quant(p.type_val):
+            return True
+
+    ret_t = inner_t.result_type if isinstance(inner_t, QFunType) else inner_t
+    if isinstance(ret_t, QTupleType) and type_contains_quant(ret_t):
+        return True
+    for p in orig_fun.params:
+        if isinstance(p.type_val, QTupleType) and type_contains_quant(p.type_val):
+            return True
+
+    return False
+
+
+def find_specialization_calls(
+    node: Any,
+    funs_dict: Optional[dict[str, Any]] = None,
+) -> list[tuple[str, tuple[QType, ...]]]:
     """Finds all polymorphic function calls needing call-site specialization."""
     calls: list[tuple[str, tuple[QType, ...]]] = []
 
@@ -275,7 +328,7 @@ def find_specialization_calls(node: Any) -> list[tuple[str, tuple[QType, ...]]]:
                     func_name = f"{effective_func.target.name}.{effective_func.field}"
 
                 if func_name and type_args:
-                    if any(is_specialization_needed(t) for t in type_args):
+                    if _should_specialize_call(func_name, tuple(type_args), funs_dict):
                         calls.append((func_name, tuple(type_args)))
 
                 scan(f)
@@ -498,16 +551,17 @@ def analyze_program_for_c(
 
     # 2. Call-site specialization discovery and synthesis
     specializations: dict[tuple[str, tuple[QType, ...]], tuple[str, TypedFun]] = {}
+    funs_dict: dict[str, tuple[TypedFun, Any]] = {**module_funs_dict, **top_funs_dict}
     worklist: list[Any] = list(prog.phrases)
 
     while worklist:
         curr_node = worklist.pop(0)
-        found_calls = find_specialization_calls(curr_node)
+        found_calls = find_specialization_calls(curr_node, funs_dict)
         for fname, targs in found_calls:
             spec_key = (fname, targs)
             if spec_key in specializations:
                 continue
-            orig = top_funs_dict.get(fname) or module_funs_dict.get(fname)
+            orig = funs_dict.get(fname)
             if orig is None:
                 continue
             orig_fun, orig_sym = orig
@@ -515,6 +569,7 @@ def analyze_program_for_c(
             specializations[spec_key] = (spec_ident, spec_fun)
             top_funs.append((spec_ident, spec_fun, orig_sym))
             top_funs_dict[spec_ident] = (spec_fun, orig_sym)
+            funs_dict[spec_ident] = (spec_fun, orig_sym)
             top_fun_names.add(spec_ident)
             worklist.append(spec_fun)
 

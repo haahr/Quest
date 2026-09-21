@@ -1,0 +1,22 @@
+(* Language: Cardelli §5.3 Abstract Data Type with Existential Packages *)
+
+Let CounterPackage = Tuple
+    Counter::TYPE
+    new(init: Int): Counter
+    inc(c: Counter): Counter
+    add(c: Counter n: Int): Counter
+    get(c: Counter): Int
+end;
+
+let counterModule: CounterPackage = tuple
+    Let Counter::TYPE = Int
+    let new(init: Int): Counter = init
+    let inc(c: Counter): Counter = c + 1
+    let add(c: Counter n: Int): Counter = c + n
+    let get(c: Counter): Int = c
+end;
+
+let c0: counterModule.Counter = counterModule.new(0);
+let c1: counterModule.Counter = counterModule.inc(c0);
+let c2: counterModule.Counter = counterModule.add(c1 10);
+let total: Int = counterModule.get(c2);

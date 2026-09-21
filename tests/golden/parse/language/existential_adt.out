@@ -1,0 +1,221 @@
+(Program
+  :phrases (
+    (LetTypeBinding
+      :name 'CounterPackage'
+      :type_val (TypeTuple
+        :fields (
+          (TypeFormal
+            :name 'Counter'
+            :bound (KindType)
+          )
+          (FieldSig
+            :name 'new'
+            :type_sig (TypeAll
+              :quantifiers (
+                (Quantifier
+                  :name 'init'
+                  :bound (KindPower
+                    :bound (TypePath ('Int'))
+                  )
+                  :mode VALUE
+                )
+              )
+              :result_type (TypePath ('Counter'))
+            )
+            :mode VALUE
+          )
+          (FieldSig
+            :name 'inc'
+            :type_sig (TypeAll
+              :quantifiers (
+                (Quantifier
+                  :name 'c'
+                  :bound (KindPower
+                    :bound (TypePath ('Counter'))
+                  )
+                  :mode VALUE
+                )
+              )
+              :result_type (TypePath ('Counter'))
+            )
+            :mode VALUE
+          )
+          (FieldSig
+            :name 'add'
+            :type_sig (TypeAll
+              :quantifiers (
+                (Quantifier
+                  :name 'c'
+                  :bound (KindPower
+                    :bound (TypePath ('Counter'))
+                  )
+                  :mode VALUE
+                )
+                (Quantifier
+                  :name 'n'
+                  :bound (KindPower
+                    :bound (TypePath ('Int'))
+                  )
+                  :mode VALUE
+                )
+              )
+              :result_type (TypePath ('Counter'))
+            )
+            :mode VALUE
+          )
+          (FieldSig
+            :name 'get'
+            :type_sig (TypeAll
+              :quantifiers (
+                (Quantifier
+                  :name 'c'
+                  :bound (KindPower
+                    :bound (TypePath ('Counter'))
+                  )
+                  :mode VALUE
+                )
+              )
+              :result_type (TypePath ('Int'))
+            )
+            :mode VALUE
+          )
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'counterModule'
+      :value (ExprTuple
+        :fields (
+          (LetTypeBinding
+            :name 'Counter'
+            :type_val (TypePath ('Int'))
+            :bound (KindType)
+          )
+          (TupleBinding
+            :name 'new'
+            :value (ExprFun
+              :params (
+                (FormalParam
+                  :name 'init'
+                  :type_annot (TypePath ('Int'))
+                  :mode VALUE
+                )
+              )
+              :return_type (TypePath ('Counter'))
+              :body (ExprId 'init')
+            )
+          )
+          (TupleBinding
+            :name 'inc'
+            :value (ExprFun
+              :params (
+                (FormalParam
+                  :name 'c'
+                  :type_annot (TypePath ('Counter'))
+                  :mode VALUE
+                )
+              )
+              :return_type (TypePath ('Counter'))
+              :body (ExprInfix
+                :left (ExprId 'c')
+                :op '+'
+                :right (ExprInt 1 '1')
+              )
+            )
+          )
+          (TupleBinding
+            :name 'add'
+            :value (ExprFun
+              :params (
+                (FormalParam
+                  :name 'c'
+                  :type_annot (TypePath ('Counter'))
+                  :mode VALUE
+                )
+                (FormalParam
+                  :name 'n'
+                  :type_annot (TypePath ('Int'))
+                  :mode VALUE
+                )
+              )
+              :return_type (TypePath ('Counter'))
+              :body (ExprInfix
+                :left (ExprId 'c')
+                :op '+'
+                :right (ExprId 'n')
+              )
+            )
+          )
+          (TupleBinding
+            :name 'get'
+            :value (ExprFun
+              :params (
+                (FormalParam
+                  :name 'c'
+                  :type_annot (TypePath ('Counter'))
+                  :mode VALUE
+                )
+              )
+              :return_type (TypePath ('Int'))
+              :body (ExprId 'c')
+            )
+          )
+        )
+      )
+      :type_annot (TypePath ('CounterPackage'))
+    )
+    (LetValueBinding
+      :name 'c0'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'counterModule')
+          :field 'new'
+        )
+        :args (
+          (ExprInt 0 '0')
+        )
+      )
+      :type_annot (TypePath ('counterModule' 'Counter'))
+    )
+    (LetValueBinding
+      :name 'c1'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'counterModule')
+          :field 'inc'
+        )
+        :args (
+          (ExprId 'c0')
+        )
+      )
+      :type_annot (TypePath ('counterModule' 'Counter'))
+    )
+    (LetValueBinding
+      :name 'c2'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'counterModule')
+          :field 'add'
+        )
+        :args (
+          (ExprId 'c1')
+          (ExprInt 10 '10')
+        )
+      )
+      :type_annot (TypePath ('counterModule' 'Counter'))
+    )
+    (LetValueBinding
+      :name 'total'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'counterModule')
+          :field 'get'
+        )
+        :args (
+          (ExprId 'c2')
+        )
+      )
+      :type_annot (TypePath ('Int'))
+    )
+  )
+)

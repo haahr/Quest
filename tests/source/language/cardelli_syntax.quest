@@ -1,5 +1,4 @@
 (* Language: Cardelli Stage 2 Alignment (Monadic Operators, Lvalues, Listfix) *)
-(* @skip-phase: run_c_compiled *)
 
 (* 1. Explicit polymorphic type arguments and anonymous tuples *)
 let id(A::TYPE a: A): A = a;

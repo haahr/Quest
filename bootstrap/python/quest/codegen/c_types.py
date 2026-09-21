@@ -10,6 +10,7 @@ from quest.types import (
     OK_TYPE,
     REAL_TYPE,
     STRING_TYPE,
+    QAbstractType,
     QAllType,
     QArrayType,
     QExceptionType,
@@ -17,6 +18,8 @@ from quest.types import (
     QFunType,
     QOptionField,
     QOptionType,
+    QPathType,
+    QPowerKind,
     QRecordField,
     QRecordType,
     QTupleField,
@@ -46,9 +49,24 @@ def mangle_module_ident(module_name: str, name: str) -> str:
     return f"qv_{clean_mod}_{clean_name}"
 
 
+def resolve_type_bound(t: QType) -> QType:
+    """Unwraps upper bounds for path types and type variables bounded by POWER(T)."""
+    curr = t.prune() if hasattr(t, "prune") else t
+    visited = set()
+    while isinstance(curr, (QTypeVar, QAbstractType, QPathType)) and isinstance(curr.bound, QPowerKind):
+        sym_id = getattr(curr, "symbol_id", id(curr))
+        if sym_id in visited:
+            break
+        visited.add(sym_id)
+        curr = curr.bound.bound
+        curr = curr.prune() if hasattr(curr, "prune") else curr
+    return curr
+
+
 def type_to_c_tag(t: QType) -> str:
     """Produces a deterministic, valid C identifier component for a QType."""
     t = t.prune() if hasattr(t, "prune") else t
+    t = resolve_type_bound(t)
     if t == INT_TYPE:
         return "Int"
     if t == REAL_TYPE:
@@ -80,7 +98,7 @@ def type_to_c_tag(t: QType) -> str:
         return "QClosure"
     if isinstance(t, (QVarType, QOutType)):
         return f"Ref_{type_to_c_tag(t.element_type)}"
-    if isinstance(t, QTypeVar):
+    if isinstance(t, (QTypeVar, QAbstractType, QPathType)):
         return "QVal"
     if isinstance(t, QArrayType):
         return f"QArray_{type_to_c_tag(t.element_type)}"
@@ -171,6 +189,7 @@ class RecordNamingContext:
 def qtype_to_c_type(t: QType, ctx: Optional[RecordNamingContext] = None) -> str:
     """Maps a semantic Quest QType to its corresponding C scalar or pointer type representation."""
     t = t.prune() if hasattr(t, "prune") else t
+    t = resolve_type_bound(t)
     if t == INT_TYPE:
         return "QInt"
     if t == REAL_TYPE:
@@ -213,7 +232,7 @@ def qtype_to_c_type(t: QType, ctx: Optional[RecordNamingContext] = None) -> str:
         return f"{option_struct_name(opt_t)} *"
     if isinstance(t, (QVarType, QOutType)):
         return f"{qtype_to_c_type(t.element_type, ctx)} *"
-    if isinstance(t, QTypeVar):
+    if isinstance(t, (QTypeVar, QAbstractType, QPathType)):
         return "QVal"
     return "QVal"
 
@@ -279,6 +298,7 @@ def c_char_literal(ch: str) -> str:
 def qval_wrap(expr_str: str, t: QType) -> str:
     """Wraps a scalar or pointer expression into a QVal union initializer."""
     t = t.prune() if hasattr(t, "prune") else t
+    t = resolve_type_bound(t)
     if qtype_to_c_type(t) == "QVal":
         return expr_str
     if resolve_record_bound(t) is not None:
@@ -295,6 +315,7 @@ def qval_wrap(expr_str: str, t: QType) -> str:
 def qval_unwrap(qval_expr: str, t: QType, ctx: Optional[RecordNamingContext] = None) -> str:
     """Extracts the underlying concrete scalar or pointer from a QVal expression."""
     t = t.prune() if hasattr(t, "prune") else t
+    t = resolve_type_bound(t)
     if qtype_to_c_type(t, ctx) == "QVal":
         return qval_expr
     if resolve_record_bound(t) is not None:
@@ -365,7 +386,9 @@ def is_tuple_subtype(s: QType, t: QType) -> bool:
     if len(s.value_fields) < len(t.value_fields):
         return False
     for i in range(len(t.value_fields)):
-        if s.value_fields[i].type_val != t.value_fields[i].type_val:
+        s_c = qtype_to_c_type(s.value_fields[i].type_val)
+        t_c = qtype_to_c_type(t.value_fields[i].type_val)
+        if s_c != t_c:
             return False
     return True
 
