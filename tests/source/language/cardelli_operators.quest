@@ -1,5 +1,4 @@
 (* Language: Cardelli Stage 1 Operator & Syntax Alignment *)
-(* @skip-phase: run_c_compiled *)
 
 (* 1. Prefix and standalone symbolic operators *)
 let a = +(10 20);

@@ -24,6 +24,7 @@ from quest.codegen.c_types import (
     is_variant_subtype,
     mangle_ident,
     mangle_module_ident,
+    normalize_type,
     option_struct_name,
     qtype_to_c_type,
     qtype_to_name_str,
@@ -94,6 +95,7 @@ from quest.types import (
     BOOL_TYPE,
     CHAR_TYPE,
     DYNAMIC_TYPE,
+    INFIX_OPERATORS,
     INT_TYPE,
     OK_TYPE,
     REAL_TYPE,
@@ -1405,6 +1407,8 @@ class CEmitter:
             case TypedVar(name=name):
                 if name == "DivideByZero":
                     return "(&quest_exc_DivideByZero)"
+                if name in INFIX_OPERATORS and name not in self.current_env_vars:
+                    return f"(&{mangle_ident(name)}_closure)"
                 if name in self.top_fun_names:
                     return f"(&{self.mangle_ident(name)}_closure)"
                 if name in self.current_env_vars:
@@ -1538,14 +1542,15 @@ class CEmitter:
                     if nb is not None and nb.c_val is not None:
                         return nb.c_val
                 c_tgt = self.emit_val(tgt, lines)
-                if isinstance(tgt.type_val, QTupleType):
-                    val_idx = self._tuple_field_index(tgt.type_val, fld)
+                tgt_t = normalize_type(tgt.type_val)
+                if isinstance(tgt_t, QTupleType):
+                    val_idx = self._tuple_field_index(tgt_t, fld)
                     return f"{c_tgt}->_{val_idx}"
-                elif isinstance(tgt.type_val, QRecordType):
+                elif isinstance(tgt_t, QRecordType):
                     return self._emit_record_field_access(
-                        c_tgt, tgt.type_val, fld, expr.type_val, lines, as_ref=False
+                        c_tgt, tgt_t, fld, expr.type_val, lines, as_ref=False
                     )
-                elif (rec_bound := resolve_record_bound(tgt.type_val)) is not None:
+                elif (rec_bound := resolve_record_bound(tgt_t)) is not None:
                     return self._emit_record_field_access(
                         c_tgt, rec_bound, fld, expr.type_val, lines, as_ref=False
                     )
@@ -1557,14 +1562,15 @@ class CEmitter:
                 elem_t = expr.type_val
                 if isinstance(elem_t, (QVarType, QOutType)):
                     elem_t = elem_t.element_type
-                if isinstance(tgt.type_val, QTupleType):
-                    val_idx = self._tuple_field_index(tgt.type_val, fld)
+                tgt_t = normalize_type(tgt.type_val)
+                if isinstance(tgt_t, QTupleType):
+                    val_idx = self._tuple_field_index(tgt_t, fld)
                     return f"(&({c_tgt}->_{val_idx}))"
-                elif isinstance(tgt.type_val, QRecordType):
+                elif isinstance(tgt_t, QRecordType):
                     return self._emit_record_field_access(
-                        c_tgt, tgt.type_val, fld, elem_t, lines, as_ref=True
+                        c_tgt, tgt_t, fld, elem_t, lines, as_ref=True
                     )
-                elif (rec_bound := resolve_record_bound(tgt.type_val)) is not None:
+                elif (rec_bound := resolve_record_bound(tgt_t)) is not None:
                     return self._emit_record_field_access(
                         c_tgt, rec_bound, fld, elem_t, lines, as_ref=True
                     )
@@ -1619,6 +1625,17 @@ class CEmitter:
                         if self.c_type(args[0].type_val) == "QVal":
                             return f"(((const int64_t *)({c_arg}.p))[0])"
                         return f"(({c_arg})->tag)"
+
+                # Direct inline lowering for Cardelli prefix built-in binary operators
+                if (
+                    isinstance(effective_func, TypedVar)
+                    and effective_func.name in INFIX_OPERATORS
+                    and effective_func.name not in self.current_env_vars
+                    and len(args) == 2
+                ):
+                    c_l = self.emit_val(args[0], lines)
+                    c_r = self.emit_val(args[1], lines)
+                    return self._emit_infix(c_l, effective_func.name, c_r)
 
                 # Direct lowering for built-in arrayOp calls
                 if isinstance(effective_func, TypedSelect) and isinstance(effective_func.target, TypedVar):

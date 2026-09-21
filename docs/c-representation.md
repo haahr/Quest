@@ -170,8 +170,8 @@ Quest supports arbitrary symbolic operator names. Symbolic characters map to hum
 | Symbol | Mangle Segment | Symbol | Mangle Segment | Symbol | Mangle Segment |
 | :---: | :--- | :---: | :--- | :---: | :--- |
 | `+` | `plus` | `-` | `minus` | `*` | `star` |
-| `/` | `slash` | `=` | `equals` | `<` | `lessthan` |
-| `>` | `greaterthan` | `!` | `bang` | `?` | `question` |
+| `/` | `slash` | `=` | `equals` | `<` | `lt` |
+| `>` | `gt` | `!` | `bang` | `?` | `question` |
 | `:` | `colon` | `@` | `at` | `#` | `hash` |
 | `$` | `dollar` | `%` | `percent` | `^` | `caret` |
 | `&` | `amp` | `|` | `pipe` | `~` | `tilde` |
@@ -180,10 +180,10 @@ Quest supports arbitrary symbolic operator names. Symbolic characters map to hum
 #### Examples:
 - `+` $\rightarrow$ `qv_sym_plus`
 - `++` $\rightarrow$ `qv_sym_plus_plus`
-- `<-=` $\rightarrow$ `qv_sym_lessthan_minus_equals`
-- `<>` $\rightarrow$ `qv_sym_lessthan_greaterthan`
+- `<-=` $\rightarrow$ `qv_sym_lt_minus_equals`
+- `<>` $\rightarrow$ `qv_sym_lt_gt`
 - `:=` $\rightarrow$ `qv_sym_colon_equals`
-- `>>=` $\rightarrow$ `qv_sym_greaterthan_greaterthan_equals`
+- `>>=` $\rightarrow$ `qv_sym_gt_gt_equals`
 
 ---
 

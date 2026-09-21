@@ -427,4 +427,28 @@ static inline QInt quest_int_mod(QInt a, QInt b) {
     return a % b;
 }
 
+/* Built-in operator closures (Cardelli §4.2) */
+extern QClosure qv_sym_plus_closure;
+extern QClosure qv_sym_minus_closure;
+extern QClosure qv_sym_star_closure;
+extern QClosure qv_sym_slash_closure;
+extern QClosure qv_sym_percent_closure;
+extern QClosure qv_mod_closure;
+extern QClosure qv_sym_lt_closure;
+extern QClosure qv_sym_lt_equals_closure;
+extern QClosure qv_sym_gt_closure;
+extern QClosure qv_sym_gt_equals_closure;
+extern QClosure qv_sym_plus_plus_closure;
+extern QClosure qv_sym_minus_minus_closure;
+extern QClosure qv_sym_star_star_closure;
+extern QClosure qv_sym_slash_slash_closure;
+extern QClosure qv_sym_caret_caret_closure;
+extern QClosure qv_sym_lt_lt_closure;
+extern QClosure qv_sym_lt_lt_equals_closure;
+extern QClosure qv_sym_gt_gt_closure;
+extern QClosure qv_sym_gt_gt_equals_closure;
+extern QClosure qv_sym_lt_gt_closure;
+extern QClosure qv_sym_slash_backslash_closure;
+extern QClosure qv_sym_backslash_slash_closure;
+
 #endif /* QUEST_RUNTIME_H */

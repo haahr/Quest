@@ -56,16 +56,17 @@ Quest scalar types map to native C99 types defined in `runtime/quest_runtime.h`:
 To prevent collisions with C99 keywords (`int`, `return`, `default`, `static`, etc.) and libc symbols:
 - **Value and variable names** are prefixed with `qv_`:
   - `let x = 10` $ightarrow$ `QInt qv_x = 10LL;`
-  - `let default = true` $ightarrow$ `QBool qv_default = true;`
+  - `let x = 10` $\rightarrow$ `QInt qv_x = 10LL;`
+  - `let default = true` $\rightarrow$ `QBool qv_default = true;`
 - **Temporary variable names** are generated uniquely with fresh counters:
   - `_res_1`, `_if_res_2`, `_div_r_3`
 
 ### 2.3. Operator Mangling
 When operators appear as first-class functions or bindings, they are mangled with the prefix `qv_sym_`:
-- `+` $ightarrow$ `qv_sym_plus`
-- `++` $ightarrow$ `qv_sym_plus_plus`
-- `<>` $ightarrow$ `qv_sym_lessthan_greaterthan`
-- `:=` $ightarrow$ `qv_sym_colon_equals`
+- `+` $\rightarrow$ `qv_sym_plus`
+- `++` $\rightarrow$ `qv_sym_plus_plus`
+- `<>` $\rightarrow$ `qv_sym_lt_gt`
+- `:=` $\rightarrow$ `qv_sym_colon_equals`
 
 ---
 

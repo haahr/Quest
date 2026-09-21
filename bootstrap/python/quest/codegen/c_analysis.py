@@ -30,6 +30,7 @@ from quest.codegen.c_types import (
     is_record_subtype,
     is_tuple_subtype,
     is_variant_subtype,
+    normalize_type,
     option_struct_name,
     record_struct_name,
     tuple_struct_name,
@@ -357,6 +358,7 @@ def collect_aggregate_types(
     def visit_type(t: Optional[QType]) -> None:
         if t is None:
             return
+        t = normalize_type(t)
         if isinstance(t, QTupleType):
             for f in t.value_fields:
                 visit_type(f.type_val)

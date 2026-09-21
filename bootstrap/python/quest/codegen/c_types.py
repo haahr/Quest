@@ -25,6 +25,7 @@ from quest.types import (
     QTupleField,
     QTupleType,
     QType,
+    QTypeApp,
     QTypeVar,
     QVarType,
     QOutType,
@@ -35,9 +36,67 @@ from quest.types import (
     resolve_option_bound,
 )
 
+SYMBOL_MANGLE_MAP: dict[str, str] = {
+    "+": "plus",
+    "-": "minus",
+    "*": "star",
+    "/": "slash",
+    "=": "equals",
+    "<": "lt",
+    ">": "gt",
+    "!": "bang",
+    "?": "question",
+    ":": "colon",
+    "@": "at",
+    "#": "hash",
+    "$": "dollar",
+    "%": "percent",
+    "^": "caret",
+    "&": "amp",
+    "|": "pipe",
+    "~": "tilde",
+    "\\": "backslash",
+    ".": "dot",
+    "'": "prime",
+}
+
+
+def is_symbolic_name(name: str) -> bool:
+    """Returns True if the identifier contains symbolic operator characters (excluding simple module dots)."""
+    return any(ch in SYMBOL_MANGLE_MAP and ch != "." for ch in name)
+
+
+def mangle_symbolic_ident(name: str) -> str:
+    """Mangles an identifier containing symbolic operator characters into a C-safe identifier."""
+    parts: list[str] = []
+    curr: list[str] = []
+    for ch in name:
+        if ch in SYMBOL_MANGLE_MAP and ch != ".":
+            if curr:
+                s = "".join(curr).strip("_")
+                if s:
+                    parts.append(s)
+                curr.clear()
+            parts.append(SYMBOL_MANGLE_MAP[ch])
+        elif ch == ".":
+            if curr:
+                s = "".join(curr).strip("_")
+                if s:
+                    parts.append(s)
+                curr.clear()
+        else:
+            curr.append(ch)
+    if curr:
+        s = "".join(curr).strip("_")
+        if s:
+            parts.append(s)
+    return "qv_sym_" + "_".join(parts)
+
 
 def mangle_ident(name: str) -> str:
     """Mangles a Quest identifier into a C-safe identifier prefixed with qv_."""
+    if is_symbolic_name(name):
+        return mangle_symbolic_ident(name)
     clean = name.replace(".", "_")
     return f"qv_{clean}"
 
@@ -45,8 +104,21 @@ def mangle_ident(name: str) -> str:
 def mangle_module_ident(module_name: str, name: str) -> str:
     """Mangles a module-scoped Quest identifier into a C-safe identifier prefixed with qv_<mod>_."""
     clean_mod = module_name.replace(".", "_")
+    if is_symbolic_name(name):
+        sym_suffix = mangle_symbolic_ident(name)[3:]  # strip leading 'qv_'
+        return f"qv_{clean_mod}_{sym_suffix}"
     clean_name = name.replace(".", "_")
     return f"qv_{clean_mod}_{clean_name}"
+
+
+def normalize_type(t: QType) -> QType:
+    """Evaluates type applications lazily if they reduce to concrete tuple or record types."""
+    t = t.prune() if hasattr(t, "prune") else t
+    if isinstance(t, QTypeApp):
+        evaled = t.evaluate_lazily()
+        if evaled != t and isinstance(evaled, (QTupleType, QRecordType)):
+            return evaled
+    return t
 
 
 def resolve_type_bound(t: QType) -> QType:
@@ -67,6 +139,7 @@ def type_to_c_tag(t: QType) -> str:
     """Produces a deterministic, valid C identifier component for a QType."""
     t = t.prune() if hasattr(t, "prune") else t
     t = resolve_type_bound(t)
+    t = normalize_type(t)
     if t == INT_TYPE:
         return "Int"
     if t == REAL_TYPE:
@@ -190,6 +263,7 @@ def qtype_to_c_type(t: QType, ctx: Optional[RecordNamingContext] = None) -> str:
     """Maps a semantic Quest QType to its corresponding C scalar or pointer type representation."""
     t = t.prune() if hasattr(t, "prune") else t
     t = resolve_type_bound(t)
+    t = normalize_type(t)
     if t == INT_TYPE:
         return "QInt"
     if t == REAL_TYPE:
