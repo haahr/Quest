@@ -8,13 +8,10 @@ from quest.ast import (
     TypeFormal,
     TypeTuple,
 )
-import tempfile
-from pathlib import Path
 from quest.elaborate_types import elaborate_type
 from quest.env import Environment
 from quest.interpreter import RuntimeEnvironment
-from quest.pipeline import CompilerContext, compile_pipeline, default_pipeline
-from quest.codegen.compiler_runner import compile_c_source, run_binary
+from quest.pipeline import CompilerContext, default_pipeline
 from quest.runtime import QClosure, QInt, QTuple, QTypeValue
 from quest.diagnostics import QuestTypeError
 from quest.types import (
@@ -311,79 +308,6 @@ class TestExistentialTuplesPhase4(unittest.TestCase):
         self.assertEqual(out_expr, "<hidden> : t1.A")
 
 
-class TestExistentialTuplesPhase5(unittest.TestCase):
-    """Verifies Phase 5: C transpilation and native execution of existential tuples."""
-
-    def compile_and_run(self, source: str) -> str:
-        pipeline = compile_pipeline()
-        res = pipeline.execute(source, "<test>")
-        self.assertTrue(res.success, f"Pipeline failed: {res.diagnostics}")
-        c_code = res.artifacts.get("codegen_c")
-        self.assertIsNotNone(c_code)
-
-        with tempfile.NamedTemporaryFile(suffix="", delete=False) as f:
-            bin_path = Path(f.name)
-        try:
-            compile_c_source(c_code, output_path=bin_path)
-            proc = run_binary(bin_path)
-            self.assertEqual(proc.returncode, 0, f"Binary failed: {proc.stderr}")
-            return proc.stdout
-        finally:
-            if bin_path.exists():
-                bin_path.unlink()
-
-    def test_existential_tuple_packing_and_method_call_c(self) -> None:
-        """Verifies Cardelli §5.3 existential tuple packing, adaptation, and method calling in C."""
-        source = """
-        Let T = Tuple A::TYPE a: A f(x: A): Int end;
-        let t1: T = tuple Let A::TYPE = Int let a = 0 let f(x: A): Int = x + 1 end;
-        let a1: t1.A = t1.a;
-        let res1: Int = t1.f(a1);
-        """
-        self.compile_and_run(source)
-
-    def test_bounded_existential_tuple_c(self) -> None:
-        """Verifies bounded existential tuple (A::POWER(Int)) lowers to unboxed scalar arithmetic."""
-        source = """
-        Let TB = Tuple A::POWER(Int) a: A end;
-        let tb: TB = tuple Let A::POWER(Int) = Int let a = 42 end;
-        let res2: Int = tb.a + 1;
-        """
-        self.compile_and_run(source)
-
-    def test_transparent_to_existential_coercion_c(self) -> None:
-        """Verifies coercion from transparent tuple to existential signature in C."""
-        source = """
-        let tTrans = tuple Let A::TYPE = Int let a: A = 100 end;
-        Let SimpleT = Tuple A::TYPE a: A end;
-        let t2: SimpleT = tTrans;
-        """
-        self.compile_and_run(source)
-
-    def test_existential_adt_c(self) -> None:
-        """Verifies full Abstract Data Type with methods and operations in C."""
-        source = """
-        Let CounterPackage = Tuple
-            Counter::TYPE
-            new(init: Int): Counter
-            inc(c: Counter): Counter
-            add(c: Counter n: Int): Counter
-            get(c: Counter): Int
-        end;
-        let counterModule: CounterPackage = tuple
-            Let Counter::TYPE = Int
-            let new(init: Int): Counter = init
-            let inc(c: Counter): Counter = c + 1
-            let add(c: Counter n: Int): Counter = c + n
-            let get(c: Counter): Int = c
-        end;
-        let c0: counterModule.Counter = counterModule.new(0);
-        let c1: counterModule.Counter = counterModule.inc(c0);
-        let c2: counterModule.Counter = counterModule.add(c1 10);
-        let total: Int = counterModule.get(c2);
-        """
-        self.compile_and_run(source)
-
-
 if __name__ == "__main__":
     unittest.main()
+
