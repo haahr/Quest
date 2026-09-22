@@ -1,0 +1,79 @@
+(* Language: Dynamic Subtyping, Compound Descriptors, and Inspection *)
+
+import writer: Writer;
+import conv: Conv;
+import dynamic: Dynamic;
+
+let wOut = writer.output;
+let printInt(x: Int): Ok =
+    begin
+        writer.putString(wOut conv.int(x));
+        writer.putString(wOut "\n")
+    end;
+
+(* 1. Record width subtyping via Dynamic *)
+Let BigRec = Record x: Int y: Int z: Int end;
+Let SmallRec = Record x: Int y: Int end;
+let br: BigRec = record x = 10 y = 20 z = 30 end;
+let dRec = dynamic.new(:BigRec br);
+let sr: SmallRec = dynamic.be(:SmallRec dRec);
+printInt(sr.x + sr.y);
+
+(* 2. Record permutation subtyping via Dynamic *)
+Let PermRec = Record b: Int a: Int end;
+Let OrderedRec = Record a: Int b: Int end;
+let pr: PermRec = record b = 2 a = 1 end;
+let dPerm = dynamic.new(:PermRec pr);
+let ord: OrderedRec = dynamic.be(:OrderedRec dPerm);
+printInt(ord.a * 10 + ord.b);
+
+(* 3. Record depth subtyping via Dynamic *)
+Let InnerBig = Record x: Int y: Int end;
+Let InnerSmall = Record x: Int end;
+Let OuterBig = Record inner: InnerBig tag: String end;
+Let OuterSmall = Record inner: InnerSmall tag: String end;
+let ob: OuterBig = record inner = record x = 42 y = 99 end tag = "nested" end;
+let dNest = dynamic.new(:OuterBig ob);
+let os: OuterSmall = dynamic.be(:OuterSmall dNest);
+printInt(os.inner.x);
+writer.putString(wOut os.tag);
+writer.putString(wOut "\n");
+
+(* 4. Variant subtyping via Dynamic *)
+Let VarSmall = Variant a: Int end;
+Let VarBig = Variant a: Int b: String end;
+let va: VarSmall = variant a of VarSmall with 55 end;
+let dVar = dynamic.new(:VarSmall va);
+let vb: VarBig = dynamic.be(:VarBig dVar);
+case vb
+    when a with n then printInt(n)
+    else printInt(0)
+end;
+
+(* 5. Inspect expressions with subtyping *)
+let classify(d: Dynamic): Int =
+    inspect d
+    when Int with n then
+        n
+    when SmallRec with r then
+        r.x + r.y
+    else
+        999
+    end;
+
+printInt(classify(dynamic.new(:Int 7)));
+printInt(classify(dRec));
+printInt(classify(dynamic.new(:String "hello")));
+
+(* 6. Dynamic type mismatch raises dynamic.error *)
+let testMismatch(d: Dynamic): Int =
+    try
+        let ignored = dynamic.be(:Int d);
+        1
+    when dynamic.error then
+        2
+    else
+        3
+    end;
+
+printInt(testMismatch(dynamic.new(:String "wrong")));

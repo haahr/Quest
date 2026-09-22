@@ -131,6 +131,44 @@ Record return values are returned in `x0` and `x1` without stack-spill or hidden
 
 ---
 
+## 6. Dynamic Subtyping & Runtime Type Descriptors
+
+Dynamic values (`Dynamic`) wrap an arbitrary runtime value paired with a `const QTypeDescriptor *`:
+```c
+typedef struct QDynamic {
+    const QTypeDescriptor *type_desc;
+    QVal                   payload;
+} QDynamic;
+```
+
+### 1. Hybrid Descriptor Architecture
+- **Compile-time Static Descriptors (.rodata):** Closed types generated during compilation are emitted as
+  `static const QTypeDescriptor quest_type_<tag> Q_UNUSED` with static payload structs (`qrec_desc_*`, `qtup_desc_*`,
+  `qvar_desc_*`, `qarr_desc_*`). Forward declarations allow mutual and self-referential descriptor links without
+  dynamic allocation.
+- **Runtime Descriptors with Hash-Interning:** Dynamic constructor functions (`quest_make_record_descriptor`,
+  `quest_make_tuple_descriptor`, `quest_make_variant_descriptor`, etc.) provide runtime type synthesis interned via
+  hash table buckets to guarantee canonical pointer equality ($T_1 \equiv T_2 \iff \text{desc}_1 == \text{desc}_2$).
+
+### 2. Structural Subtyping Algorithm (`quest_is_subtype`)
+Subtyping checks are unified under `quest_is_subtype`:
+- **Records:** Width subtyping (all supertype fields present in subtype), permutation subtyping (order independent),
+  depth subtyping on immutable fields ($T_{\text{sub}} <: T_{\text{super}}$), and invariance on mutable `var` fields.
+- **Tuples:** Prefix subtyping with covariant element types.
+- **Variants:** Branch set inclusion with covariant immutable payloads.
+- **Coinductive Cycle Detection:** Recursive type subtyping cycles are guarded using an active cycle trail
+  (`quest_subtyping_trail`) to ensure terminating coinductive subtyping checks.
+
+### 3. Dynamic Value Adaptation (`quest_record_adapt` & `quest_variant_adapt`)
+When `dynamic.be` or `inspect` succeeds on a structural subtype:
+- For records: `quest_record_adapt` synthesizes an offset dictionary mapping target fields (alphabetically ordered)
+  to source record byte offsets, recursively adapting nested subtyped immutable fields. Results are cached in a
+  memoized thread-safe adapter cache.
+- For variants: `quest_variant_adapt` remaps source variant tags to target tag indices and adapts payloads via a
+  memoized tag-mapping adapter cache.
+
+---
+
 ## See Also
 - [README.md](../README.md): Project overview.
 - [roadmap.md](roadmap.md): 7-stage implementation roadmap.

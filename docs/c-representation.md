@@ -658,13 +658,57 @@ struct QTypeDescriptor {
     const void *extra;
 };
 ```
-- **Base types** (`Int`, `Real`, `String`, etc.) are pre-allocated `static const` structs in `.rodata`.
-- **Opaque types (`QTYPE_KIND_OPAQUE`)** represent nominal abstract types (`T::TYPE` in an interface or existential package). They possess unique pointer identity to ensure that `dynamic.be` respects module abstraction barriers.
-- **Manifest types (`Def T = ...`)** are pure compile-time aliases, completely erased at runtime with no separate descriptors or module record fields.
-- **Memoization Cache:** Dynamically constructed compound descriptors are interned in a runtime table (`quest_intern_type_descriptor`) to ensure canonical pointer equality ($T_1 \equiv T_2 \iff \text{desc}_1 == \text{desc}_2$). *(Note: this is an intentional unbounded cache since types in loaded code are bounded).*
-- **Future Value Representation:** With `QTypeDescriptor` carrying `size` and `alignment`, the runtime establishes
-  the foundation to evolve beyond the 64-bit `QVal` restriction, supporting 128-bit fat pointers for subtyped records
-  (`{ void *ptr, const QRecordFieldDict *dict }`) and unboxed polymorphic flat arrays.
+
+##### Compound Descriptor Payloads (`.extra`)
+- **Records (`QRecordTypeDescriptor`):** Holds `size_t field_count` and an array of `QRecordFieldDescriptor`
+  (`name`, `type`, `offset`, `is_var`). Fields are canonically ordered alphabetically by field name so that index $i$
+  corresponds directly to the field's position in `QRecordVal.dict`.
+- **Tuples (`QTupleTypeDescriptor`):** Holds `size_t element_count` and an array of `QTupleElementDescriptor`
+  (`name`, `type`, `offset`).
+- **Variants & Options (`QVariantTypeDescriptor`):** Holds `size_t case_count` and an array of `QVariantCaseDescriptor`
+  (`name`, `payload_type`, `tag_index`, `is_var`).
+- **Arrays (`QArrayTypeDescriptor`):** Holds `const QTypeDescriptor *element_type`.
+- **Functions (`QFunTypeDescriptor`):** Holds `size_t param_count`, `QFunParamDescriptor *params`, and
+  `const QTypeDescriptor *result_type`.
+
+##### Static Compilation (.rodata) vs. Runtime Synthesis
+- **Closed Types in Code:** For all concrete types appearing in the program, the C emitter synthesizes `static const`
+  descriptor structs in `.rodata` with `Q_UNUSED` attribute. Forward declarations ensure that self-referential or
+  mutually recursive types can cross-reference descriptor addresses as compile-time address constants.
+- **Runtime Synthesis & Interning:** The C runtime provides constructor functions (`quest_make_record_descriptor`,
+  `quest_make_tuple_descriptor`, `quest_make_variant_descriptor`, `quest_make_fun_descriptor`,
+  `quest_make_array_descriptor`, `quest_make_opaque_descriptor`) with hash-interning in a global bucket table to ensure
+  canonical pointer equality for dynamically constructed types.
+- **Opaque Types (`QTYPE_KIND_OPAQUE`):** Represent nominal abstract types (`T::TYPE` in an interface or existential
+  package). Subtyping checks compare pointers or canonical nominal names to preserve module encapsulation barriers.
+- **Manifest Types (`Def T = ...`):** Pure compile-time aliases, completely erased at runtime with no separate
+  descriptors.
+
+##### Subtyping Verification (`quest_is_subtype`)
+Subtyping checks are unified under `quest_is_subtype(sub, super_type)`:
+- **Identity & Base Types:** Exact descriptor pointer match or matching primitive kind.
+- **Tuples:** Prefix subtyping ($N_{\text{sub}} \ge N_{\text{super}}$ with covariant element types).
+- **Records:** Width subtyping ($S \subseteq R$ where every supertype field is present in the subtype), permutation
+  subtyping (field order is irrelevant), depth subtyping on immutable fields ($T_{\text{sub}} <: T_{\text{super}}$),
+  and invariance on mutable `var` fields ($T_{\text{sub}} \equiv T_{\text{super}}$).
+- **Variants:** Case inclusion ($R_{\text{sub}} \subseteq R_{\text{super}}$) with covariant immutable payload types
+  and invariant mutable payload types.
+- **Coinduction:** Cyclic type comparisons are tracked via an active subtyping trail (`quest_subtyping_trail`) to
+  prevent infinite recursion on recursive records or variants.
+
+##### Dynamic Value Adaptation (`dynamic.be` and `inspect`)
+When extracting a value from a dynamic package (`dynamic.be[:T](d)` or `inspect d when T with x then ...`):
+1. The runtime checks `quest_is_subtype(d->type_desc, target_desc)`. If not a subtype, `dynamic.be` raises
+   `dynamic.error` (or `inspect` falls through to the next branch or `else`).
+2. If exact descriptor match, the payload is returned unchanged.
+3. If structural subtyping holds:
+   - **Record Adaptation (`quest_record_adapt`):** Dynamically synthesizes a new `QRecordVal` fat pointer.
+     Synthesizes an offset dictionary mapping target fields (alphabetical) to source record memory offsets, and
+     recursively adapts nested immutable fields for depth subtyping. Results are memoized in a thread-safe
+     adapter cache.
+   - **Variant Adaptation (`quest_variant_adapt`):** Dynamically remaps the variant tag using a synthesized tag map
+     from source branch names to target branch tag indices, and adapts the payload if needed. Memoized in an adapter
+     cache.
 
 ### 6.5. Mutable Reference Parameters (`out` and `var`) and `@` Lvalues (Phase 4.12)
 

@@ -182,6 +182,41 @@ typedef struct QRecordTypeDescriptor {
     const QRecordFieldDescriptor fields[];
 } QRecordTypeDescriptor;
 
+typedef struct QTupleElementDescriptor {
+    const char            *name;       /* Field label or NULL if anonymous */
+    const QTypeDescriptor *type;
+    size_t                 offset;     /* Offset in tuple struct */
+} QTupleElementDescriptor;
+
+typedef struct QTupleTypeDescriptor {
+    size_t                        element_count;
+    const QTupleElementDescriptor elements[];
+} QTupleTypeDescriptor;
+
+typedef struct QVariantCaseDescriptor {
+    const char            *name;       /* Case tag identifier */
+    const QTypeDescriptor *payload_type; /* NULL for parameterless / Ok payload */
+    int64_t                tag_index;  /* Concrete integer discriminant */
+    bool                   is_var;
+} QVariantCaseDescriptor;
+
+typedef struct QVariantTypeDescriptor {
+    size_t                       case_count;
+    const QVariantCaseDescriptor cases[];
+} QVariantTypeDescriptor;
+
+typedef struct QFunParamDescriptor {
+    const QTypeDescriptor *type;
+    bool                   is_var;
+    bool                   is_out;
+} QFunParamDescriptor;
+
+typedef struct QFunTypeDescriptor {
+    size_t                    param_count;
+    const QTypeDescriptor    *result_type;
+    const QFunParamDescriptor params[];
+} QFunTypeDescriptor;
+
 /* First-class Dynamic object: type descriptor paired with 64-bit value */
 typedef struct QDynamic {
     const QTypeDescriptor *type_desc;
@@ -388,9 +423,22 @@ double  quest_real_exp(double a, double b);
 void quest_builtins_init(int argc, char **argv);
 
 /* Type descriptor interning and dynamic operations */
+bool                   quest_is_subtype(const QTypeDescriptor *sub, const QTypeDescriptor *super_type);
 const QTypeDescriptor *quest_intern_type_descriptor(const QTypeDescriptor *desc);
 const QTypeDescriptor *quest_make_array_descriptor(const QTypeDescriptor *element_desc);
 const QTypeDescriptor *quest_make_opaque_descriptor(const char *name);
+const QTypeDescriptor *quest_make_record_descriptor(
+    const char *name, size_t size, size_t alignment, size_t field_count, const QRecordFieldDescriptor *fields);
+const QTypeDescriptor *quest_make_tuple_descriptor(
+    const char *name, size_t size, size_t alignment, size_t element_count, const QTupleElementDescriptor *elements);
+const QTypeDescriptor *quest_make_variant_descriptor(
+    const char *name, size_t size, size_t alignment, size_t case_count, const QVariantCaseDescriptor *cases);
+const QTypeDescriptor *quest_make_fun_descriptor(
+    const char *name, size_t param_count, const QFunParamDescriptor *params, const QTypeDescriptor *result_type);
+QRecordVal             quest_record_adapt(
+    const QTypeDescriptor *sub_desc, const QTypeDescriptor *super_desc, QVal payload);
+QVariantVal            quest_variant_adapt(
+    const QTypeDescriptor *sub_desc, const QTypeDescriptor *super_desc, QVal payload);
 QDynamic              *quest_dynamic_new(const QTypeDescriptor *type_desc, QVal val);
 QVal                   quest_dynamic_be(const QTypeDescriptor *target_type_desc, const QDynamic *d);
 

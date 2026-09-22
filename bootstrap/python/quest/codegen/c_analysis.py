@@ -84,6 +84,7 @@ class CProgramAnalysis:
     val_referenced_top_funs: set[str]
     lifted_lambdas: list[CLambdaInfo]
     lambda_info_by_id: dict[int, CLambdaInfo]
+    all_program_types: list[QType]
     top_funs_dict: dict[str, tuple[TypedFun, Any]]
     specializations: dict[tuple[str, tuple[QType, ...]], tuple[str, TypedFun]]
     needed_builtin_modules: list[str] = field(default_factory=list)
@@ -354,11 +355,13 @@ def collect_aggregate_types(
     visited_names: set[str] = set()
     result: list[tuple[str, QType]] = []
     variant_types: list[QVariantType] = []
+    all_types: list[QType] = []
 
     def visit_type(t: Optional[QType]) -> None:
         if t is None:
             return
         t = normalize_type(t)
+        all_types.append(t)
         if isinstance(t, QTupleType):
             for f in t.value_fields:
                 visit_type(f.type_val)
@@ -443,7 +446,7 @@ def collect_aggregate_types(
                 visit_node(getattr(n, field_name))
 
     visit_node(node)
-    return result, variant_types
+    return result, variant_types, all_types
 
 
 def analyze_program_for_c(
@@ -576,11 +579,14 @@ def analyze_program_for_c(
             worklist.append(spec_fun)
 
     # 3. Aggregate and variant types collection across prog and all specialized functions
-    agg_types, variant_types = collect_aggregate_types(prog, record_ctx)
+    all_program_types: list[QType] = []
+    agg_types, variant_types, p_types = collect_aggregate_types(prog, record_ctx)
+    all_program_types.extend(p_types)
 
     agg_names: set[str] = {name for name, _ in agg_types}
     for _, sfun, _ in top_funs:
-        s_agg, s_var = collect_aggregate_types(sfun, record_ctx)
+        s_agg, s_var, s_types = collect_aggregate_types(sfun, record_ctx)
+        all_program_types.extend(s_types)
         for item in s_agg:
             if item[0] not in agg_names:
                 agg_names.add(item[0])
@@ -591,7 +597,8 @@ def analyze_program_for_c(
 
     for mod in sorted_modules:
         for b in mod.bindings:
-            b_agg, b_var = collect_aggregate_types(b, record_ctx)
+            b_agg, b_var, b_types = collect_aggregate_types(b, record_ctx)
+            all_program_types.extend(b_types)
             for item in b_agg:
                 if item[0] not in agg_names:
                     agg_names.add(item[0])
@@ -600,7 +607,8 @@ def analyze_program_for_c(
                 if v not in variant_types:
                     variant_types.append(v)
         mod_rec_t = BuiltinModuleRegistry._build_record_type_from_scope(mod.scope)
-        rec_agg, rec_var = collect_aggregate_types(mod_rec_t, record_ctx)
+        rec_agg, rec_var, rec_types = collect_aggregate_types(mod_rec_t, record_ctx)
+        all_program_types.extend(rec_types)
         for item in rec_agg:
             if item[0] not in agg_names:
                 agg_names.add(item[0])
@@ -673,6 +681,7 @@ def analyze_program_for_c(
         val_referenced_top_funs=val_referenced_top_funs,
         lifted_lambdas=lifted_lambdas,
         lambda_info_by_id=lambda_info_by_id,
+        all_program_types=all_program_types,
         top_funs_dict=top_funs_dict,
         specializations=specializations,
         needed_builtin_modules=needed_builtin_modules,

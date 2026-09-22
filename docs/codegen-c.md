@@ -680,6 +680,9 @@ The C code generator is verified through comprehensive unit, integration, and en
 - `tests/source/02_expressions_control_flow.quest`: Verified end-to-end native compilation and execution.
 - `tests/source/03_functions_closures.quest`: Verified end-to-end native compilation and execution of closures.
 - `tests/source/04_records_variants_options.quest`: Verified end-to-end native compilation and execution.
+- `tests/python/test_runtime_descriptors.py` & `tests/source/language/dynamic_subtyping.quest`: Dynamic
+  subtyping, compound descriptors (records, tuples, variants, options, arrays, functions, opaques), dynamic
+  record width/permutation/depth adaptation, dynamic variant tag remapping, and inspect branch code generation.
 
 ---
 

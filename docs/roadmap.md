@@ -139,9 +139,10 @@ native **AArch64 (ARM64)** machine code and providing a **JIT compiler** for int
 - **Bootstrap Compiler Completion Prerequisites:**
   - *Separate Compilation & Object Linking:* Compiling modules independently to `.o` files with header/interface
     exports and linking.
-  - *Dynamic Subtyping & Compound Type Descriptors:* Structural subtyping in `quest_dynamic_be`
-    (`is_subtype(sub, super)`) across records, variants, and compound types, alongside deferred `dynamic.extern` /
-    `intern` text serialization in the C runtime (interpreter JSON/JSOG format complete).
+  - *Dynamic Subtyping & Compound Type Descriptors:* Static and dynamic compound type descriptors (records,
+    tuples, variants, options, arrays, functions, opaques) and structural subtyping in C runtime (coinductive cycle
+    detection, dynamic record width/permutation/depth adaptation, dynamic variant tag remapping, and inspect
+    branching). — *Complete* (deferred text serialization `dynamic.extern` / `intern` for Stage 5/7)
 - C transpiler architecture in [codegen-c.md](codegen-c.md);
   C ABI specification in [c-representation.md](c-representation.md);
   language extensions specification in [extensions.md](extensions.md).

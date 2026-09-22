@@ -338,13 +338,8 @@ void quest_print_val(QVal val, const char *type_name) {
     printf("<val> : %s\n", type_name);
 }
 
-/* Base type subtyping predicate: initially canonical pointer equality */
-static bool quest_base_is_subtype(const QTypeDescriptor *sub, const QTypeDescriptor *super_type) {
-    if (sub == super_type) return true;
-    /* EmptyTuple ("Tuple end") is the top type of kind TYPE in Cardelli Quest */
-    if (super_type == &quest_type_EmptyTuple) return true;
-    return false;
-}
+/* Universal subtyping predicate forward declaration */
+bool quest_is_subtype(const QTypeDescriptor *sub, const QTypeDescriptor *super_type);
 
 /* Statically pre-allocated base type descriptors */
 const QTypeDescriptor quest_type_Int = {
@@ -352,7 +347,7 @@ const QTypeDescriptor quest_type_Int = {
     .name = "Int",
     .size = sizeof(QInt),
     .alignment = sizeof(QInt),
-    .is_subtype = quest_base_is_subtype,
+    .is_subtype = quest_is_subtype,
     .extra = NULL
 };
 
@@ -361,7 +356,7 @@ const QTypeDescriptor quest_type_Real = {
     .name = "Real",
     .size = sizeof(QReal),
     .alignment = sizeof(QReal),
-    .is_subtype = quest_base_is_subtype,
+    .is_subtype = quest_is_subtype,
     .extra = NULL
 };
 
@@ -370,7 +365,7 @@ const QTypeDescriptor quest_type_Bool = {
     .name = "Bool",
     .size = sizeof(QInt),
     .alignment = sizeof(QInt),
-    .is_subtype = quest_base_is_subtype,
+    .is_subtype = quest_is_subtype,
     .extra = NULL
 };
 
@@ -379,7 +374,7 @@ const QTypeDescriptor quest_type_Char = {
     .name = "Char",
     .size = sizeof(QInt),
     .alignment = sizeof(QInt),
-    .is_subtype = quest_base_is_subtype,
+    .is_subtype = quest_is_subtype,
     .extra = NULL
 };
 
@@ -388,7 +383,7 @@ const QTypeDescriptor quest_type_String = {
     .name = "String",
     .size = sizeof(void *),
     .alignment = sizeof(void *),
-    .is_subtype = quest_base_is_subtype,
+    .is_subtype = quest_is_subtype,
     .extra = NULL
 };
 
@@ -397,7 +392,7 @@ const QTypeDescriptor quest_type_Ok = {
     .name = "Ok",
     .size = sizeof(QInt),
     .alignment = sizeof(QInt),
-    .is_subtype = quest_base_is_subtype,
+    .is_subtype = quest_is_subtype,
     .extra = NULL
 };
 
@@ -406,7 +401,7 @@ const QTypeDescriptor quest_type_Dynamic = {
     .name = "Dynamic",
     .size = sizeof(void *),
     .alignment = sizeof(void *),
-    .is_subtype = quest_base_is_subtype,
+    .is_subtype = quest_is_subtype,
     .extra = NULL
 };
 
@@ -415,7 +410,7 @@ const QTypeDescriptor quest_type_EmptyTuple = {
     .name = "Tuple end",
     .size = sizeof(void *),
     .alignment = sizeof(void *),
-    .is_subtype = quest_base_is_subtype,
+    .is_subtype = quest_is_subtype,
     .extra = NULL
 };
 
@@ -490,20 +485,390 @@ const QTypeDescriptor *quest_intern_type_descriptor(const QTypeDescriptor *desc)
     return desc;
 }
 
-/* Array subtyping: Cardelli arrays are invariant in their element type */
-static bool quest_array_is_subtype(const QTypeDescriptor *sub, const QTypeDescriptor *super_type) {
+static char *quest_dup_str(const char *s) {
+    if (s == NULL) return NULL;
+    size_t len = strlen(s);
+    char *copy = (char *)quest_alloc_atomic(len + 1);
+    memcpy(copy, s, len + 1);
+    return copy;
+}
+
+#define Q_SUBTYPE_TRAIL_MAX 64
+typedef struct QSubtypePair {
+    const QTypeDescriptor *sub;
+    const QTypeDescriptor *super_type;
+} QSubtypePair;
+
+static Q_THREAD_LOCAL QSubtypePair quest_subtyping_trail[Q_SUBTYPE_TRAIL_MAX];
+static Q_THREAD_LOCAL size_t quest_subtyping_trail_len = 0;
+
+bool quest_is_subtype(const QTypeDescriptor *sub, const QTypeDescriptor *super_type) {
     if (sub == super_type) return true;
     if (super_type == &quest_type_EmptyTuple) return true;
     if (sub == NULL || super_type == NULL) return false;
-    if (super_type->kind != QTYPE_KIND_ARRAY) return false;
 
-    const QArrayTypeDescriptor *sub_arr = (const QArrayTypeDescriptor *)sub->extra;
-    const QArrayTypeDescriptor *sup_arr = (const QArrayTypeDescriptor *)super_type->extra;
-    if (sub_arr == NULL || sup_arr == NULL) return false;
+    /* Cycle detection trail */
+    for (size_t i = 0; i < quest_subtyping_trail_len; ++i) {
+        if (quest_subtyping_trail[i].sub == sub && quest_subtyping_trail[i].super_type == super_type) {
+            return true;
+        }
+    }
+    if (quest_subtyping_trail_len >= Q_SUBTYPE_TRAIL_MAX) {
+        return false;
+    }
+    quest_subtyping_trail[quest_subtyping_trail_len++] = (QSubtypePair){ sub, super_type };
 
-    /* Invariance check: element types must be identical descriptors */
-    return sub_arr->element_type == sup_arr->element_type;
+    bool result = false;
+
+    switch (super_type->kind) {
+        case QTYPE_KIND_INT:
+        case QTYPE_KIND_REAL:
+        case QTYPE_KIND_BOOL:
+        case QTYPE_KIND_CHAR:
+        case QTYPE_KIND_STRING:
+        case QTYPE_KIND_OK:
+        case QTYPE_KIND_DYNAMIC:
+            result = (sub == super_type);
+            break;
+
+        case QTYPE_KIND_OPAQUE:
+            result = (sub == super_type) ||
+                     (sub->name != NULL && super_type->name != NULL && strcmp(sub->name, super_type->name) == 0);
+            break;
+
+        case QTYPE_KIND_ARRAY: {
+            if (sub->kind != QTYPE_KIND_ARRAY) { result = false; break; }
+            const QArrayTypeDescriptor *s = (const QArrayTypeDescriptor *)sub->extra;
+            const QArrayTypeDescriptor *t = (const QArrayTypeDescriptor *)super_type->extra;
+            if (s == NULL || t == NULL) { result = false; break; }
+            result = quest_is_subtype(s->element_type, t->element_type) &&
+                     quest_is_subtype(t->element_type, s->element_type);
+            break;
+        }
+
+        case QTYPE_KIND_TUPLE: {
+            if (super_type == &quest_type_EmptyTuple) { result = true; break; }
+            if (sub->kind != QTYPE_KIND_TUPLE) { result = false; break; }
+            const QTupleTypeDescriptor *s = (const QTupleTypeDescriptor *)sub->extra;
+            const QTupleTypeDescriptor *t = (const QTupleTypeDescriptor *)super_type->extra;
+            if (t == NULL || t->element_count == 0) { result = true; break; }
+            if (s == NULL || s->element_count < t->element_count) { result = false; break; }
+            bool match = true;
+            for (size_t i = 0; i < t->element_count; ++i) {
+                if (t->elements[i].name != NULL) {
+                    if (s->elements[i].name == NULL || strcmp(s->elements[i].name, t->elements[i].name) != 0) {
+                        match = false;
+                        break;
+                    }
+                }
+                if (!quest_is_subtype(s->elements[i].type, t->elements[i].type)) {
+                    match = false;
+                    break;
+                }
+            }
+            result = match;
+            break;
+        }
+
+        case QTYPE_KIND_RECORD: {
+            if (sub->kind != QTYPE_KIND_RECORD) { result = false; break; }
+            const QRecordTypeDescriptor *s = (const QRecordTypeDescriptor *)sub->extra;
+            const QRecordTypeDescriptor *t = (const QRecordTypeDescriptor *)super_type->extra;
+            if (t == NULL || t->field_count == 0) { result = true; break; }
+            if (s == NULL) { result = false; break; }
+            bool match = true;
+            for (size_t j = 0; j < t->field_count; ++j) {
+                const QRecordFieldDescriptor *tf = &t->fields[j];
+                const QRecordFieldDescriptor *sf = NULL;
+                for (size_t i = 0; i < s->field_count; ++i) {
+                    if (s->fields[i].name != NULL && strcmp(s->fields[i].name, tf->name) == 0) {
+                        sf = &s->fields[i];
+                        break;
+                    }
+                }
+                if (sf == NULL) { match = false; break; }
+                if (tf->is_var) {
+                    if (!sf->is_var) { match = false; break; }
+                    if (!quest_is_subtype(sf->type, tf->type) || !quest_is_subtype(tf->type, sf->type)) {
+                        match = false;
+                        break;
+                    }
+                } else {
+                    if (!quest_is_subtype(sf->type, tf->type)) {
+                        match = false;
+                        break;
+                    }
+                }
+            }
+            result = match;
+            break;
+        }
+
+        case QTYPE_KIND_VARIANT:
+        case QTYPE_KIND_OPTION: {
+            if (sub->kind != QTYPE_KIND_VARIANT && sub->kind != QTYPE_KIND_OPTION) {
+                result = false;
+                break;
+            }
+            const QVariantTypeDescriptor *s = (const QVariantTypeDescriptor *)sub->extra;
+            const QVariantTypeDescriptor *t = (const QVariantTypeDescriptor *)super_type->extra;
+            if (s == NULL || s->case_count == 0) { result = true; break; }
+            if (t == NULL) { result = false; break; }
+            bool match = true;
+            for (size_t i = 0; i < s->case_count; ++i) {
+                const QVariantCaseDescriptor *sc = &s->cases[i];
+                const QVariantCaseDescriptor *tc = NULL;
+                for (size_t j = 0; j < t->case_count; ++j) {
+                    if (t->cases[j].name != NULL && strcmp(t->cases[j].name, sc->name) == 0) {
+                        tc = &t->cases[j];
+                        break;
+                    }
+                }
+                if (tc == NULL) { match = false; break; }
+                if (sc->payload_type == NULL) {
+                    if (tc->payload_type != NULL) { match = false; break; }
+                } else {
+                    if (tc->payload_type == NULL) { match = false; break; }
+                    if (sc->is_var || tc->is_var) {
+                        if (!quest_is_subtype(sc->payload_type, tc->payload_type) ||
+                            !quest_is_subtype(tc->payload_type, sc->payload_type)) {
+                            match = false;
+                            break;
+                        }
+                    } else {
+                        if (!quest_is_subtype(sc->payload_type, tc->payload_type)) {
+                            match = false;
+                            break;
+                        }
+                    }
+                }
+            }
+            result = match;
+            break;
+        }
+
+        case QTYPE_KIND_FUN: {
+            if (sub->kind != QTYPE_KIND_FUN) { result = false; break; }
+            const QFunTypeDescriptor *s = (const QFunTypeDescriptor *)sub->extra;
+            const QFunTypeDescriptor *t = (const QFunTypeDescriptor *)super_type->extra;
+            if (s == NULL || t == NULL) { result = (s == t); break; }
+            if (s->param_count != t->param_count) { result = false; break; }
+            bool match = true;
+            for (size_t i = 0; i < s->param_count; ++i) {
+                if (s->params[i].type != t->params[i].type ||
+                    s->params[i].is_var != t->params[i].is_var ||
+                    s->params[i].is_out != t->params[i].is_out) {
+                    match = false;
+                    break;
+                }
+            }
+            if (match && s->result_type != t->result_type) {
+                match = false;
+            }
+            result = match;
+            break;
+        }
+
+        default:
+            result = (sub == super_type);
+            break;
+    }
+
+    quest_subtyping_trail_len--;
+    return result;
 }
+
+/* ------------------------------------------------------------------------- */
+/* Dynamic Aggregate Adaptation Cache & Coercion Functions                   */
+/* ------------------------------------------------------------------------- */
+
+typedef struct QRecordAdapterCacheEntry {
+    const QTypeDescriptor          *sub_desc;
+    const QTypeDescriptor          *super_desc;
+    const size_t                   *dict;
+    bool                            needs_recursive;
+    struct QRecordAdapterCacheEntry *next;
+} QRecordAdapterCacheEntry;
+
+static QRecordAdapterCacheEntry *quest_record_adapter_cache = NULL;
+
+QRecordVal quest_record_adapt(const QTypeDescriptor *sub_desc, const QTypeDescriptor *super_desc, QVal payload) {
+    if (payload.p == NULL) {
+        return (QRecordVal){ .val = NULL, .dict = NULL };
+    }
+    const QRecordVal *orig_rec = (const QRecordVal *)payload.p;
+    if (sub_desc == super_desc || super_desc == &quest_type_EmptyTuple) {
+        return *orig_rec;
+    }
+
+    const QRecordTypeDescriptor *s_meta = (const QRecordTypeDescriptor *)sub_desc->extra;
+    const QRecordTypeDescriptor *t_meta = (const QRecordTypeDescriptor *)super_desc->extra;
+    if (t_meta == NULL || t_meta->field_count == 0) {
+        return *orig_rec;
+    }
+
+    /* Check adaptation cache */
+    QRecordAdapterCacheEntry *cached = NULL;
+    for (QRecordAdapterCacheEntry *cur = quest_record_adapter_cache; cur != NULL; cur = cur->next) {
+        if (cur->sub_desc == sub_desc && cur->super_desc == super_desc) {
+            cached = cur;
+            break;
+        }
+    }
+
+    if (cached == NULL) {
+        size_t *dict = (size_t *)quest_alloc(sizeof(size_t) * t_meta->field_count);
+        bool recursive = false;
+        for (size_t j = 0; j < t_meta->field_count; ++j) {
+            const QRecordFieldDescriptor *tf = &t_meta->fields[j];
+            const QRecordFieldDescriptor *sf = NULL;
+            if (s_meta != NULL) {
+                for (size_t i = 0; i < s_meta->field_count; ++i) {
+                    if (s_meta->fields[i].name != NULL && strcmp(s_meta->fields[i].name, tf->name) == 0) {
+                        sf = &s_meta->fields[i];
+                        break;
+                    }
+                }
+            }
+            if (sf != NULL) {
+                dict[j] = sf->offset;
+                if (!tf->is_var && (tf->type->kind == QTYPE_KIND_RECORD || tf->type->kind == QTYPE_KIND_VARIANT)) {
+                    if (sf->type != tf->type) {
+                        recursive = true;
+                    }
+                }
+            } else {
+                dict[j] = 0;
+            }
+        }
+        cached = (QRecordAdapterCacheEntry *)quest_alloc(sizeof(QRecordAdapterCacheEntry));
+        cached->sub_desc = sub_desc;
+        cached->super_desc = super_desc;
+        cached->dict = dict;
+        cached->needs_recursive = recursive;
+        cached->next = quest_record_adapter_cache;
+        quest_record_adapter_cache = cached;
+    }
+
+    if (!cached->needs_recursive) {
+        return (QRecordVal){ .val = orig_rec->val, .dict = cached->dict };
+    }
+
+    /* Recursive payload allocation and field adaptation */
+    void *new_val = quest_alloc(super_desc->size > 0 ? super_desc->size : sizeof(void *));
+    for (size_t j = 0; j < t_meta->field_count; ++j) {
+        const QRecordFieldDescriptor *tf = &t_meta->fields[j];
+        const QRecordFieldDescriptor *sf = NULL;
+        for (size_t i = 0; i < s_meta->field_count; ++i) {
+            if (s_meta->fields[i].name != NULL && strcmp(s_meta->fields[i].name, tf->name) == 0) {
+                sf = &s_meta->fields[i];
+                break;
+            }
+        }
+        if (sf == NULL) continue;
+        void *src_field = (char *)orig_rec->val + sf->offset;
+        void *dst_field = (char *)new_val + tf->offset;
+
+        if (tf->type->kind == QTYPE_KIND_RECORD && sf->type != tf->type) {
+            QRecordVal *sub_r = (QRecordVal *)src_field;
+            QRecordVal adapted_inner = quest_record_adapt(sf->type, tf->type, (QVal){ .p = sub_r });
+            *(QRecordVal *)dst_field = adapted_inner;
+        } else if ((tf->type->kind == QTYPE_KIND_VARIANT || tf->type->kind == QTYPE_KIND_OPTION) &&
+                   sf->type != tf->type) {
+            QVariantVal *sub_v = (QVariantVal *)src_field;
+            QVariantVal adapted_inner = quest_variant_adapt(sf->type, tf->type, (QVal){ .p = sub_v });
+            *(QVariantVal *)dst_field = adapted_inner;
+        } else {
+            size_t copy_size = tf->type->size > 0 ? tf->type->size : sizeof(QVal);
+            memcpy(dst_field, src_field, copy_size);
+        }
+    }
+    return (QRecordVal){ .val = new_val, .dict = cached->dict };
+}
+
+typedef struct QVariantAdapterCacheEntry {
+    const QTypeDescriptor            *sub_desc;
+    const QTypeDescriptor            *super_desc;
+    const int64_t                    *tagmap;
+    struct QVariantAdapterCacheEntry *next;
+} QVariantAdapterCacheEntry;
+
+static QVariantAdapterCacheEntry *quest_variant_adapter_cache = NULL;
+
+QVariantVal quest_variant_adapt(const QTypeDescriptor *sub_desc, const QTypeDescriptor *super_desc, QVal payload) {
+    if (payload.p == NULL) {
+        return (QVariantVal){ .tag = 0, .payload = (QVal){ .u = 0 } };
+    }
+    const QVariantVal *orig_var = (const QVariantVal *)payload.p;
+    if (sub_desc == super_desc) {
+        return *orig_var;
+    }
+
+    const QVariantTypeDescriptor *s_meta = (const QVariantTypeDescriptor *)sub_desc->extra;
+    const QVariantTypeDescriptor *t_meta = (const QVariantTypeDescriptor *)super_desc->extra;
+    if (s_meta == NULL || t_meta == NULL) {
+        return *orig_var;
+    }
+
+    /* Check tagmap cache */
+    QVariantAdapterCacheEntry *cached = NULL;
+    for (QVariantAdapterCacheEntry *cur = quest_variant_adapter_cache; cur != NULL; cur = cur->next) {
+        if (cur->sub_desc == sub_desc && cur->super_desc == super_desc) {
+            cached = cur;
+            break;
+        }
+    }
+
+    if (cached == NULL) {
+        int64_t *tagmap = (int64_t *)quest_alloc(sizeof(int64_t) * s_meta->case_count);
+        for (size_t i = 0; i < s_meta->case_count; ++i) {
+            const QVariantCaseDescriptor *sc = &s_meta->cases[i];
+            int64_t target_idx = -1;
+            for (size_t j = 0; j < t_meta->case_count; ++j) {
+                if (t_meta->cases[j].name != NULL && strcmp(t_meta->cases[j].name, sc->name) == 0) {
+                    target_idx = (int64_t)j;
+                    break;
+                }
+            }
+            tagmap[i] = target_idx >= 0 ? target_idx : 0;
+        }
+        cached = (QVariantAdapterCacheEntry *)quest_alloc(sizeof(QVariantAdapterCacheEntry));
+        cached->sub_desc = sub_desc;
+        cached->super_desc = super_desc;
+        cached->tagmap = tagmap;
+        cached->next = quest_variant_adapter_cache;
+        quest_variant_adapter_cache = cached;
+    }
+
+    int64_t target_tag = (orig_var->tag >= 0 && (size_t)orig_var->tag < s_meta->case_count)
+                             ? cached->tagmap[orig_var->tag]
+                             : 0;
+
+    /* Adapt payload if payload type is a compound subtype */
+    QVal adapted_payload = orig_var->payload;
+    const QVariantCaseDescriptor *sc = (orig_var->tag >= 0 && (size_t)orig_var->tag < s_meta->case_count)
+                                           ? &s_meta->cases[orig_var->tag]
+                                           : NULL;
+    const QVariantCaseDescriptor *tc = (target_tag >= 0 && (size_t)target_tag < t_meta->case_count)
+                                           ? &t_meta->cases[target_tag]
+                                           : NULL;
+    if (sc != NULL && tc != NULL && sc->payload_type != NULL && tc->payload_type != NULL &&
+        sc->payload_type != tc->payload_type) {
+        if (tc->payload_type->kind == QTYPE_KIND_RECORD) {
+            QRecordVal adapted_rec = quest_record_adapt(sc->payload_type, tc->payload_type, orig_var->payload);
+            adapted_payload = (QVal){ .p = quest_record_box(adapted_rec) };
+        } else if (tc->payload_type->kind == QTYPE_KIND_VARIANT || tc->payload_type->kind == QTYPE_KIND_OPTION) {
+            QVariantVal adapted_v = quest_variant_adapt(sc->payload_type, tc->payload_type, orig_var->payload);
+            adapted_payload = (QVal){ .p = quest_variant_box(adapted_v) };
+        }
+    }
+
+    return (QVariantVal){ .tag = target_tag, .payload = adapted_payload };
+}
+
+/* ------------------------------------------------------------------------- */
+/* Type Descriptor Constructors & Helpers                                    */
+/* ------------------------------------------------------------------------- */
 
 const QTypeDescriptor *quest_make_array_descriptor(const QTypeDescriptor *element_desc) {
     quest_init_type_intern_table();
@@ -527,7 +892,7 @@ const QTypeDescriptor *quest_make_array_descriptor(const QTypeDescriptor *elemen
     desc->name = arr_name;
     desc->size = sizeof(void *);
     desc->alignment = sizeof(void *);
-    desc->is_subtype = quest_array_is_subtype;
+    desc->is_subtype = quest_is_subtype;
 
     QArrayTypeDescriptor *arr_meta = (QArrayTypeDescriptor *)quest_alloc(sizeof(QArrayTypeDescriptor));
     arr_meta->element_type = element_desc;
@@ -540,20 +905,135 @@ const QTypeDescriptor *quest_make_opaque_descriptor(const char *name) {
     /* Opaque types use unique pointer identity for encapsulation */
     QTypeDescriptor *desc = (QTypeDescriptor *)quest_alloc(sizeof(QTypeDescriptor));
     desc->kind = QTYPE_KIND_OPAQUE;
-    if (name != NULL) {
-        size_t len = strlen(name);
-        char *n = (char *)quest_alloc_atomic(len + 1);
-        memcpy(n, name, len + 1);
-        desc->name = n;
-    } else {
-        desc->name = "Opaque";
-    }
+    desc->name = name != NULL ? quest_dup_str(name) : "Opaque";
     desc->size = sizeof(QVal);
     desc->alignment = sizeof(QVal);
-    desc->is_subtype = quest_base_is_subtype;
+    desc->is_subtype = quest_is_subtype;
     desc->extra = NULL;
     /* Do NOT intern: each opaque type creation has unique nominal identity */
     return desc;
+}
+
+const QTypeDescriptor *quest_make_record_descriptor(
+    const char *name, size_t size, size_t alignment, size_t field_count, const QRecordFieldDescriptor *fields
+) {
+    quest_init_type_intern_table();
+    const char *rec_name = name ? name : "Record end";
+
+    uint64_t h = quest_hash_string(rec_name) % Q_TYPE_INTERN_TABLE_SIZE;
+    for (QTypeDescriptorEntry *cur = quest_type_intern_buckets[h]; cur != NULL; cur = cur->next) {
+        if (cur->desc->name != NULL && strcmp(cur->desc->name, rec_name) == 0) {
+            return cur->desc;
+        }
+    }
+
+    QTypeDescriptor *desc = (QTypeDescriptor *)quest_alloc(sizeof(QTypeDescriptor));
+    desc->kind = QTYPE_KIND_RECORD;
+    desc->name = quest_dup_str(rec_name);
+    desc->size = size;
+    desc->alignment = alignment > 0 ? alignment : sizeof(void *);
+    desc->is_subtype = quest_is_subtype;
+
+    size_t meta_size = sizeof(QRecordTypeDescriptor) + sizeof(QRecordFieldDescriptor) * field_count;
+    QRecordTypeDescriptor *meta = (QRecordTypeDescriptor *)quest_alloc(meta_size);
+    meta->field_count = field_count;
+    if (fields != NULL && field_count > 0) {
+        memcpy((void *)meta->fields, fields, sizeof(QRecordFieldDescriptor) * field_count);
+    }
+    desc->extra = meta;
+    return quest_intern_type_descriptor(desc);
+}
+
+const QTypeDescriptor *quest_make_tuple_descriptor(
+    const char *name, size_t size, size_t alignment, size_t element_count, const QTupleElementDescriptor *elements
+) {
+    if (element_count == 0) return &quest_type_EmptyTuple;
+    quest_init_type_intern_table();
+    const char *tup_name = name ? name : "Tuple end";
+
+    uint64_t h = quest_hash_string(tup_name) % Q_TYPE_INTERN_TABLE_SIZE;
+    for (QTypeDescriptorEntry *cur = quest_type_intern_buckets[h]; cur != NULL; cur = cur->next) {
+        if (cur->desc->name != NULL && strcmp(cur->desc->name, tup_name) == 0) {
+            return cur->desc;
+        }
+    }
+
+    QTypeDescriptor *desc = (QTypeDescriptor *)quest_alloc(sizeof(QTypeDescriptor));
+    desc->kind = QTYPE_KIND_TUPLE;
+    desc->name = quest_dup_str(tup_name);
+    desc->size = size;
+    desc->alignment = alignment > 0 ? alignment : sizeof(void *);
+    desc->is_subtype = quest_is_subtype;
+
+    size_t meta_size = sizeof(QTupleTypeDescriptor) + sizeof(QTupleElementDescriptor) * element_count;
+    QTupleTypeDescriptor *meta = (QTupleTypeDescriptor *)quest_alloc(meta_size);
+    meta->element_count = element_count;
+    if (elements != NULL && element_count > 0) {
+        memcpy((void *)meta->elements, elements, sizeof(QTupleElementDescriptor) * element_count);
+    }
+    desc->extra = meta;
+    return quest_intern_type_descriptor(desc);
+}
+
+const QTypeDescriptor *quest_make_variant_descriptor(
+    const char *name, size_t size, size_t alignment, size_t case_count, const QVariantCaseDescriptor *cases
+) {
+    quest_init_type_intern_table();
+    const char *var_name = name ? name : "Variant end";
+
+    uint64_t h = quest_hash_string(var_name) % Q_TYPE_INTERN_TABLE_SIZE;
+    for (QTypeDescriptorEntry *cur = quest_type_intern_buckets[h]; cur != NULL; cur = cur->next) {
+        if (cur->desc->name != NULL && strcmp(cur->desc->name, var_name) == 0) {
+            return cur->desc;
+        }
+    }
+
+    QTypeDescriptor *desc = (QTypeDescriptor *)quest_alloc(sizeof(QTypeDescriptor));
+    desc->kind = QTYPE_KIND_VARIANT;
+    desc->name = quest_dup_str(var_name);
+    desc->size = size > 0 ? size : sizeof(QVariantVal);
+    desc->alignment = alignment > 0 ? alignment : sizeof(void *);
+    desc->is_subtype = quest_is_subtype;
+
+    size_t meta_size = sizeof(QVariantTypeDescriptor) + sizeof(QVariantCaseDescriptor) * case_count;
+    QVariantTypeDescriptor *meta = (QVariantTypeDescriptor *)quest_alloc(meta_size);
+    meta->case_count = case_count;
+    if (cases != NULL && case_count > 0) {
+        memcpy((void *)meta->cases, cases, sizeof(QVariantCaseDescriptor) * case_count);
+    }
+    desc->extra = meta;
+    return quest_intern_type_descriptor(desc);
+}
+
+const QTypeDescriptor *quest_make_fun_descriptor(
+    const char *name, size_t param_count, const QFunParamDescriptor *params, const QTypeDescriptor *result_type
+) {
+    quest_init_type_intern_table();
+    const char *fn_name = name ? name : "Fun()";
+
+    uint64_t h = quest_hash_string(fn_name) % Q_TYPE_INTERN_TABLE_SIZE;
+    for (QTypeDescriptorEntry *cur = quest_type_intern_buckets[h]; cur != NULL; cur = cur->next) {
+        if (cur->desc->name != NULL && strcmp(cur->desc->name, fn_name) == 0) {
+            return cur->desc;
+        }
+    }
+
+    QTypeDescriptor *desc = (QTypeDescriptor *)quest_alloc(sizeof(QTypeDescriptor));
+    desc->kind = QTYPE_KIND_FUN;
+    desc->name = quest_dup_str(fn_name);
+    desc->size = sizeof(QClosure);
+    desc->alignment = sizeof(void *);
+    desc->is_subtype = quest_is_subtype;
+
+    size_t meta_size = sizeof(QFunTypeDescriptor) + sizeof(QFunParamDescriptor) * param_count;
+    QFunTypeDescriptor *meta = (QFunTypeDescriptor *)quest_alloc(meta_size);
+    meta->param_count = param_count;
+    meta->result_type = result_type;
+    if (params != NULL && param_count > 0) {
+        memcpy((void *)meta->params, params, sizeof(QFunParamDescriptor) * param_count);
+    }
+    desc->extra = meta;
+    return quest_intern_type_descriptor(desc);
 }
 
 QDynamic *quest_dynamic_new(const QTypeDescriptor *type_desc, QVal val) {
@@ -567,16 +1047,24 @@ QVal quest_dynamic_be(const QTypeDescriptor *target_type_desc, const QDynamic *d
     if (d == NULL || d->type_desc == NULL || target_type_desc == NULL) {
         quest_raise_dynamic_error();
     }
-    /* Check exact pointer identity or subtyping predicate */
+    /* Check exact pointer identity */
     if (d->type_desc == target_type_desc) {
         return d->payload;
     }
-    if (target_type_desc->is_subtype != NULL && target_type_desc->is_subtype(d->type_desc, target_type_desc)) {
-        return d->payload;
+    /* Check structural subtyping */
+    if (!quest_is_subtype(d->type_desc, target_type_desc)) {
+        quest_raise_dynamic_error();
     }
-    /* Type mismatch */
-    quest_raise_dynamic_error();
-    return (QVal){ .u = 0 }; /* Unreachable */
+    /* Coercion and adaptation for aggregates */
+    if (target_type_desc->kind == QTYPE_KIND_RECORD) {
+        QRecordVal adapted = quest_record_adapt(d->type_desc, target_type_desc, d->payload);
+        return (QVal){ .p = quest_record_box(adapted) };
+    }
+    if (target_type_desc->kind == QTYPE_KIND_VARIANT || target_type_desc->kind == QTYPE_KIND_OPTION) {
+        QVariantVal adapted = quest_variant_adapt(d->type_desc, target_type_desc, d->payload);
+        return (QVal){ .p = quest_variant_box(adapted) };
+    }
+    return d->payload;
 }
 
 /* ------------------------------------------------------------------------- */

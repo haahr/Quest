@@ -9,20 +9,35 @@ from quest.codegen.c_analysis import CLambdaInfo, CProgramAnalysis
 from quest.codegen.c_types import (
     RecordNamingContext,
     mangle_ident,
+    normalize_type,
     option_struct_name,
     record_struct_name,
     tuple_struct_name,
     type_to_c_tag,
 )
 from quest.types import (
+    BOOL_TYPE,
+    CHAR_TYPE,
+    DYNAMIC_TYPE,
+    INT_TYPE,
     OK_TYPE,
+    QAbstractType,
     QAllType,
+    QArrayType,
+    QExternalType,
     QFunType,
     QOptionType,
     QQuantifier,
     QRecordType,
     QTupleType,
     QType,
+    QTypeVar,
+    QVariantType,
+    REAL_TYPE,
+    STRING_TYPE,
+    resolve_option_bound,
+    resolve_record_bound,
+    resolve_variant_bound,
 )
 
 
@@ -205,6 +220,250 @@ class CDeclarationEmitter:
                     f"static const int64_t tagmap_{tgt_tag}_{src_tag}[{len(src.variants)}] = "
                     f"{{ {', '.join(entries)} }};"
                 )
+            lines.append("")
+        return lines
+
+    def emit_type_descriptors(
+        self,
+        agg_types: list[tuple[str, QType]],
+        variant_types: list[QVariantType],
+        desc_fn: Callable[[QType], str],
+        all_program_types: Optional[list[QType]] = None,
+    ) -> list[str]:
+        lines: list[str] = []
+        records: list[tuple[str, QRecordType]] = []
+        tuples: list[tuple[str, QTupleType]] = []
+        variants_and_options: list[tuple[str, Any]] = []
+        arrays: list[tuple[str, QArrayType]] = []
+        opaques: list[tuple[str, str]] = []
+        seen_tags: set[str] = set()
+
+        def visit(t: Optional[QType]) -> None:
+            if t is None:
+                return
+            t = t.prune() if hasattr(t, "prune") else t
+            t = normalize_type(t)
+            if t in (INT_TYPE, REAL_TYPE, BOOL_TYPE, CHAR_TYPE, STRING_TYPE, OK_TYPE, DYNAMIC_TYPE):
+                return
+            if isinstance(t, QTypeVar) and t.name == "Dynamic.T":
+                return
+            if isinstance(t, QTupleType) and not t.fields:
+                return
+            if isinstance(t, QRecordType) or (rec_b := resolve_record_bound(t)) is not None:
+                rec_t = t if isinstance(t, QRecordType) else rec_b
+                tag = record_struct_name(rec_t, self.record_ctx)
+                if tag not in seen_tags:
+                    seen_tags.add(tag)
+                    records.append((tag, rec_t))
+                    for f in rec_t.fields:
+                        visit(f.type_val)
+                return
+            if isinstance(t, QTupleType):
+                tag = tuple_struct_name(t)
+                if tag not in seen_tags:
+                    seen_tags.add(tag)
+                    tuples.append((tag, t))
+                    for f in t.value_fields:
+                        visit(f.type_val)
+                return
+            if isinstance(t, QVariantType) or (var_b := resolve_variant_bound(t)) is not None:
+                var_t = t if isinstance(t, QVariantType) else var_b
+                tag = type_to_c_tag(var_t)
+                if tag not in seen_tags:
+                    seen_tags.add(tag)
+                    variants_and_options.append((tag, var_t))
+                    for v in var_t.variants:
+                        if getattr(v, "type_val", None):
+                            visit(v.type_val)
+                return
+            if isinstance(t, QOptionType) or (opt_b := resolve_option_bound(t)) is not None:
+                opt_t = t if isinstance(t, QOptionType) else opt_b
+                tag = option_struct_name(opt_t)
+                if tag not in seen_tags:
+                    seen_tags.add(tag)
+                    variants_and_options.append((tag, opt_t))
+                    for o in opt_t.options:
+                        if o.payload_type:
+                            visit(o.payload_type)
+                return
+            if isinstance(t, QArrayType):
+                elem_tag = type_to_c_tag(t.element_type)
+                tag = f"array_{elem_tag}"
+                if tag not in seen_tags:
+                    seen_tags.add(tag)
+                    arrays.append((tag, t))
+                    visit(t.element_type)
+                return
+            if isinstance(t, QExternalType):
+                name = t.name or t.c_type
+                tag = f"opaque_{mangle_ident(name)}"
+                if tag not in seen_tags:
+                    seen_tags.add(tag)
+                    opaques.append((tag, name))
+                return
+            if isinstance(t, (QTypeVar, QAbstractType)):
+                name = t.name
+                tag = f"opaque_{mangle_ident(name)}"
+                if tag not in seen_tags:
+                    seen_tags.add(tag)
+                    opaques.append((tag, name))
+                return
+            if isinstance(t, (QFunType, QAllType)):
+                tag = f"fun_{type_to_c_tag(t)}"
+                if tag not in seen_tags:
+                    seen_tags.add(tag)
+                    opaques.append((tag, str(t)))
+                return
+
+        for _, t in agg_types:
+            visit(t)
+        for v in variant_types:
+            visit(v)
+        if all_program_types:
+            for t in all_program_types:
+                visit(t)
+
+        if not seen_tags:
+            return lines
+
+        lines.append("/* Forward declarations for static type descriptors */")
+        for tag in sorted(seen_tags):
+            lines.append(f"static const QTypeDescriptor quest_type_{tag} Q_UNUSED;")
+        lines.append("")
+
+        lines.append("/* Static runtime type descriptors for compound and opaque types */")
+        for tag, name in opaques:
+            c_name = name.replace('"', '\\"')
+            lines.append(f"static const QTypeDescriptor quest_type_{tag} Q_UNUSED = {{")
+            lines.append(f"    .kind = QTYPE_KIND_OPAQUE,")
+            lines.append(f"    .name = \"{c_name}\",")
+            lines.append(f"    .size = sizeof(QVal),")
+            lines.append(f"    .alignment = sizeof(void *),")
+            lines.append(f"    .is_subtype = quest_is_subtype,")
+            lines.append(f"    .extra = NULL,")
+            lines.append(f"}};")
+            lines.append("")
+
+        for tag, arr_t in arrays:
+            elem_desc = desc_fn(arr_t.element_type)
+            elem_name = str(arr_t.element_type).replace('"', '\\"')
+            lines.append(f"static const QArrayTypeDescriptor qarr_desc_{tag} Q_UNUSED = {{")
+            lines.append(f"    .element_type = {elem_desc},")
+            lines.append(f"}};")
+            lines.append(f"static const QTypeDescriptor quest_type_{tag} Q_UNUSED = {{")
+            lines.append(f"    .kind = QTYPE_KIND_ARRAY,")
+            lines.append(f"    .name = \"Array({elem_name})\",")
+            lines.append(f"    .size = sizeof(void *),")
+            lines.append(f"    .alignment = sizeof(void *),")
+            lines.append(f"    .is_subtype = quest_is_subtype,")
+            lines.append(f"    .extra = &qarr_desc_{tag},")
+            lines.append(f"}};")
+            lines.append("")
+
+        for tag, qtype in records:
+            c_name = str(qtype).replace('"', '\\"')
+            sorted_fields = sorted(qtype.fields, key=lambda f: f.name)
+            n = len(sorted_fields)
+            if n > 0:
+                lines.append(f"static const struct {{")
+                lines.append(f"    size_t field_count;")
+                lines.append(f"    const QRecordFieldDescriptor fields[{n}];")
+                lines.append(f"}} qrec_desc_{tag} Q_UNUSED = {{")
+                lines.append(f"    .field_count = {n},")
+                lines.append(f"    .fields = {{")
+                for f in sorted_fields:
+                    f_desc = desc_fn(f.type_val)
+                    is_var_str = "true" if f.is_var else "false"
+                    lines.append(
+                        f"        {{ .name = \"{f.name}\", .type = {f_desc}, "
+                        f".offset = offsetof(struct {tag}, qf_{f.name}), .is_var = {is_var_str} }},"
+                    )
+                lines.append(f"    }}")
+                lines.append(f"}};")
+                lines.append(f"static const QTypeDescriptor quest_type_{tag} Q_UNUSED = {{")
+                lines.append(f"    .kind = QTYPE_KIND_RECORD,")
+                lines.append(f"    .name = \"{c_name}\",")
+                lines.append(f"    .size = sizeof(struct {tag}),")
+                lines.append(f"    .alignment = sizeof(void *),")
+                lines.append(f"    .is_subtype = quest_is_subtype,")
+                lines.append(f"    .extra = &qrec_desc_{tag},")
+                lines.append(f"}};")
+            else:
+                lines.append(f"static const QRecordTypeDescriptor qrec_desc_{tag} Q_UNUSED = {{ .field_count = 0 }};")
+                lines.append(f"static const QTypeDescriptor quest_type_{tag} Q_UNUSED = {{")
+                lines.append(f"    .kind = QTYPE_KIND_RECORD,")
+                lines.append(f"    .name = \"Record end\",")
+                lines.append(f"    .size = sizeof(void *),")
+                lines.append(f"    .alignment = sizeof(void *),")
+                lines.append(f"    .is_subtype = quest_is_subtype,")
+                lines.append(f"    .extra = &qrec_desc_{tag},")
+                lines.append(f"}};")
+            lines.append("")
+
+        for tag, qtype in tuples:
+            c_name = str(qtype).replace('"', '\\"')
+            val_fields = qtype.value_fields
+            n = len(val_fields)
+            if n > 0:
+                lines.append(f"static const struct {{")
+                lines.append(f"    size_t element_count;")
+                lines.append(f"    const QTupleElementDescriptor elements[{n}];")
+                lines.append(f"}} qtup_desc_{tag} Q_UNUSED = {{")
+                lines.append(f"    .element_count = {n},")
+                lines.append(f"    .elements = {{")
+                for i, f in enumerate(val_fields):
+                    f_desc = desc_fn(f.type_val)
+                    name_str = f'"{f.name}"' if getattr(f, "name", None) is not None else "NULL"
+                    lines.append(
+                        f"        {{ .name = {name_str}, .type = {f_desc}, "
+                        f".offset = offsetof(struct {tag}, _{i}) }},"
+                    )
+                lines.append(f"    }}")
+                lines.append(f"}};")
+                lines.append(f"static const QTypeDescriptor quest_type_{tag} Q_UNUSED = {{")
+                lines.append(f"    .kind = QTYPE_KIND_TUPLE,")
+                lines.append(f"    .name = \"{c_name}\",")
+                lines.append(f"    .size = sizeof(struct {tag}),")
+                lines.append(f"    .alignment = sizeof(void *),")
+                lines.append(f"    .is_subtype = quest_is_subtype,")
+                lines.append(f"    .extra = &qtup_desc_{tag},")
+                lines.append(f"}};")
+            lines.append("")
+
+        for tag, qtype in variants_and_options:
+            c_name = str(qtype).replace('"', '\\"')
+            cases = (
+                [(v.name, getattr(v, "type_val", None), getattr(v, "is_var", False)) for v in qtype.variants]
+                if isinstance(qtype, QVariantType)
+                else [(o.name, o.payload_type, False) for o in qtype.options]
+            )
+            n = len(cases)
+            if n > 0:
+                lines.append(f"static const struct {{")
+                lines.append(f"    size_t case_count;")
+                lines.append(f"    const QVariantCaseDescriptor cases[{n}];")
+                lines.append(f"}} qvar_desc_{tag} Q_UNUSED = {{")
+                lines.append(f"    .case_count = {n},")
+                lines.append(f"    .cases = {{")
+                for i, (c_tag_name, p_type, is_var) in enumerate(cases):
+                    p_desc = desc_fn(p_type) if p_type is not None else "NULL"
+                    is_var_str = "true" if is_var else "false"
+                    lines.append(
+                        f"        {{ .name = \"{c_tag_name}\", .payload_type = {p_desc}, "
+                        f".tag_index = {i}LL, .is_var = {is_var_str} }},"
+                    )
+                lines.append(f"    }}")
+                lines.append(f"}};")
+                kind_str = "QTYPE_KIND_VARIANT" if isinstance(qtype, QVariantType) else "QTYPE_KIND_OPTION"
+                size_str = f"sizeof(struct {tag})" if isinstance(qtype, QOptionType) else "sizeof(QVariantVal)"
+                lines.append(f"static const QTypeDescriptor quest_type_{tag} Q_UNUSED = {{")
+                lines.append(f"    .kind = {kind_str},")
+                lines.append(f"    .name = \"{c_name}\",")
+                lines.append(f"    .size = {size_str},")
+                lines.append(f"    .alignment = sizeof(void *),")
+                lines.append(f"    .is_subtype = quest_is_subtype,")
+                lines.append(f"    .extra = &qvar_desc_{tag},")
+                lines.append(f"}};")
             lines.append("")
         return lines
 

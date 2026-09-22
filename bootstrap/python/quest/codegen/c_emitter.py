@@ -60,6 +60,8 @@ from quest.typed_ast import (
     TypedIndexAssign,
     TypedIndexRef,
     TypedInfix,
+    TypedInspect,
+    TypedInspectBranch,
     TypedInt,
     TypedLetType,
     TypedLetValue,
@@ -185,6 +187,8 @@ class CEmitter:
 
     def c_type_descriptor(self, t: QType) -> str:
         """Returns the C expression evaluating to `const QTypeDescriptor *` for type `t`."""
+        t = t.prune() if hasattr(t, "prune") else t
+        t = normalize_type(t)
         if t == INT_TYPE:
             return "&quest_type_Int"
         if t == REAL_TYPE:
@@ -201,19 +205,41 @@ class CEmitter:
             return "&quest_type_Dynamic"
         if isinstance(t, QTupleType) and not t.fields:
             return "&quest_type_EmptyTuple"
+        if isinstance(t, QRecordType) or (rec_b := resolve_record_bound(t)) is not None:
+            rec_t = t if isinstance(t, QRecordType) else rec_b
+            tag = record_struct_name(rec_t, self.record_ctx)
+            return f"(&quest_type_{tag})"
+        if isinstance(t, QTupleType):
+            tag = tuple_struct_name(t)
+            return f"(&quest_type_{tag})"
+        if isinstance(t, QVariantType) or (var_b := resolve_variant_bound(t)) is not None:
+            var_t = t if isinstance(t, QVariantType) else var_b
+            tag = type_to_c_tag(var_t)
+            return f"(&quest_type_{tag})"
+        if isinstance(t, QOptionType) or (opt_b := resolve_option_bound(t)) is not None:
+            opt_t = t if isinstance(t, QOptionType) else opt_b
+            tag = option_struct_name(opt_t)
+            return f"(&quest_type_{tag})"
+        if isinstance(t, QArrayType):
+            elem_tag = type_to_c_tag(t.element_type)
+            return f"(&quest_type_array_{elem_tag})"
+        if isinstance(t, QExternalType):
+            name = t.name or t.c_type
+            tag = f"opaque_{mangle_ident(name)}"
+            return f"(&quest_type_{tag})"
         if isinstance(t, QTypeVar):
             if t.name in self.in_scope_type_descriptors:
                 return self.in_scope_type_descriptors[t.name]
-            return f"quest_make_opaque_descriptor({_c_string_literal(t.name)})"
+            tag = f"opaque_{mangle_ident(t.name)}"
+            return f"(&quest_type_{tag})"
         if isinstance(t, QAbstractType):
             if t.name in self.in_scope_type_descriptors:
                 return self.in_scope_type_descriptors[t.name]
-            return f"qv_qt_{t.name}"
-        if isinstance(t, QArrayType):
-            elem_desc = self.c_type_descriptor(t.element_type)
-            return f"quest_make_array_descriptor({elem_desc})"
-        if isinstance(t, QExternalType):
-            return f"quest_make_opaque_descriptor({_c_string_literal(t.name or t.c_type)})"
+            tag = f"opaque_{mangle_ident(t.name)}"
+            return f"(&quest_type_{tag})"
+        if isinstance(t, (QFunType, QAllType)):
+            tag = f"fun_{type_to_c_tag(t)}"
+            return f"(&quest_type_{tag})"
         return "&quest_type_EmptyTuple"
 
     def record_struct_name(self, t: QRecordType) -> str:
@@ -788,6 +814,12 @@ class CEmitter:
         lines.extend(decl_emitter.emit_aggregate_structs(analysis.agg_types))
         lines.extend(decl_emitter.emit_evidence_dictionaries(analysis.agg_types, self.needed_dicts))
         lines.extend(decl_emitter.emit_coercion_tables(self.tuple_coercions, self.variant_coercions))
+        lines.extend(decl_emitter.emit_type_descriptors(
+            analysis.agg_types,
+            analysis.variant_types,
+            self.c_type_descriptor,
+            analysis.all_program_types,
+        ))
         lines.extend(decl_emitter.emit_environment_structs(self.lifted_lambdas))
         lines.extend(decl_emitter.emit_top_vars_declarations(analysis.top_vars, self.var_dict_names))
         lines.extend(decl_emitter.emit_forward_declarations_and_trampolines(
@@ -1522,7 +1554,7 @@ class CEmitter:
                     lines.append("quest_raise_variant_error();")
                     return "((void)0)"
 
-            case TypedCase():
+            case TypedCase() | TypedInspect():
                 if expr.type_val == OK_TYPE:
                     self.emit_to(expr, None, lines)
                     return "((void)0)"
@@ -2524,6 +2556,47 @@ class CEmitter:
                 lines.append("        }")
                 lines.append("    }")
                 lines.append("}")
+
+            case TypedInspect(target=tgt, branches=branches, else_branch=else_b, type_val=t):
+                c_tgt = self.emit_val(tgt, lines)
+                if not c_tgt.isidentifier():
+                    tmp_tgt = self.fresh_tmp("_insp_tgt")
+                    lines.append(f"const QDynamic *{tmp_tgt} = {c_tgt};")
+                    c_tgt = tmp_tgt
+                if not branches:
+                    if else_b is not None:
+                        self.emit_to(else_b, dest, lines)
+                    else:
+                        lines.append("quest_raise_dynamic_error();")
+                else:
+                    for i, branch in enumerate(branches):
+                        match_desc = self.c_type_descriptor(branch.match_type)
+                        cond = f"quest_is_subtype({c_tgt}->type_desc, {match_desc})"
+                        prefix = "if" if i == 0 else "} else if"
+                        lines.append(f"{prefix} ({cond}) {{")
+                        branch_lines: list[str] = []
+                        if branch.binders:
+                            call_str = f"quest_dynamic_be({match_desc}, {c_tgt})"
+                            val_expr = _qval_unwrap(call_str, branch.match_type, self)
+                            first_sym = branch.binders[0]
+                            c_b_type = self.c_type(first_sym.type_val)
+                            tmp_bind = self.fresh_tmp("_insp_val")
+                            branch_lines.append(f"{c_b_type} {tmp_bind} = {val_expr};")
+                            for b_sym in branch.binders:
+                                b_name = mangle_ident(b_sym.name)
+                                branch_lines.append(f"{c_b_type} {b_name} = {tmp_bind};")
+                        self.emit_to(branch.body, dest, branch_lines)
+                        for bl in branch_lines:
+                            lines.append(f"    {bl}" if bl.strip() else bl)
+                    lines.append("} else {")
+                    default_lines: list[str] = []
+                    if else_b is not None:
+                        self.emit_to(else_b, dest, default_lines)
+                    else:
+                        default_lines.append("quest_raise_dynamic_error();")
+                    for dl in default_lines:
+                        lines.append(f"    {dl}" if dl.strip() else dl)
+                    lines.append("}")
 
             case _:
                 val = self.emit_val(expr, lines)

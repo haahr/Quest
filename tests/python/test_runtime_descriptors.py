@@ -220,6 +220,129 @@ class TestRuntimeDescriptors(unittest.TestCase):
         self.assertEqual(proc.returncode, 0, f"Failed: {proc.stderr}")
         self.assertIn("DYNAMIC_ERROR_CAUGHT_OK", proc.stdout)
 
+    def test_compound_record_subtyping_and_adaptation(self):
+        """Tests record width/depth subtyping and dynamic dictionary synthesis."""
+        c_code = """
+        #include "quest_runtime.h"
+        #include <assert.h>
+        #include <stdio.h>
+
+        /* Big record: { x: Int, y: Int, z: Int } */
+        struct BigRec {
+            int64_t qf_x;
+            int64_t qf_y;
+            int64_t qf_z;
+        };
+        /* Small record: { y: Int } */
+        struct SmallRec {
+            int64_t qf_y;
+        };
+
+        /* Offset dict for SmallRec */
+        struct DictSmall {
+            size_t offset_y;
+        };
+
+        int main(void) {
+            quest_gc_init();
+
+            QRecordFieldDescriptor big_fields[] = {
+                { .name = "x", .type = &quest_type_Int, .offset = offsetof(struct BigRec, qf_x), .is_var = false },
+                { .name = "y", .type = &quest_type_Int, .offset = offsetof(struct BigRec, qf_y), .is_var = false },
+                { .name = "z", .type = &quest_type_Int, .offset = offsetof(struct BigRec, qf_z), .is_var = false }
+            };
+            const QTypeDescriptor *big_desc = quest_make_record_descriptor(
+                "Record x: Int y: Int z: Int end", sizeof(struct BigRec), 8, 3, big_fields);
+
+            QRecordFieldDescriptor small_fields[] = {
+                { .name = "y", .type = &quest_type_Int, .offset = offsetof(struct SmallRec, qf_y), .is_var = false }
+            };
+            const QTypeDescriptor *small_desc = quest_make_record_descriptor(
+                "Record y: Int end", sizeof(struct SmallRec), 8, 1, small_fields);
+
+            /* Subtyping: big <: small, but NOT small <: big */
+            assert(quest_is_subtype(big_desc, small_desc));
+            assert(!quest_is_subtype(small_desc, big_desc));
+
+            /* Allocate big record payload */
+            struct BigRec *b = (struct BigRec *)quest_alloc(sizeof(struct BigRec));
+            b->qf_x = 100;
+            b->qf_y = 200;
+            b->qf_z = 300;
+
+            QRecordVal r_big = { .val = b, .dict = NULL };
+            QDynamic *d = quest_dynamic_new(big_desc, (QVal){ .p = quest_record_box(r_big) });
+
+            /* Coerce to SmallRec via dynamic.be */
+            QVal extracted = quest_dynamic_be(small_desc, d);
+            QRecordVal *r_small = (QRecordVal *)extracted.p;
+            assert(r_small != NULL);
+
+            /* Check that dictionary correctly mapped 'y' offset to BigRec.qf_y */
+            const struct DictSmall *dict = (const struct DictSmall *)r_small->dict;
+            assert(dict->offset_y == offsetof(struct BigRec, qf_y));
+
+            int64_t val_y = *(int64_t *)((char *)r_small->val + dict->offset_y);
+            assert(val_y == 200);
+
+            printf("RECORD_SUBTYPING_OK\\n");
+            return 0;
+        }
+        """
+        proc = self.compile_and_run_c(c_code)
+        self.assertEqual(proc.returncode, 0, f"Failed: {proc.stderr}")
+        self.assertIn("RECORD_SUBTYPING_OK", proc.stdout)
+
+    def test_compound_variant_subtyping_and_adaptation(self):
+        """Tests variant subtyping and dynamic tag remapping."""
+        c_code = """
+        #include "quest_runtime.h"
+        #include <assert.h>
+        #include <stdio.h>
+
+        int main(void) {
+            quest_gc_init();
+
+            /* Subvariant: Option b end (case count 1, tag 'b' = 0) */
+            QVariantCaseDescriptor sub_cases[] = {
+                { .name = "b", .payload_type = NULL, .tag_index = 0, .is_var = false }
+            };
+            const QTypeDescriptor *sub_desc = quest_make_variant_descriptor(
+                "Option b end", sizeof(QVariantVal), 8, 1, sub_cases);
+
+            /* Supervariant: Option a b c end (tag 'a' = 0, 'b' = 1, 'c' = 2) */
+            QVariantCaseDescriptor super_cases[] = {
+                { .name = "a", .payload_type = NULL, .tag_index = 0, .is_var = false },
+                { .name = "b", .payload_type = NULL, .tag_index = 1, .is_var = false },
+                { .name = "c", .payload_type = NULL, .tag_index = 2, .is_var = false }
+            };
+            const QTypeDescriptor *super_desc = quest_make_variant_descriptor(
+                "Option a b c end", sizeof(QVariantVal), 8, 3, super_cases);
+
+            /* Subtyping: sub <: super (fewer cases is subtype of more cases) */
+            assert(quest_is_subtype(sub_desc, super_desc));
+            assert(!quest_is_subtype(super_desc, sub_desc));
+
+            /* Create variant 'b' with local tag 0 */
+            QVariantVal v = { .tag = 0, .payload = (QVal){ .u = 0 } };
+            QDynamic *d = quest_dynamic_new(sub_desc, (QVal){ .p = quest_variant_box(v) });
+
+            /* Coerce to supervariant */
+            QVal extracted = quest_dynamic_be(super_desc, d);
+            QVariantVal *res_v = (QVariantVal *)extracted.p;
+            assert(res_v != NULL);
+            /* Tag must be remapped from 0 to 1! */
+            assert(res_v->tag == 1);
+
+            printf("VARIANT_SUBTYPING_OK\\n");
+            return 0;
+        }
+        """
+        proc = self.compile_and_run_c(c_code)
+        self.assertEqual(proc.returncode, 0, f"Failed: {proc.stderr}")
+        self.assertIn("VARIANT_SUBTYPING_OK", proc.stdout)
+
 
 if __name__ == "__main__":
     unittest.main()
+

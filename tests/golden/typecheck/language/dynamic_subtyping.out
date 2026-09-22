@@ -1,0 +1,310 @@
+(TypedProgram
+  :phrases (
+    (TypedImport
+      :items (
+        (TypedImportItem ('writer') : 'Writer')
+      ))
+    (TypedImport
+      :items (
+        (TypedImportItem ('conv') : 'Conv')
+      ))
+    (TypedImport
+      :items (
+        (TypedImportItem ('dynamic') : 'Dynamic')
+      ))
+    (TypedLetValue 'wOut' :type Writer.T
+      :value (TypedSelect 'output' :type Writer.T
+        :target (TypedVar 'writer' :type Record error: Exception output: Writer.T err: Writer.T file: Fun(name: String): Writer.T putString: Fun(writer: Writer.T string: String): Ok putChar: Fun(writer: Writer.T char: Char): Ok putSubString: Fun(writer: Writer.T string: String start: Int size: Int): Ok flush: Fun(writer: Writer.T): Ok close: Fun(writer: Writer.T): Ok end)))
+    (TypedLetValue 'printInt' :type Fun(x: Int): Ok
+      :value (TypedFun :params (('x' : Int)) :type Fun(x: Int): Ok
+        :body (TypedBlock :type Ok
+          :bindings (
+            (TypedExprStmt
+              :expr (TypedApp :type Ok
+                :func (TypedSelect 'putString' :type Fun(writer: Writer.T string: String): Ok
+                  :target (TypedVar 'writer' :type Record error: Exception output: Writer.T err: Writer.T file: Fun(name: String): Writer.T putString: Fun(writer: Writer.T string: String): Ok putChar: Fun(writer: Writer.T char: Char): Ok putSubString: Fun(writer: Writer.T string: String start: Int size: Int): Ok flush: Fun(writer: Writer.T): Ok close: Fun(writer: Writer.T): Ok end))
+                :args (
+                  (TypedVar 'wOut' :type Writer.T)
+                  (TypedApp :type String
+                    :func (TypedSelect 'int' :type Fun(n: Int): String
+                      :target (TypedVar 'conv' :type Record okay: Fun(): String bool: Fun(b: Bool): String int: Fun(n: Int): String real: Fun(r: Real): String char: Fun(c: Char): String string: Fun(s: String): String end))
+                    :args (
+                      (TypedVar 'x' :type Int)
+                    ))
+                )))
+          )
+          :result (TypedApp :type Ok
+            :func (TypedSelect 'putString' :type Fun(writer: Writer.T string: String): Ok
+              :target (TypedVar 'writer' :type Record error: Exception output: Writer.T err: Writer.T file: Fun(name: String): Writer.T putString: Fun(writer: Writer.T string: String): Ok putChar: Fun(writer: Writer.T char: Char): Ok putSubString: Fun(writer: Writer.T string: String start: Int size: Int): Ok flush: Fun(writer: Writer.T): Ok close: Fun(writer: Writer.T): Ok end))
+            :args (
+              (TypedVar 'wOut' :type Writer.T)
+              (TypedString '\n' :type String)
+            )))))
+    (TypedLetType 'BigRec' :kind TYPE)
+    (TypedLetType 'SmallRec' :kind TYPE)
+    (TypedLetValue 'br' :type Record x: Int y: Int z: Int end
+      :value (TypedRecord :type Record x: Int y: Int z: Int end
+        :fields (
+          (TypedRecordField 'x'
+            :value (TypedInt 10 :type Int))
+          (TypedRecordField 'y'
+            :value (TypedInt 20 :type Int))
+          (TypedRecordField 'z'
+            :value (TypedInt 30 :type Int))
+        )))
+    (TypedLetValue 'dRec' :type Dynamic.T
+      :value (TypedApp :type Dynamic.T
+        :func (TypedTypeApp [Record x: Int y: Int z: Int end] :type Fun(a: Record x: Int y: Int z: Int end): Dynamic.T
+          :func (TypedSelect 'new' :type All(A :: TYPE) Fun(a: A): Dynamic.T
+            :target (TypedVar 'dynamic' :type Record error: Exception new: All(A :: TYPE) Fun(a: A): Dynamic.T be: All(A :: TYPE) Fun(d: Dynamic.T): A copy: Fun(d: Dynamic.T): Dynamic.T intern: Fun(rd: Reader.T): Dynamic.T extern: Fun(wr: Writer.T d: Dynamic.T): Ok end)))
+        :args (
+          (TypedVar 'br' :type Record x: Int y: Int z: Int end)
+        )))
+    (TypedLetValue 'sr' :type Record x: Int y: Int end
+      :value (TypedApp :type Record x: Int y: Int end
+        :func (TypedTypeApp [Record x: Int y: Int end] :type Fun(d: Dynamic.T): Record x: Int y: Int end
+          :func (TypedSelect 'be' :type All(A :: TYPE) Fun(d: Dynamic.T): A
+            :target (TypedVar 'dynamic' :type Record error: Exception new: All(A :: TYPE) Fun(a: A): Dynamic.T be: All(A :: TYPE) Fun(d: Dynamic.T): A copy: Fun(d: Dynamic.T): Dynamic.T intern: Fun(rd: Reader.T): Dynamic.T extern: Fun(wr: Writer.T d: Dynamic.T): Ok end)))
+        :args (
+          (TypedVar 'dRec' :type Dynamic.T)
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printInt' :type Fun(x: Int): Ok)
+        :args (
+          (TypedInfix '+' :type Int
+            :left (TypedSelect 'x' :type Int
+              :target (TypedVar 'sr' :type Record x: Int y: Int end))
+            :right (TypedSelect 'y' :type Int
+              :target (TypedVar 'sr' :type Record x: Int y: Int end)))
+        )))
+    (TypedLetType 'PermRec' :kind TYPE)
+    (TypedLetType 'OrderedRec' :kind TYPE)
+    (TypedLetValue 'pr' :type Record b: Int a: Int end
+      :value (TypedRecord :type Record b: Int a: Int end
+        :fields (
+          (TypedRecordField 'b'
+            :value (TypedInt 2 :type Int))
+          (TypedRecordField 'a'
+            :value (TypedInt 1 :type Int))
+        )))
+    (TypedLetValue 'dPerm' :type Dynamic.T
+      :value (TypedApp :type Dynamic.T
+        :func (TypedTypeApp [Record b: Int a: Int end] :type Fun(a: Record b: Int a: Int end): Dynamic.T
+          :func (TypedSelect 'new' :type All(A :: TYPE) Fun(a: A): Dynamic.T
+            :target (TypedVar 'dynamic' :type Record error: Exception new: All(A :: TYPE) Fun(a: A): Dynamic.T be: All(A :: TYPE) Fun(d: Dynamic.T): A copy: Fun(d: Dynamic.T): Dynamic.T intern: Fun(rd: Reader.T): Dynamic.T extern: Fun(wr: Writer.T d: Dynamic.T): Ok end)))
+        :args (
+          (TypedVar 'pr' :type Record b: Int a: Int end)
+        )))
+    (TypedLetValue 'ord' :type Record a: Int b: Int end
+      :value (TypedApp :type Record a: Int b: Int end
+        :func (TypedTypeApp [Record a: Int b: Int end] :type Fun(d: Dynamic.T): Record a: Int b: Int end
+          :func (TypedSelect 'be' :type All(A :: TYPE) Fun(d: Dynamic.T): A
+            :target (TypedVar 'dynamic' :type Record error: Exception new: All(A :: TYPE) Fun(a: A): Dynamic.T be: All(A :: TYPE) Fun(d: Dynamic.T): A copy: Fun(d: Dynamic.T): Dynamic.T intern: Fun(rd: Reader.T): Dynamic.T extern: Fun(wr: Writer.T d: Dynamic.T): Ok end)))
+        :args (
+          (TypedVar 'dPerm' :type Dynamic.T)
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printInt' :type Fun(x: Int): Ok)
+        :args (
+          (TypedInfix '*' :type Int
+            :left (TypedSelect 'a' :type Int
+              :target (TypedVar 'ord' :type Record a: Int b: Int end))
+            :right (TypedInfix '+' :type Int
+              :left (TypedInt 10 :type Int)
+              :right (TypedSelect 'b' :type Int
+                :target (TypedVar 'ord' :type Record a: Int b: Int end))))
+        )))
+    (TypedLetType 'InnerBig' :kind TYPE)
+    (TypedLetType 'InnerSmall' :kind TYPE)
+    (TypedLetType 'OuterBig' :kind TYPE)
+    (TypedLetType 'OuterSmall' :kind TYPE)
+    (TypedLetValue 'ob' :type Record inner: Record x: Int y: Int end tag: String end
+      :value (TypedRecord :type Record inner: Record x: Int y: Int end tag: String end
+        :fields (
+          (TypedRecordField 'inner'
+            :value (TypedRecord :type Record x: Int y: Int end
+              :fields (
+                (TypedRecordField 'x'
+                  :value (TypedInt 42 :type Int))
+                (TypedRecordField 'y'
+                  :value (TypedInt 99 :type Int))
+              )))
+          (TypedRecordField 'tag'
+            :value (TypedString 'nested' :type String))
+        )))
+    (TypedLetValue 'dNest' :type Dynamic.T
+      :value (TypedApp :type Dynamic.T
+        :func (TypedTypeApp [Record inner: Record x: Int y: Int end tag: String end] :type Fun(a: Record inner: Record x: Int y: Int end tag: String end): Dynamic.T
+          :func (TypedSelect 'new' :type All(A :: TYPE) Fun(a: A): Dynamic.T
+            :target (TypedVar 'dynamic' :type Record error: Exception new: All(A :: TYPE) Fun(a: A): Dynamic.T be: All(A :: TYPE) Fun(d: Dynamic.T): A copy: Fun(d: Dynamic.T): Dynamic.T intern: Fun(rd: Reader.T): Dynamic.T extern: Fun(wr: Writer.T d: Dynamic.T): Ok end)))
+        :args (
+          (TypedVar 'ob' :type Record inner: Record x: Int y: Int end tag: String end)
+        )))
+    (TypedLetValue 'os' :type Record inner: Record x: Int end tag: String end
+      :value (TypedApp :type Record inner: Record x: Int end tag: String end
+        :func (TypedTypeApp [Record inner: Record x: Int end tag: String end] :type Fun(d: Dynamic.T): Record inner: Record x: Int end tag: String end
+          :func (TypedSelect 'be' :type All(A :: TYPE) Fun(d: Dynamic.T): A
+            :target (TypedVar 'dynamic' :type Record error: Exception new: All(A :: TYPE) Fun(a: A): Dynamic.T be: All(A :: TYPE) Fun(d: Dynamic.T): A copy: Fun(d: Dynamic.T): Dynamic.T intern: Fun(rd: Reader.T): Dynamic.T extern: Fun(wr: Writer.T d: Dynamic.T): Ok end)))
+        :args (
+          (TypedVar 'dNest' :type Dynamic.T)
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printInt' :type Fun(x: Int): Ok)
+        :args (
+          (TypedSelect 'x' :type Int
+            :target (TypedSelect 'inner' :type Record x: Int end
+              :target (TypedVar 'os' :type Record inner: Record x: Int end tag: String end)))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedSelect 'putString' :type Fun(writer: Writer.T string: String): Ok
+          :target (TypedVar 'writer' :type Record error: Exception output: Writer.T err: Writer.T file: Fun(name: String): Writer.T putString: Fun(writer: Writer.T string: String): Ok putChar: Fun(writer: Writer.T char: Char): Ok putSubString: Fun(writer: Writer.T string: String start: Int size: Int): Ok flush: Fun(writer: Writer.T): Ok close: Fun(writer: Writer.T): Ok end))
+        :args (
+          (TypedVar 'wOut' :type Writer.T)
+          (TypedSelect 'tag' :type String
+            :target (TypedVar 'os' :type Record inner: Record x: Int end tag: String end))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedSelect 'putString' :type Fun(writer: Writer.T string: String): Ok
+          :target (TypedVar 'writer' :type Record error: Exception output: Writer.T err: Writer.T file: Fun(name: String): Writer.T putString: Fun(writer: Writer.T string: String): Ok putChar: Fun(writer: Writer.T char: Char): Ok putSubString: Fun(writer: Writer.T string: String start: Int size: Int): Ok flush: Fun(writer: Writer.T): Ok close: Fun(writer: Writer.T): Ok end))
+        :args (
+          (TypedVar 'wOut' :type Writer.T)
+          (TypedString '\n' :type String)
+        )))
+    (TypedLetType 'VarSmall' :kind TYPE)
+    (TypedLetType 'VarBig' :kind TYPE)
+    (TypedLetValue 'va' :type Variant a: Int end
+      :value (TypedVariant 'a' :type Variant a: Int end
+        :payload (TypedInt 55 :type Int)))
+    (TypedLetValue 'dVar' :type Dynamic.T
+      :value (TypedApp :type Dynamic.T
+        :func (TypedTypeApp [Variant a: Int end] :type Fun(a: Variant a: Int end): Dynamic.T
+          :func (TypedSelect 'new' :type All(A :: TYPE) Fun(a: A): Dynamic.T
+            :target (TypedVar 'dynamic' :type Record error: Exception new: All(A :: TYPE) Fun(a: A): Dynamic.T be: All(A :: TYPE) Fun(d: Dynamic.T): A copy: Fun(d: Dynamic.T): Dynamic.T intern: Fun(rd: Reader.T): Dynamic.T extern: Fun(wr: Writer.T d: Dynamic.T): Ok end)))
+        :args (
+          (TypedVar 'va' :type Variant a: Int end)
+        )))
+    (TypedLetValue 'vb' :type Variant a: Int b: String end
+      :value (TypedApp :type Variant a: Int b: String end
+        :func (TypedTypeApp [Variant a: Int b: String end] :type Fun(d: Dynamic.T): Variant a: Int b: String end
+          :func (TypedSelect 'be' :type All(A :: TYPE) Fun(d: Dynamic.T): A
+            :target (TypedVar 'dynamic' :type Record error: Exception new: All(A :: TYPE) Fun(a: A): Dynamic.T be: All(A :: TYPE) Fun(d: Dynamic.T): A copy: Fun(d: Dynamic.T): Dynamic.T intern: Fun(rd: Reader.T): Dynamic.T extern: Fun(wr: Writer.T d: Dynamic.T): Ok end)))
+        :args (
+          (TypedVar 'dVar' :type Dynamic.T)
+        )))
+    (TypedExprStmt
+      :expr (TypedCase :type Ok
+        :target (TypedVar 'vb' :type Variant a: Int b: String end)
+        :branches (
+          (TypedCaseBranch tags=(a) :binder 'n'
+            :body (TypedApp :type Ok
+              :func (TypedVar 'printInt' :type Fun(x: Int): Ok)
+              :args (
+                (TypedVar 'n' :type Int)
+              )))
+        )
+        :else (TypedApp :type Ok
+          :func (TypedVar 'printInt' :type Fun(x: Int): Ok)
+          :args (
+            (TypedInt 0 :type Int)
+          ))))
+    (TypedLetValue 'classify' :type Fun(d: Dynamic): Int
+      :value (TypedFun :params (('d' : Dynamic)) :type Fun(d: Dynamic): Int
+        :body (TypedInspect :type Int
+          :target (TypedVar 'd' :type Dynamic)
+          :branches (
+            (TypedInspectBranch match=Int
+              :body (TypedVar 'n' :type Int))
+            (TypedInspectBranch match=Record x: Int y: Int end
+              :body (TypedInfix '+' :type Int
+                :left (TypedSelect 'x' :type Int
+                  :target (TypedVar 'r' :type Record x: Int y: Int end))
+                :right (TypedSelect 'y' :type Int
+                  :target (TypedVar 'r' :type Record x: Int y: Int end))))
+          )
+          :else (TypedInt 999 :type Int))))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printInt' :type Fun(x: Int): Ok)
+        :args (
+          (TypedApp :type Int
+            :func (TypedVar 'classify' :type Fun(d: Dynamic): Int)
+            :args (
+              (TypedApp :type Dynamic.T
+                :func (TypedTypeApp [Int] :type Fun(a: Int): Dynamic.T
+                  :func (TypedSelect 'new' :type All(A :: TYPE) Fun(a: A): Dynamic.T
+                    :target (TypedVar 'dynamic' :type Record error: Exception new: All(A :: TYPE) Fun(a: A): Dynamic.T be: All(A :: TYPE) Fun(d: Dynamic.T): A copy: Fun(d: Dynamic.T): Dynamic.T intern: Fun(rd: Reader.T): Dynamic.T extern: Fun(wr: Writer.T d: Dynamic.T): Ok end)))
+                :args (
+                  (TypedInt 7 :type Int)
+                ))
+            ))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printInt' :type Fun(x: Int): Ok)
+        :args (
+          (TypedApp :type Int
+            :func (TypedVar 'classify' :type Fun(d: Dynamic): Int)
+            :args (
+              (TypedVar 'dRec' :type Dynamic.T)
+            ))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printInt' :type Fun(x: Int): Ok)
+        :args (
+          (TypedApp :type Int
+            :func (TypedVar 'classify' :type Fun(d: Dynamic): Int)
+            :args (
+              (TypedApp :type Dynamic.T
+                :func (TypedTypeApp [String] :type Fun(a: String): Dynamic.T
+                  :func (TypedSelect 'new' :type All(A :: TYPE) Fun(a: A): Dynamic.T
+                    :target (TypedVar 'dynamic' :type Record error: Exception new: All(A :: TYPE) Fun(a: A): Dynamic.T be: All(A :: TYPE) Fun(d: Dynamic.T): A copy: Fun(d: Dynamic.T): Dynamic.T intern: Fun(rd: Reader.T): Dynamic.T extern: Fun(wr: Writer.T d: Dynamic.T): Ok end)))
+                :args (
+                  (TypedString 'hello' :type String)
+                ))
+            ))
+        )))
+    (TypedLetValue 'testMismatch' :type Fun(d: Dynamic): Int
+      :value (TypedFun :params (('d' : Dynamic)) :type Fun(d: Dynamic): Int
+        :body (TypedTry :type Int
+          :body (TypedBlock :type Int
+            :bindings (
+              (TypedLetValue 'ignored' :type Int
+                :value (TypedApp :type Int
+                  :func (TypedTypeApp [Int] :type Fun(d: Dynamic.T): Int
+                    :func (TypedSelect 'be' :type All(A :: TYPE) Fun(d: Dynamic.T): A
+                      :target (TypedVar 'dynamic' :type Record error: Exception new: All(A :: TYPE) Fun(a: A): Dynamic.T be: All(A :: TYPE) Fun(d: Dynamic.T): A copy: Fun(d: Dynamic.T): Dynamic.T intern: Fun(rd: Reader.T): Dynamic.T extern: Fun(wr: Writer.T d: Dynamic.T): Ok end)))
+                  :args (
+                    (TypedVar 'd' :type Dynamic)
+                  )))
+            )
+            :result (TypedInt 1 :type Int))
+          :branches (
+            (TypedTryBranch
+              :exc_pattern (TypedSelect 'error' :type Exception
+                :target (TypedVar 'dynamic' :type Record error: Exception new: All(A :: TYPE) Fun(a: A): Dynamic.T be: All(A :: TYPE) Fun(d: Dynamic.T): A copy: Fun(d: Dynamic.T): Dynamic.T intern: Fun(rd: Reader.T): Dynamic.T extern: Fun(wr: Writer.T d: Dynamic.T): Ok end))
+              :body (TypedInt 2 :type Int))
+          )
+          :else (TypedInt 3 :type Int))))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printInt' :type Fun(x: Int): Ok)
+        :args (
+          (TypedApp :type Int
+            :func (TypedVar 'testMismatch' :type Fun(d: Dynamic): Int)
+            :args (
+              (TypedApp :type Dynamic.T
+                :func (TypedTypeApp [String] :type Fun(a: String): Dynamic.T
+                  :func (TypedSelect 'new' :type All(A :: TYPE) Fun(a: A): Dynamic.T
+                    :target (TypedVar 'dynamic' :type Record error: Exception new: All(A :: TYPE) Fun(a: A): Dynamic.T be: All(A :: TYPE) Fun(d: Dynamic.T): A copy: Fun(d: Dynamic.T): Dynamic.T intern: Fun(rd: Reader.T): Dynamic.T extern: Fun(wr: Writer.T d: Dynamic.T): Ok end)))
+                :args (
+                  (TypedString 'wrong' :type String)
+                ))
+            ))
+        )))
+  ))
