@@ -136,13 +136,20 @@ native **AArch64 (ARM64)** machine code and providing a **JIT compiler** for int
   - **Phase 4.13 (Existential Tuples & Dot-Projections):** Packing packages (weak sums `Tuple A::TYPE ... end`),
     path-type projection (`p.T`), member projection (`p.v`), closure adaptation thunks for abstract signatures,
     native unboxing for bounded path-types (`A <: T`), and structural tuple coercion in C transpilation. — *Complete*
+  - **Phase 4.14 (Dynamic Subtyping & Compound Type Descriptors):** Static and dynamic compound type descriptors
+    (records, tuples, variants, options, arrays, functions, opaques), unified structural subtyping in C runtime
+    (`quest_is_subtype` with coinductive cycle detection), dynamic value adaptation (`quest_record_adapt` for width,
+    permutation, and depth subtyping; `quest_variant_adapt` for tag remapping), static `.rodata` descriptor emission,
+    and `inspect` expression branching. — *Complete*
 - **Bootstrap Compiler Completion Prerequisites:**
   - *Separate Compilation & Object Linking:* Compiling modules independently to `.o` files with header/interface
     exports and linking.
-  - *Dynamic Subtyping & Compound Type Descriptors:* Static and dynamic compound type descriptors (records,
-    tuples, variants, options, arrays, functions, opaques) and structural subtyping in C runtime (coinductive cycle
-    detection, dynamic record width/permutation/depth adaptation, dynamic variant tag remapping, and inspect
-    branching). — *Complete* (deferred text serialization `dynamic.extern` / `intern` for Stage 5/7)
+  - *Dynamic Serialization (`dynamic.extern` / `dynamic.intern`):* C runtime implementation of text-format
+    serialization and deserialization of typed dynamic packages (`dynamic.extern` converting arbitrary typed
+    values into serialized text streams with cyclic reference preservation, and `dynamic.intern` parsing stream
+    inputs back into dynamically typed values validated against compound type descriptors). While the reference
+    interpreter implementation is complete (JSON/JSOG format with cycle support), the native C runtime implementation
+    is deferred.
 - C transpiler architecture in [codegen-c.md](codegen-c.md);
   C ABI specification in [c-representation.md](c-representation.md);
   language extensions specification in [extensions.md](extensions.md).
