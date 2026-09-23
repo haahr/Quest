@@ -150,10 +150,11 @@ native **AArch64 (ARM64)** machine code and providing a **JIT compiler** for int
   - **Phase 4.16 (Separate Compilation & Object Linking):** Separate compilation of interfaces (`.int.quest`) into
     C headers (`.h`) and portable serialized type metadata (`.qi`) via dynamic JSON/JSOG, compilation of modules
     (`.mod.quest`) to object files (`.o`), and client linking (`main.quest` + `*.o` -> binary). Step 1 (Interface
-    compilation `.int.quest` -> `.h` + `.qi` with shadow Quest record schema and CLI driver support) is complete;
-    Step 2 (Module compilation `.mod.quest` -> `.c` -> `.o`) is in progress.
+    compilation `.int.quest` -> `.h` + `.qi`) and Step 2 (Module compilation `.mod.quest` -> `.c` -> `.o` with
+    dual direct C function and closure trampoline ABI and idempotent chained initialization) are complete;
+    Step 3 (Client compilation and object linking `main.quest` + `*.o` -> native binary) is in progress.
 - **Bootstrap Compiler Completion Prerequisites:**
-  - *Separate Compilation & Object Linking:* Finalizing Steps 2 and 3 in Phase 4.16.
+  - *Separate Compilation & Object Linking:* Finalizing Step 3 in Phase 4.16.
 - C transpiler architecture in [codegen-c.md](codegen-c.md);
   C ABI specification in [c-representation.md](c-representation.md);
   language extensions specification in [extensions.md](extensions.md).

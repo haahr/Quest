@@ -127,3 +127,51 @@ def run_binary(
         timeout=timeout,
     )
 
+
+def compile_c_to_object(
+    c_path: Path | str,
+    output_object_path: Path | str,
+    include_paths: Optional[list[Path | str]] = None,
+    nogc: bool = False,
+    compiler_path: Optional[str] = None,
+    extra_flags: Optional[list[str]] = None,
+) -> Path:
+    """Compiles a C source file into an object file (.o)."""
+    target_obj = Path(output_object_path)
+    compiler = compiler_path or find_c_compiler()
+    runtime_dir = get_runtime_dir()
+
+    cmd = [
+        compiler,
+        "-std=c99",
+        "-pedantic-errors",
+        "-Wall",
+        "-Wextra",
+        "-O2",
+        f"-I{runtime_dir}",
+    ]
+    if include_paths:
+        for p in include_paths:
+            cmd.append(f"-I{p}")
+    gc_flags = detect_gc_flags(nogc=nogc)
+    for flag in gc_flags:
+        if flag.startswith("-I") or flag.startswith("-D"):
+            cmd.append(flag)
+    if extra_flags:
+        cmd.extend(extra_flags)
+    cmd.extend([
+        "-c",
+        str(c_path),
+        "-o",
+        str(target_obj),
+    ])
+
+    proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    if proc.returncode != 0:
+        raise RuntimeError(
+            f"C object compilation failed with exit code {proc.returncode}:\n"
+            f"Command: {' '.join(cmd)}\n"
+            f"{proc.stderr}"
+        )
+    return target_obj
+

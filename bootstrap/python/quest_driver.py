@@ -154,6 +154,15 @@ def run_driver(args: list[str]) -> int:
             except Exception as err:
                 sys.stderr.write(f"quest: error: {err}\n")
                 return 1
+        if file_path.name.endswith(".mod.quest"):
+            from quest.module_compiler import compile_module_file
+            try:
+                include_paths = [Path(p) for p in parsed_args.include_paths]
+                compile_module_file(file_path, include_paths=include_paths)
+                return 0
+            except Exception as err:
+                sys.stderr.write(f"quest: error: {err}\n")
+                return 1
         try:
             source_text = file_path.read_text(encoding="utf-8")
             file_name = str(file_path)
@@ -344,6 +353,16 @@ def run_compile(args: list[str]) -> int:
             try:
                 include_paths = [Path(p) for p in parsed_args.include_paths]
                 compile_interface_file(file_path, include_paths=include_paths)
+                return 0
+            except Exception as err:
+                sys.stderr.write(f"quest compile: error: {err}\n")
+                return 1
+        if file_path.name.endswith(".mod.quest"):
+            from quest.module_compiler import compile_module_file
+            try:
+                include_paths = [Path(p) for p in parsed_args.include_paths]
+                output_dir = Path(parsed_args.output).parent if parsed_args.output else None
+                compile_module_file(file_path, output_dir=output_dir, include_paths=include_paths)
                 return 0
             except Exception as err:
                 sys.stderr.write(f"quest compile: error: {err}\n")

@@ -315,6 +315,25 @@ Compiling an interface (`quest -c counter.int.quest`) generates two complementar
    - Serialized via `dynamic.extern` / `jsog_encode` and deserialized via `dynamic.intern` / `jsog_decode`.
    - Allows the compiler to typecheck client code or implementing modules without the original `.int.quest` source.
 
+### 9.2. Module Compilation (`.mod.quest` -> `.c` -> `.o`)
+Compiling a module implementation (`quest -c counter.mod.quest`) generates both C source and relocatable object files:
+1. **C Source File (`<name>.c`):**
+   - Includes `#include "quest_runtime.h"` and `#include "<interface>.h"`.
+   - **Dual Linkage ABI:**
+     - Direct C functions: Exported interface member functions are emitted with external C linkage
+       (`qv_<mod>_<func>(...)`), allowing native C calls and optimal direct linking without closure indirection.
+     - Trampolines: Small `static` functions (`qv_<mod>_<func>_trampoline`) wrapping direct functions for closure
+       dispatch.
+     - Module record: The global module singleton `QRecordVal qv_<mod>;` is declared with external C linkage and
+       populated with closures pointing to trampolines during initialization.
+   - **Idempotent Chained Initialization:** Emits an exported initialization routine `void qv_mod_<mod>_init(void)`
+     with an internal `initialized` guard. Before executing module expressions, it automatically calls the
+     initialization functions of any imported dependency modules (`qv_mod_<dep>_init()`), ensuring all transitive
+     module state is ready before use.
+2. **Relocatable Object File (`<name>.o`):**
+   - Produced by invoking the host C compiler (`clang -c <name>.c -o <name>.o -I runtime -I <include_paths>`).
+   - Both `<name>.c` and `<name>.o` are retained on disk for debugging, inspection, and native linking.
+
 ---
 
 ## See Also

@@ -914,285 +914,17 @@ class CEmitter:
                 lines.append("")
 
         # 8b. Emit module functions and initializers
-        # 8b. Emit module functions and initializers
         if sorted_modules:
             lines.append("/* Compiled module definitions and initializers */")
             for mod in sorted_modules:
-                clean_mod = mod.name.replace(".", "_")
-                # Collect functions, variables, and native bindings in this module
-                mod_funs: list[tuple[str, TypedFun, Any]] = []
-                mod_vars: list[tuple[str, TypedExpr, Any]] = []
-                mod_native_funs: list[TypedNativeBinding] = []
-                mod_native_vals: list[TypedNativeBinding] = []
-                mod_imported_mods: list[str] = []
-                for b in mod.bindings:
-                    match b:
-                        case TypedLetValue(name=b_name, value=b_val, symbol=b_sym):
-                            if isinstance(b_val, TypedFun):
-                                mod_funs.append((b_name, b_val, b_sym))
-                            elif isinstance(b_val, TypedExternal) and isinstance(b_sym.type_val, (QFunType, QAllType)):
-                                mod_native_funs.append(
-                                    TypedNativeBinding(
-                                        name=b_name,
-                                        symbol=b_val.symbol,
-                                        inline_template=None,
-                                        c_val=None,
-                                        type_val=b_sym.type_val,
-                                    )
-                                )
-                            else:
-                                mod_vars.append((b_name, b_val, b_sym))
-                        case TypedNativeBinding() as nb:
-                            if nb.c_val is not None:
-                                mod_native_vals.append(nb)
-                            elif isinstance(nb.type_val, (QFunType, QAllType)):
-                                mod_native_funs.append(nb)
-                            else:
-                                mod_native_vals.append(nb)
-                        case TypedImport(items=items):
-                            for it in items:
-                                for iname in it.names:
-                                    if iname in all_module_map:
-                                        mod_imported_mods.append(iname)
-                        case TypedException(name=b_name, type_val=b_t) as exc_n:
-                            if b_name:
-                                mod_vars.append((b_name, exc_n, type("Symbol", (), {"type_val": b_t})()))
-                        case _:
-                            pass
-
-                # Static variables for module internal let values
-                for vname, vval, vsym in mod_vars:
-                    if vsym.type_val != OK_TYPE:
-                        m_ident = mangle_module_ident(clean_mod, vname)
-                        lines.append(f"static {self.c_type(vsym.type_val)} {m_ident};")
-
-                # Forward declarations and definitions for module functions
-                for fname, ffun, fsym in mod_funs:
-                    m_ident = mangle_module_ident(clean_mod, fname)
-                    quants, params, _, ret_type = self._collect_fun_params(ffun)
-                    ret_c = "void" if ret_type == OK_TYPE else self.c_type(ret_type)
-                    quant_decls = [f"const QTypeDescriptor *descriptor_{q.name}" for q in quants]
-                    param_decls = quant_decls + [
-                        self._param_c_decl(p, mangle_module_ident(clean_mod, p.name))
-                        for p in params
-                    ]
-                    sig = "void" if not param_decls else ", ".join(param_decls)
-                    lines.append(f"static {ret_c} {m_ident}({sig});")
-
-                # Trampolines for module functions so they can be wrapped in QClosure for exported record
-                for fname, ffun, fsym in mod_funs:
-                    m_ident = mangle_module_ident(clean_mod, fname)
-                    tramp_name = f"{m_ident}_trampoline"
-                    quants, params, _, ret_type = self._collect_fun_params(ffun)
-                    ret_c = "void" if ret_type == OK_TYPE else self.c_type(ret_type)
-                    quant_decls = [f"const QTypeDescriptor *descriptor_{q.name}" for q in quants]
-                    param_decls = quant_decls + [
-                        self._param_c_decl(p, mangle_module_ident(clean_mod, p.name))
-                        for p in params
-                    ]
-                    param_sigs = ["void *env"] + param_decls
-                    sig = ", ".join(param_sigs)
-                    f_args = [f"descriptor_{q.name}" for q in quants] + [
-                        mangle_module_ident(clean_mod, p.name) for p in params
-                    ]
-                    args_str = ", ".join(f_args)
-                    lines.append(f"static {ret_c} {tramp_name}({sig}) {{")
-                    lines.append("    (void)env;")
-                    if ret_type == OK_TYPE:
-                        lines.append(f"    {m_ident}({args_str});")
-                        lines.append("    return;")
-                    else:
-                        lines.append(f"    return {m_ident}({args_str});")
-                    lines.append("}")
-
-                # Trampolines for native module functions
-                for nb in mod_native_funs:
-                    if not (nb.symbol or nb.inline_template):
-                        continue
-                    tramp_name = f"qv_{clean_mod}_{nb.name}_trampoline"
-                    quants, body_t = collect_fun_quantifiers(nb.type_val)
-                    if isinstance(body_t, QFunType):
-                        params = body_t.params
-                        ret_type = body_t.result_type
-                        ret_c = "void" if ret_type == OK_TYPE else self.c_type(ret_type)
-                        quant_decls = [f"const QTypeDescriptor *descriptor_{q.name}" for q in quants]
-                        param_decls = quant_decls + [
-                            f"{self.c_type(p.type_val)} arg_{i}"
-                            for i, p in enumerate(params)
-                        ]
-                        param_sigs = ["void *env"] + param_decls
-                        sig = ", ".join(param_sigs)
-                        param_names = [f"arg_{i}" for i in range(len(params))]
-                        call_args = (
-                            [f"descriptor_{q.name}" for q in quants]
-                            if getattr(nb, "pass_type_descriptors", False)
-                            else []
-                        ) + param_names
-                        if nb.inline_template:
-                            call_expr = nb.inline_template.format(*call_args)
-                        else:
-                            call_expr = f"{nb.symbol}({', '.join(call_args)})"
-                        lines.append(f"static {ret_c} {tramp_name}({sig}) {{")
-                        lines.append("    (void)env;")
-                        for q in quants:
-                            lines.append(f"    (void)descriptor_{q.name};")
-                        for i in range(len(params)):
-                            lines.append(f"    (void)arg_{i};")
-                        if ret_type == OK_TYPE:
-                            lines.append(f"    {call_expr};")
-                            lines.append("    return;")
-                        else:
-                            lines.append(f"    return {call_expr};")
-                        lines.append("}")
-                        lines.append("")
-
-                # Function definitions for module functions using module-scoped emitter
-                mod_emitter = CEmitter(echo=False, module_prefix=clean_mod)
-                mod_emitter.top_fun_names = {fname for fname, _, _ in mod_funs}
-                mod_emitter.top_funs_dict = {fname: (ffun, fsym) for fname, ffun, fsym in mod_funs}
-                mod_emitter.record_ctx = self.record_ctx
-                mod_emitter.all_modules = self.all_modules
-
-                # Forward declarations for module static functions
-                for fname, ffun, fsym in mod_funs:
-                    m_ident = mangle_module_ident(clean_mod, fname)
-                    quants, params, _, ret_type = self._collect_fun_params(ffun)
-                    ret_c = "void" if ret_type == OK_TYPE else self.c_type(ret_type)
-                    quant_decls = [f"const QTypeDescriptor *descriptor_{q.name}" for q in quants]
-                    param_decls = quant_decls + [
-                        self._param_c_decl(p, mangle_module_ident(clean_mod, p.name))
-                        for p in params
-                    ]
-                    sig = "void" if not param_decls else ", ".join(param_decls)
-                    lines.append(f"static {ret_c} {m_ident}({sig});")
-                if mod_funs:
-                    lines.append("")
-
-                for fname, ffun, fsym in mod_funs:
-                    m_ident = mangle_module_ident(clean_mod, fname)
-                    quants, params, body, ret_type = self._collect_fun_params(ffun)
-                    ret_c = "void" if ret_type == OK_TYPE else self.c_type(ret_type)
-                    quant_decls = [f"const QTypeDescriptor *descriptor_{q.name}" for q in quants]
-                    param_decls = quant_decls + [
-                        self._param_c_decl(p, mangle_module_ident(clean_mod, p.name))
-                        for p in params
-                    ]
-                    sig = "void" if not param_decls else ", ".join(param_decls)
-                    lines.append(f"static {ret_c} {m_ident}({sig}) {{")
-                    fn_lines: list[str] = []
-                    for q in quants:
-                        mod_emitter.in_scope_type_descriptors[q.name] = f"descriptor_{q.name}"
-                        fn_lines.append(f"(void)descriptor_{q.name};")
-                    # Map param names in current_env_vars so they resolve to mangled names
-                    prev_env = mod_emitter.current_env_vars
-                    mod_emitter.current_env_vars = {
-                        p.name: mangle_module_ident(clean_mod, p.name) for p in params
-                    }
-                    for vname, _, _ in mod_vars:
-                        mod_emitter.current_env_vars[vname] = mangle_module_ident(clean_mod, vname)
-                    mod_emitter.pointer_params = {
-                        p.name for p in params if getattr(p, "is_out", False) or getattr(p, "is_var", False)
-                    }
-                    mod_emitter._emit_fun_return(body, ret_type, fn_lines)
-                    mod_emitter.pointer_params = set()
-                    mod_emitter.current_env_vars = prev_env
-                    for fl in fn_lines:
-                        lines.append(f"    {fl}" if fl.strip() else fl)
-                    lines.append("}")
-                    lines.append("")
-
-                # Module initializer function
-                lines.append(f"static void qv_mod_{clean_mod}_init(void) {{")
-                lines.append(f"    if (qv_mod_{clean_mod}_initialized) return;")
-                lines.append(f"    qv_mod_{clean_mod}_initialized = true;")
-                # Initialize dependencies first
-                for dep in mod_imported_mods:
-                    dep_clean = dep.replace(".", "_")
-                    lines.append(f"    qv_mod_{dep_clean}_init();")
-                if mod.c_init:
-                    lines.append(f"    {mod.c_init};")
-                # Evaluate module let values
-                init_lines: list[str] = []
-                mod_emitter.current_env_vars = {
-                    vname: mangle_module_ident(clean_mod, vname) for vname, _, _ in mod_vars
-                }
-                for b in mod.bindings:
-                    match b:
-                        case TypedLetValue(name=vname, value=vval, symbol=vsym):
-                            if any(vname == mv[0] for mv in mod_vars):
-                                m_ident = mangle_module_ident(clean_mod, vname)
-                                if vsym.type_val == OK_TYPE:
-                                    mod_emitter.emit_to(vval, None, init_lines)
-                                else:
-                                    mod_emitter.emit_to(vval, m_ident, init_lines)
-                        case TypedException(name=ename) as exc_n:
-                            if ename and any(ename == mv[0] for mv in mod_vars):
-                                m_ident = mangle_module_ident(clean_mod, ename)
-                                mod_emitter.emit_to(exc_n, m_ident, init_lines)
-                        case _:
-                            pass
-                for il in init_lines:
-                    lines.append(f"    {il}" if il.strip() else il)
-
-                # Allocate and populate module record
-                mod_rec_t = BuiltinModuleRegistry._build_record_type_from_scope(mod.scope)
-                rec_struct = self.record_struct_name(mod_rec_t)
-                payload_var = f"_{clean_mod}_payload"
-                lines.append(
-                    f"    {rec_struct} *{payload_var} = "
-                    f"({rec_struct} *)quest_alloc(sizeof({rec_struct}));"
+                lines.extend(
+                    self._emit_single_module_definition(
+                        mod,
+                        all_module_map,
+                        standalone=False,
+                        decl_emitter=decl_emitter,
+                    )
                 )
-                lines.append(f"    {payload_var}->header.descriptor = NULL;")
-                for fld in sorted(mod_rec_t.fields, key=lambda f: f.name):
-                    # Check if exported field is a pure Quest function
-                    if any(fn == fld.name for fn, _, _ in mod_funs):
-                        tramp_name = f"{mangle_module_ident(clean_mod, fld.name)}_trampoline"
-                        clos_tmp = self.fresh_tmp(f"_{clean_mod}_{fld.name}_clos")
-                        lines.append(
-                            f"    QClosure *{clos_tmp} = "
-                            f"(QClosure *)quest_alloc(sizeof(QClosure));"
-                        )
-                        lines.append(f"    {clos_tmp}->fn = (void *){tramp_name};")
-                        lines.append(f"    {clos_tmp}->env = NULL;")
-                        lines.append(f"    {payload_var}->qf_{fld.name} = {clos_tmp};")
-                    # Check if exported field is a native function
-                    elif (nb := next((b for b in mod_native_funs if b.name == fld.name), None)) is not None:
-                        if nb.symbol or nb.inline_template:
-                            tramp_name = f"qv_{clean_mod}_{fld.name}_trampoline"
-                            clos_tmp = self.fresh_tmp(f"_{clean_mod}_{fld.name}_clos")
-                            lines.append(
-                                f"    QClosure *{clos_tmp} = "
-                                f"(QClosure *)quest_alloc(sizeof(QClosure));"
-                            )
-                            lines.append(f"    {clos_tmp}->fn = (void *){tramp_name};")
-                            lines.append(f"    {clos_tmp}->env = NULL;")
-                            lines.append(f"    {payload_var}->qf_{fld.name} = {clos_tmp};")
-                        else:
-                            lines.append(f"    {payload_var}->qf_{fld.name} = NULL;")
-                    # Check if exported field is a native value
-                    elif (nb := next((b for b in mod_native_vals if b.name == fld.name), None)) is not None:
-                        val_str = nb.c_val
-                        if self.c_type(fld.type_val) == "QVal" and self.c_type(nb.type_val) != "QVal":
-                            val_str = _qval_wrap(val_str, nb.type_val)
-                        lines.append(f"    {payload_var}->qf_{fld.name} = {val_str};")
-                    # Otherwise pure Quest let value
-                    else:
-                        m_ident = mangle_module_ident(clean_mod, fld.name)
-                        val_b = next((b for b in mod.bindings if getattr(b, "name", None) == fld.name), None)
-                        val_t = getattr(getattr(val_b, "symbol", None), "type_val", None)
-                        if val_t is None:
-                            val_t = getattr(val_b, "type_val", None)
-                        val_str = m_ident
-                        if val_t and self.c_type(fld.type_val) == "QVal" and self.c_type(val_t) != "QVal":
-                            val_str = _qval_wrap(val_str, val_t)
-                        lines.append(f"    {payload_var}->qf_{fld.name} = {val_str};")
-                d_name = self.record_ctx.offset_dict_instance_name(mod_rec_t, mod_rec_t)
-                lines.append(
-                    f"    qv_{clean_mod} = (QRecordVal){{ .val = (void *){payload_var}, "
-                    f".dict = (const void *)&{d_name} }};"
-                )
-                lines.append("}")
-                lines.append("")
 
         # 9. Main entrypoint
         main_lines: list[str] = [
@@ -1233,6 +965,361 @@ class CEmitter:
 
         lines.extend(main_lines)
         return "\n".join(lines)
+
+    def emit_module(
+        self,
+        mod: TypedModule,
+        loaded_modules: Optional[dict[str, TypedModule]] = None,
+        interface_header: Optional[str] = None,
+        exported_funs: Optional[set[str]] = None,
+    ) -> str:
+        """Translates a standalone TypedModule into a C99 source string (no main function)."""
+        prog = TypedProgram(phrases=(mod,))
+        analysis = analyze_program_for_c(prog, self.record_ctx, loaded_modules)
+
+        self.needed_dicts = analysis.needed_dicts
+        self.tuple_coercions = analysis.tuple_coercions
+        self.variant_coercions = analysis.variant_coercions
+        self.top_fun_names = analysis.top_fun_names
+        self.top_var_names = analysis.top_var_names
+        self.val_referenced_top_funs = analysis.val_referenced_top_funs
+        self.lifted_lambdas = analysis.lifted_lambdas
+        self.lambda_info_by_id = analysis.lambda_info_by_id
+        self.top_funs_dict = analysis.top_funs_dict
+        self.specializations = analysis.specializations
+
+        decl_emitter = CDeclarationEmitter(
+            record_ctx=self.record_ctx,
+            c_type_fn=self.c_type,
+            param_sigs_fn=self._param_signatures,
+            collect_quants_fn=self._collect_fun_quantifiers,
+            is_exact_record_literal_fn=self._is_exact_record_literal,
+        )
+
+        lines: list[str] = [
+            "/* Emitted by Quest Module Compiler */",
+            "#include \"quest_runtime.h\"",
+        ]
+        if interface_header:
+            lines.append(f'#include "{interface_header}"')
+        lines.append("")
+
+        lines.extend(decl_emitter.emit_forward_typedefs(analysis.agg_types))
+        lines.extend(decl_emitter.emit_aggregate_structs(analysis.agg_types))
+        lines.extend(decl_emitter.emit_evidence_dictionaries(analysis.agg_types, self.needed_dicts))
+        lines.extend(decl_emitter.emit_coercion_tables(self.tuple_coercions, self.variant_coercions))
+        lines.extend(decl_emitter.emit_type_descriptors(
+            analysis.agg_types,
+            analysis.variant_types,
+            self.c_type_descriptor,
+            analysis.all_program_types,
+        ))
+        lines.extend(decl_emitter.emit_environment_structs(self.lifted_lambdas))
+
+        all_module_map: dict[str, TypedModule] = {m.name: m for m in analysis.sorted_modules}
+        if loaded_modules:
+            for m in loaded_modules.values():
+                if isinstance(m, TypedModule):
+                    all_module_map[m.name] = m
+        all_module_map[mod.name] = mod
+        self.all_modules = all_module_map
+
+        lines.append("/* Compiled module definitions and initializers */")
+        lines.extend(self._emit_single_module_definition(
+            mod,
+            all_module_map,
+            standalone=True,
+            exported_funs=exported_funs,
+            decl_emitter=decl_emitter,
+        ))
+
+        if self.adapter_defs:
+            lines.append("/* Closure adaptation thunks for existential packages */")
+            lines.extend(self.adapter_defs)
+
+        return "\n".join(lines)
+
+    def _emit_single_module_definition(
+        self,
+        mod: TypedModule,
+        all_module_map: dict[str, TypedModule],
+        standalone: bool = False,
+        exported_funs: Optional[set[str]] = None,
+        decl_emitter: Optional[CDeclarationEmitter] = None,
+    ) -> list[str]:
+        lines: list[str] = []
+        clean_mod = mod.name.replace(".", "_")
+        mod_funs: list[tuple[str, TypedFun, Any]] = []
+        mod_vars: list[tuple[str, TypedExpr, Any]] = []
+        mod_native_funs: list[TypedNativeBinding] = []
+        mod_native_vals: list[TypedNativeBinding] = []
+        mod_imported_mods: list[str] = []
+        for b in mod.bindings:
+            match b:
+                case TypedLetValue(name=b_name, value=b_val, symbol=b_sym):
+                    if isinstance(b_val, TypedFun):
+                        mod_funs.append((b_name, b_val, b_sym))
+                    elif (
+                        isinstance(b_val, TypedExternal)
+                        and isinstance(b_sym.type_val, (QFunType, QAllType))
+                    ):
+                        mod_native_funs.append(
+                            TypedNativeBinding(
+                                name=b_name,
+                                symbol=b_val.symbol,
+                                inline_template=None,
+                                c_val=None,
+                                type_val=b_sym.type_val,
+                            )
+                        )
+                    else:
+                        mod_vars.append((b_name, b_val, b_sym))
+                case TypedNativeBinding() as nb:
+                    if nb.c_val is not None:
+                        mod_native_vals.append(nb)
+                    elif isinstance(nb.type_val, (QFunType, QAllType)):
+                        mod_native_funs.append(nb)
+                    else:
+                        mod_native_vals.append(nb)
+                case TypedImport(items=items):
+                    for it in items:
+                        for iname in it.names:
+                            if standalone or iname in all_module_map:
+                                mod_imported_mods.append(iname)
+                case TypedException(name=b_name, type_val=b_t) as exc_n:
+                    if b_name:
+                        mod_vars.append(
+                            (b_name, exc_n, type("Symbol", (), {"type_val": b_t})())
+                        )
+                case _:
+                    pass
+
+        if standalone and mod_imported_mods:
+            lines.append("/* Forward declarations for imported dependency modules */")
+            for dep in mod_imported_mods:
+                dep_clean = dep.replace(".", "_")
+                lines.append(f"extern void qv_mod_{dep_clean}_init(void);")
+                lines.append(f"extern QRecordVal qv_{dep_clean};")
+            lines.append("")
+
+        for vname, vval, vsym in mod_vars:
+            if vsym.type_val != OK_TYPE:
+                m_ident = mangle_module_ident(clean_mod, vname)
+                lines.append(f"static {self.c_type(vsym.type_val)} {m_ident};")
+
+        for fname, ffun, fsym in mod_funs:
+            m_ident = mangle_module_ident(clean_mod, fname)
+            quants, params, _, ret_type = self._collect_fun_params(ffun)
+            ret_c = "void" if ret_type == OK_TYPE else self.c_type(ret_type)
+            quant_decls = [f"const QTypeDescriptor *descriptor_{q.name}" for q in quants]
+            param_decls = quant_decls + [
+                self._param_c_decl(p, mangle_module_ident(clean_mod, p.name))
+                for p in params
+            ]
+            sig = "void" if not param_decls else ", ".join(param_decls)
+            is_exported = standalone and (exported_funs is None or fname in exported_funs)
+            linkage = "" if is_exported else "static "
+            lines.append(f"{linkage}{ret_c} {m_ident}({sig});")
+
+        for fname, ffun, fsym in mod_funs:
+            m_ident = mangle_module_ident(clean_mod, fname)
+            tramp_name = f"{m_ident}_trampoline"
+            quants, params, _, ret_type = self._collect_fun_params(ffun)
+            ret_c = "void" if ret_type == OK_TYPE else self.c_type(ret_type)
+            quant_decls = [f"const QTypeDescriptor *descriptor_{q.name}" for q in quants]
+            param_decls = quant_decls + [
+                self._param_c_decl(p, mangle_module_ident(clean_mod, p.name))
+                for p in params
+            ]
+            param_sigs = ["void *env"] + param_decls
+            sig = ", ".join(param_sigs)
+            f_args = [f"descriptor_{q.name}" for q in quants] + [
+                mangle_module_ident(clean_mod, p.name) for p in params
+            ]
+            args_str = ", ".join(f_args)
+            lines.append(f"static {ret_c} {tramp_name}({sig}) {{")
+            lines.append("    (void)env;")
+            if ret_type == OK_TYPE:
+                lines.append(f"    {m_ident}({args_str});")
+            else:
+                lines.append(f"    return {m_ident}({args_str});")
+            lines.append("}")
+            lines.append("")
+
+        for nb in mod_native_funs:
+            if nb.symbol or nb.inline_template:
+                tramp_name = f"qv_{clean_mod}_{nb.name}_trampoline"
+                if isinstance(nb.type_val, QAllType):
+                    quants = nb.type_val.quantifiers
+                    base_fun = nb.type_val.body
+                else:
+                    quants = ()
+                    base_fun = nb.type_val
+                params = base_fun.params if isinstance(base_fun, QFunType) else ()
+                ret_type = base_fun.result_type if isinstance(base_fun, QFunType) else OK_TYPE
+                ret_c = "void" if ret_type == OK_TYPE else self.c_type(ret_type)
+                quant_decls = [f"const QTypeDescriptor *descriptor_{q.name}" for q in quants]
+                param_decls = quant_decls + [
+                    f"{self.c_type(p.type_val)} qv_p_{p.name}" for p in params
+                ]
+                param_sigs = ["void *env"] + param_decls
+                sig = ", ".join(param_sigs)
+                call_args = (
+                    [f"descriptor_{q.name}" for q in quants]
+                    if getattr(nb, "pass_type_descriptors", False)
+                    else []
+                ) + [f"qv_p_{p.name}" for p in params]
+                if nb.inline_template:
+                    call_expr = nb.inline_template.format(*call_args)
+                else:
+                    call_expr = f"{nb.symbol}({', '.join(call_args)})"
+                lines.append(f"static {ret_c} {tramp_name}({sig}) {{")
+                lines.append("    (void)env;")
+                for q in quants:
+                    lines.append(f"    (void)descriptor_{q.name};")
+                if ret_type == OK_TYPE:
+                    lines.append(f"    {call_expr};")
+                else:
+                    lines.append(f"    return {call_expr};")
+                lines.append("}")
+                lines.append("")
+
+        mod_emitter = CEmitter(echo=False, module_prefix=clean_mod)
+        mod_emitter.top_fun_names = {fname for fname, _, _ in mod_funs}
+        mod_emitter.top_funs_dict = {fname: (ffun, fsym) for fname, ffun, fsym in mod_funs}
+        mod_emitter.record_ctx = self.record_ctx
+        mod_emitter.all_modules = self.all_modules
+
+        for fname, ffun, fsym in mod_funs:
+            m_ident = mangle_module_ident(clean_mod, fname)
+            quants, params, body, ret_type = self._collect_fun_params(ffun)
+            ret_c = "void" if ret_type == OK_TYPE else self.c_type(ret_type)
+            quant_decls = [f"const QTypeDescriptor *descriptor_{q.name}" for q in quants]
+            param_decls = quant_decls + [
+                self._param_c_decl(p, mangle_module_ident(clean_mod, p.name))
+                for p in params
+            ]
+            sig = "void" if not param_decls else ", ".join(param_decls)
+            is_exported = standalone and (exported_funs is None or fname in exported_funs)
+            linkage = "" if is_exported else "static "
+            lines.append(f"{linkage}{ret_c} {m_ident}({sig}) {{")
+            fn_lines: list[str] = []
+            for q in quants:
+                mod_emitter.in_scope_type_descriptors[q.name] = f"descriptor_{q.name}"
+                fn_lines.append(f"(void)descriptor_{q.name};")
+            prev_env = mod_emitter.current_env_vars
+            mod_emitter.current_env_vars = {
+                p.name: mangle_module_ident(clean_mod, p.name) for p in params
+            }
+            for vname, _, _ in mod_vars:
+                mod_emitter.current_env_vars[vname] = mangle_module_ident(clean_mod, vname)
+            mod_emitter.pointer_params = {
+                p.name for p in params if getattr(p, "is_out", False) or getattr(p, "is_var", False)
+            }
+            mod_emitter._emit_fun_return(body, ret_type, fn_lines)
+            mod_emitter.pointer_params = set()
+            mod_emitter.current_env_vars = prev_env
+            for fl in fn_lines:
+                lines.append(f"    {fl}" if fl.strip() else fl)
+            lines.append("}")
+            lines.append("")
+
+        if standalone:
+            lines.append(f"QRecordVal qv_{clean_mod};")
+            lines.append(f"static bool qv_mod_{clean_mod}_initialized = false;")
+            lines.append(f"void qv_mod_{clean_mod}_init(void) {{")
+        else:
+            lines.append(f"static void qv_mod_{clean_mod}_init(void) {{")
+        lines.append(f"    if (qv_mod_{clean_mod}_initialized) return;")
+        lines.append(f"    qv_mod_{clean_mod}_initialized = true;")
+        if standalone and decl_emitter and decl_emitter.emitted_descriptor_tags:
+            lines.append("    /* Register static program type descriptors */")
+            for tag in decl_emitter.emitted_descriptor_tags:
+                lines.append(f"    quest_register_static_type_descriptor(&quest_type_{tag});")
+            lines.append("")
+        for dep in mod_imported_mods:
+            dep_clean = dep.replace(".", "_")
+            lines.append(f"    qv_mod_{dep_clean}_init();")
+        if mod.c_init:
+            lines.append(f"    {mod.c_init};")
+
+        init_lines: list[str] = []
+        mod_emitter.current_env_vars = {
+            vname: mangle_module_ident(clean_mod, vname) for vname, _, _ in mod_vars
+        }
+        for b in mod.bindings:
+            match b:
+                case TypedLetValue(name=vname, value=vval, symbol=vsym):
+                    if any(vname == mv[0] for mv in mod_vars):
+                        m_ident = mangle_module_ident(clean_mod, vname)
+                        if vsym.type_val == OK_TYPE:
+                            mod_emitter.emit_to(vval, None, init_lines)
+                        else:
+                            mod_emitter.emit_to(vval, m_ident, init_lines)
+                case TypedException(name=ename) as exc_n:
+                    if ename and any(ename == mv[0] for mv in mod_vars):
+                        m_ident = mangle_module_ident(clean_mod, ename)
+                        mod_emitter.emit_to(exc_n, m_ident, init_lines)
+                case _:
+                    pass
+        for il in init_lines:
+            lines.append(f"    {il}" if il.strip() else il)
+
+        mod_rec_t = BuiltinModuleRegistry._build_record_type_from_scope(mod.scope)
+        rec_struct = self.record_struct_name(mod_rec_t)
+        payload_var = f"_{clean_mod}_payload"
+        lines.append(
+            f"    {rec_struct} *{payload_var} = "
+            f"({rec_struct} *)quest_alloc(sizeof({rec_struct}));"
+        )
+        lines.append(f"    {payload_var}->header.descriptor = NULL;")
+        for fld in sorted(mod_rec_t.fields, key=lambda f: f.name):
+            if any(fn == fld.name for fn, _, _ in mod_funs):
+                tramp_name = f"{mangle_module_ident(clean_mod, fld.name)}_trampoline"
+                clos_tmp = self.fresh_tmp(f"_{clean_mod}_{fld.name}_clos")
+                lines.append(
+                    f"    QClosure *{clos_tmp} = "
+                    f"(QClosure *)quest_alloc(sizeof(QClosure));"
+                )
+                lines.append(f"    {clos_tmp}->fn = (void *){tramp_name};")
+                lines.append(f"    {clos_tmp}->env = NULL;")
+                lines.append(f"    {payload_var}->qf_{fld.name} = {clos_tmp};")
+            elif (nb := next((b for b in mod_native_funs if b.name == fld.name), None)) is not None:
+                if nb.symbol or nb.inline_template:
+                    tramp_name = f"qv_{clean_mod}_{fld.name}_trampoline"
+                    clos_tmp = self.fresh_tmp(f"_{clean_mod}_{fld.name}_clos")
+                    lines.append(
+                        f"    QClosure *{clos_tmp} = "
+                        f"(QClosure *)quest_alloc(sizeof(QClosure));"
+                    )
+                    lines.append(f"    {clos_tmp}->fn = (void *){tramp_name};")
+                    lines.append(f"    {clos_tmp}->env = NULL;")
+                    lines.append(f"    {payload_var}->qf_{fld.name} = {clos_tmp};")
+                else:
+                    lines.append(f"    {payload_var}->qf_{fld.name} = NULL;")
+            elif (nb := next((b for b in mod_native_vals if b.name == fld.name), None)) is not None:
+                val_str = nb.c_val
+                if self.c_type(fld.type_val) == "QVal" and self.c_type(nb.type_val) != "QVal":
+                    val_str = _qval_wrap(val_str, nb.type_val)
+                lines.append(f"    {payload_var}->qf_{fld.name} = {val_str};")
+            else:
+                m_ident = mangle_module_ident(clean_mod, fld.name)
+                val_b = next((b for b in mod.bindings if getattr(b, "name", None) == fld.name), None)
+                val_t = getattr(getattr(val_b, "symbol", None), "type_val", None)
+                if val_t is None:
+                    val_t = getattr(val_b, "type_val", None)
+                val_str = m_ident
+                if val_t and self.c_type(fld.type_val) == "QVal" and self.c_type(val_t) != "QVal":
+                    val_str = _qval_wrap(val_str, val_t)
+                lines.append(f"    {payload_var}->qf_{fld.name} = {val_str};")
+        d_name = self.record_ctx.offset_dict_instance_name(mod_rec_t, mod_rec_t)
+        lines.append(
+            f"    qv_{clean_mod} = (QRecordVal){{ .val = (void *){payload_var}, "
+            f".dict = (const void *)&{d_name} }};"
+        )
+        lines.append("}")
+        lines.append("")
+        return lines
 
     def _format_existential_tuple_val(self, typ: QTupleType) -> str:
         """Formats the hidden representation of an existential tuple value for interactive output."""
