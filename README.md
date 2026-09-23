@@ -34,12 +34,12 @@ The compiler is built using a staged bootstrap methodology across seven distinct
 | **Step 1** | Python | Front-End: Lexer, PEG Parser, and Untyped AST | **Complete** |
 | **Step 2** | Python | Typechecker: $F_{<:}^\omega$ Subtyping, Equi-Recursion, Elaboration | **Complete** |
 | **Step 3** | Python | Tree-Walking Interpreter & Interactive REPL | **Complete** |
-| **Step 4** | Python | Bootstrap C Transpiler (emits C99 + Boehm GC) | **In Progress** (Phase 4.8 Complete) |
+| **Step 4** | Python | Bootstrap C Transpiler (emits C99 + Boehm GC) | **Complete** (Phases 4.1–4.16) |
 | **Step 5** | Quest | Self-Hosted Front-End & C Compiler (written in Quest) | Queued |
 | **Step 6** | Quest | Self-Hosted Native AArch64 Compiler (Nanopass Pipeline) | Queued |
 | **Step 7** | Quest | Native AArch64 JIT & Dynamic Incremental Runtime | Queued |
 
-For full architectural details on each stage and prerequisites for completing the bootstrap compiler, see [docs/roadmap.md](docs/roadmap.md).
+For full architectural details on each stage, see [docs/roadmap.md](docs/roadmap.md).
 
 ---
 
@@ -103,6 +103,32 @@ PYTHONPATH=bootstrap/python python3 -m unittest discover -s tests/python
 
 ---
 
+## Known Differences from Typeful Programming
+
+While this implementation strives for high fidelity to Luca Cardelli's
+[*Typeful Programming*](http://lucacardelli.name/Papers/TypefulProg.pdf), several practical distinctions exist:
+
+1. **Systems of Interfaces:**
+   Cardelli discusses "systems of interfaces" in the "Huge Programs" section (§7.3) as a conceptual mechanism to group
+   and configure interdependent interfaces and modules. However, this feature was not clearly defined or given formal
+   syntax in the paper, and requires further thought before implementation. As Cardelli noted in Section 1:
+   > *"The example language is still speculative in some parts; the boundary between solid and tentative features can
+   > be detected by looking at the formal syntax in the Appendix. Features that have been given syntax there have also
+   > been implemented and are relatively well thought out. Other features described in the paper should be regarded
+   > with more suspicion"*
+
+2. **Dynamic Serialization (`dynamic.extern` / `dynamic.intern`):**
+   Cardelli envisioned dynamic values serializing arbitrary data and code representations. In this implementation,
+   `dynamic.extern` and `dynamic.intern` serialize and deserialize typed values (primitives, records, tuples, variants,
+   options, arrays, dynamic packages, and type descriptors) with cyclic reference preservation. Serialization of
+   first-class functions and closures is not supported due to portability, code versioning, and execution
+   environment constraints.
+
+For full details on language extensions (including the `System` OS interface and native `external` syntax) as well as
+runtime additions, see [docs/extensions.md](docs/extensions.md).
+
+---
+
 ## Documentation Index
 
 Comprehensive documentation for the language, formal semantics, and compiler subsystems is organized in `docs/`:
@@ -115,6 +141,8 @@ Comprehensive documentation for the language, formal semantics, and compiler sub
 - [docs/TheQuestLanguageAndSystem.md](docs/TheQuestLanguageAndSystem.md): System architecture and original bytecode
   interpreter design (1994).
 - [docs/grammar.txt](docs/grammar.txt): Canonical EBNF grammar specification.
+- [docs/extensions.md](docs/extensions.md): Core language extensions, `System` OS interface, and native `external`
+  syntax.
 
 ### Compiler Architecture & Subsystems
 - [docs/pipeline.md](docs/pipeline.md): The compiler phase pipeline framework, dual-pipeline architecture (interpreter
