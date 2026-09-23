@@ -95,6 +95,37 @@ def resolve_module_file(
     return None
 
 
+def resolve_object_file(
+    name: str,
+    current_dir: Optional[Path],
+    include_paths: list[Path],
+) -> Optional[Path]:
+    """Finds <name.lower()>.o in current_dir, include_paths, or DEFAULT_LIB_DIR."""
+    filename = f"{name.lower()}.o"
+    if current_dir is not None:
+        candidate = current_dir / filename
+        if candidate.is_file():
+            return candidate.resolve()
+
+    for inc in include_paths:
+        candidate = Path(inc) / filename
+        if candidate.is_file():
+            return candidate.resolve()
+
+    env_lib = os.environ.get("QUEST_LIB")
+    if env_lib:
+        candidate = Path(env_lib) / filename
+        if candidate.is_file():
+            return candidate.resolve()
+
+    if DEFAULT_LIB_DIR.is_dir():
+        candidate = DEFAULT_LIB_DIR / filename
+        if candidate.is_file():
+            return candidate.resolve()
+
+    return None
+
+
 def load_interface(name: str, env: Environment) -> Scope:
     """Loads, validates, and elaborates an interface from a .int.quest file."""
     existing = env.lookup_interface(name)
@@ -188,6 +219,29 @@ def load_module(name: str, expected_interface: str, env: Environment) -> TypedMo
             f"Cyclic dependency detected in module imports: {' -> '.join(chain)}"
         )
 
+    def _synthesize_precompiled_module() -> TypedModule:
+        target_interface_scope = env.lookup_interface(expected_interface)
+        if target_interface_scope is None:
+            target_interface_scope = load_interface(expected_interface, env)
+
+        from quest.modules import create_module_export_scope
+        module_export_scope = create_module_export_scope(name, target_interface_scope, env)
+        env.register_module(name, module_export_scope)
+
+        from quest.typed_ast import TypedModule
+        typed_mod = TypedModule(
+            name=name,
+            interface_name=expected_interface,
+            bindings=(),
+            scope=module_export_scope,
+            is_precompiled=True,
+        )
+        env.loaded_modules_ast[name] = typed_mod
+        return typed_mod
+
+    if name in env.precompiled_modules:
+        return _synthesize_precompiled_module()
+
     file_path = resolve_module_file(name, env.current_dir, env.include_paths)
     if file_path is None:
         from quest.builtins import BuiltinModuleRegistry
@@ -196,13 +250,20 @@ def load_module(name: str, expected_interface: str, env: Environment) -> TypedMo
             env.loaded_modules_ast[name] = builtin_ast
             return builtin_ast
 
+        obj_file = resolve_object_file(name, env.current_dir, env.include_paths)
+        if obj_file is not None or name in env.precompiled_modules:
+            if obj_file is not None and obj_file not in env.linked_objects:
+                env.linked_objects.append(obj_file)
+            env.precompiled_modules.add(name)
+            return _synthesize_precompiled_module()
+
         searched = [str(env.current_dir)] if env.current_dir else []
         searched.extend(str(p) for p in env.include_paths)
         if DEFAULT_LIB_DIR.is_dir():
             searched.append(str(DEFAULT_LIB_DIR))
         raise QuestTypeError(
             f"Undefined module '{name}': cannot find module file for '{name}' "
-            f"(looked for '{norm_name}.mod.quest' in {searched})"
+            f"(looked for '{norm_name}.mod.quest' or '{norm_name}.o' in {searched})"
         )
 
     try:

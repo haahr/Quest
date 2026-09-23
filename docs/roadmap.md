@@ -92,7 +92,7 @@ native **AArch64 (ARM64)** machine code and providing a **JIT compiler** for int
 - Interpreter architecture in [interpreter.md](interpreter.md); REPL guide in [repl.md](repl.md); implementation
   plan in [step3-interpreter.md](step3-interpreter.md).
 
-### Step 4: Bootstrap C Transpiler (Python)
+### Step 4: Bootstrap C Transpiler (Python) — *Complete (Phases 4.1–4.16)*
 - Multi-pass translation pipeline emitting standard ISO C99 linked with Boehm GC (`libgc`) or libc (`--nogc`):
   - **Phase 4.1 (Runtime ABI & Core Pipeline):** 64-bit `QVal` representation, `runtime/quest_runtime.h`,
     `compiler_runner.py` toolchain discovery, and `codegen_c` pipeline integration. — *Complete*
@@ -150,11 +150,10 @@ native **AArch64 (ARM64)** machine code and providing a **JIT compiler** for int
   - **Phase 4.16 (Separate Compilation & Object Linking):** Separate compilation of interfaces (`.int.quest`) into
     C headers (`.h`) and portable serialized type metadata (`.qi`) via dynamic JSON/JSOG, compilation of modules
     (`.mod.quest`) to object files (`.o`), and client linking (`main.quest` + `*.o` -> binary). Step 1 (Interface
-    compilation `.int.quest` -> `.h` + `.qi`) and Step 2 (Module compilation `.mod.quest` -> `.c` -> `.o` with
-    dual direct C function and closure trampoline ABI and idempotent chained initialization) are complete;
-    Step 3 (Client compilation and object linking `main.quest` + `*.o` -> native binary) is in progress.
-- **Bootstrap Compiler Completion Prerequisites:**
-  - *Separate Compilation & Object Linking:* Finalizing Step 3 in Phase 4.16.
+    compilation `.int.quest` -> `.h` + `.qi`), Step 2 (Module compilation `.mod.quest` -> `.c` -> `.o` with
+    dual direct C function and closure trampoline ABI and idempotent chained initialization), and Step 3 (Client
+    compilation and object linking `main.quest` + `*.o` -> native binary with dual linkage support and signature
+    adaptation) are complete. — *Complete*
 - C transpiler architecture in [codegen-c.md](codegen-c.md);
   C ABI specification in [c-representation.md](c-representation.md);
   language extensions specification in [extensions.md](extensions.md).

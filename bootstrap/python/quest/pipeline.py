@@ -64,6 +64,7 @@ class CompilerOptions:
     expected_exit: int = 0
     target_env: Optional[dict[str, str]] = None
     target_stdin: Optional[str] = None
+    extra_objects: list[Path] = field(default_factory=list)
 
 
 @dataclass
@@ -361,8 +362,18 @@ class RunCCompiledPhase(Phase):
         with tempfile.NamedTemporaryFile(suffix="", delete=False) as tmp_file:
             bin_path = Path(tmp_file.name)
 
+        extra_objs = list(ctx.options.extra_objects)
+        for obj in ctx.env.linked_objects:
+            if obj not in extra_objs:
+                extra_objs.append(obj)
+
         try:
-            compile_c_source(c_code, output_path=bin_path, nogc=ctx.options.nogc)
+            compile_c_source(
+                c_code,
+                output_path=bin_path,
+                nogc=ctx.options.nogc,
+                extra_objects=extra_objs,
+            )
             proc = run_binary(
                 bin_path,
                 args=ctx.options.target_args,

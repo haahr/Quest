@@ -820,6 +820,7 @@ class TypedModule(TypedBinding):
     bindings: tuple[TypedBinding, ...]
     scope: Scope
     c_init: Optional[str] = None
+    is_precompiled: bool = False
 
     def dump_header(self) -> str:
         return f"'{self.name}' implements '{self.interface_name}'"

@@ -334,6 +334,35 @@ Compiling a module implementation (`quest -c counter.mod.quest`) generates both 
    - Produced by invoking the host C compiler (`clang -c <name>.c -o <name>.o -I runtime -I <include_paths>`).
    - Both `<name>.c` and `<name>.o` are retained on disk for debugging, inspection, and native linking.
 
+### 9.3. Client Compilation & Object Linking (`main.quest` + `*.o` -> Native Binary)
+Compiling client code that depends on precompiled modules links `.o` files directly into the native executable:
+1. **Invocation Syntax & Search Paths:**
+   - Explicit object files: `quest main.quest counter.o -o my_app` (or `quest compile main.quest counter.o -o my_app`).
+   - Auto-discovery: When `import counter : Counter` is processed, if `counter.o` exists in the current directory or
+     any directory specified via `-I`, the compiler automatically registers `counter` as a precompiled module and
+     queues `counter.o` for linking.
+   - Source independence: The module implementation source (`counter.mod.quest`) does not need to exist on disk;
+     typechecking and code generation rely solely on the interface (`counter.qi` or `counter.int.quest`) and the
+     precompiled object file.
+2. **Dual Linkage ABI & External Declarations:**
+   - In the emitted client C code, precompiled modules emit external declarations for both linkage forms:
+     - Direct C functions: `extern <Ret> qv_<mod>_<func>(<Params>);`
+     - Global module record: `extern QRecordVal qv_<mod>;`
+     - Initializer: `extern void qv_mod_<mod>_init(void);`
+   - Direct calls (`counter.inc(c)`) lower to fast native C calls `qv_counter_inc(c)`.
+   - Closure access (`let f = counter.inc; f(c)`) extracts closures from `qv_counter` and dispatches via trampolines.
+3. **Signature Adaptation & Abstract Type ABI:**
+   - Exported interface types define the canonical C ABI at module boundaries. Abstract types (`T::TYPE`) erase
+     uniformly to `QVal`.
+   - When a module implements an interface where concrete types differ from interface representations (e.g. `T`
+     implemented as a record `QRecordVal` vs. interface `QVal`), the module compiler emits internal implementations
+     (`_qv_<mod>_<func>_impl`) alongside exported boundary adapters (`qv_<mod>_<func>`) and trampolines that safely
+     box and unbox arguments and return values using `quest_record_box` and value unwrappers.
+4. **Binary Generation:**
+   - The pipeline compiles the client C file and invokes the host C compiler (`clang`), passing all required
+     runtime files (`quest_runtime.c`, `quest_serialization.c`), precompiled object files (`counter.o`), and GC
+     libraries to produce the final executable binary.
+
 ---
 
 ## See Also

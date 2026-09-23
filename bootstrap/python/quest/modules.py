@@ -129,6 +129,53 @@ def elaborate_interface(decl: ast.InterfaceDecl, env: Environment) -> TypedInter
     return TypedInterface(name=decl.name, signatures=(), scope=interface_scope, offset=decl.offset)
 
 
+def create_module_export_scope(
+    module_name: str,
+    target_interface_scope: Scope,
+    env: Environment,
+) -> Scope:
+    """Creates the exported scope for a module conforming to an interface scope."""
+    module_export_scope = Scope(name=f"module_export_{module_name}")
+    export_type_subst: dict[int, QType] = {}
+
+    for type_name, interface_type_symbol in target_interface_scope.types.items():
+        if interface_type_symbol.definition is None:
+            export_sym_id = env.fresh_symbol_id()
+            opaque_type_symbol = TypeSymbol(
+                name=type_name,
+                symbol_id=export_sym_id,
+                kind=interface_type_symbol.kind,
+                definition=None,
+            )
+            module_export_scope.declare_type(opaque_type_symbol)
+            export_type_subst[interface_type_symbol.symbol_id] = QTypeVar(
+                name=f"{module_name}.{type_name}",
+                symbol_id=export_sym_id,
+                bound=interface_type_symbol.kind,
+            )
+        else:
+            manifest_type_symbol = TypeSymbol(
+                name=type_name,
+                symbol_id=env.fresh_symbol_id(),
+                kind=interface_type_symbol.kind,
+                definition=interface_type_symbol.definition,
+            )
+            module_export_scope.declare_type(manifest_type_symbol)
+
+    for val_name, interface_val_symbol in target_interface_scope.values.items():
+        exported_val_type = interface_val_symbol.type_val.substitute(export_type_subst)
+        module_export_scope.declare_value(
+            ValueSymbol(
+                name=val_name,
+                type_val=exported_val_type,
+                is_var=interface_val_symbol.is_var,
+                is_out=interface_val_symbol.is_out,
+            )
+        )
+
+    return module_export_scope
+
+
 def elaborate_module(
     decl: ast.ModuleDecl,
     env: Environment,
@@ -175,8 +222,16 @@ def elaborate_module(
                 if kind_symbol is not None:
                     module_internal_scope.declare_kind(kind_symbol)
                     continue
-                from quest.module_loader import resolve_module_file, load_module
-                on_disk = resolve_module_file(name, env.current_dir, env.include_paths) is not None
+                from quest.module_loader import (
+                    load_module,
+                    resolve_module_file,
+                    resolve_object_file,
+                )
+                on_disk = (
+                    resolve_module_file(name, env.current_dir, env.include_paths) is not None
+                    or resolve_object_file(name, env.current_dir, env.include_paths) is not None
+                    or name in env.precompiled_modules
+                )
                 if on_disk or name in env.loaded_modules_ast:
                     if name not in env.loaded_modules_ast:
                         load_module(name, imp.interface_name, env)
@@ -276,43 +331,7 @@ def elaborate_module(
         env.current_scope = saved_scope
 
     # 4. Create exported module scope (strictly opaque for abstract interface types)
-    module_export_scope = Scope(name=f"module_export_{decl.name}")
-    export_type_subst: dict[int, QType] = {}
-
-    for type_name, interface_type_symbol in target_interface_scope.types.items():
-        if interface_type_symbol.definition is None:
-            export_sym_id = env.fresh_symbol_id()
-            opaque_type_symbol = TypeSymbol(
-                name=type_name,
-                symbol_id=export_sym_id,
-                kind=interface_type_symbol.kind,
-                definition=None,
-            )
-            module_export_scope.declare_type(opaque_type_symbol)
-            export_type_subst[interface_type_symbol.symbol_id] = QTypeVar(
-                name=f"{decl.name}.{type_name}",
-                symbol_id=export_sym_id,
-                bound=interface_type_symbol.kind,
-            )
-        else:
-            manifest_type_symbol = TypeSymbol(
-                name=type_name,
-                symbol_id=env.fresh_symbol_id(),
-                kind=interface_type_symbol.kind,
-                definition=interface_type_symbol.definition,
-            )
-            module_export_scope.declare_type(manifest_type_symbol)
-
-    for val_name, interface_val_symbol in target_interface_scope.values.items():
-        exported_val_type = interface_val_symbol.type_val.substitute(export_type_subst)
-        module_export_scope.declare_value(
-            ValueSymbol(
-                name=val_name,
-                type_val=exported_val_type,
-                is_var=interface_val_symbol.is_var,
-                is_out=interface_val_symbol.is_out,
-            )
-        )
+    module_export_scope = create_module_export_scope(decl.name, target_interface_scope, env)
 
     env.register_module(decl.name, module_export_scope)
 
@@ -359,8 +378,16 @@ def elaborate_import(phrase: ast.ImportPhrase, env: Environment) -> TypedImport:
         else:
             # import mod1, mod2: Interface
             for mod_name in item.names:
-                from quest.module_loader import resolve_module_file, load_module
-                on_disk = resolve_module_file(mod_name, env.current_dir, env.include_paths) is not None
+                from quest.module_loader import (
+                    load_module,
+                    resolve_module_file,
+                    resolve_object_file,
+                )
+                on_disk = (
+                    resolve_module_file(mod_name, env.current_dir, env.include_paths) is not None
+                    or resolve_object_file(mod_name, env.current_dir, env.include_paths) is not None
+                    or mod_name in env.precompiled_modules
+                )
                 if on_disk or mod_name in env.loaded_modules_ast:
                     if mod_name not in env.loaded_modules_ast:
                         load_module(mod_name, iface_name, env)

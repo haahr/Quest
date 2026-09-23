@@ -74,11 +74,14 @@ class TestModuleCompiler(unittest.TestCase):
         # Idempotent initializer declared with external linkage
         self.assertIn("void qv_mod_counter_init(void) {", c_source)
         self.assertIn("if (qv_mod_counter_initialized) return;", c_source)
-        # Direct C functions exported without static
-        self.assertIn("QInt qv_counter_read(QRecordVal qv_counter_c) {", c_source)
-        self.assertIn("void qv_counter_inc(QRecordVal qv_counter_c) {", c_source)
-        self.assertNotIn("static QInt qv_counter_read(", c_source)
-        self.assertNotIn("static void qv_counter_inc(", c_source)
+        # Direct C functions exported without static, conforming to interface ABI (QVal for abstract T)
+        self.assertIn("QInt qv_counter_read(QVal qv_p_c) {", c_source)
+        self.assertIn("void qv_counter_inc(QVal qv_p_c) {", c_source)
+        self.assertNotIn("static QInt qv_counter_read(QVal", c_source)
+        self.assertNotIn("static void qv_counter_inc(QVal", c_source)
+        # Internal implementations take concrete module type QRecordVal
+        self.assertIn("static QInt _qv_counter_read_impl(QRecordVal qv_counter_c) {", c_source)
+        self.assertIn("static void _qv_counter_inc_impl(QRecordVal qv_counter_c) {", c_source)
         # Trampoline functions are static
         self.assertIn("static QInt qv_counter_read_trampoline(void *env", c_source)
         self.assertIn("static void qv_counter_inc_trampoline(void *env", c_source)

@@ -9,6 +9,7 @@ from quest.codegen.c_analysis import CLambdaInfo, CProgramAnalysis
 from quest.codegen.c_types import (
     RecordNamingContext,
     mangle_ident,
+    mangle_module_ident,
     normalize_type,
     option_struct_name,
     record_struct_name,
@@ -77,9 +78,46 @@ class CDeclarationEmitter:
             lines.append("/* Forward declarations and state for compiled modules */")
             for mod in analysis.sorted_modules:
                 clean_mod = mod.name.replace(".", "_")
-                lines.append(f"static QRecordVal qv_{clean_mod};")
-                lines.append(f"static bool qv_mod_{clean_mod}_initialized = false;")
-                lines.append(f"static void qv_mod_{clean_mod}_init(void);")
+                if getattr(mod, "is_precompiled", False):
+                    lines.append(f"extern QRecordVal qv_{clean_mod};")
+                    lines.append(f"extern void qv_mod_{clean_mod}_init(void);")
+                else:
+                    lines.append(f"static QRecordVal qv_{clean_mod};")
+                    lines.append(f"static bool qv_mod_{clean_mod}_initialized = false;")
+                    lines.append(f"static void qv_mod_{clean_mod}_init(void);")
+            lines.append("")
+        return lines
+
+    def emit_precompiled_module_declarations(self, analysis: CProgramAnalysis) -> list[str]:
+        lines: list[str] = []
+        precompiled_mods = [m for m in analysis.sorted_modules if getattr(m, "is_precompiled", False)]
+        if precompiled_mods:
+            lines.append("/* External declarations for precompiled module functions */")
+            for mod in precompiled_mods:
+                clean_mod = mod.name.replace(".", "_")
+                for val_name, val_sym in mod.scope.values.items():
+                    type_val = val_sym.type_val
+                    if isinstance(type_val, QAllType):
+                        quants = type_val.quantifiers
+                        fun_t = type_val.body
+                    else:
+                        quants = ()
+                        fun_t = type_val
+                    if isinstance(fun_t, QFunType):
+                        m_ident = mangle_module_ident(clean_mod, val_name)
+                        ret_type = fun_t.result_type
+                        ret_c = "void" if ret_type == OK_TYPE else (
+                            "QRecordVal"
+                            if isinstance(ret_type, QRecordType)
+                            else self.c_type(ret_type)
+                        )
+                        quant_decls = [f"const QTypeDescriptor *descriptor_{q.name}" for q in quants]
+                        param_decls = quant_decls + [
+                            f"{self.c_type(p.type_val)}{' *' if p.is_out or p.is_var else ' '}qv_p_{p.name}"
+                            for p in fun_t.params
+                        ]
+                        sig = "void" if not param_decls else ", ".join(param_decls)
+                        lines.append(f"extern {ret_c} {m_ident}({sig});")
             lines.append("")
         return lines
 

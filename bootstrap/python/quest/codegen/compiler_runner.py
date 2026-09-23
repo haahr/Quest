@@ -60,6 +60,7 @@ def compile_c_source(
     compiler_path: Optional[str] = None,
     extra_flags: Optional[list[str]] = None,
     output_path: Optional[Path | str] = None,
+    extra_objects: Optional[list[Path | str]] = None,
 ) -> Path:
     """Compiles a generated C source string into an executable binary."""
     out_target = output_path if output_path is not None else output_binary
@@ -88,9 +89,13 @@ def compile_c_source(
             str(runtime_c),
             str(serialization_c),
             str(temp_c_path),
+        ]
+        if extra_objects:
+            cmd.extend(str(obj) for obj in extra_objects)
+        cmd.extend([
             "-o",
             str(target_bin),
-        ]
+        ])
         cmd.extend(detect_gc_flags(nogc=nogc))
         if extra_flags:
             cmd.extend(extra_flags)

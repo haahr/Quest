@@ -184,6 +184,21 @@ quest compile --stop-after typecheck file.quest
 quest compile --dump-after typecheck --stop-after codegen_c file.quest
 ```
 
+### 4.3. Separate Compilation & Object Linking (`quest -c`, `*.o`)
+```bash
+# Compile an interface to C header (.h) and serialized type metadata (.qi):
+quest -c counter.int.quest
+
+# Compile a module implementation to C source (.c) and object file (.o):
+quest -c counter.mod.quest -I ./interfaces
+
+# Compile client program and link against precompiled .o modules:
+quest main.quest counter.o -o my_app
+
+# Compile client program with auto-discovery of .o modules in include paths:
+quest main.quest -I ./modules -o my_app
+```
+
 ### Exit Codes
 - `0`: Successful compilation / execution (or successful early dump).
 - `1`: User code error or host compilation error (diagnostic rendered via `DiagnosticRenderer`).

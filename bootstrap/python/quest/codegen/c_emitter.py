@@ -828,6 +828,7 @@ class CEmitter:
             self.val_referenced_top_funs,
             self.top_funs_dict,
         ))
+        lines.extend(decl_emitter.emit_precompiled_module_declarations(analysis))
 
         top_funs = analysis.top_funs
         top_vars = analysis.top_vars
@@ -917,6 +918,8 @@ class CEmitter:
         if sorted_modules:
             lines.append("/* Compiled module definitions and initializers */")
             for mod in sorted_modules:
+                if getattr(mod, "is_precompiled", False):
+                    continue
                 lines.extend(
                     self._emit_single_module_definition(
                         mod,
@@ -1107,10 +1110,14 @@ class CEmitter:
                 m_ident = mangle_module_ident(clean_mod, vname)
                 lines.append(f"static {self.c_type(vsym.type_val)} {m_ident};")
 
+        fun_adapters: dict[
+            str,
+            tuple[str, str, QType, list[TypedParam], QType, list[Any], str, str, str],
+        ] = {}
         for fname, ffun, fsym in mod_funs:
             m_ident = mangle_module_ident(clean_mod, fname)
             quants, params, _, ret_type = self._collect_fun_params(ffun)
-            ret_c = "void" if ret_type == OK_TYPE else self.c_type(ret_type)
+            int_ret_c = "void" if ret_type == OK_TYPE else self.c_type(ret_type)
             quant_decls = [f"const QTypeDescriptor *descriptor_{q.name}" for q in quants]
             param_decls = quant_decls + [
                 self._param_c_decl(p, mangle_module_ident(clean_mod, p.name))
@@ -1119,32 +1126,86 @@ class CEmitter:
             sig = "void" if not param_decls else ", ".join(param_decls)
             is_exported = standalone and (exported_funs is None or fname in exported_funs)
             linkage = "" if is_exported else "static "
-            lines.append(f"{linkage}{ret_c} {m_ident}({sig});")
 
-        for fname, ffun, fsym in mod_funs:
-            m_ident = mangle_module_ident(clean_mod, fname)
-            tramp_name = f"{m_ident}_trampoline"
-            quants, params, _, ret_type = self._collect_fun_params(ffun)
-            ret_c = "void" if ret_type == OK_TYPE else self.c_type(ret_type)
-            quant_decls = [f"const QTypeDescriptor *descriptor_{q.name}" for q in quants]
-            param_decls = quant_decls + [
-                self._param_c_decl(p, mangle_module_ident(clean_mod, p.name))
-                for p in params
-            ]
-            param_sigs = ["void *env"] + param_decls
-            sig = ", ".join(param_sigs)
-            f_args = [f"descriptor_{q.name}" for q in quants] + [
-                mangle_module_ident(clean_mod, p.name) for p in params
-            ]
-            args_str = ", ".join(f_args)
-            lines.append(f"static {ret_c} {tramp_name}({sig}) {{")
-            lines.append("    (void)env;")
-            if ret_type == OK_TYPE:
-                lines.append(f"    {m_ident}({args_str});")
+            exp_sym = mod.scope.values.get(fname)
+            needs_adapter = False
+            if exp_sym is not None:
+                exp_val_t = exp_sym.type_val
+                if isinstance(exp_val_t, QAllType):
+                    exp_quants = exp_val_t.quantifiers
+                    exp_fun = exp_val_t.body
+                else:
+                    exp_quants = ()
+                    exp_fun = exp_val_t
+                if isinstance(exp_fun, QFunType):
+                    exp_ret_t = exp_fun.result_type
+                    exp_params = exp_fun.params
+                    exp_ret_c = "void" if exp_ret_t == OK_TYPE else self.c_type(exp_ret_t)
+                    if exp_ret_c != int_ret_c or len(exp_params) != len(params):
+                        needs_adapter = True
+                    else:
+                        for ep, ip in zip(exp_params, params):
+                            if self.c_type(ep.type_val) != self.c_type(ip.type_val):
+                                needs_adapter = True
+                                break
+
+            if needs_adapter:
+                impl_ident = f"_{m_ident}_impl"
+                lines.append(f"static {int_ret_c} {impl_ident}({sig});")
+                exp_quant_decls = [f"const QTypeDescriptor *descriptor_{q.name}" for q in exp_quants]
+                exp_param_decls = exp_quant_decls + [
+                    (
+                        f"{self.c_type(p.type_val)}"
+                        f"{' *' if getattr(p, 'is_out', False) or getattr(p, 'is_var', False) else ' '}"
+                        f"qv_p_{p.name}"
+                    )
+                    for p in exp_params
+                ]
+                exp_sig = "void" if not exp_param_decls else ", ".join(exp_param_decls)
+                lines.append(f"{linkage}{exp_ret_c} {m_ident}({exp_sig});")
+                tramp_name = f"{m_ident}_trampoline"
+                tramp_param_sigs = ["void *env"] + exp_param_decls
+                tramp_sig = ", ".join(tramp_param_sigs)
+                tramp_call_args = [f"descriptor_{q.name}" for q in exp_quants] + [
+                    f"qv_p_{p.name}" for p in exp_params
+                ]
+                tramp_args_str = ", ".join(tramp_call_args)
+                lines.append(f"static {exp_ret_c} {tramp_name}({tramp_sig}) {{")
+                lines.append("    (void)env;")
+                if exp_ret_t == OK_TYPE:
+                    lines.append(f"    {m_ident}({tramp_args_str});")
+                else:
+                    lines.append(f"    return {m_ident}({tramp_args_str});")
+                lines.append("}")
+                lines.append("")
+                fun_adapters[fname] = (
+                    impl_ident,
+                    sig,
+                    ret_type,
+                    params,
+                    exp_ret_t,
+                    exp_params,
+                    exp_sig,
+                    exp_ret_c,
+                    linkage,
+                )
             else:
-                lines.append(f"    return {m_ident}({args_str});")
-            lines.append("}")
-            lines.append("")
+                lines.append(f"{linkage}{int_ret_c} {m_ident}({sig});")
+                tramp_name = f"{m_ident}_trampoline"
+                param_sigs = ["void *env"] + param_decls
+                tramp_sig = ", ".join(param_sigs)
+                f_args = [f"descriptor_{q.name}" for q in quants] + [
+                    mangle_module_ident(clean_mod, p.name) for p in params
+                ]
+                args_str = ", ".join(f_args)
+                lines.append(f"static {int_ret_c} {tramp_name}({tramp_sig}) {{")
+                lines.append("    (void)env;")
+                if ret_type == OK_TYPE:
+                    lines.append(f"    {m_ident}({args_str});")
+                else:
+                    lines.append(f"    return {m_ident}({args_str});")
+                lines.append("}")
+                lines.append("")
 
         for nb in mod_native_funs:
             if nb.symbol or nb.inline_template:
@@ -1193,36 +1254,99 @@ class CEmitter:
         for fname, ffun, fsym in mod_funs:
             m_ident = mangle_module_ident(clean_mod, fname)
             quants, params, body, ret_type = self._collect_fun_params(ffun)
-            ret_c = "void" if ret_type == OK_TYPE else self.c_type(ret_type)
-            quant_decls = [f"const QTypeDescriptor *descriptor_{q.name}" for q in quants]
-            param_decls = quant_decls + [
-                self._param_c_decl(p, mangle_module_ident(clean_mod, p.name))
-                for p in params
-            ]
-            sig = "void" if not param_decls else ", ".join(param_decls)
-            is_exported = standalone and (exported_funs is None or fname in exported_funs)
-            linkage = "" if is_exported else "static "
-            lines.append(f"{linkage}{ret_c} {m_ident}({sig}) {{")
-            fn_lines: list[str] = []
-            for q in quants:
-                mod_emitter.in_scope_type_descriptors[q.name] = f"descriptor_{q.name}"
-                fn_lines.append(f"(void)descriptor_{q.name};")
-            prev_env = mod_emitter.current_env_vars
-            mod_emitter.current_env_vars = {
-                p.name: mangle_module_ident(clean_mod, p.name) for p in params
-            }
-            for vname, _, _ in mod_vars:
-                mod_emitter.current_env_vars[vname] = mangle_module_ident(clean_mod, vname)
-            mod_emitter.pointer_params = {
-                p.name for p in params if getattr(p, "is_out", False) or getattr(p, "is_var", False)
-            }
-            mod_emitter._emit_fun_return(body, ret_type, fn_lines)
-            mod_emitter.pointer_params = set()
-            mod_emitter.current_env_vars = prev_env
-            for fl in fn_lines:
-                lines.append(f"    {fl}" if fl.strip() else fl)
-            lines.append("}")
-            lines.append("")
+            if fname in fun_adapters:
+                (
+                    impl_ident,
+                    int_sig,
+                    int_ret_t,
+                    int_params,
+                    exp_ret_t,
+                    exp_params,
+                    exp_sig,
+                    exp_ret_c,
+                    linkage,
+                ) = fun_adapters[fname]
+                int_ret_c = "void" if int_ret_t == OK_TYPE else self.c_type(int_ret_t)
+                lines.append(f"static {int_ret_c} {impl_ident}({int_sig}) {{")
+                fn_lines: list[str] = []
+                for q in quants:
+                    mod_emitter.in_scope_type_descriptors[q.name] = f"descriptor_{q.name}"
+                    fn_lines.append(f"(void)descriptor_{q.name};")
+                prev_env = mod_emitter.current_env_vars
+                mod_emitter.current_env_vars = {
+                    p.name: mangle_module_ident(clean_mod, p.name) for p in params
+                }
+                for vname, _, _ in mod_vars:
+                    mod_emitter.current_env_vars[vname] = mangle_module_ident(clean_mod, vname)
+                for fn_k, (fn_impl, *_) in fun_adapters.items():
+                    mod_emitter.current_env_vars[fn_k] = fn_impl
+                mod_emitter.pointer_params = {
+                    p.name for p in params if getattr(p, "is_out", False) or getattr(p, "is_var", False)
+                }
+                mod_emitter._emit_fun_return(body, int_ret_t, fn_lines)
+                mod_emitter.pointer_params = set()
+                mod_emitter.current_env_vars = prev_env
+                for fl in fn_lines:
+                    lines.append(f"    {fl}" if fl.strip() else fl)
+                lines.append("}")
+                lines.append("")
+
+                lines.append(f"{linkage}{exp_ret_c} {m_ident}({exp_sig}) {{")
+                adapter_args = [f"descriptor_{q.name}" for q in quants]
+                for ep, ip in zip(exp_params, int_params):
+                    ep_name = f"qv_p_{ep.name}"
+                    if self.c_type(ep.type_val) != self.c_type(ip.type_val):
+                        unwrapped = _qval_unwrap(ep_name, ip.type_val, self)
+                        adapter_args.append(unwrapped)
+                    else:
+                        adapter_args.append(ep_name)
+                args_str = ", ".join(adapter_args)
+                if int_ret_t == OK_TYPE:
+                    lines.append(f"    {impl_ident}({args_str});")
+                    if exp_ret_t != OK_TYPE:
+                        lines.append("    return ((QVal){ .p = NULL });")
+                    else:
+                        lines.append("    return;")
+                else:
+                    lines.append(f"    {int_ret_c} _res = {impl_ident}({args_str});")
+                    if exp_ret_c != int_ret_c:
+                        wrapped = _qval_wrap("_res", int_ret_t)
+                        lines.append(f"    return {wrapped};")
+                    else:
+                        lines.append("    return _res;")
+                lines.append("}")
+                lines.append("")
+            else:
+                ret_c = "void" if ret_type == OK_TYPE else self.c_type(ret_type)
+                quant_decls = [f"const QTypeDescriptor *descriptor_{q.name}" for q in quants]
+                param_decls = quant_decls + [
+                    self._param_c_decl(p, mangle_module_ident(clean_mod, p.name))
+                    for p in params
+                ]
+                sig = "void" if not param_decls else ", ".join(param_decls)
+                is_exported = standalone and (exported_funs is None or fname in exported_funs)
+                linkage = "" if is_exported else "static "
+                lines.append(f"{linkage}{ret_c} {m_ident}({sig}) {{")
+                fn_lines: list[str] = []
+                for q in quants:
+                    mod_emitter.in_scope_type_descriptors[q.name] = f"descriptor_{q.name}"
+                    fn_lines.append(f"(void)descriptor_{q.name};")
+                prev_env = mod_emitter.current_env_vars
+                mod_emitter.current_env_vars = {
+                    p.name: mangle_module_ident(clean_mod, p.name) for p in params
+                }
+                for vname, _, _ in mod_vars:
+                    mod_emitter.current_env_vars[vname] = mangle_module_ident(clean_mod, vname)
+                mod_emitter.pointer_params = {
+                    p.name for p in params if getattr(p, "is_out", False) or getattr(p, "is_var", False)
+                }
+                mod_emitter._emit_fun_return(body, ret_type, fn_lines)
+                mod_emitter.pointer_params = set()
+                mod_emitter.current_env_vars = prev_env
+                for fl in fn_lines:
+                    lines.append(f"    {fl}" if fl.strip() else fl)
+                lines.append("}")
+                lines.append("")
 
         if standalone:
             lines.append(f"QRecordVal qv_{clean_mod};")
@@ -1946,10 +2070,94 @@ class CEmitter:
                         return "((void)0)"
                     return call_str
                 elif isinstance(effective_func, TypedVar) and effective_func.name in self.top_fun_names:
-                    c_func = self.mangle_ident(effective_func.name)
+                    c_func = self.current_env_vars.get(
+                        effective_func.name, self.mangle_ident(effective_func.name)
+                    )
                     c_args = list(descriptor_args)
                     fun, _ = self.top_funs_dict[effective_func.name]
                     _, formal_params, _, ret_type = self._collect_fun_params(fun)
+                    writebacks: list[str] = []
+                    for formal_p, actual_a in zip(formal_params, args):
+                        is_r = getattr(formal_p, "is_out", False) or getattr(formal_p, "is_var", False)
+                        is_o = getattr(formal_p, "is_out", False)
+                        c_args.append(
+                            self._emit_call_arg(
+                                formal_p.type_val,
+                                actual_a,
+                                lines,
+                                is_ref=is_r,
+                                is_out=is_o,
+                                writebacks=writebacks,
+                            )
+                        )
+                    args_str = ", ".join(c_args)
+                    call_str = f"{c_func}({args_str})"
+                    if (
+                        self.c_type(ret_type) == "QVal"
+                        and self.c_type(expr.type_val) != "QVal"
+                    ):
+                        if (rec_bound := resolve_record_bound(ret_type)) is not None:
+                            if isinstance(expr.type_val, QRecordType):
+                                tmp_ret = self.fresh_tmp("_call_ret")
+                                lines.append(f"QRecordVal {tmp_ret} = {call_str};")
+                                d_name = self.record_ctx.offset_dict_instance_name(
+                                    expr.type_val, expr.type_val
+                                )
+                                call_str = (
+                                    f"((QRecordVal){{ .val = {tmp_ret}.val, "
+                                    f".dict = (const void *)&{d_name} }})"
+                                )
+                        elif resolve_variant_bound(ret_type) is not None:
+                            pass
+                        else:
+                            call_str = _qval_unwrap(call_str, expr.type_val, self)
+                    elif (
+                        isinstance(ret_type, QTupleType)
+                        and isinstance(expr.type_val, QTupleType)
+                        and ret_type != expr.type_val
+                    ):
+                        call_str = self._coerce_tuple_val(call_str, ret_type, expr.type_val, lines)
+                    if writebacks:
+                        if expr.type_val == OK_TYPE:
+                            lines.append(f"{call_str};")
+                            for wb in writebacks:
+                                lines.append(wb)
+                            return "((void)0)"
+                        else:
+                            ret_c = self.c_type(expr.type_val)
+                            ret_tmp = self.fresh_tmp("_call_res")
+                            lines.append(f"{ret_c} {ret_tmp} = {call_str};")
+                            for wb in writebacks:
+                                lines.append(wb)
+                            return ret_tmp
+                    if expr.type_val == OK_TYPE:
+                        lines.append(f"{call_str};")
+                        return "((void)0)"
+                    return call_str
+                elif (
+                    isinstance(effective_func, TypedSelect)
+                    and isinstance(effective_func.target, TypedVar)
+                    and effective_func.target.name in self.all_modules
+                    and (
+                        (mod := self.all_modules[effective_func.target.name]) is not None
+                        and getattr(mod, "is_precompiled", False)
+                        and effective_func.field in mod.scope.values
+                        and isinstance(mod.scope.values[effective_func.field].type_val, (QFunType, QAllType))
+                    )
+                ):
+                    mod_name = effective_func.target.name
+                    fld = effective_func.field
+                    mod = self.all_modules[mod_name]
+                    clean_mod = mod_name.replace(".", "_")
+                    fld_sym = mod.scope.values[fld]
+                    c_func = mangle_module_ident(clean_mod, fld)
+                    c_args = list(descriptor_args)
+                    if isinstance(fld_sym.type_val, QAllType):
+                        mod_fun_t = fld_sym.type_val.body
+                    else:
+                        mod_fun_t = fld_sym.type_val
+                    formal_params = mod_fun_t.params if isinstance(mod_fun_t, QFunType) else ()
+                    ret_type = mod_fun_t.result_type if isinstance(mod_fun_t, QFunType) else OK_TYPE
                     writebacks: list[str] = []
                     for formal_p, actual_a in zip(formal_params, args):
                         is_r = getattr(formal_p, "is_out", False) or getattr(formal_p, "is_var", False)

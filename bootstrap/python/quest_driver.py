@@ -49,10 +49,16 @@ def run_driver(args: list[str]) -> int:
         description="Quest Compiler Driver — compile, check, interpret, and inspect Quest programs.",
     )
     arg_parser.add_argument(
-        "file",
-        nargs="?",
+        "files",
+        nargs="*",
+        default=[],
+        help="Path to Quest source file (.quest), object files (.o, .a), or '-' for standard input.",
+    )
+    arg_parser.add_argument(
+        "-o", "--output",
+        dest="output",
         default=None,
-        help="Path to Quest source file (.quest), or '-' for standard input.",
+        help="Output binary file path (or C file path if --emit-c).",
     )
     arg_parser.add_argument(
         "-c", "--compile-only",
@@ -126,22 +132,36 @@ def run_driver(args: list[str]) -> int:
 
     parsed_args = arg_parser.parse_args(driver_args)
 
-    # Determine input source
+    # Determine input source and extra objects
     is_inline_code = parsed_args.code is not None
+    source_file = None
+    extra_objects: list[Path] = []
+    for f_str in parsed_args.files:
+        p = Path(f_str)
+        if p.suffix in (".o", ".a", ".dylib", ".so"):
+            extra_objects.append(p.resolve() if p.exists() else p)
+        elif source_file is None:
+            source_file = f_str
+        else:
+            sys.stderr.write(
+                f"quest: error: multiple source files specified: '{source_file}' and '{f_str}'\n"
+            )
+            return 1
+
     if is_inline_code:
         source_text = parsed_args.code
         file_name = "<string>"
-    elif parsed_args.file is None:
+    elif source_file is None:
         if parsed_args.interactive or sys.stdin.isatty():
             from quest.repl import run_repl
             return run_repl()
         source_text = sys.stdin.read()
         file_name = "<stdin>"
-    elif parsed_args.file == "-":
+    elif source_file == "-":
         source_text = sys.stdin.read()
         file_name = "<stdin>"
     else:
-        file_path = Path(parsed_args.file)
+        file_path = Path(source_file)
         if not file_path.exists():
             sys.stderr.write(f"quest: error: file not found: '{file_path}'\n")
             return 1
@@ -158,7 +178,8 @@ def run_driver(args: list[str]) -> int:
             from quest.module_compiler import compile_module_file
             try:
                 include_paths = [Path(p) for p in parsed_args.include_paths]
-                compile_module_file(file_path, include_paths=include_paths)
+                output_dir = Path(parsed_args.output).parent if parsed_args.output else None
+                compile_module_file(file_path, output_dir=output_dir, include_paths=include_paths)
                 return 0
             except Exception as err:
                 sys.stderr.write(f"quest: error: {err}\n")
@@ -171,16 +192,29 @@ def run_driver(args: list[str]) -> int:
             return 1
 
     # Configure pipeline and options
+    has_output = parsed_args.output is not None
+    has_objects = bool(extra_objects)
     needs_c_pipeline = (
-        parsed_args.stop_after in ("codegen_c", "run_c_compiled")
+        has_output
+        or has_objects
+        or parsed_args.stop_after in ("codegen_c", "run_c_compiled")
         or any(p in ("codegen_c", "run_c_compiled") for p in parsed_args.dump_after)
     )
-    pipeline = full_pipeline() if needs_c_pipeline else default_pipeline()
+    if has_output:
+        pipeline = compile_pipeline()
+    elif needs_c_pipeline:
+        pipeline = full_pipeline()
+    else:
+        pipeline = default_pipeline()
+
     available_phases = pipeline.phase_names()
-    print_result = parsed_args.print_result or (parsed_args.stop_after == "run_c_compiled")
+    stop_after = parsed_args.stop_after
+    if has_objects and not has_output and stop_after is None and not parsed_args.dump_after:
+        stop_after = "run_c_compiled"
+    print_result = parsed_args.print_result or (stop_after == "run_c_compiled")
 
     options = CompilerOptions(
-        stop_after=parsed_args.stop_after,
+        stop_after=stop_after,
         dump_after=set(parsed_args.dump_after),
         include_paths=[Path(p) for p in parsed_args.include_paths],
         echo=parsed_args.echo,
@@ -189,6 +223,7 @@ def run_driver(args: list[str]) -> int:
         print_result=print_result,
         target_args=target_args,
         expected_exit=parsed_args.expected_exit,
+        extra_objects=extra_objects,
     )
 
     sys.argv = [file_name] + target_args
@@ -197,6 +232,11 @@ def run_driver(args: list[str]) -> int:
     # Execute pipeline
     try:
         ctx = CompilerContext.create(source_text, file_name, options=options)
+        for obj in extra_objects:
+            mod_name = obj.name.split(".")[0]
+            ctx.env.precompiled_modules.add(mod_name)
+            if obj not in ctx.env.linked_objects:
+                ctx.env.linked_objects.append(obj)
         result = pipeline.execute(source_text, file_name, options=options, ctx=ctx)
     except SystemExit as exc:
         code = exc.code if isinstance(exc.code, int) else (0 if exc.code is None else 1)
@@ -235,6 +275,28 @@ def run_driver(args: list[str]) -> int:
     if not result.success:
         return 1
 
+    if has_output:
+        c_code = result.artifacts.get("codegen_c")
+        if c_code is None:
+            return 1
+        output_path = Path(parsed_args.output)
+        from quest.codegen import compile_c_source
+        try:
+            extra_objs = list(options.extra_objects)
+            for obj in ctx.env.linked_objects:
+                if obj not in extra_objs:
+                    extra_objs.append(obj)
+            compile_c_source(
+                c_code,
+                output_path=output_path,
+                nogc=False,
+                extra_objects=extra_objs,
+            )
+            return 0
+        except Exception as error:
+            sys.stderr.write(f"quest: error: {error}\n")
+            return 1
+
     # If -i / --interactive was requested with a file, enter REPL with populated context
     if parsed_args.interactive:
         from quest.repl import run_repl
@@ -256,10 +318,10 @@ def run_compile(args: list[str]) -> int:
         description="Quest Compiler — compile Quest source into C or native machine binary.",
     )
     arg_parser.add_argument(
-        "file",
-        nargs="?",
-        default=None,
-        help="Path to Quest source file (.quest), or '-' for standard input.",
+        "files",
+        nargs="*",
+        default=[],
+        help="Path to Quest source file (.quest), object files (.o, .a), or '-' for standard input.",
     )
     arg_parser.add_argument(
         "-o", "--output",
@@ -326,25 +388,39 @@ def run_compile(args: list[str]) -> int:
 
     parsed_args = arg_parser.parse_args(args)
 
-    # Determine input source
+    # Determine input source and extra objects
     is_inline_code = parsed_args.code is not None
+    source_file = None
+    extra_objects: list[Path] = []
+    for f_str in parsed_args.files:
+        p = Path(f_str)
+        if p.suffix in (".o", ".a", ".dylib", ".so"):
+            extra_objects.append(p.resolve() if p.exists() else p)
+        elif source_file is None:
+            source_file = f_str
+        else:
+            sys.stderr.write(
+                f"quest compile: error: multiple source files specified: '{source_file}' and '{f_str}'\n"
+            )
+            return 1
+
     if is_inline_code:
         source_text = parsed_args.code
         file_name = "<string>"
         default_out = Path("a.out")
-    elif parsed_args.file is None:
+    elif source_file is None:
         if sys.stdin.isatty():
             arg_parser.print_help(sys.stderr)
             return 1
         source_text = sys.stdin.read()
         file_name = "<stdin>"
         default_out = Path("a.out")
-    elif parsed_args.file == "-":
+    elif source_file == "-":
         source_text = sys.stdin.read()
         file_name = "<stdin>"
         default_out = Path("a.out")
     else:
-        file_path = Path(parsed_args.file)
+        file_path = Path(source_file)
         if not file_path.exists():
             sys.stderr.write(f"quest compile: error: file not found: '{file_path}'\n")
             return 1
@@ -389,9 +465,15 @@ def run_compile(args: list[str]) -> int:
         output_path=output_path,
         nogc=parsed_args.nogc,
         print_result=parsed_args.print_result,
+        extra_objects=extra_objects,
     )
 
     ctx = CompilerContext.create(source_text, file_name, options=options)
+    for obj in extra_objects:
+        mod_name = obj.name.split(".")[0]
+        ctx.env.precompiled_modules.add(mod_name)
+        if obj not in ctx.env.linked_objects:
+            ctx.env.linked_objects.append(obj)
     result = pipeline.execute(source_text, file_name, options=options, ctx=ctx)
 
     for phase_name in available_phases:
@@ -432,7 +514,16 @@ def run_compile(args: list[str]) -> int:
 
     from quest.codegen import compile_c_source
     try:
-        compile_c_source(c_code, output_path=output_path, nogc=parsed_args.nogc)
+        extra_objs = list(options.extra_objects)
+        for obj in ctx.env.linked_objects:
+            if obj not in extra_objs:
+                extra_objs.append(obj)
+        compile_c_source(
+            c_code,
+            output_path=output_path,
+            nogc=parsed_args.nogc,
+            extra_objects=extra_objs,
+        )
     except Exception as error:
         sys.stderr.write(f"quest compile: error: {error}\n")
         return 1
