@@ -861,10 +861,14 @@ typedef struct QDynamic {
 } QDynamic;
 
 static_assert(sizeof(QDynamic) == 16, qdynamic_must_be_16_bytes);
-```
-- `dynamic.new(:A x)` compiles to `quest_dynamic_new(descriptor_A, _qval_wrap(x, A))`.
-- `dynamic.be(:A d)` compiles to `_qval_unwrap(quest_dynamic_be(descriptor_A, d), A)` and checks `is_subtype(d->type_desc, descriptor_A)`, raising `dynamic.error` on mismatch.
-- `dynamic.copy(d)` compiles to `quest_dynamic_new(d->type_desc, d->payload)`.
+- `dynamic.new(:A x)` compiles via standard `TypedNativeBinding` to
+  `quest_dynamic_new(descriptor_A, _qval_wrap(x, A))`.
+- `dynamic.be(:A d)` compiles via standard `TypedNativeBinding` to
+  `_qval_unwrap(quest_dynamic_be(descriptor_A, d), A)` and checks `is_subtype(d->type_desc, descriptor_A)`,
+  raising `dynamic.error` on mismatch.
+- `dynamic.copy(d)` compiles via standard `TypedNativeBinding` to `quest_dynamic_copy(d)`.
+- `dynamic.extern(w d)` compiles via standard `TypedNativeBinding` to `quest_dynamic_extern(w, d)`.
+- `dynamic.intern(r)` compiles via standard `TypedNativeBinding` to `quest_dynamic_intern(r)`.
 - `dynamic.error` lowers to `(&quest_exc_dynamic_error)`.
 
 ---
@@ -902,10 +906,12 @@ All heap allocations route through two runtime allocator functions:
 The runtime files are located at the repository root and shared with future native code backends:
 ```
 runtime/
-├── quest_runtime.h    /* Core ABI, QVal union, layout assertions, allocator macros */
-├── quest_runtime.c    /* String primitives, math helpers, panic handlers, printing */
-├── quest_io.c         /* Future: C implementation of Writer and Reader stream modules */
-└── quest_conv.c       /* Future: C implementation of Conv, Ascii, IntOp, RealOp, StringOp */
+├── quest_runtime.h         /* Core ABI, QVal union, layout assertions, allocator macros */
+├── quest_runtime.c         /* String primitives, math helpers, panic handlers, printing */
+├── quest_serialization.h   /* Dynamic serialization & deserialization API */
+├── quest_serialization.c   /* JSON/JSOG dynamic.extern & dynamic.intern implementation */
+├── quest_io.c              /* Future: C implementation of Writer and Reader stream modules */
+└── quest_conv.c            /* Future: C implementation of Conv, Ascii, IntOp, RealOp, StringOp */
 ```
 
 ### 10.1. Implemented Runtime Functions (`runtime/quest_runtime.c`)
@@ -929,11 +935,34 @@ runtime/
     `Exception: arrayOp.error\n` to `stderr` and terminates the process with exit code 1.
   - `void quest_raise_string_error(void)`: Triggered on out-of-bounds string index or slice bounds. Prints
     `Exception: string.error\n` to `stderr` and terminates the process with exit code 1.
+  - `void quest_raise_dynamic_error(void)`: Triggered on dynamic coercion failure (`dynamic.be`) or invalid
+    serialization/deserialization. Prints `Exception: dynamic.error\n` to `stderr` and terminates process.
 - **Debug & Value Printing:**
   - `void quest_raise_variant_error(void)`: Triggered on failed variant tag assertions (`!tag`). Prints
     `Exception: variant.tagMismatch\n` to `stderr` and terminates the process with exit code 1.
   - `void quest_print_val(QVal val, const char *type_name)`: Formats and prints interactive expression results
     matching Cardelli's typescript format (e.g., `42 : Int`, `15.75 : Real`, `true : Bool`, `"hello" : String`).
+
+---
+
+## 11. Dynamic Serialization & JSOG Architecture (`runtime/quest_serialization.c`)
+
+Quest supports graph serialization and deserialization of dynamically typed values via `dynamic.extern(w d)` and
+`dynamic.intern(r)`:
+- **Format Parity:** Uses the exact JSON/JSOG format defined by the Python reference implementation (`dynamic_json.py`),
+  assigning integer `@id` properties to repeated objects and emitting `{"@ref": id}` references for cycles and shared
+  nodes.
+- **Type Envelopes:** Every dynamic envelope serializes as `{"@type": "<type_expr>", "@value": <payload>}`.
+- **Record Field Ordering:** Record fields are serialized in deterministic alphabetical order matching the C runtime's
+  canonical field order.
+- **Cycle & Multi-Reference Detection:** A pre-scan pointer graph traversal using a GC-safe address hash table
+  identifies all cyclic or multiply-referenced heap objects (`Record`, `Array`, `Tuple`, `Dynamic`) and assigns
+  sequential `@id`s.
+- **Type Descriptor Auto-Registration:** All static program type descriptors (`quest_type_*`) are automatically
+  registered in `main` into the runtime interning table (`quest_register_static_type_descriptor`) so deserialization
+  resolves known program types directly.
+- **Natural C ABI Struct Packing:** Dynamically synthesized records use standard C struct packing (8-byte
+  scalars/pointers, 16-byte wide records/variants) matching static compiler emission.
 
 ---
 

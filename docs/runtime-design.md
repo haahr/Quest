@@ -163,9 +163,18 @@ Subtyping checks are unified under `quest_is_subtype`:
 When `dynamic.be` or `inspect` succeeds on a structural subtype:
 - For records: `quest_record_adapt` synthesizes an offset dictionary mapping target fields (alphabetically ordered)
   to source record byte offsets, recursively adapting nested subtyped immutable fields. Results are cached in a
-  memoized thread-safe adapter cache.
 - For variants: `quest_variant_adapt` remaps source variant tags to target tag indices and adapts payloads via a
   memoized tag-mapping adapter cache.
+
+### 4. Dynamic Graph Serialization (`dynamic.extern` & `dynamic.intern`)
+- **JSON/JSOG Representation:** Dynamically serialized packages use a JSON/JSOG representation (`@id` and `@ref`)
+  matching the interpreter's `dynamic_json.py`, handling arbitrary cyclic and DAG data structures.
+- **Auto-Registration of Static Descriptors:** When `main` initializes, the generated program automatically registers
+  all compiled static `QTypeDescriptor` structures with the runtime intern table
+  (`quest_register_static_type_descriptor`). Deserialization lookups for known types resolve in $O(1)$ without runtime
+  descriptor allocation.
+- **Natural C ABI Packing:** Dynamically interned compound records allocate heap memory matching standard C ABI struct
+  packing rules (8-byte aligned scalars and pointers, 16-byte aligned fat records and variants).
 
 ---
 

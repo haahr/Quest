@@ -1023,10 +1023,15 @@ class CEmitter:
                         param_sigs = ["void *env"] + param_decls
                         sig = ", ".join(param_sigs)
                         param_names = [f"arg_{i}" for i in range(len(params))]
+                        call_args = (
+                            [f"descriptor_{q.name}" for q in quants]
+                            if getattr(nb, "pass_type_descriptors", False)
+                            else []
+                        ) + param_names
                         if nb.inline_template:
-                            call_expr = nb.inline_template.format(*param_names)
+                            call_expr = nb.inline_template.format(*call_args)
                         else:
-                            call_expr = f"{nb.symbol}({', '.join(param_names)})"
+                            call_expr = f"{nb.symbol}({', '.join(call_args)})"
                         lines.append(f"static {ret_c} {tramp_name}({sig}) {{")
                         lines.append("    (void)env;")
                         for q in quants:
@@ -1196,6 +1201,12 @@ class CEmitter:
             "    quest_builtins_init(argc, argv);",
             "",
         ]
+
+        if decl_emitter.emitted_descriptor_tags:
+            main_lines.append("    /* Register static program type descriptors */")
+            for tag in decl_emitter.emitted_descriptor_tags:
+                main_lines.append(f"    quest_register_static_type_descriptor(&quest_type_{tag});")
+            main_lines.append("")
 
         # Initialize all compiled modules topologically
         if sorted_modules:
@@ -1743,20 +1754,6 @@ class CEmitter:
                                 wrap = _qval_wrap(c_item, target_elem_t)
                                 lines.append(f"{c_arr}->data[{c_idx}] = {wrap};")
                             return "((void)0)"
-                    elif mod_name == "dynamic":
-                        if fld == "new" and len(args) == 1 and len(type_args) == 1:
-                            desc = self.c_type_descriptor(type_args[0])
-                            c_val = self.emit_val(args[0], lines)
-                            wrap = _qval_wrap(c_val, args[0].type_val)
-                            return f"quest_dynamic_new({desc}, {wrap})"
-                        elif fld == "be" and len(args) == 1 and len(type_args) == 1:
-                            desc = self.c_type_descriptor(type_args[0])
-                            c_dyn = self.emit_val(args[0], lines)
-                            call_str = f"quest_dynamic_be({desc}, {c_dyn})"
-                            return _qval_unwrap(call_str, type_args[0], self)
-                        elif fld == "copy" and len(args) == 1:
-                            c_dyn = self.emit_val(args[0], lines)
-                            return f"quest_dynamic_new({c_dyn}->type_desc, {c_dyn}->payload)"
                     elif mod_name in self.all_modules:
                         mod = self.all_modules[mod_name]
                         clean_mod = mod_name.replace(".", "_")
@@ -1765,7 +1762,36 @@ class CEmitter:
                             None,
                         )
                         if isinstance(binding, TypedNativeBinding):
-                            c_args = [self.emit_val(a, lines) for a in args]
+                            quants, inner_t = self._collect_fun_quantifiers(binding.type_val)
+                            c_args = []
+                            if type_args and quants and getattr(binding, "pass_type_descriptors", False):
+                                for targ in type_args:
+                                    c_args.append(self.c_type_descriptor(targ))
+                            if isinstance(inner_t, QFunType):
+                                formal_params = inner_t.params
+                                for i, a in enumerate(args):
+                                    formal_t = (
+                                        formal_params[i].type_val
+                                        if i < len(formal_params)
+                                        else a.type_val
+                                    )
+                                    is_r = (
+                                        getattr(formal_params[i], "is_out", False)
+                                        or getattr(formal_params[i], "is_var", False)
+                                    ) if i < len(formal_params) else False
+                                    is_o = (
+                                        getattr(formal_params[i], "is_out", False)
+                                        if i < len(formal_params)
+                                        else False
+                                    )
+                                    c_args.append(
+                                        self._emit_call_arg(
+                                            formal_t, a, lines, is_ref=is_r, is_out=is_o
+                                        )
+                                    )
+                            else:
+                                c_args.extend([self.emit_val(a, lines) for a in args])
+
                             if binding.inline_template:
                                 return binding.inline_template.format(*c_args)
                             elif binding.symbol:
@@ -1773,6 +1799,12 @@ class CEmitter:
                                 if expr.type_val == OK_TYPE:
                                     lines.append(f"{call_str};")
                                     return "((void)0)"
+                                if (
+                                    isinstance(inner_t, QFunType)
+                                    and self.c_type(inner_t.result_type) == "QVal"
+                                    and self.c_type(expr.type_val) != "QVal"
+                                ):
+                                    return _qval_unwrap(call_str, expr.type_val, self)
                                 return call_str
                         elif (
                             isinstance(binding, TypedLetValue)

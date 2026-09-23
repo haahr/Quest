@@ -162,8 +162,8 @@ def jsog_encode(dyn: QDynamicVal) -> str:
                 d: dict[str, Any] = {}
                 if cur_id is not None:
                     d["@id"] = cur_id
-                for k, v in val.fields.items():
-                    d[k] = encode_val(v)
+                for k in sorted(val.fields.keys()):
+                    d[k] = encode_val(val.fields[k])
                 return d
 
             if isinstance(val, QArray):

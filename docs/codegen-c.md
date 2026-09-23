@@ -550,9 +550,13 @@ All modules—whether pure Quest, standard library built-ins (`writer`, `reader`
       (`qv_<mod>_<fn>_trampoline`) with `(void)arg_{i}` unused parameter suppression, wrapped in `QClosure *` objects.
     - Native constants (`TypedExternal`) and evaluated `let` bindings populate fields directly, wrapping in `QVal`
       (`_qval_wrap`) if the interface field is abstract.
-- **Direct Native Call Lowering:** When selecting a function on a known module (e.g. `writer.putString(w s)`), the
-  compiler resolves the native binding and directly emits `quest_writer_put_string(...)` or expands the inline
-  template, bypassing closure allocation and indirect calls.
+- **Direct Native Call Lowering & Polymorphic Native Bindings:** When selecting a function on a known module
+  (e.g. `writer.putString(w s)`), the compiler resolves the native binding and directly emits
+  `quest_writer_put_string(...)` or expands the inline template, bypassing closure allocation and indirect calls.
+  Polymorphic native functions that inspect runtime types (e.g. `dynamic.new`, `dynamic.be`) set
+  `pass_type_descriptors=True` on their `TypedNativeBinding`, receiving caller-synthesized `QTypeDescriptor *`
+  arguments automatically. All `dynamic` operations (`dynamic.new`, `dynamic.be`, `dynamic.copy`, `dynamic.extern`,
+  `dynamic.intern`) are standard `TypedNativeBinding`s with zero compiler special-casing.
 - **External C Types and Values:** `external "C_TYPE"` and `external "C_SYMBOL"` seamlessly bridge C runtime
   structures (e.g. `QWriter *`, `QReader *`) into Quest's type system without compiler special-casing.
 
@@ -631,6 +635,7 @@ The compiler runner manages external C compiler toolchain discovery, Boehm GC fl
    ```bash
    clang -std=c99 -Wall -Wextra -O2 \
      -I <repo_root>/runtime <repo_root>/runtime/quest_runtime.c \
+     <repo_root>/runtime/quest_serialization.c \
      <temp.c> -o <out_bin> [GC_FLAGS]
    ```
 3. Executes command via `subprocess.run()`. On failure, captures `stderr` and raises `RuntimeError`.
@@ -683,6 +688,9 @@ The C code generator is verified through comprehensive unit, integration, and en
 - `tests/python/test_runtime_descriptors.py` & `tests/source/language/dynamic_subtyping.quest`: Dynamic
   subtyping, compound descriptors (records, tuples, variants, options, arrays, functions, opaques), dynamic
   record width/permutation/depth adaptation, dynamic variant tag remapping, and inspect branch code generation.
+- `tests/source/stdlib/dynamic_extern.quest`: Dynamic graph serialization (`dynamic.extern`), JSOG cycle detection,
+  natural C ABI packing, static descriptor auto-registration, and deterministic field ordering matching Python
+  interpreter.
 
 ---
 

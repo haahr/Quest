@@ -1067,6 +1067,19 @@ QVal quest_dynamic_be(const QTypeDescriptor *target_type_desc, const QDynamic *d
     return d->payload;
 }
 
+QDynamic *quest_dynamic_copy(const QDynamic *d) {
+    if (d == NULL || d->type_desc == NULL) {
+        quest_raise_dynamic_error();
+    }
+    return quest_dynamic_new(d->type_desc, d->payload);
+}
+
+void quest_register_static_type_descriptor(const QTypeDescriptor *desc) {
+    if (desc != NULL) {
+        quest_intern_type_descriptor(desc);
+    }
+}
+
 /* ------------------------------------------------------------------------- */
 /* Standard Library Implementation                                           */
 /* ------------------------------------------------------------------------- */

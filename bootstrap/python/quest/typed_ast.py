@@ -763,6 +763,7 @@ class TypedNativeBinding(TypedBinding):
     inline_template: Optional[str]
     c_val: Optional[str]
     type_val: QType
+    pass_type_descriptors: bool = False
 
     def dump_header(self) -> str:
         return f"'{self.name}' -> '{self.symbol}' :type {self.type_val}"

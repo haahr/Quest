@@ -441,6 +441,8 @@ QVariantVal            quest_variant_adapt(
     const QTypeDescriptor *sub_desc, const QTypeDescriptor *super_desc, QVal payload);
 QDynamic              *quest_dynamic_new(const QTypeDescriptor *type_desc, QVal val);
 QVal                   quest_dynamic_be(const QTypeDescriptor *target_type_desc, const QDynamic *d);
+QDynamic              *quest_dynamic_copy(const QDynamic *d);
+void                   quest_register_static_type_descriptor(const QTypeDescriptor *desc);
 
 static inline QRecordVal *quest_record_box(QRecordVal rec) {
     QRecordVal *box = (QRecordVal *)quest_alloc(sizeof(QRecordVal));
@@ -498,5 +500,7 @@ extern QClosure qv_sym_gt_gt_equals_closure;
 extern QClosure qv_sym_lt_gt_closure;
 extern QClosure qv_sym_slash_backslash_closure;
 extern QClosure qv_sym_backslash_slash_closure;
+
+#include "quest_serialization.h"
 
 #endif /* QUEST_RUNTIME_H */

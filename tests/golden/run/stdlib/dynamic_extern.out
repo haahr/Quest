@@ -1,0 +1,15 @@
+{"@type":"Int","@value":42}
+{"@type":"Real","@value":3.14}
+{"@type":"Bool","@value":true}
+{"@type":"Char","@value":"z"}
+{"@type":"String","@value":"Hello, \"World\"!\n\t\\test"}
+{"@type":"Ok","@value":null}
+{"@type":"Record x: Int y: Int end","@value":{"x":10,"y":20}}
+{"@type":"Record start: Record x: Int y: Int end finish: Record x: Int y: Int end end","@value":{"finish":{"x":30,"y":40},"start":{"x":10,"y":20}}}
+{"@type":"Variant success: Ok error: Int end","@value":"success"}
+{"@type":"Variant success: Ok error: Int end","@value":{"error":404}}
+{"@type":"Array(Int)","@value":[100,200,300]}
+{"@type":"Tuple :Int :String end","@value":[7,"seven"]}
+{"@type":"Record id: Int var next: Dynamic end","@value":{"@id":"1","id":1,"next":{"@type":"Record id: Int var next: Dynamic end","@value":{"id":2,"next":{"@type":"Record id: Int var next: Dynamic end","@value":{"@ref":"1"}}}}}}
+{"@type":"Record id: Int var next: Dynamic end","@value":{"@id":"1","id":1,"next":{"@type":"Record id: Int var next: Dynamic end","@value":{"id":2,"next":{"@type":"Record id: Int var next: Dynamic end","@value":{"@ref":"1"}}}}}}
+SUCCESS: closure raised dynamic.error

@@ -141,15 +141,17 @@ native **AArch64 (ARM64)** machine code and providing a **JIT compiler** for int
     (`quest_is_subtype` with coinductive cycle detection), dynamic value adaptation (`quest_record_adapt` for width,
     permutation, and depth subtyping; `quest_variant_adapt` for tag remapping), static `.rodata` descriptor emission,
     and `inspect` expression branching. — *Complete*
+  - **Phase 4.15 (Dynamic Serialization: `dynamic.extern` & `dynamic.intern`):** C runtime implementation of
+    text-format serialization and deserialization of typed dynamic packages (`dynamic.extern` converting arbitrary typed
+    values into serialized text streams with cyclic reference preservation, and `dynamic.intern` parsing stream
+    inputs back into dynamically typed values validated against compound type descriptors). Fully compatible and
+    interchangeable with the interpreter's JSON/JSOG representation (`dynamic_json.py`). Step 1 (`dynamic.extern` native
+    emission, dynamic module builtin cleanup, static descriptor auto-registration) is complete; Step 2 (`dynamic.intern`
+    streaming JSON parser and type deserialization) is in progress.
 - **Bootstrap Compiler Completion Prerequisites:**
   - *Separate Compilation & Object Linking:* Compiling modules independently to `.o` files with header/interface
     exports and linking.
-  - *Dynamic Serialization (`dynamic.extern` / `dynamic.intern`):* C runtime implementation of text-format
-    serialization and deserialization of typed dynamic packages (`dynamic.extern` converting arbitrary typed
-    values into serialized text streams with cyclic reference preservation, and `dynamic.intern` parsing stream
-    inputs back into dynamically typed values validated against compound type descriptors). While the reference
-    interpreter implementation is complete (JSON/JSOG format with cycle support), the native C runtime implementation
-    is deferred.
+  - *Dynamic Serialization Completion:* Finalizing Step 2 (`dynamic.intern`) in Phase 4.15.
 - C transpiler architecture in [codegen-c.md](codegen-c.md);
   C ABI specification in [c-representation.md](c-representation.md);
   language extensions specification in [extensions.md](extensions.md).

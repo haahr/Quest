@@ -235,6 +235,7 @@ class ModuleBuilder:
         fn: Callable,
         c_symbol: Optional[str] = None,
         inline_template: Optional[str] = None,
+        pass_type_descriptors: bool = False,
     ) -> None:
         body_type: QType = _make_fn_type(params, result_type) if params else result_type
         poly_type = _make_poly_fn_type(type_param_name, type_param_id, body_type)
@@ -248,6 +249,7 @@ class ModuleBuilder:
                 inline_template=inline_template,
                 c_val=None,
                 type_val=poly_type,
+                pass_type_descriptors=pass_type_descriptors,
             )
         )
 
@@ -1083,11 +1085,31 @@ class BuiltinModuleRegistry:
             from quest.dynamic_json import jsog_decode
             return jsog_decode(raw)
 
-        dyn_b.def_poly_fn("new", "A", dyn_a_id, [("a", dyn_a)], dyn_t, _dynamic_new)
-        dyn_b.def_poly_fn("be", "A", dyn_a_id, [("d", dyn_t)], dyn_a, _dynamic_be)
-        dyn_b.def_fn("copy", [("d", dyn_t)], dyn_t, _dynamic_copy)
-        dyn_b.def_fn("intern", [("rd", reader_t)], dyn_t, _dynamic_intern)
-        dyn_b.def_fn("extern", [("wr", writer_t), ("d", dyn_t)], OK_TYPE, _dynamic_extern)
+        dyn_b.def_poly_fn(
+            "new",
+            "A",
+            dyn_a_id,
+            [("a", dyn_a)],
+            dyn_t,
+            _dynamic_new,
+            c_symbol="quest_dynamic_new",
+            pass_type_descriptors=True,
+        )
+        dyn_b.def_poly_fn(
+            "be",
+            "A",
+            dyn_a_id,
+            [("d", dyn_t)],
+            dyn_a,
+            _dynamic_be,
+            c_symbol="quest_dynamic_be",
+            pass_type_descriptors=True,
+        )
+        dyn_b.def_fn("copy", [("d", dyn_t)], dyn_t, _dynamic_copy, c_symbol="quest_dynamic_copy")
+        dyn_b.def_fn("intern", [("rd", reader_t)], dyn_t, _dynamic_intern, c_symbol="quest_dynamic_intern")
+        dyn_b.def_fn(
+            "extern", [("wr", writer_t), ("d", dyn_t)], OK_TYPE, _dynamic_extern, c_symbol="quest_dynamic_extern"
+        )
         dyn_b.finish()
 
         # --------------------------------------------------------------------

@@ -1,0 +1,1002 @@
+(Program
+  :phrases (
+    (ImportPhrase
+      :items (
+        (ImportItem ('dynamic') 'Dynamic')
+      )
+    )
+    (ImportPhrase
+      :items (
+        (ImportItem ('writer') 'Writer')
+      )
+    )
+    (ImportPhrase
+      :items (
+        (ImportItem ('arrayOp') 'ArrayOp')
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'dynamic')
+          :field 'extern'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'dynamic')
+              :field 'new'
+            )
+            :args (
+              (TypeArgument
+                :type_val (TypePath ('Int'))
+              )
+              (ExprInt 42 '42')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprString '\n' '"\\n"')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'dynamic')
+          :field 'extern'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'dynamic')
+              :field 'new'
+            )
+            :args (
+              (TypeArgument
+                :type_val (TypePath ('Real'))
+              )
+              (ExprReal 3.14 '3.14')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprString '\n' '"\\n"')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'dynamic')
+          :field 'extern'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'dynamic')
+              :field 'new'
+            )
+            :args (
+              (TypeArgument
+                :type_val (TypePath ('Bool'))
+              )
+              (ExprBool True)
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprString '\n' '"\\n"')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'dynamic')
+          :field 'extern'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'dynamic')
+              :field 'new'
+            )
+            :args (
+              (TypeArgument
+                :type_val (TypePath ('Char'))
+              )
+              (ExprChar 'z' "'z'")
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprString '\n' '"\\n"')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'dynamic')
+          :field 'extern'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'dynamic')
+              :field 'new'
+            )
+            :args (
+              (TypeArgument
+                :type_val (TypePath ('String'))
+              )
+              (ExprString 'Hello, "World"!\n\t\\test' '"Hello, \\"World\\"!\\n\\t\\\\test"')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprString '\n' '"\\n"')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'dynamic')
+          :field 'extern'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'dynamic')
+              :field 'new'
+            )
+            :args (
+              (TypeArgument
+                :type_val (TypePath ('Ok'))
+              )
+              (ExprOk)
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprString '\n' '"\\n"')
+        )
+      )
+    )
+    (LetTypeBinding
+      :name 'Point'
+      :type_val (TypeRecord
+        :fields (
+          (RecordFieldSig
+            :name 'x'
+            :type_sig (TypePath ('Int'))
+          )
+          (RecordFieldSig
+            :name 'y'
+            :type_sig (TypePath ('Int'))
+          )
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'p1'
+      :value (ExprRecord
+        :fields (
+          (RecordBinding
+            :name 'x'
+            :value (ExprInt 10 '10')
+          )
+          (RecordBinding
+            :name 'y'
+            :value (ExprInt 20 '20')
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'dynamic')
+          :field 'extern'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'dynamic')
+              :field 'new'
+            )
+            :args (
+              (TypeArgument
+                :type_val (TypePath ('Point'))
+              )
+              (ExprId 'p1')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprString '\n' '"\\n"')
+        )
+      )
+    )
+    (LetTypeBinding
+      :name 'Line'
+      :type_val (TypeRecord
+        :fields (
+          (RecordFieldSig
+            :name 'start'
+            :type_sig (TypePath ('Point'))
+          )
+          (RecordFieldSig
+            :name 'finish'
+            :type_sig (TypePath ('Point'))
+          )
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'line1'
+      :value (ExprRecord
+        :fields (
+          (RecordBinding
+            :name 'start'
+            :value (ExprId 'p1')
+          )
+          (RecordBinding
+            :name 'finish'
+            :value (ExprRecord
+              :fields (
+                (RecordBinding
+                  :name 'x'
+                  :value (ExprInt 30 '30')
+                )
+                (RecordBinding
+                  :name 'y'
+                  :value (ExprInt 40 '40')
+                )
+              )
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'dynamic')
+          :field 'extern'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'dynamic')
+              :field 'new'
+            )
+            :args (
+              (TypeArgument
+                :type_val (TypePath ('Line'))
+              )
+              (ExprId 'line1')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprString '\n' '"\\n"')
+        )
+      )
+    )
+    (LetTypeBinding
+      :name 'Status'
+      :type_val (TypeVariant
+        :fields (
+          (VariantFieldSig
+            :tag 'success'
+            :type_sig (TypePath ('Ok'))
+          )
+          (VariantFieldSig
+            :tag 'error'
+            :type_sig (TypePath ('Int'))
+          )
+        )
+      )
+    )
+    (LetValueBinding
+      :name 's1'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'dynamic')
+          :field 'new'
+        )
+        :args (
+          (TypeArgument
+            :type_val (TypePath ('Status'))
+          )
+          (ExprVariant
+            :tag 'success'
+            :variant_type (TypePath ('Status'))
+            :payload (ExprOk)
+          )
+        )
+      )
+    )
+    (LetValueBinding
+      :name 's2'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'dynamic')
+          :field 'new'
+        )
+        :args (
+          (TypeArgument
+            :type_val (TypePath ('Status'))
+          )
+          (ExprVariant
+            :tag 'error'
+            :variant_type (TypePath ('Status'))
+            :payload (ExprInt 404 '404')
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'dynamic')
+          :field 'extern'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprId 's1')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprString '\n' '"\\n"')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'dynamic')
+          :field 'extern'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprId 's2')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprString '\n' '"\\n"')
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'arr'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'arrayOp')
+          :field 'new'
+        )
+        :args (
+          (TypeArgument
+            :type_val (TypePath ('Int'))
+          )
+          (ExprInt 3 '3')
+          (ExprInt 0 '0')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'arrayOp')
+          :field 'set'
+        )
+        :args (
+          (TypeArgument
+            :type_val (TypePath ('Int'))
+          )
+          (ExprId 'arr')
+          (ExprInt 0 '0')
+          (ExprInt 100 '100')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'arrayOp')
+          :field 'set'
+        )
+        :args (
+          (TypeArgument
+            :type_val (TypePath ('Int'))
+          )
+          (ExprId 'arr')
+          (ExprInt 1 '1')
+          (ExprInt 200 '200')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'arrayOp')
+          :field 'set'
+        )
+        :args (
+          (TypeArgument
+            :type_val (TypePath ('Int'))
+          )
+          (ExprId 'arr')
+          (ExprInt 2 '2')
+          (ExprInt 300 '300')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'dynamic')
+          :field 'extern'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'dynamic')
+              :field 'new'
+            )
+            :args (
+              (TypeArgument
+                :type_val (TypeArray
+                  :element_type (TypePath ('Int'))
+                )
+              )
+              (ExprId 'arr')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprString '\n' '"\\n"')
+        )
+      )
+    )
+    (LetTypeBinding
+      :name 'Pair'
+      :type_val (TypeTuple
+        :fields (
+          (FieldSig
+            :type_sig (TypePath ('Int'))
+            :mode VALUE
+          )
+          (FieldSig
+            :type_sig (TypePath ('String'))
+            :mode VALUE
+          )
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'tup'
+      :value (ExprTuple
+        :fields (
+          (TupleBinding
+            :value (ExprInt 7 '7')
+          )
+          (TupleBinding
+            :value (ExprString 'seven' '"seven"')
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'dynamic')
+          :field 'extern'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'dynamic')
+              :field 'new'
+            )
+            :args (
+              (TypeArgument
+                :type_val (TypePath ('Pair'))
+              )
+              (ExprId 'tup')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprString '\n' '"\\n"')
+        )
+      )
+    )
+    (LetTypeBinding
+      :name 'RefNode'
+      :type_val (TypeRecord
+        :fields (
+          (RecordFieldSig
+            :name 'id'
+            :type_sig (TypePath ('Int'))
+          )
+          (RecordFieldSig
+            :name 'next'
+            :type_sig (TypePath ('Dynamic' 'T'))
+            :is_var True
+          )
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'n1'
+      :value (ExprRecord
+        :fields (
+          (RecordBinding
+            :name 'id'
+            :value (ExprInt 1 '1')
+          )
+          (RecordBinding
+            :name 'next'
+            :value (ExprApp
+              :func (ExprSelect
+                :target (ExprId 'dynamic')
+                :field 'new'
+              )
+              :args (
+                (TypeArgument
+                  :type_val (TypePath ('Ok'))
+                )
+                (ExprOk)
+              )
+            )
+            :is_var True
+          )
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'n2'
+      :value (ExprRecord
+        :fields (
+          (RecordBinding
+            :name 'id'
+            :value (ExprInt 2 '2')
+          )
+          (RecordBinding
+            :name 'next'
+            :value (ExprApp
+              :func (ExprSelect
+                :target (ExprId 'dynamic')
+                :field 'new'
+              )
+              :args (
+                (TypeArgument
+                  :type_val (TypePath ('RefNode'))
+                )
+                (ExprId 'n1')
+              )
+            )
+            :is_var True
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprInfix
+        :left (ExprSelect
+          :target (ExprId 'n1')
+          :field 'next'
+        )
+        :op ':='
+        :right (ExprApp
+          :func (ExprSelect
+            :target (ExprId 'dynamic')
+            :field 'new'
+          )
+          :args (
+            (TypeArgument
+              :type_val (TypePath ('RefNode'))
+            )
+            (ExprId 'n2')
+          )
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'dNode'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'dynamic')
+          :field 'new'
+        )
+        :args (
+          (TypeArgument
+            :type_val (TypePath ('RefNode'))
+          )
+          (ExprId 'n1')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'dynamic')
+          :field 'extern'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprId 'dNode')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprString '\n' '"\\n"')
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'dCopy'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'dynamic')
+          :field 'copy'
+        )
+        :args (
+          (ExprId 'dNode')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'dynamic')
+          :field 'extern'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprId 'dCopy')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprString '\n' '"\\n"')
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'fnVal'
+      :value (ExprFun
+        :params (
+          (FormalParam
+            :name 'x'
+            :type_annot (TypePath ('Int'))
+            :mode VALUE
+          )
+        )
+        :return_type (TypePath ('Int'))
+        :body (ExprInfix
+          :left (ExprId 'x')
+          :op '+'
+          :right (ExprInt 1 '1')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprTry
+        :body (ExprBlock
+          :bindings (
+            (LetValueBinding
+              :name 'ignored'
+              :value (ExprApp
+                :func (ExprSelect
+                  :target (ExprId 'dynamic')
+                  :field 'extern'
+                )
+                :args (
+                  (ExprSelect
+                    :target (ExprId 'writer')
+                    :field 'output'
+                  )
+                  (ExprApp
+                    :func (ExprSelect
+                      :target (ExprId 'dynamic')
+                      :field 'new'
+                    )
+                    :args (
+                      (TypeArgument
+                        :type_val (TypeAll
+                          :quantifiers (
+                            (Quantifier
+                              :name 'x'
+                              :bound (KindPower
+                                :bound (TypePath ('Int'))
+                              )
+                              :mode VALUE
+                            )
+                          )
+                          :result_type (TypePath ('Int'))
+                        )
+                      )
+                      (ExprId 'fnVal')
+                    )
+                  )
+                )
+              )
+            )
+            (ExprStmt
+              :expr (ExprApp
+                :func (ExprSelect
+                  :target (ExprId 'writer')
+                  :field 'putString'
+                )
+                :args (
+                  (ExprSelect
+                    :target (ExprId 'writer')
+                    :field 'output'
+                  )
+                  (ExprString 'FAILURE: closure did not raise dynamic.error\n' '"FAILURE: closure did not raise dynamic.error\\n"')
+                )
+              )
+            )
+          )
+        )
+        :branches (
+          (TryBranch
+            :exc_pattern (ExprSelect
+              :target (ExprId 'dynamic')
+              :field 'error'
+            )
+            :body (ExprStmt
+              :expr (ExprApp
+                :func (ExprSelect
+                  :target (ExprId 'writer')
+                  :field 'putString'
+                )
+                :args (
+                  (ExprSelect
+                    :target (ExprId 'writer')
+                    :field 'output'
+                  )
+                  (ExprString 'SUCCESS: closure raised dynamic.error\n' '"SUCCESS: closure raised dynamic.error\\n"')
+                )
+              )
+            )
+          )
+        )
+        :else_branch (ExprStmt
+          :expr (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'writer')
+              :field 'putString'
+            )
+            :args (
+              (ExprSelect
+                :target (ExprId 'writer')
+                :field 'output'
+              )
+              (ExprString 'FAILURE: other exception\n' '"FAILURE: other exception\\n"')
+            )
+          )
+        )
+      )
+    )
+  )
+)

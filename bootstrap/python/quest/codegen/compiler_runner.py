@@ -69,6 +69,7 @@ def compile_c_source(
     compiler = compiler_path or find_c_compiler()
     runtime_dir = get_runtime_dir()
     runtime_c = runtime_dir / "quest_runtime.c"
+    serialization_c = runtime_dir / "quest_serialization.c"
 
     # Create temporary .c file for the source
     with tempfile.NamedTemporaryFile(suffix=".c", mode="w", delete=False, encoding="utf-8") as f:
@@ -85,6 +86,7 @@ def compile_c_source(
             "-O2",
             f"-I{runtime_dir}",
             str(runtime_c),
+            str(serialization_c),
             str(temp_c_path),
             "-o",
             str(target_bin),

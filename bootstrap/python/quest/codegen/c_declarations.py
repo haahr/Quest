@@ -57,6 +57,7 @@ class CDeclarationEmitter:
         self.param_signatures = param_sigs_fn
         self.collect_fun_quantifiers = collect_quants_fn
         self.is_exact_record_literal = is_exact_record_literal_fn
+        self.emitted_descriptor_tags: list[str] = []
 
     def emit_forward_typedefs(self, agg_types: list[tuple[str, QType]]) -> list[str]:
         lines: list[str] = []
@@ -326,8 +327,9 @@ class CDeclarationEmitter:
         if not seen_tags:
             return lines
 
+        self.emitted_descriptor_tags = sorted(seen_tags)
         lines.append("/* Forward declarations for static type descriptors */")
-        for tag in sorted(seen_tags):
+        for tag in self.emitted_descriptor_tags:
             lines.append(f"static const QTypeDescriptor quest_type_{tag} Q_UNUSED;")
         lines.append("")
 

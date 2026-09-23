@@ -375,6 +375,8 @@ def qval_wrap(expr_str: str, t: QType) -> str:
     t = resolve_type_bound(t)
     if qtype_to_c_type(t) == "QVal":
         return expr_str
+    if t == OK_TYPE:
+        return "Q_OK_VAL"
     if resolve_record_bound(t) is not None:
         return f"((QVal){{ .p = (void *)quest_record_box({expr_str}) }})"
     if resolve_variant_bound(t) is not None:

@@ -1,0 +1,82 @@
+(* Standard library: Dynamic serialization (dynamic.extern) with JSOG cycle preservation *)
+
+import dynamic: Dynamic;
+import writer: Writer;
+import arrayOp: ArrayOp;
+
+(* 1. Primitives *)
+dynamic.extern(writer.output dynamic.new(:Int 42));
+writer.putString(writer.output "\n");
+
+dynamic.extern(writer.output dynamic.new(:Real 3.14));
+writer.putString(writer.output "\n");
+
+dynamic.extern(writer.output dynamic.new(:Bool true));
+writer.putString(writer.output "\n");
+
+dynamic.extern(writer.output dynamic.new(:Char 'z'));
+writer.putString(writer.output "\n");
+
+dynamic.extern(writer.output dynamic.new(:String "Hello, \"World\"!\n\t\\test"));
+writer.putString(writer.output "\n");
+
+dynamic.extern(writer.output dynamic.new(:Ok ok));
+writer.putString(writer.output "\n");
+
+(* 2. Records and nested records *)
+Let Point = Record x: Int y: Int end;
+let p1 = record x = 10 y = 20 end;
+dynamic.extern(writer.output dynamic.new(:Point p1));
+writer.putString(writer.output "\n");
+
+Let Line = Record start: Point finish: Point end;
+let line1 = record start = p1 finish = record x = 30 y = 40 end end;
+dynamic.extern(writer.output dynamic.new(:Line line1));
+writer.putString(writer.output "\n");
+
+(* 3. Variants: Unit and Payload *)
+Let Status = Variant success: Ok error: Int end;
+let s1 = dynamic.new(:Status variant success of Status with ok end);
+let s2 = dynamic.new(:Status variant error of Status with 404 end);
+dynamic.extern(writer.output s1);
+writer.putString(writer.output "\n");
+dynamic.extern(writer.output s2);
+writer.putString(writer.output "\n");
+
+(* 4. Arrays and Tuples *)
+let arr = arrayOp.new(:Int 3 0);
+arrayOp.set(:Int arr 0 100);
+arrayOp.set(:Int arr 1 200);
+arrayOp.set(:Int arr 2 300);
+dynamic.extern(writer.output dynamic.new(:Array(Int) arr));
+writer.putString(writer.output "\n");
+
+Let Pair = Tuple :Int :String end;
+let tup = tuple 7 "seven" end;
+dynamic.extern(writer.output dynamic.new(:Pair tup));
+writer.putString(writer.output "\n");
+
+(* 5. Shared and Cyclic References (JSOG @id and @ref) *)
+Let RefNode = Record id: Int var next: Dynamic.T end;
+let n1 = record id = 1 var next = dynamic.new(:Ok ok) end;
+let n2 = record id = 2 var next = dynamic.new(:RefNode n1) end;
+n1.next := dynamic.new(:RefNode n2);
+let dNode = dynamic.new(:RefNode n1);
+dynamic.extern(writer.output dNode);
+writer.putString(writer.output "\n");
+
+(* 6. Dynamic Copy *)
+let dCopy = dynamic.copy(dNode);
+dynamic.extern(writer.output dCopy);
+writer.putString(writer.output "\n");
+
+(* 7. Prohibited type handling *)
+let fnVal = fun(x: Int): Int x + 1;
+try
+    let ignored = dynamic.extern(writer.output dynamic.new(:All(x: Int) Int fnVal));
+    writer.putString(writer.output "FAILURE: closure did not raise dynamic.error\n");
+when dynamic.error then
+    writer.putString(writer.output "SUCCESS: closure raised dynamic.error\n");
+else
+    writer.putString(writer.output "FAILURE: other exception\n");
+end;
