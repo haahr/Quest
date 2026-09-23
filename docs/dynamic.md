@@ -169,6 +169,18 @@ Converts the textual type representation in `@type` back into a `QType` object:
   with `Tokenizer`, parsed using `parse_quest_program(tokens, symbol_map, target="Type")`, and elaborated in a base
   type environment.
 
+### 3.4. Native C Runtime Implementation (`runtime/quest_serialization.c`)
+The native C implementation provides full format parity with the Python reference:
+- **`quest_dynamic_extern`:** Traverses the pointer graph, identifies cycles and multi-references with an address hash
+  table, and emits JSON/JSOG text using canonical alphabetical record field ordering.
+- **`quest_dynamic_intern`:** Reads characters from a `QReader` using a streaming lexer/parser, consuming exactly one
+  top-level JSON value while preserving unread stream characters in `peek_char`.
+- **Type Descriptor Resolution:** Checks registered static program types (`quest_lookup_type_descriptor_by_name`),
+  falling back to a recursive-descent type expression parser (`quest_parse_type_descriptor`) for dynamically
+  synthesized types.
+- **Two-Pass Deserialization:** Pre-allocates heap memory for all `@id` nodes (`quest_jsog_preallocate`) using natural
+  C struct alignment, and links fields and `@ref` pointers (`quest_jsog_decode_value`).
+
 ---
 
 ## 4. Example Serialization

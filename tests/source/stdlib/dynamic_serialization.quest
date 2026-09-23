@@ -1,5 +1,4 @@
 (* Standard library: Dynamic serialization (JSON / JSOG) operations *)
-(* @skip-phase: run_c_compiled *)
 (* @stdin:
 {"@type":"Record a: Int b: String c: Array(Int) end","@value":{"a":42,"b":"hello","c":[1,2,3]}}
 *)

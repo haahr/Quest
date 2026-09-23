@@ -169,10 +169,17 @@ When `dynamic.be` or `inspect` succeeds on a structural subtype:
 ### 4. Dynamic Graph Serialization (`dynamic.extern` & `dynamic.intern`)
 - **JSON/JSOG Representation:** Dynamically serialized packages use a JSON/JSOG representation (`@id` and `@ref`)
   matching the interpreter's `dynamic_json.py`, handling arbitrary cyclic and DAG data structures.
-- **Auto-Registration of Static Descriptors:** When `main` initializes, the generated program automatically registers
-  all compiled static `QTypeDescriptor` structures with the runtime intern table
+- **Streaming Single-Value Parser:** Deserialization (`dynamic.intern`) parses exactly one JSON value from `QReader`,
+  skipping leading whitespace and leaving trailing stream characters unread, allowing multiple objects to be read
+  sequentially.
+- **Auto-Registration & Dynamic Type Parsing Fallback:** When `main` initializes, the generated program automatically
+  registers all compiled static `QTypeDescriptor` structures with the runtime intern table
   (`quest_register_static_type_descriptor`). Deserialization lookups for known types resolve in $O(1)$ without runtime
-  descriptor allocation.
+  descriptor allocation. For dynamically transmitted types unknown to the binary, a recursive-descent type parser
+  (`quest_parse_type_descriptor`) dynamically synthesizes descriptors at runtime.
+- **Two-Pass Deserialization with Pre-allocation:** JSOG cycles and shared subgraphs are resolved via a two-pass decode
+  (`quest_jsog_preallocate` and `quest_jsog_decode_value`), pre-allocating record, array, and tuple nodes before
+  populating fields and connecting `@ref` pointers.
 - **Natural C ABI Packing:** Dynamically interned compound records allocate heap memory matching standard C ABI struct
   packing rules (8-byte aligned scalars and pointers, 16-byte aligned fat records and variants).
 

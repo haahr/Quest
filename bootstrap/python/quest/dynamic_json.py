@@ -246,6 +246,8 @@ def jsog_decode(raw_json: str) -> QDynamicVal:
             if ref_id not in id_map:
                 raise QuestException(DYNAMIC_ERROR_EXC)
             res = id_map[ref_id]
+            if isinstance(res, tuple) and len(res) == 2 and isinstance(res[0], list):
+                return QTuple(tuple(res[0]), labels=res[1])
             if isinstance(res, list):
                 return QTuple(tuple(res))
             return res
@@ -283,6 +285,29 @@ def jsog_decode(raw_json: str) -> QDynamicVal:
                 return QChar(node)
             return QString(node)
 
+        is_tuple_dict = isinstance(node, dict) and "@tuple" in node
+        is_tuple_list = isinstance(expected_type, QTupleType) and isinstance(node, list)
+        if is_tuple_dict or is_tuple_list:
+            if isinstance(node, dict):
+                obj_id = str(node["@id"])
+                raw_list = node["@tuple"]
+            else:
+                obj_id = None
+                raw_list = node
+            labels = None
+            if isinstance(expected_type, QTupleType):
+                labels = tuple(f.name for f in expected_type.value_fields)
+                tuple_t = tuple(f.type_val for f in expected_type.value_fields)
+            else:
+                tuple_t = None
+            elems: list[QValue] = []
+            for i, item in enumerate(raw_list):
+                cur_t = tuple_t[i] if tuple_t and i < len(tuple_t) else None
+                elems.append(decode_node(item, cur_t))
+            if obj_id is not None:
+                id_map[obj_id] = (elems, labels)
+            return QTuple(tuple(elems), labels=labels)
+
         if isinstance(node, list) or (isinstance(node, dict) and "@array" in node):
             if isinstance(node, dict):
                 obj_id = str(node["@id"])
@@ -294,17 +319,6 @@ def jsog_decode(raw_json: str) -> QDynamicVal:
             elem_t = expected_type.element_type if isinstance(expected_type, QArrayType) else None
             arr.elements = [decode_node(item, elem_t) for item in raw_list]
             return arr
-
-        if isinstance(node, dict) and "@tuple" in node:
-            obj_id = str(node["@id"])
-            raw_list = node["@tuple"]
-            tuple_t = expected_type.elements if isinstance(expected_type, QTupleType) else None
-            elems: list[QValue] = []
-            for i, item in enumerate(raw_list):
-                cur_t = tuple_t[i] if tuple_t and i < len(tuple_t) else None
-                elems.append(decode_node(item, cur_t))
-            id_map[obj_id] = elems
-            return QTuple(tuple(elems))
 
         if isinstance(node, dict) and "@type" in node and "@value" in node and len(node) == 2:
             inner_t = parse_type_string(str(node["@type"]))

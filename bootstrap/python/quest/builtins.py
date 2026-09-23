@@ -1068,20 +1068,79 @@ class BuiltinModuleRegistry:
         def _dynamic_intern(rd: QReader) -> QDynamicVal:
             if rd.is_closed:
                 raise QuestException(DYNAMIC_ERROR_EXC)
-            buf = []
-            peek = getattr(rd, "_peek_char", None)
-            if peek is not None:
-                buf.append(peek)
-                rd._peek_char = None
-            try:
-                rest = rd.stream.read()
-                if rest:
-                    buf.append(rest)
-            except OSError:
-                raise QuestException(DYNAMIC_ERROR_EXC)
-            raw = "".join(buf).strip()
-            if not raw:
-                raise QuestException(DYNAMIC_ERROR_EXC)
+
+            def read_ch() -> str:
+                peek = getattr(rd, "_peek_char", None)
+                if peek is not None:
+                    rd._peek_char = None
+                    return peek
+                try:
+                    return rd.stream.read(1)
+                except OSError:
+                    raise QuestException(DYNAMIC_ERROR_EXC)
+
+            # Skip leading whitespace
+            while True:
+                ch = read_ch()
+                if not ch:
+                    raise QuestException(DYNAMIC_ERROR_EXC)
+                if ch not in " \t\r\n":
+                    break
+
+            buf = [ch]
+            if ch in "{[":
+                depth = 1
+                in_str = False
+                esc = False
+                while depth > 0:
+                    c = read_ch()
+                    if not c:
+                        raise QuestException(DYNAMIC_ERROR_EXC)
+                    buf.append(c)
+                    if in_str:
+                        if esc:
+                            esc = False
+                        elif c == "\\":
+                            esc = True
+                        elif c == '"':
+                            in_str = False
+                    else:
+                        if c == '"':
+                            in_str = True
+                        elif c in "{[":
+                            depth += 1
+                        elif c in "}]":
+                            depth -= 1
+            elif ch == '"':
+                esc = False
+                while True:
+                    c = read_ch()
+                    if not c:
+                        raise QuestException(DYNAMIC_ERROR_EXC)
+                    buf.append(c)
+                    if esc:
+                        esc = False
+                    elif c == "\\":
+                        esc = True
+                    elif c == '"':
+                        break
+            else:
+                while True:
+                    peek = getattr(rd, "_peek_char", None)
+                    if peek is not None:
+                        c = peek
+                    else:
+                        try:
+                            c = rd.stream.read(1)
+                            rd._peek_char = c
+                        except OSError:
+                            c = ""
+                    if not c or c in " \t\r\n,]}":
+                        break
+                    rd._peek_char = None
+                    buf.append(c)
+
+            raw = "".join(buf)
             from quest.dynamic_json import jsog_decode
             return jsog_decode(raw)
 

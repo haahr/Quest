@@ -443,6 +443,7 @@ QDynamic              *quest_dynamic_new(const QTypeDescriptor *type_desc, QVal 
 QVal                   quest_dynamic_be(const QTypeDescriptor *target_type_desc, const QDynamic *d);
 QDynamic              *quest_dynamic_copy(const QDynamic *d);
 void                   quest_register_static_type_descriptor(const QTypeDescriptor *desc);
+const QTypeDescriptor *quest_lookup_type_descriptor_by_name(const char *name);
 
 static inline QRecordVal *quest_record_box(QRecordVal rec) {
     QRecordVal *box = (QRecordVal *)quest_alloc(sizeof(QRecordVal));

@@ -1080,6 +1080,19 @@ void quest_register_static_type_descriptor(const QTypeDescriptor *desc) {
     }
 }
 
+const QTypeDescriptor *quest_lookup_type_descriptor_by_name(const char *name) {
+    if (name == NULL) return NULL;
+    if (strcmp(name, "Dynamic.T") == 0) return &quest_type_Dynamic;
+    quest_init_type_intern_table();
+    uint64_t h = quest_hash_string(name) % Q_TYPE_INTERN_TABLE_SIZE;
+    for (QTypeDescriptorEntry *cur = quest_type_intern_buckets[h]; cur != NULL; cur = cur->next) {
+        if (cur->desc->name != NULL && strcmp(cur->desc->name, name) == 0) {
+            return cur->desc;
+        }
+    }
+    return NULL;
+}
+
 /* ------------------------------------------------------------------------- */
 /* Standard Library Implementation                                           */
 /* ------------------------------------------------------------------------- */

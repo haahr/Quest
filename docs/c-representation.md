@@ -958,9 +958,16 @@ Quest supports graph serialization and deserialization of dynamically typed valu
 - **Cycle & Multi-Reference Detection:** A pre-scan pointer graph traversal using a GC-safe address hash table
   identifies all cyclic or multiply-referenced heap objects (`Record`, `Array`, `Tuple`, `Dynamic`) and assigns
   sequential `@id`s.
-- **Type Descriptor Auto-Registration:** All static program type descriptors (`quest_type_*`) are automatically
-  registered in `main` into the runtime interning table (`quest_register_static_type_descriptor`) so deserialization
-  resolves known program types directly.
+- **Streaming Single-Value Parser:** `quest_dynamic_intern` streams characters from `QReader`, parsing exactly one JSON
+  object/array/value while preserving unread stream characters in `peek_char` so consecutive objects can be read
+  sequentially from a single stream.
+- **Type Descriptor Resolution:** All static program type descriptors (`quest_type_*`) are automatically
+  registered in `main` into the runtime interning table (`quest_register_static_type_descriptor`) for $O(1)$ lookup.
+  For dynamically transmitted types unknown to the binary, a zero-dependency recursive-descent parser
+  (`quest_parse_type_descriptor`) parses type syntax (e.g. `Record ... end`, `Tuple ... end`, `Array(...)`,
+  `Variant ... end`, `Option ... end`) into interned `QTypeDescriptor` structures.
+- **Two-Pass JSOG Deserialization:** Pass 1 (`quest_jsog_preallocate`) pre-allocates heap blocks for all `@id` nodes;
+  Pass 2 (`quest_jsog_decode_value`) decodes fields and assigns `@ref` pointers directly to resolved memory blocks.
 - **Natural C ABI Struct Packing:** Dynamically synthesized records use standard C struct packing (8-byte
   scalars/pointers, 16-byte wide records/variants) matching static compiler emission.
 

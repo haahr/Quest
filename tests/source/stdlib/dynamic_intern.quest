@@ -1,0 +1,77 @@
+(* Standard library: Dynamic deserialization (dynamic.intern) & JSOG interop *)
+(* @stdin:
+{"@type":"Int","@value":42}
+{"@type":"Real","@value":3.14}
+{"@type":"String","@value":"sequential stream"}
+{"@type":"Tuple a: Int b: String c: Bool end","@value":[100,"test",true]}
+{"@type":"Variant left: Int right: String end","@value":{"right":"variant payload"}}
+{"@type":"Record id: Int var next: Dynamic.T end",
+ "@value":{"@id":"1","id":10,"next":{
+   "@type":"Record id: Int var next: Dynamic.T end",
+   "@value":{"@id":"2","id":20,"next":{
+     "@type":"Record id: Int var next: Dynamic.T end",
+     "@value":{"@ref":"1"}}}}}}
+*)
+
+import dynamic: Dynamic;
+import reader: Reader;
+import writer: Writer;
+import conv: Conv;
+import arrayOp: ArrayOp;
+
+(* 1. Read sequential stream of multiple objects from single reader *)
+let d1 = dynamic.intern(reader.input);
+let i1 = dynamic.be(:Int d1);
+writer.putString(writer.output conv.int(i1));
+writer.putString(writer.output "\n");
+
+let d2 = dynamic.intern(reader.input);
+let r2 = dynamic.be(:Real d2);
+writer.putString(writer.output conv.real(r2));
+writer.putString(writer.output "\n");
+
+let d3 = dynamic.intern(reader.input);
+let s3 = dynamic.be(:String d3);
+writer.putString(writer.output s3);
+writer.putString(writer.output "\n");
+
+(* 2. Read tuple *)
+Let Tup = Tuple a: Int b: String c: Bool end;
+let d4 = dynamic.intern(reader.input);
+let t4 = dynamic.be(:Tup d4);
+writer.putString(writer.output conv.int(t4.a));
+writer.putString(writer.output " ");
+writer.putString(writer.output t4.b);
+writer.putString(writer.output " ");
+writer.putString(writer.output conv.bool(t4.c));
+writer.putString(writer.output "\n");
+
+(* 3. Read variant *)
+Let Either = Variant left: Int right: String end;
+let d5 = dynamic.intern(reader.input);
+let v5 = dynamic.be(:Either d5);
+case v5
+  when left with n then writer.putString(writer.output conv.int(n))
+  when right with s then writer.putString(writer.output s)
+end;
+writer.putString(writer.output "\n");
+
+(* 4. Read cyclic graph and traverse cycle *)
+Let Node = Record id: Int var next: Dynamic.T end;
+let d6 = dynamic.intern(reader.input);
+let n1 = dynamic.be(:Node d6);
+let n2 = dynamic.be(:Node n1.next);
+let n3 = dynamic.be(:Node n2.next);
+writer.putString(writer.output conv.int(n1.id));
+writer.putString(writer.output " -> ");
+writer.putString(writer.output conv.int(n2.id));
+writer.putString(writer.output " -> ");
+writer.putString(writer.output conv.int(n3.id));
+writer.putString(writer.output "\n");
+
+(* 5. Extern record *)
+Let Item = Record name: String qty: Int end;
+let it = record name = "widgets" qty = 5 end;
+let dIt = dynamic.new(:Item it);
+dynamic.extern(writer.output dIt);
+writer.putString(writer.output "\n");

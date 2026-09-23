@@ -145,13 +145,12 @@ native **AArch64 (ARM64)** machine code and providing a **JIT compiler** for int
     text-format serialization and deserialization of typed dynamic packages (`dynamic.extern` converting arbitrary typed
     values into serialized text streams with cyclic reference preservation, and `dynamic.intern` parsing stream
     inputs back into dynamically typed values validated against compound type descriptors). Fully compatible and
-    interchangeable with the interpreter's JSON/JSOG representation (`dynamic_json.py`). Step 1 (`dynamic.extern` native
-    emission, dynamic module builtin cleanup, static descriptor auto-registration) is complete; Step 2 (`dynamic.intern`
-    streaming JSON parser and type deserialization) is in progress.
+    interchangeable with the interpreter's JSON/JSOG representation (`dynamic_json.py`), featuring zero-dependency
+    streaming single-value JSON/JSOG decoding on `QReader`, recursive-descent type descriptor parsing, natural C ABI
+    struct packing, and coinductive cycle resolution. — *Complete*
 - **Bootstrap Compiler Completion Prerequisites:**
   - *Separate Compilation & Object Linking:* Compiling modules independently to `.o` files with header/interface
     exports and linking.
-  - *Dynamic Serialization Completion:* Finalizing Step 2 (`dynamic.intern`) in Phase 4.15.
 - C transpiler architecture in [codegen-c.md](codegen-c.md);
   C ABI specification in [c-representation.md](c-representation.md);
   language extensions specification in [extensions.md](extensions.md).
