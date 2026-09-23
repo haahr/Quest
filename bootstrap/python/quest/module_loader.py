@@ -37,28 +37,29 @@ def resolve_interface_file(
     current_dir: Optional[Path],
     include_paths: list[Path],
 ) -> Optional[Path]:
-    """Finds <name.lower()>.int.quest in current_dir, include_paths, or DEFAULT_LIB_DIR."""
-    filename = f"{name.lower()}.int.quest"
-    if current_dir is not None:
-        candidate = current_dir / filename
-        if candidate.is_file():
-            return candidate.resolve()
+    """Finds <name.lower()>.qi or <name.lower()>.int.quest in current_dir, include_paths, or DEFAULT_LIB_DIR."""
+    for ext in (".qi", ".int.quest"):
+        filename = f"{name.lower()}{ext}"
+        if current_dir is not None:
+            candidate = current_dir / filename
+            if candidate.is_file():
+                return candidate.resolve()
 
-    for inc in include_paths:
-        candidate = Path(inc) / filename
-        if candidate.is_file():
-            return candidate.resolve()
+        for inc in include_paths:
+            candidate = Path(inc) / filename
+            if candidate.is_file():
+                return candidate.resolve()
 
-    env_lib = os.environ.get("QUEST_LIB")
-    if env_lib:
-        candidate = Path(env_lib) / filename
-        if candidate.is_file():
-            return candidate.resolve()
+        env_lib = os.environ.get("QUEST_LIB")
+        if env_lib:
+            candidate = Path(env_lib) / filename
+            if candidate.is_file():
+                return candidate.resolve()
 
-    if DEFAULT_LIB_DIR.is_dir():
-        candidate = DEFAULT_LIB_DIR / filename
-        if candidate.is_file():
-            return candidate.resolve()
+        if DEFAULT_LIB_DIR.is_dir():
+            candidate = DEFAULT_LIB_DIR / filename
+            if candidate.is_file():
+                return candidate.resolve()
 
     return None
 
@@ -122,8 +123,12 @@ def load_interface(name: str, env: Environment) -> Scope:
             searched.append(str(DEFAULT_LIB_DIR))
         raise QuestTypeError(
             f"Undefined interface '{name}': cannot find interface file for '{name}' "
-            f"(looked for '{norm_name}.int.quest' in {searched})"
+            f"(looked for '{norm_name}.qi' or '{norm_name}.int.quest' in {searched})"
         )
+
+    if file_path.suffix == ".qi":
+        from quest.interface_compiler import load_interface_from_qi_file
+        return load_interface_from_qi_file(file_path, env)
 
     try:
         source_text = file_path.read_text(encoding="utf-8")

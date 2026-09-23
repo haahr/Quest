@@ -2,7 +2,7 @@
 """Quest Compiler Unified CLI Driver.
 
 Executes compiler phases sequentially, supporting early exit (--stop-after),
-intermediate inspection (--dump-after), inline execution (-c), and include paths (-I).
+intermediate inspection (--dump-after), inline execution (-e), and include paths (-I).
 """
 
 from __future__ import annotations
@@ -55,7 +55,13 @@ def run_driver(args: list[str]) -> int:
         help="Path to Quest source file (.quest), or '-' for standard input.",
     )
     arg_parser.add_argument(
-        "-c", "--code", "--command",
+        "-c", "--compile-only",
+        dest="compile_only",
+        action="store_true",
+        help="Compile only (do not link). For interfaces, generates .h and .qi.",
+    )
+    arg_parser.add_argument(
+        "-e", "--eval", "--code", "--command",
         dest="code",
         help="Inline Quest code string to process.",
     )
@@ -139,6 +145,15 @@ def run_driver(args: list[str]) -> int:
         if not file_path.exists():
             sys.stderr.write(f"quest: error: file not found: '{file_path}'\n")
             return 1
+        if file_path.name.endswith(".int.quest"):
+            from quest.interface_compiler import compile_interface_file
+            try:
+                include_paths = [Path(p) for p in parsed_args.include_paths]
+                compile_interface_file(file_path, include_paths=include_paths)
+                return 0
+            except Exception as err:
+                sys.stderr.write(f"quest: error: {err}\n")
+                return 1
         try:
             source_text = file_path.read_text(encoding="utf-8")
             file_name = str(file_path)
@@ -187,7 +202,7 @@ def run_driver(args: list[str]) -> int:
             if out_str:
                 sys.stdout.write(out_str + "\n")
 
-    # If evaluated inline code via -c, print the final phrase result (unless it's ok)
+    # If evaluated inline code via -e, print the final phrase result (unless it's ok)
     if is_inline_code and result.success and "interpret" not in result.dump_outputs and not parsed_args.echo:
         typed_prog = result.artifacts.get("typecheck")
         final_phrase = typed_prog.phrases[-1] if typed_prog and typed_prog.phrases else None
@@ -256,7 +271,13 @@ def run_compile(args: list[str]) -> int:
         help="Compile without Boehm GC (uses standard libc malloc/free).",
     )
     arg_parser.add_argument(
-        "-c", "--code", "--command",
+        "-c", "--compile-only",
+        dest="compile_only",
+        action="store_true",
+        help="Compile only (do not link). For interfaces, generates .h and .qi.",
+    )
+    arg_parser.add_argument(
+        "-e", "--eval", "--code", "--command",
         dest="code",
         help="Inline Quest code string to compile.",
     )
@@ -318,6 +339,15 @@ def run_compile(args: list[str]) -> int:
         if not file_path.exists():
             sys.stderr.write(f"quest compile: error: file not found: '{file_path}'\n")
             return 1
+        if file_path.name.endswith(".int.quest"):
+            from quest.interface_compiler import compile_interface_file
+            try:
+                include_paths = [Path(p) for p in parsed_args.include_paths]
+                compile_interface_file(file_path, include_paths=include_paths)
+                return 0
+            except Exception as err:
+                sys.stderr.write(f"quest compile: error: {err}\n")
+                return 1
         try:
             source_text = file_path.read_text(encoding="utf-8")
             file_name = str(file_path)

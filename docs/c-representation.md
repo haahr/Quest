@@ -973,6 +973,22 @@ Quest supports graph serialization and deserialization of dynamically typed valu
 
 ---
 
+## 12. Interface C Headers & Linkage ABI (`.h` generation)
+
+When an interface `x.int.quest` is compiled (`quest -c x.int.quest`), the compiler emits a standard C header `x.h`:
+- **Include Guard:** Uses standard preprocessor guards `#ifndef QUEST_INTF_<NAME>_H ... #endif`.
+- **Runtime Dependency:** Always includes `#include "quest_runtime.h"`.
+- **Recursive Interface Includes:** For every imported interface (`import : Dep`), emits `#include "dep.h"`.
+- **Abstract Type Erasure:** Abstract types (`T::TYPE`) cannot have a fixed scalar size across implementations and
+  erase uniformly to `typedef QVal quest_type_<Interface>_T;`.
+- **Manifest Types:** Transparent types (`Def T = ...`) emit concrete C typedefs or struct definitions (e.g.
+  `struct quest_rec_<Interface>_<Name>` for records).
+- **Function Signature Typedefs:** Exported member functions emit function pointer typedefs
+  `typedef <Ret> (*quest_sig_<Interface>_<Member>)(<Params>);`, with uniform parameter conversions
+  (integers to `QInt`, reals to `QReal`, strings to `QString *`, records to `QRecordVal`, and abstract types to `QVal`).
+
+---
+
 ## See Also
 - [codegen-c.md](codegen-c.md): C Code Generator architecture, AST lowering, and compiler runner.
 - [pipeline.md](pipeline.md): Compiler pipeline passes and dual-pipeline CLI driver.

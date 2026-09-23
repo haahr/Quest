@@ -276,6 +276,47 @@ Following Cardelli's specification, module loading is lazy:
 
 ---
 
+## 9. Separate Compilation Architecture (Phase 4.16)
+
+Quest supports separate compilation of interfaces and modules, enabling modular builds and object linking:
+
+### 9.1. Interface Compilation (`.int.quest` -> `.h` + `.qi`)
+Compiling an interface (`quest -c counter.int.quest`) generates two complementary artifacts:
+1. **C Header (`x.h`):**
+   - Preprocessor guards (`#ifndef QUEST_INTF_X_H ... #endif`).
+   - `#include "quest_runtime.h"`.
+   - Recursive `#include "<dep>.h"` for any imported interfaces (`import : Dep`).
+   - Abstract types (`T::TYPE`) erase to uniform 64-bit words (`typedef QVal quest_type_X_T;`).
+   - Manifest types (`Def T = ...`) emit concrete C typedefs or struct definitions.
+   - Function pointer typedefs (`typedef <Ret> (*quest_sig_X_<member>)(<Params>);`).
+2. **Type Metadata (`x.qi`):**
+   - Serialized JSON/JSOG envelope using Quest's shadow record types (`InterfaceDesc`):
+     ```quest
+     Let InterfaceTypeDecl = Record
+         isManifest: Bool
+         kind: String
+         manifestType: String
+         name: String
+     end;
+
+     Let InterfaceValueDecl = Record
+         isPoly: Bool
+         name: String
+         typeSig: String
+     end;
+
+     Let InterfaceDesc = Record
+         imports: Array(String)
+         name: String
+         types: Array(InterfaceTypeDecl)
+         values: Array(InterfaceValueDecl)
+     end;
+     ```
+   - Serialized via `dynamic.extern` / `jsog_encode` and deserialized via `dynamic.intern` / `jsog_decode`.
+   - Allows the compiler to typecheck client code or implementing modules without the original `.int.quest` source.
+
+---
+
 ## See Also
 - [pipeline.md](pipeline.md): Compiler pipeline framework and CLI driver options.
 - [c-representation.md](c-representation.md): C runtime ABI, record representation, and function calling conventions.

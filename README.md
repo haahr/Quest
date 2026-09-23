@@ -56,7 +56,7 @@ Use the unified compiler driver script `./quest`:
 
 ```bash
 # Evaluate an inline Quest expression via the interpreter
-./quest -c "let x: Int = 40 + 2; x"
+./quest -e "let x: Int = 40 + 2; x"
 
 # Execute a Quest file via the tree-walking interpreter
 ./quest program.quest

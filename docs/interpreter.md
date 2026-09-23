@@ -12,7 +12,7 @@ The Step 3 interpreter executes typed Quest abstract syntax trees (`TypedProgram
 compilation or machine code generation. It serves three primary purposes:
 
 1. **Bootstrap Ground Truth:** Provides immediate operational semantics validating the typechecker and grammar.
-2. **Interactive Development:** Powers the interactive REPL and single-phrase execution (`quest -c "... "`).
+2. **Interactive Development:** Powers the interactive REPL and single-phrase execution (`quest -e "..."`).
 3. **Reference Verification:** Acts as an executable specification to verify subsequent native ARM64 code generation.
 
 The interpreter consumes the typed AST produced by `typecheck` and produces runtime Quest values (`QValue`).
@@ -198,7 +198,7 @@ The evaluator in `quest/interpreter.py` evaluates typed expressions and bindings
   - Emits only explicit runtime I/O side effects (e.g. from `writer.putString`).
   - Top-level bindings and expressions execute silently when executing files.
   - If `--interactive` is passed on the CLI, top-level binding signatures and evaluated results are echoed.
-- **Inline Execution (`quest -c '<program>'`) and Interactive Mode:**
+- **Inline Execution (`quest -e '<program>'`) and Interactive Mode:**
   - Evaluates phrases sequentially; only the final phrase produces output (consistent with batch phase semantics).
   - Uses Cardelli's canonical top-level interactive output notation:
     - **Expressions:** Formatted as `<value> : <Type>` (e.g. `42 : Int`). If the expression evaluates to `ok`

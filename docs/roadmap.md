@@ -147,10 +147,13 @@ native **AArch64 (ARM64)** machine code and providing a **JIT compiler** for int
     inputs back into dynamically typed values validated against compound type descriptors). Fully compatible and
     interchangeable with the interpreter's JSON/JSOG representation (`dynamic_json.py`), featuring zero-dependency
     streaming single-value JSON/JSOG decoding on `QReader`, recursive-descent type descriptor parsing, natural C ABI
-    struct packing, and coinductive cycle resolution. — *Complete*
+  - **Phase 4.16 (Separate Compilation & Object Linking):** Separate compilation of interfaces (`.int.quest`) into
+    C headers (`.h`) and portable serialized type metadata (`.qi`) via dynamic JSON/JSOG, compilation of modules
+    (`.mod.quest`) to object files (`.o`), and client linking (`main.quest` + `*.o` -> binary). Step 1 (Interface
+    compilation `.int.quest` -> `.h` + `.qi` with shadow Quest record schema and CLI driver support) is complete;
+    Step 2 (Module compilation `.mod.quest` -> `.c` -> `.o`) is in progress.
 - **Bootstrap Compiler Completion Prerequisites:**
-  - *Separate Compilation & Object Linking:* Compiling modules independently to `.o` files with header/interface
-    exports and linking.
+  - *Separate Compilation & Object Linking:* Finalizing Steps 2 and 3 in Phase 4.16.
 - C transpiler architecture in [codegen-c.md](codegen-c.md);
   C ABI specification in [c-representation.md](c-representation.md);
   language extensions specification in [extensions.md](extensions.md).

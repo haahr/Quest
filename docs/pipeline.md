@@ -43,7 +43,7 @@ The compiler processes Quest programs through a linear sequence of modular passe
 ### 1.1. Pipeline Modes
 The compiler driver exposes three execution pipelines:
 - **Default Pipeline (`default_pipeline()`):** `tokenize` $\to$ `parse` $\to$ `typecheck` $\to$ `interpret`.
-  Used by default for `quest <file>`, `quest -c "<code>"`, and interactive REPL sessions.
+  Used by default for `quest <file>`, `quest -e "<code>"`, and interactive REPL sessions.
 - **Compilation Pipeline (`compile_pipeline()`):** `tokenize` $\to$ `parse` $\to$ `typecheck` $\to$ `codegen_c`.
   Used by `quest compile <file>`, translating typed AST into C99 source and building native binaries.
 - **Full Execution Pipeline (`full_pipeline()`):** `tokenize` $\to$ `parse` $\to$ `typecheck` $\to$
@@ -150,7 +150,7 @@ quest --stop-after run_c_compiled file.quest
 quest --dump-after parse --stop-after typecheck file.quest
 
 # Execute inline code string:
-quest -c "let x = 10 + 20; x"
+quest -e "let x = 10 + 20; x"
 
 # Add search paths for imports:
 quest -I ./lib -I ./interfaces main.quest
@@ -177,7 +177,7 @@ quest compile file.quest --emit-c -o out.c
 quest compile file.quest --nogc -o my_app
 
 # Compile inline code string to native binary:
-quest compile -c "let x = 42; x" -o test_bin
+quest compile -e "let x = 42; x" -o test_bin
 
 # Stop after intermediate compilation phase:
 quest compile --stop-after typecheck file.quest
