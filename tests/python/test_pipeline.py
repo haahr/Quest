@@ -1,7 +1,9 @@
 """Unit tests for the Quest Compiler Phase Pipeline Framework."""
 
+import io
 import tempfile
 import unittest
+from contextlib import redirect_stdout
 from pathlib import Path
 
 from quest.env import Environment
@@ -11,6 +13,7 @@ from quest.pipeline import (
     PhasePipeline,
     default_pipeline,
 )
+from quest_driver import run_driver
 
 
 class TestPipeline(unittest.TestCase):
@@ -195,6 +198,26 @@ class TestPipeline(unittest.TestCase):
         self.assertEqual(res.final_phase, "interpret")
         self.assertIn("interpret", res.dump_outputs)
         self.assertEqual(res.dump_outputs["interpret"], '"~5" : String')
+
+    def test_driver_run_file_prints_last_expression(self):
+        """Verifies running a .quest file through run_driver prints the final phrase result."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            file_path = Path(tmp_dir) / "test.quest"
+            file_path.write_text("let x = 10;\nx + 5;\n", encoding="utf-8")
+            buf = io.StringIO()
+            with redirect_stdout(buf):
+                exit_code = run_driver([str(file_path)])
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(buf.getvalue(), "15 : Int\n")
+
+            # Also verify declarations print as expected
+            decl_path = Path(tmp_dir) / "decl.quest"
+            decl_path.write_text("let y: Int = 42;\n", encoding="utf-8")
+            buf = io.StringIO()
+            with redirect_stdout(buf):
+                exit_code = run_driver([str(decl_path)])
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(buf.getvalue(), "let y:Int = 42\n")
 
 
 if __name__ == "__main__":

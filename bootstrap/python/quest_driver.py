@@ -251,8 +251,8 @@ def run_driver(args: list[str]) -> int:
             if out_str:
                 sys.stdout.write(out_str + "\n")
 
-    # If evaluated inline code via -e, print the final phrase result (unless it's ok)
-    if is_inline_code and result.success and "interpret" not in result.dump_outputs and not parsed_args.echo:
+    # Print the final phrase result (unless it's ok or already printed via dump/echo)
+    if result.success and "interpret" not in result.dump_outputs and not parsed_args.echo:
         typed_prog = result.artifacts.get("typecheck")
         final_phrase = typed_prog.phrases[-1] if typed_prog and typed_prog.phrases else None
         val = result.artifacts.get("interpret")
