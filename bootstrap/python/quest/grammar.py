@@ -30,6 +30,10 @@ IMPORT = SyntaxTarget("Import")
 IMPORT_ITEM = SyntaxTarget("ImportItem")
 IDE = SyntaxTarget("Ide")
 IDE_LIST = SyntaxTarget("IdeList")
+PATH = SyntaxTarget("Path")
+PATH_LIST = SyntaxTarget("PathList")
+MODULE_ENTRY = SyntaxTarget("ModuleEntry")
+MODULE_ENTRY_LIST = SyntaxTarget("ModuleEntryList")
 
 KIND = SyntaxTarget("Kind")
 PRIMARY_KIND = SyntaxTarget("PrimaryKind")
@@ -72,6 +76,7 @@ HAS_KIND = SyntaxTarget("HasKind")
 
 ALL_SYNTAX_TARGETS: tuple[SyntaxTarget, ...] = (
     PROGRAM, PHRASE, INTERFACE, MODULE, LINKAGE, IMPORT, IMPORT_ITEM, IDE, IDE_LIST,
+    PATH, PATH_LIST, MODULE_ENTRY, MODULE_ENTRY_LIST,
     KIND, PRIMARY_KIND,
     TYPE, POSTFIX_TYPE, POSTFIX_TYPE_OP, PRIMARY_TYPE, TYPE_SIGNATURE, VALUE_SIGNATURE, OPTION_SIGNATURE, SIGNATURE,
     VALUE, POSTFIX_VALUE, POSTFIX_OP, PRIMARY_VALUE, INFIX_OP, BINDING, TYPE_BINDING, VALUE_BINDING,
@@ -470,6 +475,34 @@ def build_quest_grammar() -> None:
     )
     # ide
     IDE_LIST.add_rule((IDE,), lambda ident_token: (ident_token.lexeme,))
+
+    # Path: ident / Path | ident
+    PATH.add_rule(
+        (T(TK.IDENT), T(TK.SYMBOLIC_INFIX, "/"), PATH),
+        lambda ident, slash, rest: f"{ident.lexeme}/{rest}",
+    )
+    PATH.add_rule((T(TK.IDENT),), lambda ident: ident.lexeme)
+
+    # PathList: Path , PathList | Path
+    PATH_LIST.add_rule(
+        (PATH, T(TK.COMMA), PATH_LIST),
+        lambda p, comma, rest: (p,) + rest,
+    )
+    PATH_LIST.add_rule((PATH,), lambda p: (p,))
+
+    # ModuleEntry: ident = Path | Path
+    MODULE_ENTRY.add_rule(
+        (T(TK.IDENT), T(TK.EQUAL), PATH),
+        lambda ident, eq, path: (ident.lexeme, path),
+    )
+    MODULE_ENTRY.add_rule((PATH,), lambda path: (path.split("/")[-1], path))
+
+    # ModuleEntryList: ModuleEntry , ModuleEntryList | ModuleEntry
+    MODULE_ENTRY_LIST.add_rule(
+        (MODULE_ENTRY, T(TK.COMMA), MODULE_ENTRY_LIST),
+        lambda m, comma, rest: (m,) + rest,
+    )
+    MODULE_ENTRY_LIST.add_rule((MODULE_ENTRY,), lambda m: (m,))
 
     # ------------------------------------------------------------------------
     # Kinds (Level 2)
@@ -1568,18 +1601,18 @@ def build_quest_grammar() -> None:
             T(TK.KW_MODULE),
             T(TK.IDENT),
             T(TK.COLON),
-            T(TK.IDENT),
+            PATH,
             Opt(T(TK.KW_IMPORT), IMPORT),
             T(TK.KW_EXPORT),
             BINDING,
             T(TK.KW_END),
         ),
         (
-            lambda unsound, module_token, ident_token, colon_token, interface_ident,
+            lambda unsound, module_token, ident_token, colon_token, interface_path,
             imports_seq, export_token, bindings, end_token: (
                 ast.ModuleDecl(
                     name=ident_token.lexeme,
-                    interface_name=interface_ident.lexeme,
+                    interface_name=interface_path,
                     bindings=bindings if isinstance(bindings, tuple) else (bindings,),
                     imports=imports_seq[1] if imports_seq else (),
                     is_unsound=bool(unsound),
@@ -1661,20 +1694,70 @@ def build_quest_grammar() -> None:
     )
     PHRASE.add_rule((LINKAGE,), lambda linkage: linkage)
 
+    # 1. Dual alias with =: r1, r2 : Rnd = p1, p2 : IfacePath
     IMPORT_ITEM.add_rule(
-        (IDE_LIST, T(TK.COLON), T(TK.IDENT)),
-        lambda names, colon_token, iface_token: ast.ImportItem(
-            names=names,
-            interface_name=iface_token.lexeme,
+        (IDE_LIST, T(TK.COLON), T(TK.IDENT), T(TK.EQUAL), PATH_LIST, T(TK.COLON), PATH),
+        lambda ides, col1, iface_ident, eq, paths, col2, iface_path: ast.ImportItem(
+            names=ides,
+            interface_name=iface_ident.lexeme,
+            module_paths=paths,
+            interface_path=iface_path,
+            offset=col1.offset,
+        ),
+    )
+
+    # 2. Interface alias with module path: :Rnd = p1, p2 : IfacePath
+    IMPORT_ITEM.add_rule(
+        (T(TK.COLON), T(TK.IDENT), T(TK.EQUAL), PATH_LIST, T(TK.COLON), PATH),
+        lambda col1, iface_ident, eq, paths, col2, iface_path: ast.ImportItem(
+            names=tuple(p.split("/")[-1] for p in paths),
+            interface_name=iface_ident.lexeme,
+            module_paths=paths,
+            interface_path=iface_path,
+            offset=col1.offset,
+        ),
+    )
+
+    # 3. Interface alias, interface-only: :Rnd = :IfacePath
+    IMPORT_ITEM.add_rule(
+        (T(TK.COLON), T(TK.IDENT), T(TK.EQUAL), T(TK.COLON), PATH),
+        lambda col1, iface_ident, eq, col2, iface_path: ast.ImportItem(
+            names=(),
+            interface_name=iface_ident.lexeme,
+            module_paths=None,
+            interface_path=iface_path,
+            offset=col1.offset,
+        ),
+    )
+
+    # 4. Interface-only, unaliased: :IfacePath
+    IMPORT_ITEM.add_rule(
+        (T(TK.COLON), PATH),
+        lambda colon_token, iface_path: ast.ImportItem(
+            names=(),
+            interface_name=iface_path.split("/")[-1],
+            module_paths=None,
+            interface_path=iface_path if "/" in iface_path else None,
             offset=colon_token.offset,
         ),
     )
+
+    # 5. Module & interface (including module aliases and unaliased paths):
+    #    m1 = p1, m2 = p2 : IfacePath  OR  p1, p2 : IfacePath
     IMPORT_ITEM.add_rule(
-        (T(TK.COLON), T(TK.IDENT)),
-        lambda colon_token, iface_token: ast.ImportItem(
-            names=(),
-            interface_name=iface_token.lexeme,
-            offset=colon_token.offset,
+        (MODULE_ENTRY_LIST, T(TK.COLON), PATH),
+        lambda entries, colon_token, iface_path: (
+            lambda names, paths, iface_name: ast.ImportItem(
+                names=names,
+                interface_name=iface_name,
+                module_paths=paths if any("/" in p for p in paths) or paths != names else None,
+                interface_path=iface_path if "/" in iface_path else None,
+                offset=colon_token.offset,
+            )
+        )(
+            tuple(m[0] for m in entries),
+            tuple(m[1] for m in entries),
+            iface_path.split("/")[-1],
         ),
     )
 

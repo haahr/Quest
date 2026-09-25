@@ -833,11 +833,22 @@ class TypedModule(TypedBinding):
 class TypedImportItem(TypedNode):
     names: tuple[str, ...]
     interface_name: str
+    module_paths: Optional[tuple[str, ...]] = None
+    interface_path: Optional[str] = None
+
+    @property
+    def effective_module_paths(self) -> tuple[str, ...]:
+        return self.module_paths if self.module_paths is not None else self.names
+
+    @property
+    def effective_interface_path(self) -> str:
+        return self.interface_path if self.interface_path is not None else self.interface_name
 
     def dump_header(self) -> str:
         if self.names:
             return f"({' '.join(repr(n) for n in self.names)}) : '{self.interface_name}'"
         return f": '{self.interface_name}'"
+
 
 
 @dataclass(frozen=True)

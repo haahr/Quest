@@ -30,6 +30,7 @@ from quest.codegen.c_types import (
     is_record_subtype,
     is_tuple_subtype,
     is_variant_subtype,
+    mangle_module_name,
     normalize_type,
     option_struct_name,
     record_struct_name,
@@ -103,9 +104,10 @@ def topological_sort_modules(modules: list[TypedModule]) -> list[TypedModule]:
         for b in m.bindings:
             if isinstance(b, TypedImport):
                 for item in b.items:
-                    for name in item.names:
-                        if name in by_name:
-                            visit(by_name[name])
+                    for name, mpath in zip(item.names, item.effective_module_paths):
+                        target = mpath if mpath in by_name else (name if name in by_name else None)
+                        if target is not None:
+                            visit(by_name[target])
         order.append(m)
 
     for m in modules:
@@ -491,8 +493,14 @@ def analyze_program_for_c(
     for phrase in prog.phrases:
         if isinstance(phrase, TypedImport):
             for it in phrase.items:
-                for iname in it.names:
-                    _check_import_item(iname)
+                for iname, mpath in zip(it.names, it.effective_module_paths):
+                    _check_import_item(mpath)
+                    if iname != mpath:
+                        _check_import_item(iname)
+                    target = mpath if mpath in all_module_map else (iname if iname in all_module_map else None)
+                    if target is not None:
+                        all_module_map[iname] = all_module_map[target]
+                        all_module_map[mpath] = all_module_map[target]
         _scan_for_builtin_vars(phrase)
 
     for bmod in needed_builtin_modules:
@@ -548,7 +556,7 @@ def analyze_program_for_c(
     # Index module functions for possible specialization
     module_funs_dict: dict[str, tuple[TypedFun, Any]] = {}
     for mod in sorted_modules:
-        clean_mod = mod.name.replace(".", "_")
+        clean_mod = mangle_module_name(mod.name)
         for b in mod.bindings:
             if isinstance(b, TypedLetValue) and isinstance(b.value, TypedFun):
                 module_funs_dict[f"{mod.name}.{b.name}"] = (b.value, b.symbol)

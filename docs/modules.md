@@ -22,18 +22,24 @@ Quest implements a first-order module system as described by Luca Cardelli in *T
 
 When the Quest compiler or interpreter encounters an import for an interface or module that is not already registered in the lexical environment or built-in registry (`BuiltinModuleRegistry`), it automatically loads it from disk.
 
-### 2.1. File Extensions and Case Normalization
+### 2.1. File Extensions, Case Normalization, and Hierarchical Directories
 - **Interfaces:** Saved with the extension `.int.quest`.
 - **Modules:** Saved with the extension `.mod.quest`.
-- **Case Normalization:** When searching for a file, the compiler always converts the identifier to lowercase:
-  - An interface `Counter` or `counter` maps to `counter.int.quest`.
-  - A module `Stack` or `stack` maps to `stack.mod.quest`.
-  This ensures deterministic, portable behavior across case-sensitive (Linux) and case-insensitive (macOS, Windows) filesystems.
+- **Hierarchical Paths:** Unquoted forward slashes (`/`) represent directory nesting. For example, `util/random`
+  maps to the path `util/random.mod.quest` (or `util/random.int.quest`).
+- **Case Normalization:** When searching for a file, the compiler normalizes the filename components to lowercase:
+  - An interface `util/Counter` or `util/counter` maps to `util/counter.int.quest`.
+  - A module `util/Stack` or `util/stack` maps to `util/stack.mod.quest`.
+  This ensures deterministic, portable behavior across case-sensitive (Linux) and case-insensitive (macOS, Windows)
+  filesystems.
 
-### 2.2. Search Order Precedence
+### 2.2. Search Order Precedence & Sibling Relative Resolution
 The file loader searches directories in the following strict order:
-1. **Implicit Active Directory:** The directory containing the active `.quest` file is searched first. For interactive execution (`<stdin>`, `<repl>`, `<string>`), this defaults to the current working directory (`Path.cwd()`).
-2. **Explicit Include Paths (`-I`):** Any directories specified on the command line via `-I` / `--include` (or configured in `CompilerOptions.include_paths`), searched in command-line order.
+1. **Implicit Active Directory (Sibling Relative):** The directory containing the active `.quest` file or currently
+   compiling module is searched first. For instance, if `util/calc.mod.quest` imports `math`, the loader searches for
+   `util/math.mod.quest` before searching root include directories.
+2. **Explicit Include Paths (`-I`):** Any directories specified on the command line via `-I` / `--include` (or
+   configured in `CompilerOptions.include_paths`), searched in command-line order.
 
 A file in the active directory shadows any file with the same name in the include paths.
 
@@ -41,18 +47,22 @@ A file in the active directory shadows any file with the same name in the includ
 
 ## 3. Single Definition Rule and Strict Validation
 
-To keep compilation units clean, modular, and predictable, interface and module files must adhere to strict structural constraints:
+To keep compilation units clean, modular, and predictable, interface and module files must adhere to strict
+structural constraints:
 
 1. **Single Top-Level Phrase:**
    A `.int.quest` file must contain **strictly one** top-level phrase: an `interface` declaration.
    A `.mod.quest` file must contain **strictly one** top-level phrase: a `module` definition.
    Top-level expressions, `let` bindings, or standalone `import` statements outside the construct are prohibited.
 2. **Name Matching:**
-   The identifier declared in the file must match the filename base (case-insensitively). For example, `counter.int.quest` must declare `interface Counter` (or `counter`), not `interface Bag`.
+   The identifier declared in the file header must match the filename basename (case-insensitively). For example,
+   `util/counter.int.quest` must declare `interface Counter` (or `counter`), not `interface Bag`.
 3. **Interface Conformance:**
-   In a module file `m.mod.quest`, the interface specified in the module header (`module m: I`) must match the expected interface requested by the importer.
+   In a module file `m.mod.quest`, the interface specified in the module header (`module m: I` or `module m: Path/I`)
+   must match the expected interface requested by the importer or define a canonical relative interface path.
 4. **Cycle Detection:**
-   The loader tracks the active import chain. Circular imports among interfaces (e.g., `A` imports `B` which imports `A`) or modules are detected and reported as compile-time errors displaying the cycle path.
+   The loader tracks the active import chain. Circular imports among interfaces (e.g., `A` imports `B`
+   which imports `A`) or modules are detected and reported as compile-time errors displaying the cycle path.
 
 ---
 
@@ -62,7 +72,7 @@ To keep compilation units clean, modular, and predictable, interface and module 
 An interface declaration exports abstract types, manifest types, kinds, and value signatures:
 
 ```quest
-(* counter.int.quest *)
+(* util/counter.int.quest *)
 interface Counter
 export
     T::TYPE
@@ -72,10 +82,10 @@ export
 end;
 ```
 
-Interfaces can also import other interfaces using a leading `import` clause:
+Interfaces can also import other interfaces using a leading `import` clause with hierarchical paths:
 ```quest
 interface ExtendedCounter
-import : Counter
+import :util/Counter
 export
     reset(c: Counter.T): Counter.T
 end;
@@ -85,7 +95,7 @@ end;
 A module provides concrete implementations for the members specified in its interface:
 
 ```quest
-(* counter.mod.quest *)
+(* util/counter.mod.quest *)
 module counter : Counter
 export
     Let T = Int;
@@ -99,31 +109,57 @@ Modules can declare internal imports before their export block:
 ```quest
 (* app.mod.quest *)
 module app : App
-import counter: Counter
+import util/counter: util/Counter
 export
     let run(): Int = counter.get(counter.inc(counter.new(10)));
 end;
 ```
 
-### 4.3. Top-Level Imports (`main.quest`)
-Client programs import interfaces and modules using `import`:
+### 4.3. Top-Level Imports & Hierarchical Aliasing (`main.quest`)
+Client programs import interfaces and modules using the two-tier `import` syntax:
 
-- **Importing an Interface (Types and Kinds into Scope):**
-  ```quest
-  import : Counter;
-  ```
-  Binds the types and kinds defined in `Counter` directly into the current scope.
-
-- **Importing Modules:**
+- **Flat Imports (Backward-Compatible):**
   ```quest
   import counter: Counter;
+  import :Counter;
   ```
-  Loads `Counter` (if not already loaded), loads and typechecks `counter` against `Counter`, and binds the module record `counter` in the current scope.
 
-Multiple modules of the same interface or different interfaces can be imported in a single statement:
-```quest
-import c1 c2: Counter greeter: Greeter;
-```
+- **Hierarchical Path Imports:**
+  ```quest
+  import util/counter: util/Counter;
+  import :util/Counter;
+  ```
+  When imported without aliases, the bound local names default to the final component (e.g. `counter` and `Counter`).
+
+- **Local Signature Aliasing:**
+  To prevent local identifier collisions or assign concise local names, this implementation of Quest supports
+  signature-based aliasing for both modules and interfaces:
+  - **Both Module and Interface Aliased:**
+    ```quest
+    import cnt : Cnt = util/counter : util/Counter;
+    ```
+    Binds module value `cnt` and interface types/kinds `Cnt` (e.g. `Cnt_T`).
+  - **Module Aliased Only:**
+    ```quest
+    import cnt = util/counter : util/Counter;
+    ```
+    Binds module value `cnt` and interface types `Counter` (e.g. `Counter_T`).
+  - **Interface Aliased with Module:**
+    ```quest
+    import :Cnt = util/counter : util/Counter;
+    ```
+    Binds default module value `counter` and aliased interface types `Cnt` (e.g. `Cnt_T`).
+  - **Standalone Interface Aliased:**
+    ```quest
+    import :Cnt = :util/Counter;
+    ```
+    Binds aliased interface types `Cnt` into scope without instantiating any module.
+  - **Multiple Modules for One Interface:**
+    ```quest
+    import c1 = util/counter1, c2 = util/counter2 : util/Counter;
+    ```
+
+In all contexts, `/` in expressions (e.g. `10 / 2`) remains the standard division operator without syntactic ambiguity.
 
 ---
 
@@ -278,7 +314,8 @@ Following Cardelli's specification, module loading is lazy:
 
 ## 9. Separate Compilation Architecture (Phase 4.16)
 
-Quest supports separate compilation of interfaces and modules, enabling modular builds and object linking:
+This implementation of Quest supports separate compilation of interfaces and modules, enabling modular builds and
+object linking:
 
 ### 9.1. Interface Compilation (`.int.quest` -> `.h` + `.qi`)
 Compiling an interface (`quest -c counter.int.quest`) generates two complementary artifacts:
@@ -362,6 +399,27 @@ Compiling client code that depends on precompiled modules links `.o` files direc
    - The pipeline compiles the client C file and invokes the host C compiler (`clang`), passing all required
      runtime files (`quest_runtime.c`, `quest_serialization.c`), precompiled object files (`counter.o`), and GC
      libraries to produce the final executable binary.
+
+### 9.4. Hierarchical Modules and C Symbol Mangling
+When compiling hierarchical interfaces and modules:
+1. **Directory Tree Preservation:**
+   When an interface or module in a subdirectory is compiled (e.g. `quest -c util/calc.mod.quest`), the compiler
+   creates matching output subdirectories in the target destination, writing `util/calc.c`, `util/calc.o`,
+   and `util/calc.int.h`.
+2. **C Symbol Mangling:**
+   Because C identifiers cannot contain forward slashes, directory delimiters in hierarchical module names are mangled
+   to `__` (double underscore):
+   - Module record: `qv_util__calc`
+   - Initializer: `qv_mod_util__calc_init`
+   - Initialized flag: `qv_mod_util__calc_initialized`
+   - Direct functions: `qv_util__calc_multiply`
+   - Trampolines: `qv_util__calc_multiply_trampoline`
+   Single underscores (`_`) continue to cleanly separate module prefixes from exported function and variable names.
+3. **Canonical Module Identity:**
+   Both whole-program C code generation and separate compilation identify modules by their canonical include-relative
+   path (e.g. `util/calc`). When imported using local aliases (such as `import c = util/calc : util/Calc`), client
+   C code generates external references to `qv_util__calc` and `qv_util__calc_multiply`, binding the local variable
+   `qv_c` to the canonical module record.
 
 ---
 

@@ -145,7 +145,8 @@ Option types support both tag-based and ordinal-based operations (Cardelli §4.5
   ordinal of the option (e.g. `tuple 1 let x=true end : Tuple :Int x:Bool end`).
 
 ### 3.8. External Types and Value Bindings
-Quest provides `external` syntax for declaring opaque native C data structures and native C symbols:
+This implementation of Quest provides `external` syntax for declaring opaque native C data structures and native C
+symbols:
 - **External Types (`PRIMARY_TYPE`):** `type T = external "C_TYPE"` or `Let T = external "C_TYPE"`.
   Binds `T` to an opaque C data type (e.g. `external "QWriter *"`).
 - **External Values (`PRIMARY_VALUE`):** `let x: Type = external "C_SYMBOL"`.

@@ -101,9 +101,14 @@ def mangle_ident(name: str) -> str:
     return f"qv_{clean}"
 
 
+def mangle_module_name(module_name: str) -> str:
+    """Mangles a hierarchical module name into a C-safe identifier using __ for slashes."""
+    return module_name.replace("/", "__").replace(".", "_")
+
+
 def mangle_module_ident(module_name: str, name: str) -> str:
     """Mangles a module-scoped Quest identifier into a C-safe identifier prefixed with qv_<mod>_."""
-    clean_mod = module_name.replace(".", "_")
+    clean_mod = mangle_module_name(module_name)
     if is_symbolic_name(name):
         sym_suffix = mangle_symbolic_ident(name)[3:]  # strip leading 'qv_'
         return f"qv_{clean_mod}_{sym_suffix}"

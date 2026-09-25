@@ -32,13 +32,28 @@ Interface ::=
     ["unsound"] "interface" ide ["import" Import] "export" Signature "end"
 
 Module ::=
-    ["unsound"] "module" ide ":" ide ["import" Import] "export" Binding "end"
+    ["unsound"] "module" ide ":" Path ["import" Import] "export" Binding "end"
 
 Linkage ::=
     "import" Import
 
 Import ::=
-    {[IdeList] ":" ide}
+    {ImportItem}
+
+Path ::=
+    ide {"/" ide}
+
+ImportItem ::=
+    ModuleEntryList ":" Path |
+    ModuleEntryList |
+    ":" Path |
+    ":" ide "=" ":" Path
+
+ModuleEntry ::=
+    ide ["=" Path]
+
+ModuleEntryList ::=
+    ModuleEntry {"," ModuleEntry}
 
 -------------------------------------------------------------------------------
 Level 2: Kinds

@@ -24,6 +24,7 @@ from quest.codegen.c_types import (
     is_variant_subtype,
     mangle_ident,
     mangle_module_ident,
+    mangle_module_name,
     normalize_type,
     option_struct_name,
     qtype_to_c_type,
@@ -842,6 +843,15 @@ class CEmitter:
         for phrase in prog.phrases:
             if isinstance(phrase, TypedModule):
                 all_module_map[phrase.name] = phrase
+            elif isinstance(phrase, TypedImport):
+                for it in phrase.items:
+                    for iname, mpath in zip(it.names, it.effective_module_paths):
+                        target = mpath if mpath in all_module_map else (iname if iname in all_module_map else None)
+                        if target is not None:
+                            all_module_map[iname] = all_module_map[target]
+                            all_module_map[mpath] = all_module_map[target]
+                            self.current_env_vars[iname] = f"qv_{mangle_module_name(all_module_map[target].name)}"
+                            self.current_env_vars[mpath] = f"qv_{mangle_module_name(all_module_map[target].name)}"
         self.all_modules = all_module_map
         # 7. Function definitions for top-level functions
         if top_funs:
@@ -946,7 +956,7 @@ class CEmitter:
         # Initialize all compiled modules topologically
         if sorted_modules:
             for mod in sorted_modules:
-                clean_mod = mod.name.replace(".", "_")
+                clean_mod = mangle_module_name(mod.name)
                 main_lines.append(f"    qv_mod_{clean_mod}_init();")
             main_lines.append("")
 
@@ -1051,7 +1061,7 @@ class CEmitter:
         decl_emitter: Optional[CDeclarationEmitter] = None,
     ) -> list[str]:
         lines: list[str] = []
-        clean_mod = mod.name.replace(".", "_")
+        clean_mod = mangle_module_name(mod.name)
         mod_funs: list[tuple[str, TypedFun, Any]] = []
         mod_vars: list[tuple[str, TypedExpr, Any]] = []
         mod_native_funs: list[TypedNativeBinding] = []
@@ -1086,9 +1096,10 @@ class CEmitter:
                         mod_native_vals.append(nb)
                 case TypedImport(items=items):
                     for it in items:
-                        for iname in it.names:
-                            if standalone or iname in all_module_map:
-                                mod_imported_mods.append(iname)
+                        for iname, mpath in zip(it.names, it.effective_module_paths):
+                            target = mpath if (mpath in all_module_map or standalone) else iname
+                            if standalone or target in all_module_map or iname in all_module_map:
+                                mod_imported_mods.append(target)
                 case TypedException(name=b_name, type_val=b_t) as exc_n:
                     if b_name:
                         mod_vars.append(
@@ -1100,7 +1111,7 @@ class CEmitter:
         if standalone and mod_imported_mods:
             lines.append("/* Forward declarations for imported dependency modules */")
             for dep in mod_imported_mods:
-                dep_clean = dep.replace(".", "_")
+                dep_clean = mangle_module_name(dep)
                 lines.append(f"extern void qv_mod_{dep_clean}_init(void);")
                 lines.append(f"extern QRecordVal qv_{dep_clean};")
             lines.append("")
@@ -1362,7 +1373,7 @@ class CEmitter:
                 lines.append(f"    quest_register_static_type_descriptor(&quest_type_{tag});")
             lines.append("")
         for dep in mod_imported_mods:
-            dep_clean = dep.replace(".", "_")
+            dep_clean = mangle_module_name(dep)
             lines.append(f"    qv_mod_{dep_clean}_init();")
         if mod.c_init:
             lines.append(f"    {mod.c_init};")
@@ -1371,6 +1382,21 @@ class CEmitter:
         mod_emitter.current_env_vars = {
             vname: mangle_module_ident(clean_mod, vname) for vname, _, _ in mod_vars
         }
+        for b in mod.bindings:
+            if isinstance(b, TypedImport):
+                for it in b.items:
+                    for iname, mpath in zip(it.names, it.effective_module_paths):
+                        target = (
+                            mpath if mpath in self.all_modules
+                            else (iname if iname in self.all_modules else None)
+                        )
+                        if target is not None:
+                            mod_emitter.current_env_vars[iname] = (
+                                f"qv_{mangle_module_name(self.all_modules[target].name)}"
+                            )
+                            mod_emitter.current_env_vars[mpath] = (
+                                f"qv_{mangle_module_name(self.all_modules[target].name)}"
+                            )
         for b in mod.bindings:
             match b:
                 case TypedLetValue(name=vname, value=vval, symbol=vsym):
@@ -1967,7 +1993,7 @@ class CEmitter:
                             return "((void)0)"
                     elif mod_name in self.all_modules:
                         mod = self.all_modules[mod_name]
-                        clean_mod = mod_name.replace(".", "_")
+                        clean_mod = mangle_module_name(mod_name)
                         binding = next(
                             (b for b in mod.bindings if getattr(b, "name", None) == fld),
                             None,
@@ -2148,7 +2174,7 @@ class CEmitter:
                     mod_name = effective_func.target.name
                     fld = effective_func.field
                     mod = self.all_modules[mod_name]
-                    clean_mod = mod_name.replace(".", "_")
+                    clean_mod = mangle_module_name(mod.name)
                     fld_sym = mod.scope.values[fld]
                     c_func = mangle_module_ident(clean_mod, fld)
                     c_args = list(descriptor_args)

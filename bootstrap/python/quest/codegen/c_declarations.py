@@ -10,6 +10,7 @@ from quest.codegen.c_types import (
     RecordNamingContext,
     mangle_ident,
     mangle_module_ident,
+    mangle_module_name,
     normalize_type,
     option_struct_name,
     record_struct_name,
@@ -77,7 +78,7 @@ class CDeclarationEmitter:
         if analysis.sorted_modules:
             lines.append("/* Forward declarations and state for compiled modules */")
             for mod in analysis.sorted_modules:
-                clean_mod = mod.name.replace(".", "_")
+                clean_mod = mangle_module_name(mod.name)
                 if getattr(mod, "is_precompiled", False):
                     lines.append(f"extern QRecordVal qv_{clean_mod};")
                     lines.append(f"extern void qv_mod_{clean_mod}_init(void);")
@@ -94,7 +95,7 @@ class CDeclarationEmitter:
         if precompiled_mods:
             lines.append("/* External declarations for precompiled module functions */")
             for mod in precompiled_mods:
-                clean_mod = mod.name.replace(".", "_")
+                clean_mod = mangle_module_name(mod.name)
                 for val_name, val_sym in mod.scope.values.items():
                     type_val = val_sym.type_val
                     if isinstance(type_val, QAllType):

@@ -1063,19 +1063,24 @@ def eval_binding(binding: TypedBinding, env: RuntimeEnvironment) -> QValue:
             from quest.builtins import BuiltinModuleRegistry
 
             for item in items:
-                for name in item.names:
-                    if name in env.evaluated_modules:
-                        mod_val = env.evaluated_modules[name]
+                for local_name, mod_path in zip(item.names, item.effective_module_paths):
+                    if mod_path in env.evaluated_modules:
+                        mod_val = env.evaluated_modules[mod_path]
+                    elif local_name in env.evaluated_modules:
+                        mod_val = env.evaluated_modules[local_name]
                     else:
-                        mod_val = BuiltinModuleRegistry.get_runtime_module(name)
+                        mod_val = BuiltinModuleRegistry.get_runtime_module(mod_path)
+                        if mod_val is None:
+                            mod_val = BuiltinModuleRegistry.get_runtime_module(local_name)
                         if mod_val is None:
                             try:
-                                mod_val = env.lookup(name)
+                                mod_val = env.lookup(local_name)
                             except QuestRuntimeError:
                                 mod_val = None
                         if mod_val is None:
-                            if name in env.loaded_modules_ast:
-                                typed_mod = env.loaded_modules_ast[name]
+                            ast_mod = env.loaded_modules_ast.get(mod_path) or env.loaded_modules_ast.get(local_name)
+                            if ast_mod is not None:
+                                typed_mod = ast_mod
                                 mod_env = env.push_scope()
                                 for b in typed_mod.bindings:
                                     eval_binding(b, mod_env)
@@ -1083,14 +1088,16 @@ def eval_binding(binding: TypedBinding, env: RuntimeEnvironment) -> QValue:
                                 for val_name in typed_mod.scope.values:
                                     exported_fields[val_name] = mod_env.lookup(val_name)
                                 mod_val = QRecord(exported_fields)
-                                env.evaluated_modules[name] = mod_val
+                                env.evaluated_modules[mod_path] = mod_val
+                                env.evaluated_modules[local_name] = mod_val
                             else:
                                 from quest.module_loader import load_module_for_interpreter
-                                mod_val = load_module_for_interpreter(name, item.interface_name, env)
+                                mod_val = load_module_for_interpreter(mod_path, item.effective_interface_path, env)
                                 if mod_val is not None:
-                                    env.evaluated_modules[name] = mod_val
+                                    env.evaluated_modules[mod_path] = mod_val
+                                    env.evaluated_modules[local_name] = mod_val
                     if mod_val is not None:
-                        env.define(name, mod_val)
+                        env.define(local_name, mod_val)
             return OK_VALUE
 
         case TypedExprStmt(expr=inner_expr):

@@ -124,6 +124,13 @@ While this implementation strives for high fidelity to Luca Cardelli's
    first-class functions and closures is not supported due to portability, code versioning, and execution
    environment constraints.
 
+3. **Hierarchical Module Namespaces & Signature Aliasing:**
+   Cardelli's module system placed all interfaces and modules in a single flat namespace, with "systems of modules"
+   (§7.3) remaining an underspecified concept. This implementation of Quest introduces hierarchical module namespaces
+   with forward slashes (`/`) mapping directly to filesystem directory trees (e.g. `import util/random : util/Random;`),
+   along with two-tier local signature aliasing (`import rnd : Rnd = util/random : util/Random;` and
+   `import :Rnd = :util/Random;`).
+
 For full details on language extensions (including the `System` OS interface and native `external` syntax) as well as
 runtime additions, see [docs/extensions.md](docs/extensions.md).
 

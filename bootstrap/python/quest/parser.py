@@ -24,15 +24,17 @@ class Construct:
 
 @dataclass(frozen=True)
 class MatchToken(Construct):
-    """Matches a specific terminal TokenKind."""
+    """Matches a specific terminal TokenKind and optional lexeme."""
     kind: TokenKind
+    lexeme: Optional[str] = None
     can_match_empty: bool = False
 
     def evaluate(self, parser: Parser, pos: int) -> tuple[Opt[Any], int]:
         token = parser._peek(pos)
-        if token.kind == self.kind:
+        if token.kind == self.kind and (self.lexeme is None or token.lexeme == self.lexeme):
             return token, pos + 1
-        parser._record_failure(pos, self.kind.name)
+        name = f"{self.kind.name}('{self.lexeme}')" if self.lexeme else self.kind.name
+        parser._record_failure(pos, name)
         return None, pos
 
 

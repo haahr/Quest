@@ -72,8 +72,8 @@ When compiling a Quest program to native code via the C backend:
 
 ## External Syntax & Opaque C Data Structures
 
-To support native standard library modules and user-defined hybrid Quest/C extensions uniformly, Quest provides
-first-class `external` syntax for types and value bindings.
+To support native standard library modules and user-defined hybrid Quest/C extensions uniformly,
+this implementation of Quest provides first-class `external` syntax for types and value bindings.
 
 ### 1. External Type Definitions
 In module files (`.mod.quest`) or source files, an opaque C data structure is declared using `external`:
@@ -120,3 +120,49 @@ if not system.fileExists(filename) then
     system.sysexit(1);
 end;
 ```
+
+---
+
+## Hierarchical Module Namespaces and Signature Aliasing
+
+Cardelli's *Typeful Programming* (§7.1) specified modules and interfaces within a flat global namespace.
+While the speculative "systems of interfaces" section (§7.3) envisioned grouping interfaces to manage large
+codebases, it provided neither concrete formal syntax nor filesystem mapping conventions. In large applications—such
+as the self-hosted Quest compiler (`questc`)—a flat namespace invites name collisions and complicates repository
+organization.
+
+To solve this, this implementation of Quest introduces **hierarchical module and interface namespaces**
+using forward slashes (`/`), coupled with **two-tier signature aliasing**:
+
+### 1. Hierarchical Paths
+- Modules and interfaces can be organized into arbitrary subdirectory trees:
+  ```quest
+  import util/random : util/Random;
+  import :compiler/ast/Types;
+  ```
+- File lookup maps `/` directly to directory separators, resolving `util/random.mod.quest` and `util/random.int.quest`.
+- Relative sibling resolution ensures that a module in `util/calc.mod.quest` can import `math : Math` and locate
+  `util/math.mod.quest` before searching global include directories.
+- In value expressions (such as `10 / 2`), `/` remains the division operator; the parser only recognizes `/` as a
+  path separator in import items and module header interface specifications.
+
+### 2. Two-Tier Signature Aliasing
+To prevent local identifier collisions and provide concise local bindings, this implementation allows
+explicit aliasing of both module instances and interface types/kinds:
+- **Both Aliased**: `import rnd : Rnd = util/random : util/Random;`
+  Binds the module record as `rnd` and interface types as `Rnd` (e.g. `Rnd_T`).
+- **Module Aliased Only**: `import rnd = util/random : util/Random;`
+  Binds the module record as `rnd` and interface types as `Random` (e.g. `Random_T`).
+- **Interface Aliased with Module**: `import :Rnd = util/random : util/Random;`
+  Binds the module record as `random` and interface types as `Rnd`.
+- **Standalone Interface Aliased**: `import :Rnd = :util/Random;`
+  Binds interface types as `Rnd` into scope without instantiating any module.
+- **Multiple Modules**: `import r1 = util/rand1, r2 = util/rand2 : util/Random;`
+
+### 3. C Name Mangling
+In emitted C code and precompiled object files, slashes are mangled to `__` (double underscore):
+- Module record: `qv_util__random`
+- Module initializer: `qv_mod_util__random_init`
+- Direct functions: `qv_util__random_next`
+Single underscores (`_`) continue to separate module prefixes from member names, preventing symbol collisions.
+

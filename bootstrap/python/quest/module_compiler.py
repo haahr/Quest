@@ -40,6 +40,7 @@ def compile_module(
     extra_c_flags: Optional[list[str]] = None,
     source_map: Optional[SourceMap] = None,
     stem_name: Optional[str] = None,
+    canonical_name: Optional[str] = None,
 ) -> tuple[Path, Path]:
     """Compiles an AST ModuleDecl into .c and .o files."""
     if output_dir is None:
@@ -53,12 +54,13 @@ def compile_module(
 
     # 2. Load any imported interfaces or modules
     for imp in module_decl.imports:
-        if env.lookup_interface(imp.interface_name) is None:
-            load_interface(imp.interface_name, env)
-        for iname in imp.names:
-            if iname not in env.loaded_modules_ast:
+        iface_path = imp.effective_interface_path
+        if env.lookup_interface(iface_path) is None and env.lookup_interface(imp.interface_name) is None:
+            load_interface(iface_path, env)
+        for iname, mpath in zip(imp.names, imp.effective_module_paths):
+            if mpath not in env.loaded_modules_ast and iname not in env.loaded_modules_ast:
                 from quest.module_loader import load_module
-                load_module(iname, imp.interface_name, env)
+                load_module(mpath, iface_path, env)
 
     # 3. Elaborate module
     typed_mod = elaborate_module(module_decl, env)
@@ -84,13 +86,25 @@ def compile_module(
         if intf_file:
             cand_h = intf_file.parent / f"{intf_file.name.split('.')[0]}.h"
             if cand_h.is_file():
-                interface_header = cand_h.name
+                rel_cand = None
+                for s_dir in search_dirs:
+                    try:
+                        rel_cand = cand_h.relative_to(s_dir)
+                        break
+                    except ValueError:
+                        continue
+                interface_header = str(rel_cand) if rel_cand is not None else cand_h.name
 
     # 5. Determine exported functions
     exported_funs = set(target_interface_scope.values.keys())
 
+    mod_name = canonical_name or module_decl.name
+    if mod_name != typed_mod.name:
+        from dataclasses import replace
+        typed_mod = replace(typed_mod, name=mod_name)
+
     # 6. Emit C source
-    emitter = CEmitter(echo=False, module_prefix=module_decl.name)
+    emitter = CEmitter(echo=False, module_prefix=mod_name)
     c_source = emitter.emit_module(
         typed_mod,
         loaded_modules=env.loaded_modules_ast,
@@ -101,6 +115,8 @@ def compile_module(
     base = stem_name or module_decl.name.lower()
     c_file = output_dir / f"{base}.c"
     o_file = output_dir / f"{base}.o"
+    c_file.parent.mkdir(parents=True, exist_ok=True)
+    o_file.parent.mkdir(parents=True, exist_ok=True)
 
     c_file.write_text(c_source, encoding="utf-8")
 
@@ -165,6 +181,9 @@ def compile_module_file(
     env.current_dir = mod_path.parent
     env.include_paths = list(include_paths) if include_paths else []
 
+    from quest.module_loader import canonicalize_module_path
+    canon_name = canonicalize_module_path(mod_path, env.include_paths)
+
     return compile_module(
         decl,
         env,
@@ -175,4 +194,5 @@ def compile_module_file(
         extra_c_flags=extra_c_flags,
         source_map=source_map,
         stem_name=stem,
+        canonical_name=canon_name,
     )

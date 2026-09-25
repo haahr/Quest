@@ -126,6 +126,44 @@ def resolve_object_file(
     return None
 
 
+def canonicalize_module_path(
+    file_path: Path,
+    include_paths: list[Path],
+) -> str:
+    """Computes canonical hierarchical name relative to include_paths, QUEST_LIB, or DEFAULT_LIB_DIR."""
+    all_roots: list[Path] = []
+    env_lib = os.environ.get("QUEST_LIB")
+    if env_lib:
+        all_roots.append(Path(env_lib).resolve())
+    for inc in include_paths:
+        all_roots.append(Path(inc).resolve())
+    if DEFAULT_LIB_DIR.is_dir():
+        all_roots.append(DEFAULT_LIB_DIR.resolve())
+
+    all_roots.sort(key=lambda p: len(p.parts), reverse=True)
+    resolved = file_path.resolve()
+    for root in all_roots:
+        try:
+            rel = resolved.relative_to(root)
+            parts = list(rel.parts)
+            filename = parts[-1]
+            for ext in (".int.quest", ".mod.quest", ".qi", ".o"):
+                if filename.endswith(ext):
+                    filename = filename[: -len(ext)]
+                    break
+            parts[-1] = filename
+            return "/".join(parts)
+        except ValueError:
+            continue
+
+    filename = resolved.name
+    for ext in (".int.quest", ".mod.quest", ".qi", ".o"):
+        if filename.endswith(ext):
+            filename = filename[: -len(ext)]
+            break
+    return filename
+
+
 def load_interface(name: str, env: Environment) -> Scope:
     """Loads, validates, and elaborates an interface from a .int.quest file."""
     existing = env.lookup_interface(name)
@@ -187,10 +225,12 @@ def load_interface(name: str, env: Environment) -> Scope:
         )
 
     expected_base = file_path.name.split(".")[0].lower()
-    if decl.name.lower() != expected_base or decl.name.lower() != norm_name:
+    if decl.name.lower() != expected_base or decl.name.lower() != norm_name.split("/")[-1]:
         raise QuestTypeError(
             f"Interface declared in '{file_path.name}' has name '{decl.name}', which does not match file name"
         )
+
+    canon_name = canonicalize_module_path(file_path, env.include_paths)
 
     saved_dir = env.current_dir
     env.current_dir = file_path.parent
@@ -198,8 +238,11 @@ def load_interface(name: str, env: Environment) -> Scope:
     try:
         from quest.modules import elaborate_interface
         typed_iface = elaborate_interface(decl, env)
+        env.register_interface(name, typed_iface.scope)
         if decl.name != name:
-            env.register_interface(name, typed_iface.scope)
+            env.register_interface(decl.name, typed_iface.scope)
+        if canon_name != name:
+            env.register_interface(canon_name, typed_iface.scope)
         return typed_iface.scope
     finally:
         env._loading_interfaces.pop()
@@ -243,6 +286,13 @@ def load_module(name: str, expected_interface: str, env: Environment) -> TypedMo
         return _synthesize_precompiled_module()
 
     file_path = resolve_module_file(name, env.current_dir, env.include_paths)
+    canon_name = canonicalize_module_path(file_path, env.include_paths) if file_path else name
+    if canon_name in env.loaded_modules_ast:
+        typed_mod = env.loaded_modules_ast[canon_name]
+        if name != canon_name:
+            env.loaded_modules_ast[name] = typed_mod
+        return typed_mod
+
     if file_path is None:
         from quest.builtins import BuiltinModuleRegistry
         builtin_ast = BuiltinModuleRegistry.get_module_ast(name, env)
@@ -292,12 +342,16 @@ def load_module(name: str, expected_interface: str, env: Environment) -> TypedMo
         )
 
     expected_base = file_path.name.split(".")[0].lower()
-    if decl.name.lower() != expected_base or decl.name.lower() != norm_name:
+    if decl.name.lower() != expected_base or decl.name.lower() != norm_name.split("/")[-1]:
         raise QuestTypeError(
             f"Module declared in '{file_path.name}' has name '{decl.name}', which does not match file name"
         )
 
-    if decl.interface_name != expected_interface:
+    if (
+        decl.interface_name != expected_interface
+        and decl.interface_name.split("/")[-1] != expected_interface
+        and decl.interface_name != expected_interface.split("/")[-1]
+    ):
         raise QuestTypeError(
             f"Module '{decl.name}' in '{file_path.name}' implements interface '{decl.interface_name}', "
             f"expected '{expected_interface}'"
@@ -311,6 +365,11 @@ def load_module(name: str, expected_interface: str, env: Environment) -> TypedMo
         # Ensure target interface is loaded
         if env.lookup_interface(expected_interface) is None:
             load_interface(expected_interface, env)
+        if (
+            decl.interface_name != expected_interface
+            and env.lookup_interface(decl.interface_name) is None
+        ):
+            load_interface(decl.interface_name, env)
 
         from quest.modules import elaborate_module
         from quest.env import Scope
@@ -321,6 +380,8 @@ def load_module(name: str, expected_interface: str, env: Environment) -> TypedMo
         env.loaded_modules_ast[name] = typed_mod
         if decl.name != name:
             env.loaded_modules_ast[decl.name] = typed_mod
+        if canon_name != name:
+            env.loaded_modules_ast[canon_name] = typed_mod
         return typed_mod
     finally:
         env.current_scope = saved_scope
@@ -337,8 +398,17 @@ def load_module_for_interpreter(
     if name in r_env.evaluated_modules:
         return r_env.evaluated_modules[name]
 
+    file_path = resolve_module_file(name, r_env.current_dir, r_env.include_paths)
+    canon_name = canonicalize_module_path(file_path, r_env.include_paths) if file_path else name
+    if canon_name in r_env.evaluated_modules:
+        val = r_env.evaluated_modules[canon_name]
+        r_env.evaluated_modules[name] = val
+        return val
+
     if name in r_env.loaded_modules_ast:
         typed_mod = r_env.loaded_modules_ast[name]
+    elif canon_name in r_env.loaded_modules_ast:
+        typed_mod = r_env.loaded_modules_ast[canon_name]
     else:
         from quest.env import Environment
         type_env = Environment()
@@ -346,11 +416,15 @@ def load_module_for_interpreter(
         type_env.current_dir = r_env.current_dir
         typed_mod = load_module(name, expected_interface, type_env)
         r_env.loaded_modules_ast[name] = typed_mod
+        if canon_name != name:
+            r_env.loaded_modules_ast[canon_name] = typed_mod
 
     from quest.builtins import BuiltinModuleRegistry
     builtin_rec = BuiltinModuleRegistry.get_runtime_module(name)
     if not typed_mod.bindings and builtin_rec is not None:
         r_env.evaluated_modules[name] = builtin_rec
+        if canon_name != name:
+            r_env.evaluated_modules[canon_name] = builtin_rec
         return builtin_rec
 
     from quest.interpreter import eval_binding
@@ -366,4 +440,6 @@ def load_module_for_interpreter(
 
     rec = QRecord(exported_fields)
     r_env.evaluated_modules[name] = rec
+    if canon_name != name:
+        r_env.evaluated_modules[canon_name] = rec
     return rec

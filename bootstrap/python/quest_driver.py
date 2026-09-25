@@ -233,7 +233,10 @@ def run_driver(args: list[str]) -> int:
     try:
         ctx = CompilerContext.create(source_text, file_name, options=options)
         for obj in extra_objects:
+            from quest.module_loader import canonicalize_module_path
+            canon_mod = canonicalize_module_path(obj, options.include_paths)
             mod_name = obj.name.split(".")[0]
+            ctx.env.precompiled_modules.add(canon_mod)
             ctx.env.precompiled_modules.add(mod_name)
             if obj not in ctx.env.linked_objects:
                 ctx.env.linked_objects.append(obj)
@@ -470,7 +473,10 @@ def run_compile(args: list[str]) -> int:
 
     ctx = CompilerContext.create(source_text, file_name, options=options)
     for obj in extra_objects:
+        from quest.module_loader import canonicalize_module_path
+        canon_mod = canonicalize_module_path(obj, options.include_paths)
         mod_name = obj.name.split(".")[0]
+        ctx.env.precompiled_modules.add(canon_mod)
         ctx.env.precompiled_modules.add(mod_name)
         if obj not in ctx.env.linked_objects:
             ctx.env.linked_objects.append(obj)
