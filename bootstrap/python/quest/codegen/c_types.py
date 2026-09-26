@@ -378,13 +378,14 @@ def qval_wrap(expr_str: str, t: QType) -> str:
     """Wraps a scalar or pointer expression into a QVal union initializer."""
     t = t.prune() if hasattr(t, "prune") else t
     t = resolve_type_bound(t)
+    t = normalize_type(t)
     if qtype_to_c_type(t) == "QVal":
         return expr_str
     if t == OK_TYPE:
         return "Q_OK_VAL"
-    if resolve_record_bound(t) is not None:
+    if isinstance(t, QRecordType) or resolve_record_bound(t) is not None:
         return f"((QVal){{ .p = (void *)quest_record_box({expr_str}) }})"
-    if resolve_variant_bound(t) is not None:
+    if isinstance(t, QVariantType) or resolve_variant_bound(t) is not None:
         return f"((QVal){{ .p = (void *)quest_variant_box({expr_str}) }})"
     if t == INT_TYPE or t == BOOL_TYPE or t == CHAR_TYPE:
         return f"((QVal){{ .i = (int64_t)({expr_str}) }})"
@@ -397,11 +398,12 @@ def qval_unwrap(qval_expr: str, t: QType, ctx: Optional[RecordNamingContext] = N
     """Extracts the underlying concrete scalar or pointer from a QVal expression."""
     t = t.prune() if hasattr(t, "prune") else t
     t = resolve_type_bound(t)
+    t = normalize_type(t)
     if qtype_to_c_type(t, ctx) == "QVal":
         return qval_expr
-    if resolve_record_bound(t) is not None:
+    if isinstance(t, QRecordType) or resolve_record_bound(t) is not None:
         return f"(*((QRecordVal *)({qval_expr}.p)))"
-    if resolve_variant_bound(t) is not None:
+    if isinstance(t, QVariantType) or resolve_variant_bound(t) is not None:
         return f"(*((QVariantVal *)({qval_expr}.p)))"
     if t in (INT_TYPE, BOOL_TYPE, CHAR_TYPE):
         return f"({qval_expr}.i)"

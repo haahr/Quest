@@ -27,8 +27,10 @@
 
 #if defined(__GNUC__) || defined(__clang__)
 #  define Q_UNUSED __attribute__((unused))
+#  define Q_NORETURN __attribute__((noreturn))
 #else
 #  define Q_UNUSED
+#  define Q_NORETURN
 #endif
 
 /* Compile-time portable layout assertions */
@@ -324,12 +326,12 @@ QArrayWideVariant *quest_array_new_wide_variant(int64_t len, QVariantVal init_va
 int64_t  quest_array_size(const QArray *a);
 double   quest_real_pow(double base, double exp);
 const QException *quest_alloc_exception(const char *name);
-void     quest_raise(const QException *exc, QVal payload);
-void     quest_raise_divide_by_zero(void);
-void     quest_raise_array_error(void);
-void     quest_raise_string_error(void);
-void     quest_raise_variant_error(void);
-void     quest_raise_dynamic_error(void);
+Q_NORETURN void quest_raise(const QException *exc, QVal payload);
+Q_NORETURN void quest_raise_divide_by_zero(void);
+Q_NORETURN void quest_raise_array_error(void);
+Q_NORETURN void quest_raise_string_error(void);
+Q_NORETURN void quest_raise_variant_error(void);
+Q_NORETURN void quest_raise_dynamic_error(void);
 void     quest_print_val(QVal val, const char *type_name);
 
 /* Standard library singleton exceptions */
@@ -340,12 +342,12 @@ extern const QException quest_exc_int_error;
 extern const QException quest_exc_real_error;
 extern const QException quest_exc_system_error;
 
-void quest_raise_writer_error(void);
-void quest_raise_reader_error(void);
-void quest_raise_ascii_error(void);
-void quest_raise_int_error(void);
-void quest_raise_real_error(void);
-void quest_raise_system_error(void);
+Q_NORETURN void quest_raise_writer_error(void);
+Q_NORETURN void quest_raise_reader_error(void);
+Q_NORETURN void quest_raise_ascii_error(void);
+Q_NORETURN void quest_raise_int_error(void);
+Q_NORETURN void quest_raise_real_error(void);
+Q_NORETURN void quest_raise_system_error(void);
 
 /* System module primitives */
 extern QArray *quest_system_args;

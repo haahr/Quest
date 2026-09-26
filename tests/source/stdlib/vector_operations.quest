@@ -1,0 +1,188 @@
+(* Standard library: Pure Quest Vector module operations *)
+
+import collections/vector : collections/Vector;
+import writer: Writer;
+import conv: Conv;
+
+let wOut = writer.output;
+
+let printInt(n: Int): Ok =
+    begin
+        writer.putString(wOut conv.int(n));
+        writer.putString(wOut " ");
+    end;
+
+let printBool(b: Bool): Ok =
+    begin
+        writer.putString(wOut conv.bool(b));
+        writer.putString(wOut " ");
+    end;
+
+let printString(s: String): Ok =
+    begin
+        writer.putString(wOut s);
+        writer.putString(wOut " ");
+    end;
+
+let printNewline(dummy: Int): Ok =
+    writer.putString(wOut "\n");
+
+(* 1. Test new and empty on empty vector *)
+let v = vector.new(:Int);
+printBool(vector.empty(:Int v));
+printInt(vector.length(:Int v));
+printNewline(0);
+
+(* 2. Test append and growth beyond initial capacity floor of 6 *)
+for i = 1 upto 10 do
+    vector.append(:Int v i * 10);
+end;
+
+printBool(vector.empty(:Int v));
+printInt(vector.length(:Int v));
+printInt(vector.first(:Int v));
+printInt(vector.last(:Int v));
+printInt(vector.get(:Int v 4));
+printNewline(0);
+
+(* 3. Test set *)
+vector.set(:Int v 4 999);
+printInt(vector.get(:Int v 4));
+printNewline(0);
+
+(* 4. Test delete at index 4 (shifts elements 5..9 to 4..8) *)
+vector.delete(:Int v 4);
+printInt(vector.length(:Int v));
+printInt(vector.get(:Int v 4));
+printNewline(0);
+
+(* 5. Test pop and shrink *)
+let p1 = vector.pop(:Int v);
+let p2 = vector.pop(:Int v);
+printInt(p1);
+printInt(p2);
+printInt(vector.length(:Int v));
+printNewline(0);
+
+(* 6. Test toArray and fromArray *)
+let arr = vector.toArray(:Int v);
+let vFromArr = vector.fromArray(:Int arr);
+printInt(extent arr);
+printInt(vector.length(:Int vFromArr));
+printInt(vector.get(:Int vFromArr 0));
+printInt(vector.last(:Int vFromArr));
+printNewline(0);
+
+(* 7. Test copy and independent mutation *)
+let vCopy = vector.copy(:Int v);
+vector.set(:Int vCopy 0 7777);
+printInt(vector.get(:Int v 0));
+printInt(vector.get(:Int vCopy 0));
+printNewline(0);
+
+(* 8. Test concat *)
+let vConcat = vector.concat(:Int v vCopy);
+printInt(vector.length(:Int vConcat));
+printInt(vector.first(:Int vConcat));
+printInt(vector.last(:Int vConcat));
+printNewline(0);
+
+(* 9. Test clear *)
+vector.clear(:Int v);
+printBool(vector.empty(:Int v));
+printInt(vector.length(:Int v));
+printNewline(0);
+
+(* 10. Test exceptions on empty vector and out-of-bounds access *)
+let caughtEmptyFirst =
+    try
+        vector.first(:Int v);
+        false
+    when vector.error then
+        true
+    end;
+
+let caughtEmptyPop =
+    try
+        vector.pop(:Int v);
+        false
+    when vector.error then
+        true
+    end;
+
+let caughtOutOfBoundsGet =
+    try
+        vector.get(:Int vConcat 100);
+        false
+    when vector.error then
+        true
+    end;
+
+let caughtNegativeDelete =
+    try
+        vector.delete(:Int vConcat {0 - 1});
+        false
+    when vector.error then
+        true
+    end;
+
+printBool(caughtEmptyFirst);
+printBool(caughtEmptyPop);
+printBool(caughtOutOfBoundsGet);
+printBool(caughtNegativeDelete);
+printNewline(0);
+
+(* 11. Test vector with Tuple type *)
+Let Pair = Tuple
+    x: Int
+    y: Int
+end;
+
+let vPair = vector.new(:Pair);
+let pair1: Pair = tuple let x = 10 let y = 20 end;
+let pair2: Pair = tuple let x = 30 let y = 40 end;
+vector.append(:Pair vPair pair1);
+vector.append(:Pair vPair pair2);
+printInt(vector.length(:Pair vPair));
+let p0: Pair = vector.get(:Pair vPair 0);
+printInt(p0.x);
+printInt(p0.y);
+let pairUpdated: Pair = tuple let x = 99 let y = 88 end;
+vector.set(:Pair vPair 0 pairUpdated);
+let pair0Updated: Pair = vector.get(:Pair vPair 0);
+printInt(pair0Updated.x);
+printInt(pair0Updated.y);
+let pPopped: Pair = vector.pop(:Pair vPair);
+printInt(pPopped.x);
+printInt(pPopped.y);
+printInt(vector.length(:Pair vPair));
+printNewline(0);
+
+(* 12. Test vector with Record type *)
+Let Item = Record
+    id: Int
+    val: String
+end;
+
+let vItem = vector.new(:Item);
+let it1: Item = record id = 1 val = "one" end;
+let it2: Item = record id = 2 val = "two" end;
+let it3: Item = record id = 3 val = "three" end;
+vector.append(:Item vItem it1);
+vector.append(:Item vItem it2);
+vector.append(:Item vItem it3);
+printInt(vector.length(:Item vItem));
+let it0: Item = vector.get(:Item vItem 0);
+printInt(it0.id);
+printString(it0.val);
+printNewline(0);
+let itLast: Item = vector.last(:Item vItem);
+printInt(itLast.id);
+printString(itLast.val);
+printNewline(0);
+let vItemCopy = vector.copy(:Item vItem);
+let itPopped: Item = vector.pop(:Item vItem);
+printInt(itPopped.id);
+printInt(vector.length(:Item vItem));
+printInt(vector.length(:Item vItemCopy));
+printNewline(0);

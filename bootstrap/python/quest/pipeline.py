@@ -65,6 +65,8 @@ class CompilerOptions:
     target_env: Optional[dict[str, str]] = None
     target_stdin: Optional[str] = None
     extra_objects: list[Path] = field(default_factory=list)
+    build_dir: Optional[Path] = None
+    whole_program: bool = False
 
 
 @dataclass
@@ -93,8 +95,11 @@ class CompilerContext:
         r_env = runtime_env if runtime_env is not None else RuntimeEnvironment.create_root_env()
 
         # Wire include_paths and current_dir
+        environment.options = opts
         environment.include_paths = list(opts.include_paths)
-        r_env.include_paths = list(opts.include_paths)
+        if opts.build_dir and Path(opts.build_dir).resolve() not in [p.resolve() for p in environment.include_paths]:
+            environment.include_paths.insert(0, Path(opts.build_dir).resolve())
+        r_env.include_paths = list(environment.include_paths)
         r_env.loaded_modules_ast = environment.loaded_modules_ast
 
         if file_name and not file_name.startswith("<"):

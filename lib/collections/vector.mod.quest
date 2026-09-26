@@ -1,0 +1,250 @@
+(* Growable vector implementation backed by contiguous Quest arrays.
+ *
+ * Resizing & Memory Strategy:
+ * - Growth: When appending exceeds the backing array capacity, capacity grows by
+ *   a factor of 1.5x (cap + cap / 2), with an initial floor capacity of floorSize (6).
+ * - Shrinking: When vector utilization drops to 25% or below (length * 4 <= capacity)
+ *   and capacity exceeds floorSize, the backing array shrinks by half (50%), with a
+ *   lower bound of floorSize.
+ * - GC & Cleanup: On pop and delete, vacated slots are overwritten with element 0 to
+ *   release unneeded references immediately. When length reaches 0, the backing array
+ *   is reset to a zero-length array (array of :A end) so all references are released.
+ *)
+
+module vector : Vector
+export
+    (* Capacity floor for non-empty backing storage *)
+    let floorSize: Int = 6;
+
+    (* Tuple representation of a growable array *)
+    Let T = Fun(A::TYPE) Tuple
+        var data: Array(A)
+        var length: Int
+    end;
+
+    (* Exception raised on out-of-bounds access or empty vector operations *)
+    let error: Exception = exception error: Ok end;
+
+    (* Create a new empty vector *)
+    let new(A::TYPE): T(A) =
+        tuple
+            var data = array of :A end
+            var length = 0
+        end;
+
+    (* Return the number of elements in a vector *)
+    let length(A::TYPE)(v: T(A)): Int =
+        v.length;
+
+    (* Test whether a vector is empty *)
+    let empty(A::TYPE)(v: T(A)): Bool =
+        v.length == 0;
+
+    (* Return the element at the specified index, or raise error *)
+    let get(A::TYPE)(v: T(A) index: Int): A =
+        if {index < 0} \/ {index >= v.length} then
+            raise error end
+        else
+            v.data[index]
+        end;
+
+    (* Update the element at the specified index, or raise error *)
+    let set(A::TYPE)(v: T(A) index: Int value: A): Ok =
+        if {index < 0} \/ {index >= v.length} then
+            raise error end
+        else
+            v.data[index] := value
+        end;
+
+    (* Return the first element of a vector, or raise error if empty *)
+    let first(A::TYPE)(v: T(A)): A =
+        if v.length == 0 then
+            raise error end
+        else
+            v.data[0]
+        end;
+
+    (* Return the last element of a vector, or raise error if empty *)
+    let last(A::TYPE)(v: T(A)): A =
+        if v.length == 0 then
+            raise error end
+        else
+            v.data[v.length - 1]
+        end;
+
+    (* Append a new element to the end of a vector *)
+    let append(A::TYPE)(v: T(A) value: A): Ok =
+        begin
+            let cap: Int = extent v.data;
+            if v.length == cap then
+                let var newCap: Int = floorSize;
+                if cap > 0 then
+                    newCap := cap + {cap / 2};
+                end;
+                let newData: Array(A) = array of(newCap value);
+                if cap > 0 then
+                    for i = 0 upto {cap - 1} do
+                        newData[i] := v.data[i];
+                    end;
+                end;
+                v.data := newData;
+            end;
+            v.data[v.length] := value;
+            v.length := v.length + 1;
+            ok
+        end;
+
+    (* Helper to overwrite cleared slot and shrink backing storage when utilization is low *)
+    let shrinkAfterRemoval(A::TYPE)(v: T(A)): Ok =
+        if v.length == 0 then
+            v.data := array of :A end;
+            ok
+        else
+            v.data[v.length] := v.data[0];
+            let cap: Int = extent v.data;
+            if {{v.length * 4} <= cap} /\ {cap > floorSize} then
+                let var newCap: Int = cap / 2;
+                if newCap < floorSize then
+                    newCap := floorSize;
+                end;
+                if newCap < cap then
+                    let newData: Array(A) = array of(newCap v.data[0]);
+                    for i = 0 upto {v.length - 1} do
+                        newData[i] := v.data[i];
+                    end;
+                    v.data := newData;
+                end;
+            end;
+            ok
+        end;
+
+    (* Remove and return the last element of a vector, or raise error if empty *)
+    let pop(A::TYPE)(v: T(A)): A =
+        if v.length == 0 then
+            raise error end
+        else
+            let res: A = v.data[v.length - 1];
+            v.length := v.length - 1;
+            shrinkAfterRemoval(:A v);
+            res
+        end;
+
+    (* Delete the element at index and shift subsequent elements left; takes linear time in vector length *)
+    let delete(A::TYPE)(v: T(A) index: Int): Ok =
+        if {index < 0} \/ {index >= v.length} then
+            raise error end
+        else
+            if index < {v.length - 1} then
+                for i = index upto {v.length - 2} do
+                    v.data[i] := v.data[i + 1];
+                end;
+            end;
+            v.length := v.length - 1;
+            shrinkAfterRemoval(:A v);
+            ok
+        end;
+
+    (* Remove all elements from a vector *)
+    let clear(A::TYPE)(v: T(A)): Ok =
+        begin
+            v.data := array of :A end;
+            v.length := 0;
+            ok
+        end;
+
+    (* Create a shallow copy of a vector *)
+    let copy(A::TYPE)(v: T(A)): T(A) =
+        begin
+            let n: Int = v.length;
+            if n == 0 then
+                new(:A)
+            else
+                let var cap: Int = n;
+                if cap < floorSize then
+                    cap := floorSize;
+                end;
+                let newData: Array(A) = array of(cap v.data[0]);
+                for i = 0 upto {n - 1} do
+                    newData[i] := v.data[i];
+                end;
+                tuple
+                    var data = newData
+                    var length = n
+                end
+            end
+        end;
+
+    (* Concatenate two vectors into a new vector *)
+    let concat(A::TYPE)(v1: T(A) v2: T(A)): T(A) =
+        begin
+            let n1: Int = v1.length;
+            let n2: Int = v2.length;
+            let total: Int = n1 + n2;
+            if total == 0 then
+                new(:A)
+            else
+                let var cap: Int = total;
+                if cap < floorSize then
+                    cap := floorSize;
+                end;
+                let initElem: A =
+                    if n1 > 0 then
+                        v1.data[0]
+                    else
+                        v2.data[0]
+                    end;
+                let newData: Array(A) = array of(cap initElem);
+                if n1 > 0 then
+                    for i = 0 upto {n1 - 1} do
+                        newData[i] := v1.data[i];
+                    end;
+                end;
+                if n2 > 0 then
+                    for i = 0 upto {n2 - 1} do
+                        newData[n1 + i] := v2.data[i];
+                    end;
+                end;
+                tuple
+                    var data = newData
+                    var length = total
+                end
+            end
+        end;
+
+    (* Create a new vector containing the elements of an array *)
+    let fromArray(A::TYPE)(arr: Array(A)): T(A) =
+        begin
+            let n: Int = extent arr;
+            if n == 0 then
+                new(:A)
+            else
+                let var cap: Int = n;
+                if cap < floorSize then
+                    cap := floorSize;
+                end;
+                let newData: Array(A) = array of(cap arr[0]);
+                for i = 0 upto {n - 1} do
+                    newData[i] := arr[i];
+                end;
+                tuple
+                    var data = newData
+                    var length = n
+                end
+            end
+        end;
+
+    (* Create an array containing the elements of a vector *)
+    let toArray(A::TYPE)(v: T(A)): Array(A) =
+        begin
+            let n: Int = v.length;
+            if n == 0 then
+                array of :A end
+            else
+                let res: Array(A) = array of(n v.data[0]);
+                for i = 0 upto {n - 1} do
+                    res[i] := v.data[i];
+                end;
+                res
+            end
+        end;
+end;

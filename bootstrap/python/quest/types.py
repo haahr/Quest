@@ -239,14 +239,16 @@ class QTupleField:
     """A single (optionally named) value component in an ordered tuple type: [name:] T."""
     name: Optional[str]
     type_val: QType
+    is_var: bool = False
 
     def substitute(self, subst: dict[int, QType]) -> QTupleField:
-        return QTupleField(name=self.name, type_val=self.type_val.substitute(subst))
+        return QTupleField(name=self.name, type_val=self.type_val.substitute(subst), is_var=self.is_var)
 
     def __str__(self) -> str:
+        var_prefix = "var " if self.is_var else ""
         if self.name:
-            return f"{self.name}: {self.type_val}"
-        return f":{self.type_val}"
+            return f"{var_prefix}{self.name}: {self.type_val}"
+        return f"{var_prefix}:{self.type_val}"
 
 
 @dataclass(frozen=True)
@@ -344,6 +346,8 @@ class QTupleType(QType):
             elif isinstance(f1, QTupleField):
                 assert isinstance(f2, QTupleField)
                 if f1.name is not None and f2.name is not None and f1.name != f2.name:
+                    return False
+                if f1.is_var != f2.is_var:
                     return False
                 if f1.type_val != f2.type_val:
                     return False
@@ -1096,8 +1100,15 @@ def is_subtype(
                 elif isinstance(s_f, QTupleField) and isinstance(t_f, QTupleField):
                     if t_f.name is not None and s_f.name != t_f.name:
                         return False
-                    if not is_subtype(s_f.type_val, t_f.type_val, env, trail):
-                        return False
+                    if t_f.is_var:
+                        if not s_f.is_var:
+                            return False
+                        if not (is_subtype(s_f.type_val, t_f.type_val, env, trail)
+                                and is_subtype(t_f.type_val, s_f.type_val, env, trail)):
+                            return False
+                    else:
+                        if not is_subtype(s_f.type_val, t_f.type_val, env, trail):
+                            return False
                 elif isinstance(s_f, QTupleTypeBinding) and isinstance(t_f, QTupleTypeBinding):
                     if s_f.name != t_f.name or not is_subtype(s_f.type_val, t_f.type_val, env, trail):
                         return False
@@ -1737,7 +1748,8 @@ def qtype_dump(item: Union[QType, QKind], indent: int = 0) -> str:
                     )
                 elif isinstance(f, QTupleField):
                     field_strs.append(
-                        f"{pad}    (QTupleField {f.name or ''} {qtype_dump(f.type_val, indent + 2)})"
+                        f"{pad}    (QTupleField {f.name or ''}{' :var' if f.is_var else ''} "
+                        f"{qtype_dump(f.type_val, indent + 2)})"
                     )
                 elif isinstance(f, QTupleTypeBinding):
                     field_strs.append(

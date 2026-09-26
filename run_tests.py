@@ -146,6 +146,10 @@ def run_single_golden_test(
         "--stop-after",
         phase_name,
     ]
+    if phase_name in ("codegen_c", "run_c_compiled"):
+        build_dir = ROOT_DIR / ".build"
+        build_dir.mkdir(parents=True, exist_ok=True)
+        command.extend(["--build-dir", str(build_dir)])
     if expected_exit != 0:
         command.extend(["--expected-exit", str(expected_exit)])
 

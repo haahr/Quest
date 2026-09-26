@@ -388,6 +388,7 @@ class TupleBinding(ASTNode):
     name: Optional[str]
     value: Expr
     type_annot: Optional[Type] = None
+    is_var: bool = False
 
 
 @dataclass(frozen=True)

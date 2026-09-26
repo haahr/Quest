@@ -44,7 +44,7 @@ QType (Level 1)
   └── Metavariables           QTypeMeta (local bidirectional inference)
 
 QTupleComponent (Tuple Components)
-  ├── QTupleField             Value field: name (optional), type_val
+  ├── QTupleField             Value field: name (optional), type_val, is_var
   ├── QTupleTypeFormal        Existential type formal: name, symbol_id, bound
   └── QTupleTypeBinding       Manifest type binding: name, type_val, bound
 ```
@@ -128,6 +128,11 @@ Subtyping between tuple types implements Cardelli's extended subsignature rules 
    A tuple with a concrete manifest binding is a subtype of a tuple with an abstract type formal:
    `Tuple Def A::TYPE = Int a:A end <: Tuple A::TYPE a:A end`.
    The manifest type definition is substituted into remaining components of the supertype signature.
+5. **Mutable Component Invariance and Covariance (Cardelli §4.8):**
+   - If supertype component is mutable (`var`), subtype component must also be mutable and types must match
+     invariantly ($S.f \le: T.f \land T.f \le: S.f$).
+   - If supertype component is immutable, a mutable subtype component is allowed by forgetting mutability
+     (`Tuple var a:A end <: Tuple a:A end`).
 
 ### 4.3. Existential Packing and Witness Checking
 Existential packages are constructed using tuple expressions with type witness bindings:

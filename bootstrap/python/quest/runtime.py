@@ -312,6 +312,23 @@ class QTuple(QValue):
             raise KeyError(f"Tuple has no labeled component '{name}'")
         return self.elements[self._name_to_index[name]]
 
+    def set_by_index(self, index: int, value: QValue) -> None:
+        if index < 0 or index >= len(self.elements):
+            raise IndexError(f"Tuple index {index} out of bounds [0, {len(self.elements)})")
+        elems = list(self.elements)
+        elems[index] = value
+        self.elements = tuple(elems)
+
+    def set_by_name(self, name: str, value: QValue) -> None:
+        if name in self._name_to_index:
+            self.set_by_index(self._name_to_index[name], value)
+        elif name.isdigit():
+            self.set_by_index(int(name), value)
+        elif name.startswith("_") and name[1:].isdigit():
+            self.set_by_index(int(name[1:]), value)
+        else:
+            raise KeyError(f"Tuple has no labeled component '{name}'")
+
     def to_str(self, visited: Optional[set[int]] = None) -> str:
         if visited is None:
             visited = set()

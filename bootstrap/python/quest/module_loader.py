@@ -32,6 +32,38 @@ if TYPE_CHECKING:
 DEFAULT_LIB_DIR = (Path(__file__).parent.parent.parent.parent / "lib").resolve()
 
 
+def is_c_compilation_mode(env: Environment) -> bool:
+    """Checks whether the compiler environment is actively compiling or generating C code."""
+    opts = getattr(env, "options", None)
+    if opts is None:
+        return False
+    if getattr(opts, "whole_program", False):
+        return False
+    if getattr(opts, "stop_after", None) in ("codegen_c", "run_c_compiled"):
+        return True
+    if getattr(opts, "emit_c", False):
+        return True
+    if getattr(opts, "output_path", None) is not None:
+        return True
+    if any(p in ("codegen_c", "run_c_compiled") for p in getattr(opts, "dump_after", ())):
+        return True
+    return False
+
+
+def _is_artifact_stale(artifact: Path, sources: list[Path]) -> bool:
+    """Returns True if artifact does not exist or any source file has a newer mtime."""
+    if not artifact.is_file():
+        return True
+    try:
+        art_mtime = artifact.stat().st_mtime
+        for src in sources:
+            if src.is_file() and src.stat().st_mtime > art_mtime:
+                return True
+        return False
+    except OSError:
+        return True
+
+
 def resolve_interface_file(
     name: str,
     current_dir: Optional[Path],
@@ -179,6 +211,47 @@ def load_interface(name: str, env: Environment) -> Scope:
         )
 
     file_path = resolve_interface_file(name, env.current_dir, env.include_paths)
+
+    # Hierarchical interface compilation on-demand in C compilation mode
+    if is_c_compilation_mode(env) and "/" in name:
+        opts = getattr(env, "options", None)
+        build_dir = getattr(opts, "build_dir", None)
+        if build_dir is not None:
+            out_root = Path(build_dir).resolve()
+        elif file_path is not None:
+            rel_parts = len(Path(name.lower()).parts)
+            out_root = file_path.parents[rel_parts - 1].resolve()
+        else:
+            out_root = (env.current_dir or Path.cwd()).resolve()
+
+        qi_file = out_root / f"{name.lower()}.qi"
+        sources: list[Path] = []
+        if file_path and file_path.is_file():
+            sources.append(file_path)
+        mod_src = resolve_module_file(name, env.current_dir, env.include_paths)
+        if mod_src and mod_src.is_file():
+            sources.append(mod_src)
+
+        if _is_artifact_stale(qi_file, sources) and file_path is not None and mod_src is not None:
+            from quest.module_compiler import compile_hierarchical_module
+            compile_hierarchical_module(
+                name.lower(),
+                output_dir=out_root,
+                current_dir=env.current_dir,
+                include_paths=env.include_paths,
+            )
+
+        if qi_file.is_file():
+            from quest.interface_compiler import load_interface_from_qi_file
+            if out_root not in env.include_paths:
+                env.include_paths.insert(0, out_root)
+            scope = load_interface_from_qi_file(qi_file, env)
+            env.register_interface(name, scope)
+            decl_name = name.split("/")[-1]
+            if decl_name != name:
+                env.register_interface(decl_name, scope)
+            return scope
+
     if file_path is None:
         from quest.builtins import BuiltinModuleRegistry
         builtin_iface = BuiltinModuleRegistry.get_interface(name, env)
@@ -292,6 +365,44 @@ def load_module(name: str, expected_interface: str, env: Environment) -> TypedMo
         if name != canon_name:
             env.loaded_modules_ast[name] = typed_mod
         return typed_mod
+
+    # Hierarchical module separate compilation in C compilation mode
+    if is_c_compilation_mode(env) and ("/" in canon_name or "/" in name):
+        opts = getattr(env, "options", None)
+        build_dir = getattr(opts, "build_dir", None)
+        if build_dir is not None:
+            out_root = Path(build_dir).resolve()
+        elif file_path is not None:
+            rel_parts = len(Path(canon_name).parts)
+            out_root = file_path.parents[rel_parts - 1].resolve()
+        else:
+            out_root = (env.current_dir or Path.cwd()).resolve()
+
+        obj_file = out_root / f"{canon_name}.o"
+        sources: list[Path] = []
+        if file_path and file_path.is_file():
+            sources.append(file_path)
+        intf_src = resolve_interface_file(expected_interface, env.current_dir, env.include_paths)
+        if intf_src and intf_src.is_file():
+            sources.append(intf_src)
+
+        if _is_artifact_stale(obj_file, sources) and file_path is not None:
+            from quest.module_compiler import compile_hierarchical_module
+            compile_hierarchical_module(
+                canon_name,
+                output_dir=out_root,
+                current_dir=env.current_dir,
+                include_paths=env.include_paths,
+            )
+
+        if obj_file.is_file():
+            if obj_file not in env.linked_objects:
+                env.linked_objects.append(obj_file)
+            env.precompiled_modules.add(name)
+            env.precompiled_modules.add(canon_name)
+            if out_root not in env.include_paths:
+                env.include_paths.insert(0, out_root)
+            return _synthesize_precompiled_module()
 
     if file_path is None:
         from quest.builtins import BuiltinModuleRegistry

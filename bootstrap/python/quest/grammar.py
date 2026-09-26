@@ -196,6 +196,7 @@ def _process_tuple_bindings(bindings: tuple[Any, ...]) -> tuple[Any, ...]:
                     ast.TupleBinding(
                         name=item.name,
                         value=fn_expr,
+                        is_var=item.is_var,
                         offset=item.offset,
                     )
                 )
@@ -205,6 +206,7 @@ def _process_tuple_bindings(bindings: tuple[Any, ...]) -> tuple[Any, ...]:
                         name=item.name,
                         value=item.value,
                         type_annot=item.type_annot,
+                        is_var=item.is_var,
                         offset=item.offset,
                     )
                 )
@@ -231,6 +233,7 @@ def _process_tuple_bindings(bindings: tuple[Any, ...]) -> tuple[Any, ...]:
                     ast.TupleBinding(
                         name=getattr(item, "name", None),
                         value=getattr(item, "value", getattr(item, "expr", item)),
+                        is_var=getattr(item, "is_var", False),
                         offset=getattr(item, "offset", 0),
                     )
                 )
@@ -1644,6 +1647,19 @@ def build_quest_grammar() -> None:
             is_rec=bool(rec_token),
             is_var=val_declaration.is_var,
             offset=let_token.offset,
+        ),
+    )
+    # var ValueDecl (allows 'var x = 0' inside tuples, blocks, or module phrases)
+    PHRASE.add_rule(
+        (T(TK.KW_VAR), VALUE_DECL),
+        lambda var_token, val_declaration: ast.LetValueBinding(
+            name=val_declaration.name,
+            value=val_declaration.value,
+            params=val_declaration.params,
+            type_annot=val_declaration.type_annot,
+            is_rec=False,
+            is_var=True,
+            offset=var_token.offset,
         ),
     )
     # DEF KindDecl

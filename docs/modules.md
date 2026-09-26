@@ -421,6 +421,31 @@ When compiling hierarchical interfaces and modules:
    C code generates external references to `qv_util__calc` and `qv_util__calc_multiply`, binding the local variable
    `qv_c` to the canonical module record.
 
+### 9.5. Hierarchical Separate Compilation and On-Demand Builds
+To maintain high performance, modular boundaries, and clean test separation:
+1. **Canonical Hierarchical Identification:**
+   A module or interface is classified as hierarchical if and only if its canonical include-relative path contains a
+   slash `/` (e.g. `collections/vector`). Modules directly in `lib/` (`list`, `writer`, `conv`, etc.) have flat
+   canonical names and remain whole-program / direct source modules.
+2. **Phase Partitioning:**
+   - Whole-program behavior is preserved for `tokenize`, `parse`, `typecheck`, and `interpret`. The AST interpreter
+     evaluates modules directly from source.
+   - Separate compilation is always used for hierarchical modules during C phases (`codegen_c` and `run_c_compiled`).
+3. **On-Demand Compilation & Build Directory:**
+   - In C compilation modes, the module loader automatically triggers on-demand compilation of hierarchical modules
+     to `.qi`, `.h`, `.c`, and `.o` artifacts.
+   - The build output directory can be explicitly specified via `--build-dir <dir>` (such as `.build/` in test runs).
+     If unspecified, artifacts are compiled alongside the source files in their directory tree.
+   - Artifacts are only rebuilt when stale relative to `.int.quest` and `.mod.quest` source modification timestamps.
+4. **Self-Contained Client External Declarations:**
+   - In emitted client C code, the compiler generates self-contained `extern` prototypes for functions, initializers,
+     and records of precompiled modules.
+   - *Design rationale:* Compiling (as opposed to linking) the importer's C source file does not depend on whether the
+     module implementation has already been compiled or on header include paths.
+5. **Whole-Program Override:**
+   - The `--whole-program` compiler flag overrides this default, forcing the compiler to inline all imported module
+     implementations directly into the client C translation unit.
+
 ---
 
 ## See Also

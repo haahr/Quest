@@ -23,9 +23,11 @@ htmlcov/
 *.so
 *.dylib
 *.out
+*.qi
 !tests/golden/**/*.out
 !tests/golden/**/*.error
 build/
+.build/
 bin/
 dist/
 *.code-workspace

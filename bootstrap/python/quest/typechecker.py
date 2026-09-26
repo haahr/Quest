@@ -1357,12 +1357,13 @@ class TypeElaborator:
                     else:
                         val_typed = self.synth_expr(b.value, env, loop_depth)
                     elem_typeds.append(val_typed)
-                    q_fields.append(QTupleField(name=b.name, type_val=val_typed.type_val))
+                    q_fields.append(QTupleField(name=b.name, type_val=val_typed.type_val, is_var=b.is_var))
                     if b.name is not None:
                         env.current_scope.declare_value(
                             ValueSymbol(
                                 name=b.name,
                                 type_val=val_typed.type_val,
+                                is_var=b.is_var,
                                 function_depth=self.function_depth,
                             )
                         )
@@ -1459,7 +1460,7 @@ class TypeElaborator:
                             )
                         )
 
-                    case QTupleField(name=field_name, type_val=field_type):
+                    case QTupleField(name=field_name, type_val=field_type, is_var=exp_is_var):
                         if isinstance(b, (ast.LetTypeBinding, ast.DefTypeBinding)):
                             raise TypeError(
                                 f"Unexpected type binding '{b.name}' for value field '{field_name}'",
@@ -1471,7 +1472,21 @@ class TypeElaborator:
                                 offset=b.offset,
                             )
                         expected_field_type = field_type.substitute(witness_subst)
-                        if getattr(b, "type_annot", None) is not None:
+                        b_is_var = getattr(b, "is_var", False)
+                        if exp_is_var:
+                            if not b_is_var:
+                                raise TypeError(
+                                    f"Tuple field '{field_name or ''}' must be declared mutable (var)",
+                                    offset=getattr(b, "offset", expr.offset),
+                                )
+                            val_typed = self.check_expr(b.value, expected_field_type, env, loop_depth)
+                            if not is_type_equal(val_typed.type_val, expected_field_type, env):
+                                raise TypeError(
+                                    f"Mutable tuple field '{field_name or ''}' is invariant; "
+                                    f"expected '{expected_field_type}', got '{val_typed.type_val}'",
+                                    offset=getattr(b, "offset", expr.offset),
+                                )
+                        elif getattr(b, "type_annot", None) is not None:
                             annot_type = elaborate_type(b.type_annot, env)
                             if not is_subtype(annot_type, expected_field_type, env):
                                 raise TypeError(
@@ -1488,6 +1503,7 @@ class TypeElaborator:
                                 ValueSymbol(
                                     name=field_name,
                                     type_val=expected_field_type,
+                                    is_var=exp_is_var,
                                     function_depth=self.function_depth,
                                 )
                             )
@@ -2489,10 +2505,39 @@ class TypeElaborator:
                 rhs_typed = self.check_expr(expr.right, sym.type_val, env, loop_depth)
                 return TypedAssign(target=target_node, value=rhs_typed, offset=expr.offset)
 
-            # Target 2: Record field selection (r.field := rhs)
+            # Target 2: Record or Tuple field selection (r.field := rhs, t.field := rhs)
             case ast.ExprSelect(target=target, field=field, offset=sel_off):
                 target_typed = self.synth_expr(target, env, loop_depth)
                 target_type = target_typed.type_val.evaluate_lazily(env)
+                if isinstance(target_type, QTupleType):
+                    tup_f = None
+                    for i, f in enumerate(target_type.value_fields):
+                        if (
+                            f.name == field
+                            or str(i) == field
+                            or (field.startswith("_") and field[1:] == str(i))
+                        ):
+                            tup_f = f
+                            break
+                    if tup_f is None:
+                        raise TypeError(
+                            f"Tuple type '{target_type}' has no field named '{field}'",
+                            offset=sel_off,
+                        )
+                    if not tup_f.is_var:
+                        raise TypeError(
+                            f"Cannot assign to immutable tuple field '{field}'",
+                            offset=sel_off,
+                        )
+                    rhs_typed = self.check_expr(expr.right, tup_f.type_val, env, loop_depth)
+                    target_select = TypedSelect(
+                        target=target_typed,
+                        field=field,
+                        type_val=tup_f.type_val,
+                        offset=sel_off,
+                    )
+                    return TypedAssign(target=target_select, value=rhs_typed, offset=expr.offset)
+
                 rec_bound = resolve_record_bound(target_type, env)
                 if rec_bound is None:
                     raise TypeError(

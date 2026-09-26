@@ -129,6 +129,18 @@ def run_driver(args: list[str]) -> int:
         default=0,
         help="Expected exit code of target program (for testing).",
     )
+    arg_parser.add_argument(
+        "--build-dir", "--build_dir",
+        dest="build_dir",
+        default=None,
+        help="Directory path for transient build artifacts.",
+    )
+    arg_parser.add_argument(
+        "--whole-program", "--whole_program",
+        dest="whole_program",
+        action="store_true",
+        help="Force whole-program compilation (inline all modules from source).",
+    )
 
     parsed_args = arg_parser.parse_args(driver_args)
 
@@ -224,6 +236,8 @@ def run_driver(args: list[str]) -> int:
         target_args=target_args,
         expected_exit=parsed_args.expected_exit,
         extra_objects=extra_objects,
+        build_dir=Path(parsed_args.build_dir) if parsed_args.build_dir else None,
+        whole_program=parsed_args.whole_program,
     )
 
     sys.argv = [file_name] + target_args
@@ -388,6 +402,18 @@ def run_compile(args: list[str]) -> int:
         action="store_true",
         help="Print Cardelli-format result of the final phrase when compiling C code.",
     )
+    arg_parser.add_argument(
+        "--build-dir", "--build_dir",
+        dest="build_dir",
+        default=None,
+        help="Directory path for transient build artifacts.",
+    )
+    arg_parser.add_argument(
+        "--whole-program", "--whole_program",
+        dest="whole_program",
+        action="store_true",
+        help="Force whole-program compilation (inline all modules from source).",
+    )
 
     parsed_args = arg_parser.parse_args(args)
 
@@ -469,6 +495,8 @@ def run_compile(args: list[str]) -> int:
         nogc=parsed_args.nogc,
         print_result=parsed_args.print_result,
         extra_objects=extra_objects,
+        build_dir=Path(parsed_args.build_dir) if parsed_args.build_dir else None,
+        whole_program=parsed_args.whole_program,
     )
 
     ctx = CompilerContext.create(source_text, file_name, options=options)

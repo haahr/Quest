@@ -88,6 +88,7 @@ class CProgramAnalysis:
     all_program_types: list[QType]
     top_funs_dict: dict[str, tuple[TypedFun, Any]]
     specializations: dict[tuple[str, tuple[QType, ...]], tuple[str, TypedFun]]
+    specialization_origin_modules: dict[str, str] = field(default_factory=dict)
     needed_builtin_modules: list[str] = field(default_factory=list)
 
 
@@ -160,8 +161,8 @@ def collect_fun_quantifiers(fun_type: QType) -> tuple[tuple[QQuantifier, ...], Q
 
 
 def is_specialization_needed(t: QType) -> bool:
-    """Returns True if type t contains records or variants requiring call-site specialization."""
-    if isinstance(t, (QRecordType, QVariantType)):
+    """Returns True if type t contains records, variants, or tuples requiring call-site specialization."""
+    if isinstance(t, (QRecordType, QVariantType, QTupleType)):
         return True
     if resolve_record_bound(t) is not None or resolve_variant_bound(t) is not None:
         return True
@@ -555,15 +556,22 @@ def analyze_program_for_c(
 
     # Index module functions for possible specialization
     module_funs_dict: dict[str, tuple[TypedFun, Any]] = {}
+    fun_origin_module: dict[str, str] = {}
     for mod in sorted_modules:
         clean_mod = mangle_module_name(mod.name)
         for b in mod.bindings:
             if isinstance(b, TypedLetValue) and isinstance(b.value, TypedFun):
                 module_funs_dict[f"{mod.name}.{b.name}"] = (b.value, b.symbol)
                 module_funs_dict[f"{clean_mod}.{b.name}"] = (b.value, b.symbol)
+                fun_origin_module[f"{mod.name}.{b.name}"] = clean_mod
+                fun_origin_module[f"{clean_mod}.{b.name}"] = clean_mod
+                if b.name not in module_funs_dict:
+                    module_funs_dict[b.name] = (b.value, b.symbol)
+                    fun_origin_module[b.name] = clean_mod
 
     # 2. Call-site specialization discovery and synthesis
     specializations: dict[tuple[str, tuple[QType, ...]], tuple[str, TypedFun]] = {}
+    specialization_origin_modules: dict[str, str] = {}
     funs_dict: dict[str, tuple[TypedFun, Any]] = {**module_funs_dict, **top_funs_dict}
     worklist: list[Any] = list(prog.phrases)
 
@@ -580,6 +588,10 @@ def analyze_program_for_c(
             orig_fun, orig_sym = orig
             spec_ident, spec_fun = specialize_typed_fun(fname, orig_fun, targs)
             specializations[spec_key] = (spec_ident, spec_fun)
+            if "." in fname:
+                specialization_origin_modules[spec_ident] = fname.split(".")[0]
+            elif fname in fun_origin_module:
+                specialization_origin_modules[spec_ident] = fun_origin_module[fname]
             top_funs.append((spec_ident, spec_fun, orig_sym))
             top_funs_dict[spec_ident] = (spec_fun, orig_sym)
             funs_dict[spec_ident] = (spec_fun, orig_sym)
@@ -692,5 +704,6 @@ def analyze_program_for_c(
         all_program_types=all_program_types,
         top_funs_dict=top_funs_dict,
         specializations=specializations,
+        specialization_origin_modules=specialization_origin_modules,
         needed_builtin_modules=needed_builtin_modules,
     )

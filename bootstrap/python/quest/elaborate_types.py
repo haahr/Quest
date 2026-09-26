@@ -259,7 +259,11 @@ def elaborate_type(ast_type: ast.Type, env: Environment) -> QType:
                             field_type = elaborate_type(type_sig, env)
                             check_kind(field_type, TYPE_KIND, env)
                             components.append(
-                                QTupleField(name=name if name else None, type_val=field_type)
+                                QTupleField(
+                                    name=name if name else None,
+                                    type_val=field_type,
+                                    is_var=(mode == ast.ParamMode.VAR),
+                                )
                             )
                             if name:
                                 env.current_scope.declare_value(

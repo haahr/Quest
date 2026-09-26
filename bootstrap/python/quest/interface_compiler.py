@@ -98,17 +98,26 @@ def format_type_for_qi(t: QType) -> str:
         return f"Array({format_type_for_qi(t.element_type)})"
 
     if isinstance(t, QRecordType):
-        fields = " ".join(f"{f.name}: {format_type_for_qi(f.type_val)}" for f in t.fields)
+        fields = " ".join(
+            f"{'var ' if f.is_var else ''}{f.name}: {format_type_for_qi(f.type_val)}"
+            for f in t.fields
+        )
         return f"Record {fields} end" if fields else "Record end"
 
     if isinstance(t, QTupleType):
         parts: list[str] = []
         for f in t.fields:
             if isinstance(f, QTupleField):
+                var_p = "var " if f.is_var else ""
                 if f.name:
-                    parts.append(f"{f.name}: {format_type_for_qi(f.type_val)}")
+                    parts.append(f"{var_p}{f.name}: {format_type_for_qi(f.type_val)}")
                 else:
-                    parts.append(format_type_for_qi(f.type_val))
+                    parts.append(f"{var_p}:{format_type_for_qi(f.type_val)}")
+            elif isinstance(f, QTupleTypeFormal):
+                parts.append(f"{f.name}::{format_kind_for_qi(f.bound)}")
+            elif isinstance(f, QTupleTypeBinding):
+                b_str = f"::{format_kind_for_qi(f.bound)} " if f.bound else ""
+                parts.append(f"Let {f.name}{b_str}= {format_type_for_qi(f.type_val)}")
         return f"Tuple {' '.join(parts)} end" if parts else "Tuple end"
 
     if isinstance(t, QVariantType):
@@ -145,6 +154,31 @@ def format_type_for_qi(t: QType) -> str:
     return str(t)
 
 
+def format_kind_for_qi(k: ast.Kind | None) -> str:
+    """Formats an AST Kind into a valid Quest syntax string for .qi metadata."""
+    if k is None or isinstance(k, ast.KindType):
+        return "TYPE"
+    match k:
+        case ast.KindAll(param_name=pname, param_kind=pkind, body_kind=bkind):
+            return f"ALL({pname}::{format_kind_for_qi(pkind)}) {format_kind_for_qi(bkind)}"
+        case ast.KindPower(bound=bound):
+            return f"POWER({bound})"
+        case ast.KindId(name=name):
+            return name
+        case ast.KindManifest(interface_name=iname, kind_name=kname):
+            return f"{iname}_{kname}"
+        case _:
+            return "TYPE"
+
+
+def _parse_and_elaborate_kind_in_env(kind_str: str, env: Environment) -> QKind:
+    """Parses and elaborates a Quest kind string within an existing environment/scope."""
+    source_map = SourceMap(kind_str, "<kind>")
+    tokens = Tokenizer(kind_str, "<kind>").tokenize_all()
+    ast_k = parse_quest_program(tokens, source_map, target="Kind")
+    return elaborate_kind(ast_k, env)
+
+
 def _parse_and_elaborate_type_in_env(type_str: str, env: Environment) -> QType:
     """Parses and elaborates a Quest type string within an existing environment/scope."""
     source_map = SourceMap(type_str, "<type>")
@@ -164,7 +198,7 @@ def compile_interface_to_qi(decl: ast.InterfaceDecl, iface_scope: Scope) -> str:
     # Collect types
     for sig in decl.signatures:
         if isinstance(sig, ast.TypeFormal):
-            kind_str = "TYPE" if sig.bound is None or isinstance(sig.bound, ast.KindType) else str(sig.bound)
+            kind_str = format_kind_for_qi(sig.bound)
             type_records.append(
                 QRecord(
                     {
@@ -284,7 +318,10 @@ def compile_interface_to_header(decl: ast.InterfaceDecl, iface_scope: Scope) -> 
             val_t = val_sym.type_val if val_sym else None
             if isinstance(val_t, (QFunType, QAllType)):
                 inner_fn = val_t.body if isinstance(val_t, QAllType) else val_t
-                ret_c_type = qtype_to_c_type(inner_fn.result_type)
+                if isinstance(inner_fn, QFunType):
+                    ret_c_type = qtype_to_c_type(inner_fn.result_type)
+                else:
+                    ret_c_type = qtype_to_c_type(inner_fn)
                 param_c_types: list[str] = []
                 if isinstance(val_t, QAllType):
                     for q in val_t.quantifiers:
@@ -415,10 +452,10 @@ def load_interface_from_qi_file(file_path: Path, env: Environment) -> Scope:
                     kind_str = str(t_item.fields["kind"].value)
                     manifest_str = str(t_item.fields["manifestType"].value)
 
-                    bound_kind = TYPE_KIND
+                    bound_kind: QKind = TYPE_KIND
                     if kind_str and kind_str != "TYPE":
                         try:
-                            bound_kind = _parse_and_elaborate_type_in_env(kind_str, env)
+                            bound_kind = _parse_and_elaborate_kind_in_env(kind_str, env)
                         except Exception:
                             bound_kind = TYPE_KIND
 

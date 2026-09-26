@@ -175,5 +175,7 @@ Comprehensive documentation for the language, formal semantics, and compiler sub
 
 ### Implementation Plans
 - [docs/roadmap.md](docs/roadmap.md): Complete seven-stage implementation roadmap.
+- [docs/quest-self-hosting-prerequisites.md](docs/quest-self-hosting-prerequisites.md): Architectural prerequisites,
+  runtime libraries, and subsystem capabilities required for self-hosting.
 - [docs/step3-interpreter.md](docs/step3-interpreter.md): Detailed implementation plan for the Step 3 tree-walking
   interpreter and interactive REPL.

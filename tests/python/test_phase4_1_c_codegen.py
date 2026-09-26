@@ -109,6 +109,18 @@ class TestPhase41Codegen(unittest.TestCase):
         self.assertEqual(proc.returncode, 0)
         self.assertIn("15 : Int", proc.stdout)
 
+    def test_mutable_tuple(self):
+        """Tests mutable tuple field assignment in C codegen."""
+        code = """
+        let t = tuple let var a = 10 let var b = 20 end;
+        t.a := t.a + 5;
+        t.b := t.b + 10;
+        t.a + t.b
+        """
+        proc = self.compile_quest(code)
+        self.assertEqual(proc.returncode, 0)
+        self.assertIn("45 : Int", proc.stdout)
+
     def test_conditional_if(self):
         """Tests if-then-else expressions and statements."""
         code = """

@@ -548,14 +548,20 @@ def eval_expr(expr: TypedExpr, env: RuntimeEnvironment) -> QValue:
                     rec_val = eval_expr(rec_expr, env)
                     while isinstance(rec_val, QRef):
                         rec_val = rec_val.deref()
-                    if not isinstance(rec_val, QRecord):
-                        raise QuestRuntimeError("Field assignment target must be Record", offset=offset)
-                    field_cell = rec_val.get(field)
-                    if isinstance(field_cell, QRef):
-                        field_cell.assign(rhs_val)
+                    if isinstance(rec_val, QRecord):
+                        field_cell = rec_val.get(field)
+                        if isinstance(field_cell, QRef):
+                            field_cell.assign(rhs_val)
+                        else:
+                            rec_val.fields[field] = rhs_val
+                        return OK_VALUE
+                    elif isinstance(rec_val, QTuple):
+                        rec_val.set_by_name(field, rhs_val)
+                        return OK_VALUE
                     else:
-                        rec_val.fields[field] = rhs_val
-                    return OK_VALUE
+                        raise QuestRuntimeError(
+                            "Field assignment target must be Record or Tuple", offset=offset
+                        )
                 case _:
                     raise QuestRuntimeError("Unsupported assignment target in interpreter", offset=offset)
 
@@ -589,6 +595,9 @@ def eval_expr(expr: TypedExpr, env: RuntimeEnvironment) -> QValue:
                         return d.value
 
                     return QBuiltinFun("dynamic.be", fn=_be_fn)
+            if isinstance(callee, QClosure) and len(callee.params) == 0:
+                call_env = callee.env.push_scope()
+                return eval_expr(callee.body, call_env)
             return callee
 
         case TypedApp(func=func, args=args, offset=offset):

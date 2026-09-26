@@ -340,6 +340,14 @@ class TestCompoundStructuresAndMutation(unittest.TestCase):
         """
         self.assertEqual(run_quest_code(code), QInt(10))
 
+    def test_labeled_tuple_mutation(self):
+        code = """
+        let t = tuple let var count = 10 let name = "quest" end;
+        t.count := t.count + 5;
+        t.count;
+        """
+        self.assertEqual(run_quest_code(code), QInt(15))
+
     def test_array_indexing_and_mutation(self):
         code = """
         let a = array of 10 20 30 end;

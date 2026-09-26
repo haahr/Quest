@@ -152,6 +152,10 @@ def execute_phase(
         "--stop-after",
         phase_name,
     ]
+    if phase_name in ("codegen_c", "run_c_compiled"):
+        build_dir = root_dir / ".build"
+        build_dir.mkdir(parents=True, exist_ok=True)
+        command.extend(["--build-dir", str(build_dir)])
     if extra_args:
         command.extend(extra_args)
     command.append(str(source_file))

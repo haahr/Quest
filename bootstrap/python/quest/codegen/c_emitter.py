@@ -178,7 +178,9 @@ class CEmitter:
         self.top_funs_dict: dict[str, tuple[TypedFun, Any]] = {}
         self.in_scope_type_descriptors: dict[str, str] = {}
         self.specializations: dict[tuple[str, tuple[QType, ...]], tuple[str, TypedFun]] = {}
+        self.specialization_origin_modules: dict[str, str] = {}
         self.all_modules: dict[str, TypedModule] = {}
+        self.module_fun_adapters: dict[str, dict[str, str]] = {}
         self.pointer_params: set[str] = set()
         self.adapter_defs: list[str] = []
         self.adapter_cache: dict[tuple[QType, QType], str] = {}
@@ -677,8 +679,12 @@ class CEmitter:
 
         c_a = self.emit_val(actual_a, lines)
         if isinstance(formal_t, QRecordType):
+            if self.c_type(actual_a.type_val) == "QVal":
+                c_a = _qval_unwrap(c_a, formal_t, self)
             return self._coerce_record_val(c_a, actual_a, formal_t)
         elif (rec_bound := resolve_record_bound(formal_t)) is not None:
+            if self.c_type(actual_a.type_val) == "QVal":
+                c_a = _qval_unwrap(c_a, rec_bound, self)
             return self._coerce_record_val(c_a, actual_a, rec_bound)
         elif (
             isinstance(formal_t, QTupleType)
@@ -686,20 +692,34 @@ class CEmitter:
             and actual_a.type_val != formal_t
         ):
             return self._coerce_tuple_val(c_a, actual_a.type_val, formal_t, lines)
+        elif isinstance(formal_t, QTupleType):
+            if self.c_type(actual_a.type_val) == "QVal":
+                c_a = _qval_unwrap(c_a, formal_t, self)
+            return c_a
         elif (
             isinstance(formal_t, QVariantType)
             and isinstance(actual_a.type_val, QVariantType)
             and actual_a.type_val != formal_t
         ):
             return self._emit_variant_upcast(c_a, actual_a.type_val, formal_t, lines)
+        elif isinstance(formal_t, QVariantType):
+            if self.c_type(actual_a.type_val) == "QVal":
+                c_a = _qval_unwrap(c_a, formal_t, self)
+            return c_a
         elif (var_bound := resolve_variant_bound(formal_t)) is not None:
+            if self.c_type(actual_a.type_val) == "QVal":
+                c_a = _qval_unwrap(c_a, var_bound, self)
             if isinstance(actual_a.type_val, QVariantType) and actual_a.type_val != var_bound:
                 return self._emit_variant_upcast(c_a, actual_a.type_val, var_bound, lines)
             return c_a
         elif resolve_option_bound(formal_t) is not None:
+            if self.c_type(actual_a.type_val) == "QVal":
+                c_a = _qval_unwrap(c_a, formal_t, self)
             return c_a
         elif self.c_type(formal_t) == "QVal":
             return _qval_wrap(c_a, actual_a.type_val)
+        elif self.c_type(formal_t) != "QVal" and self.c_type(actual_a.type_val) == "QVal":
+            return _qval_unwrap(c_a, formal_t, self)
         else:
             return c_a
 
@@ -795,6 +815,7 @@ class CEmitter:
         self.lambda_info_by_id = analysis.lambda_info_by_id
         self.top_funs_dict = analysis.top_funs_dict
         self.specializations = analysis.specializations
+        self.specialization_origin_modules = analysis.specialization_origin_modules
 
         decl_emitter = CDeclarationEmitter(
             record_ctx=self.record_ctx,
@@ -853,7 +874,22 @@ class CEmitter:
                             self.current_env_vars[iname] = f"qv_{mangle_module_name(all_module_map[target].name)}"
                             self.current_env_vars[mpath] = f"qv_{mangle_module_name(all_module_map[target].name)}"
         self.all_modules = all_module_map
-        # 7. Function definitions for top-level functions
+        # 7. Emit module functions and initializers
+        if sorted_modules:
+            lines.append("/* Compiled module definitions and initializers */")
+            for mod in sorted_modules:
+                if getattr(mod, "is_precompiled", False):
+                    continue
+                lines.extend(
+                    self._emit_single_module_definition(
+                        mod,
+                        all_module_map,
+                        standalone=False,
+                        decl_emitter=decl_emitter,
+                    )
+                )
+
+        # 8. Function definitions for top-level functions
         if top_funs:
             lines.append("/* Function definitions */")
             for name, fun, _sym in top_funs:
@@ -865,7 +901,38 @@ class CEmitter:
                 lines.append(f"static Q_UNUSED {ret_c} {c_name}({param_sig}) {{")
                 saved_descriptors = dict(self.in_scope_type_descriptors)
                 saved_ptr_params = set(self.pointer_params)
+                saved_env = dict(self.current_env_vars)
+
+                if name in self.specialization_origin_modules:
+                    orig_mod_name = self.specialization_origin_modules[name]
+                    if orig_mod_name in all_module_map:
+                        orig_mod = all_module_map[orig_mod_name]
+                        clean_mod = mangle_module_name(orig_mod.name)
+                        for b in orig_mod.bindings:
+                            match b:
+                                case TypedLetValue(name=b_name):
+                                    if b_name:
+                                        self.current_env_vars[b_name] = mangle_module_ident(clean_mod, b_name)
+                                case TypedException(name=b_name):
+                                    if b_name:
+                                        self.current_env_vars[b_name] = mangle_module_ident(clean_mod, b_name)
+                                case TypedImport():
+                                    for it in b.items:
+                                        for iname, mpath in zip(it.names, it.effective_module_paths):
+                                            target = (
+                                                mpath if mpath in self.all_modules
+                                                else (iname if iname in self.all_modules else None)
+                                            )
+                                            if target is not None:
+                                                self.current_env_vars[iname] = (
+                                                    f"qv_{mangle_module_name(self.all_modules[target].name)}"
+                                                )
+                        if orig_mod_name in self.module_fun_adapters:
+                            for fn_k, fn_impl in self.module_fun_adapters[orig_mod_name].items():
+                                self.current_env_vars[fn_k] = fn_impl
+
                 for p in params:
+                    self.current_env_vars[p.name] = self.mangle_ident(p.name)
                     if getattr(p, "is_out", False) or getattr(p, "is_var", False):
                         self.pointer_params.add(p.name)
                 for q in quants:
@@ -877,12 +944,13 @@ class CEmitter:
                 self._emit_fun_return(body, ret_type, fn_lines)
                 self.in_scope_type_descriptors = saved_descriptors
                 self.pointer_params = saved_ptr_params
+                self.current_env_vars = saved_env
                 for f_line in fn_lines:
                     lines.append(f"    {f_line}" if f_line.strip() else f_line)
                 lines.append("}")
                 lines.append("")
 
-        # 8. Function definitions for lifted lambdas
+        # 8b. Function definitions for lifted lambdas
         if self.lifted_lambdas:
             lines.append("/* Lifted lambda definitions */")
             for l in self.lifted_lambdas:
@@ -923,21 +991,6 @@ class CEmitter:
                     lines.append(f"    {f_line}" if f_line.strip() else f_line)
                 lines.append("}")
                 lines.append("")
-
-        # 8b. Emit module functions and initializers
-        if sorted_modules:
-            lines.append("/* Compiled module definitions and initializers */")
-            for mod in sorted_modules:
-                if getattr(mod, "is_precompiled", False):
-                    continue
-                lines.extend(
-                    self._emit_single_module_definition(
-                        mod,
-                        all_module_map,
-                        standalone=False,
-                        decl_emitter=decl_emitter,
-                    )
-                )
 
         # 9. Main entrypoint
         main_lines: list[str] = [
@@ -1000,6 +1053,7 @@ class CEmitter:
         self.lambda_info_by_id = analysis.lambda_info_by_id
         self.top_funs_dict = analysis.top_funs_dict
         self.specializations = analysis.specializations
+        self.specialization_origin_modules = analysis.specialization_origin_modules
 
         decl_emitter = CDeclarationEmitter(
             record_ctx=self.record_ctx,
@@ -1159,6 +1213,12 @@ class CEmitter:
                             if self.c_type(ep.type_val) != self.c_type(ip.type_val):
                                 needs_adapter = True
                                 break
+                else:
+                    exp_ret_t = exp_fun
+                    exp_params = ()
+                    exp_ret_c = "void" if exp_ret_t == OK_TYPE else self.c_type(exp_ret_t)
+                    if exp_ret_c != int_ret_c or len(params) != 0:
+                        needs_adapter = True
 
             if needs_adapter:
                 impl_ident = f"_{m_ident}_impl"
@@ -1217,6 +1277,9 @@ class CEmitter:
                     lines.append(f"    return {m_ident}({args_str});")
                 lines.append("}")
                 lines.append("")
+
+        self.module_fun_adapters[mod.name] = {k: v[0] for k, v in fun_adapters.items()}
+        self.module_fun_adapters[clean_mod] = self.module_fun_adapters[mod.name]
 
         for nb in mod_native_funs:
             if nb.symbol or nb.inline_template:
@@ -1348,6 +1411,8 @@ class CEmitter:
                 }
                 for vname, _, _ in mod_vars:
                     mod_emitter.current_env_vars[vname] = mangle_module_ident(clean_mod, vname)
+                for fn_k, (fn_impl, *_) in fun_adapters.items():
+                    mod_emitter.current_env_vars[fn_k] = fn_impl
                 mod_emitter.pointer_params = {
                     p.name for p in params if getattr(p, "is_out", False) or getattr(p, "is_var", False)
                 }
@@ -2094,6 +2159,10 @@ class CEmitter:
                     if ret_type == OK_TYPE:
                         lines.append(f"{call_str};")
                         return "((void)0)"
+                    if self.c_type(ret_type) != "QVal" and self.c_type(expr.type_val) == "QVal":
+                        call_str = _qval_wrap(call_str, ret_type)
+                    elif self.c_type(ret_type) == "QVal" and self.c_type(expr.type_val) != "QVal":
+                        call_str = _qval_unwrap(call_str, expr.type_val, self)
                     return call_str
                 elif isinstance(effective_func, TypedVar) and effective_func.name in self.top_fun_names:
                     c_func = self.current_env_vars.get(
@@ -2381,8 +2450,10 @@ class CEmitter:
                 if isinstance(inner_t, QFunType):
                     return self.emit_val(func, lines)
                 descriptor_args = [self.c_type_descriptor(targ) for targ in type_args]
-                if isinstance(func, TypedVar) and func.name in self.top_fun_names:
-                    c_func = self.mangle_ident(func.name)
+                if isinstance(func, TypedVar) and (
+                    func.name in self.top_fun_names or func.name in self.current_env_vars
+                ):
+                    c_func = self.current_env_vars.get(func.name, self.mangle_ident(func.name))
                     call_str = f"{c_func}({', '.join(descriptor_args)})"
                     return call_str
                 else:

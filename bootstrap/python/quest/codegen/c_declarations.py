@@ -119,6 +119,17 @@ class CDeclarationEmitter:
                         ]
                         sig = "void" if not param_decls else ", ".join(param_decls)
                         lines.append(f"extern {ret_c} {m_ident}({sig});")
+                    elif quants:
+                        m_ident = mangle_module_ident(clean_mod, val_name)
+                        ret_type = fun_t
+                        ret_c = "void" if ret_type == OK_TYPE else (
+                            "QRecordVal"
+                            if isinstance(ret_type, QRecordType)
+                            else self.c_type(ret_type)
+                        )
+                        quant_decls = [f"const QTypeDescriptor *descriptor_{q.name}" for q in quants]
+                        sig = ", ".join(quant_decls)
+                        lines.append(f"extern {ret_c} {m_ident}({sig});")
             lines.append("")
         return lines
 

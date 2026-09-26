@@ -27,6 +27,7 @@ from quest.types import (
     QTupleField,
     QTupleType,
     TYPE_KIND,
+    is_subtype,
 )
 from tests.python.helpers import check_test_expr, synth_test_expr
 
@@ -80,6 +81,47 @@ class Phase4AggregatesTest(unittest.TestCase):
         # Access named field
         typed_sel = synth_test_expr("tuple let intensity = 100; end.intensity")
         self.assertEqual(typed_sel.type_val, INT_TYPE)
+
+    def test_tuple_mutation_typechecking(self) -> None:
+        """Mutable tuple fields (var x: T) can be assigned, while immutable fields cannot."""
+        env = Environment()
+        tup_type = QTupleType((
+            QTupleField("x", INT_TYPE, is_var=True),
+            QTupleField("y", INT_TYPE, is_var=False),
+        ))
+        env.current_scope.declare_value(ValueSymbol(name="t", type_val=tup_type))
+
+        # Mutate var field
+        typed_assign = synth_test_expr("t.x := 42", env)
+        self.assertIsInstance(typed_assign, TypedAssign)
+        self.assertEqual(typed_assign.type_val, OK_TYPE)
+
+        # Attempt to mutate immutable field y
+        with self.assertRaises(TypeError):
+            synth_test_expr("t.y := 42", env)
+
+    def test_tuple_mutable_subtyping(self) -> None:
+        """Tuple with mutable field is a subtype of immutable tuple (forgetting mutability), but not vice-versa."""
+        env = Environment()
+        tup_mut = QTupleType((QTupleField("x", INT_TYPE, is_var=True),))
+        tup_immut = QTupleType((QTupleField("x", INT_TYPE, is_var=False),))
+
+        # Mutable <: Immutable (covariance / forgetting mutability)
+        self.assertTrue(is_subtype(tup_mut, tup_immut, env))
+        # Immutable </: Mutable
+        self.assertFalse(is_subtype(tup_immut, tup_mut, env))
+
+    def test_tuple_checking_mode_var_enforcement(self) -> None:
+        """Checking a tuple literal against an expected mutable tuple type requires 'var'."""
+        tup_mut = QTupleType((QTupleField("x", INT_TYPE, is_var=True),))
+
+        # Without var declaration: fails
+        with self.assertRaises(TypeError):
+            check_test_expr("tuple let x = 0 end", tup_mut)
+
+        # With var declaration: succeeds
+        checked = check_test_expr("tuple let var x = 0 end", tup_mut)
+        self.assertIsInstance(checked, TypedTuple)
 
     def test_option_construction(self) -> None:
         """option red of Color end and option blue of Color with 42 end."""

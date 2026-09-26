@@ -196,3 +196,53 @@ def compile_module_file(
         stem_name=stem,
         canonical_name=canon_name,
     )
+
+
+def compile_hierarchical_module(
+    canonical_name: str,
+    output_dir: Path,
+    current_dir: Optional[Path] = None,
+    include_paths: Optional[list[Path]] = None,
+    compiler_path: Optional[str] = None,
+    nogc: bool = False,
+    extra_c_flags: Optional[list[str]] = None,
+) -> tuple[Path, Path, Path, Path]:
+    """Compiles a hierarchical interface and module by canonical name into output_dir.
+
+    Returns (qi_file, h_file, c_file, o_file).
+    """
+    from quest.interface_compiler import compile_interface_file
+
+    inc_paths = list(include_paths) if include_paths else []
+    out_dir = Path(output_dir).resolve()
+
+    intf_path = resolve_interface_file(canonical_name, current_dir, inc_paths)
+    if intf_path is None:
+        raise QuestTypeError(f"Cannot resolve interface file for '{canonical_name}'")
+
+    mod_path = resolve_module_file(canonical_name, current_dir, inc_paths)
+    if mod_path is None:
+        raise QuestTypeError(f"Cannot resolve module file for '{canonical_name}'")
+
+    target_subdir = out_dir / Path(canonical_name).parent if "/" in canonical_name else out_dir
+    target_subdir.mkdir(parents=True, exist_ok=True)
+
+    search_paths = list(inc_paths)
+    if out_dir not in search_paths:
+        search_paths.append(out_dir)
+
+    h_file, qi_file = compile_interface_file(
+        intf_path,
+        output_dir=target_subdir,
+        include_paths=search_paths,
+    )
+    c_file, o_file = compile_module_file(
+        mod_path,
+        output_dir=target_subdir,
+        include_paths=search_paths,
+        compiler_path=compiler_path,
+        nogc=nogc,
+        extra_c_flags=extra_c_flags,
+    )
+    return (qi_file, h_file, c_file, o_file)
+

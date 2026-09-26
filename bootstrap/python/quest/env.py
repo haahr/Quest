@@ -221,6 +221,7 @@ class Environment:
         self.linked_objects: list[Path] = []
         self._loading_interfaces: list[str] = []
         self._loading_modules: list[str] = []
+        self.options: Optional[Any] = None
         self._init_builtins()
 
     def fresh_symbol_id(self) -> int:

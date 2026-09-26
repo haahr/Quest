@@ -1,0 +1,52 @@
+interface Vector export
+    (* The polymorphic growable vector type constructor *)
+    T::ALL(A::TYPE) TYPE
+
+    (* Exception raised on out-of-bounds access or empty vector operations *)
+    error: Exception
+
+    (* Create a new empty vector *)
+    new: All(A::TYPE) T(A)
+
+    (* Return the number of elements in a vector *)
+    length: All(A::TYPE) All(v: T(A)) Int
+
+    (* Test whether a vector is empty *)
+    empty: All(A::TYPE) All(v: T(A)) Bool
+
+    (* Return the element at the specified index, or raise error *)
+    get: All(A::TYPE) All(v: T(A) index: Int) A
+
+    (* Update the element at the specified index, or raise error *)
+    set: All(A::TYPE) All(v: T(A) index: Int value: A) Ok
+
+    (* Return the first element of a vector, or raise error if empty *)
+    first: All(A::TYPE) All(v: T(A)) A
+
+    (* Return the last element of a vector, or raise error if empty *)
+    last: All(A::TYPE) All(v: T(A)) A
+
+    (* Append a new element to the end of a vector *)
+    append: All(A::TYPE) All(v: T(A) value: A) Ok
+
+    (* Remove and return the last element of a vector, or raise error if empty *)
+    pop: All(A::TYPE) All(v: T(A)) A
+
+    (* Delete the element at index and shift subsequent elements left; takes linear time in vector length *)
+    delete: All(A::TYPE) All(v: T(A) index: Int) Ok
+
+    (* Remove all elements from a vector *)
+    clear: All(A::TYPE) All(v: T(A)) Ok
+
+    (* Create a shallow copy of a vector *)
+    copy: All(A::TYPE) All(v: T(A)) T(A)
+
+    (* Concatenate two vectors into a new vector *)
+    concat: All(A::TYPE) All(v1: T(A) v2: T(A)) T(A)
+
+    (* Create a new vector containing the elements of an array *)
+    fromArray: All(A::TYPE) All(arr: Array(A)) T(A)
+
+    (* Create an array containing the elements of a vector *)
+    toArray: All(A::TYPE) All(v: T(A)) Array(A)
+end;
