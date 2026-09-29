@@ -119,7 +119,25 @@ Quest allows native C pointer and handle types to be declared directly in source
 - **Runtime Descriptors**: Polymorphic operations and reflection synthesize opaque descriptors for external types:
   `quest_make_opaque_descriptor("Handle")`.
 
-### 3.4. Rationale for Uniform 64-Bit Representation vs. Non-64-Bit Alternatives
+### 3.4. Word Representation (`Word.T` / `QWord`)
+Quest provides a standard `Word` module for 64-bit unsigned machine operations:
+- **Concrete Representation**: `Word.T` maps to C `uint64_t` (`typedef uint64_t QWord;`).
+- **Universal Word Boxing (`QVal`)**: When boxed into `QVal`, `Word.T` occupies `uint64_t u;`:
+  `((QVal){ .u = (uint64_t)(expr) })` and is unboxed via `((expr).u)`.
+- **Expression Inlining**: Operations like `andBits`, `orBits`, `xorBits`, `notBits`, `add`, `sub`, `mul`, `lt`,
+  `le`, `gt`, and `ge` are inlined directly to C expressions (`&`, `|`, `^`, `~`, `+`, `-`, `*`, `<`, `<=`, `>`, `>=`).
+- **Float and Integer Bit-Casts**: `toReal` and `fromReal` perform zero-copy type punning directly through `QVal`
+  compound literals (`(((QVal){ .u = (w) }).r)` and `(((QVal){ .r = (r) }).u)`), compiling to register moves (`movq`).
+- **Safety Wrappers & Bit Helpers**: `shift`, `rotate`, `extract`, `replace`, `popCount`, `countLeadingZeros`,
+  `countTrailingZeros`, `div`, and `mod` use inline runtime helpers (`quest_word_shift`, `quest_word_rotate`,
+  `quest_word_extract`, `quest_word_replace`, `quest_word_pop_count`, `quest_word_count_leading_zeros`,
+  `quest_word_count_trailing_zeros`, `quest_word_div`, `quest_word_mod`) ensuring well-defined bounds and
+  raising `DivideByZero` on zero divisors.
+- **Quest-Implemented Operations**: Single-bit operations `getBit`, `setBit`, and `clearBit` are implemented in Quest
+  within `lib/word.mod.quest` utilizing `shift`, `andBits`, `orBits`, and `notBits`.
+- **Word Size Constant**: `word.bits` provides the word width `64`.
+
+### 3.5. Rationale for Uniform 64-Bit Representation vs. Non-64-Bit Alternatives
 During C backend design, alternatives such as unboxed 8-bit integers/chars or unboxed heterogenous tuples were
 evaluated:
 1. **Generic Uniformity & Polymorphism:** In Quest, any polymorphic type variable `X <: Any` or higher-order quantifier

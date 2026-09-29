@@ -1,0 +1,255 @@
+(* Standard library: Comprehensive Word operations *)
+
+import word: Word;
+import conv: Conv;
+import writer: Writer;
+
+let w1 = word.fromInt(100);
+let w2 = word.fromInt(25);
+
+(* 1. Arithmetic *)
+let wAdd = word.add(w1 w2);
+let wSub = word.sub(w1 w2);
+let wMul = word.mul(w1 w2);
+let wDiv = word.div(w1 w2);
+let wMod = word.mod(word.fromInt(103) w2);
+
+(* 2. Modulo 2^64 wrapping *)
+let wZero = word.fromInt(0);
+let wAll = word.notBits(wZero);
+let wAddWrap = word.add(wAll word.fromInt(1));
+let wSubWrap = word.sub(wZero word.fromInt(1));
+let wMulWrap = word.mul(wAll word.fromInt(2));
+
+(* 3. Shifts *)
+let wShiftL = word.shift(w1 2);
+let wShiftR = word.shift(w1 ~2);
+let wShift0 = word.shift(w1 0);
+let wShift64 = word.shift(w1 64);
+let wShiftNeg64 = word.shift(w1 ~64);
+let wShift100 = word.shift(w1 100);
+let wShiftNeg100 = word.shift(w1 ~100);
+
+(* 4. Bitwise Logic *)
+let wAnd = word.andBits(word.fromInt(3855) word.fromInt(255));
+let wOr = word.orBits(word.fromInt(3855) word.fromInt(255));
+let wXor = word.xorBits(w1 w1);
+let wNot = word.notBits(wZero);
+
+(* 5. Exception handling *)
+let divZero = try
+    word.div(w1 wZero)
+when DivideByZero then
+    word.fromInt(777)
+end;
+
+let modZero = try
+    word.mod(w1 wZero)
+when DivideByZero then
+    word.fromInt(888)
+end;
+
+(* 6. Two's complement Int casts *)
+let iZero = word.toInt(word.fromInt(0));
+let iPos = word.toInt(word.fromInt(12345));
+let iNeg = word.toInt(word.fromInt(~54321));
+let iMin = word.toInt(word.fromInt(~9223372036854775807 - 1));
+let iMax = word.toInt(word.fromInt(9223372036854775807));
+
+(* 7. Float bit casts *)
+let rZero = word.toReal(word.fromReal(0.0));
+let rOne = word.toReal(word.fromReal(1.0));
+let rPi = word.toReal(word.fromReal(3.14159));
+let rNeg = word.toReal(word.fromReal(~42.5));
+
+(* 8. Unsigned comparisons *)
+let bLt1 = word.lt(w2 w1);
+let bLt2 = word.lt(w1 w2);
+let bLt3 = word.lt(w1 w1);
+let bLe1 = word.le(w2 w1);
+let bLe2 = word.le(w1 w1);
+let bLe3 = word.le(w1 w2);
+let bGt1 = word.gt(w1 w2);
+let bGt2 = word.gt(w2 w1);
+let bGt3 = word.gt(w1 w1);
+let bGe1 = word.ge(w1 w2);
+let bGe2 = word.ge(w1 w1);
+let bGe3 = word.ge(w2 w1);
+let bUnsignedLt = word.lt(wZero wAll);
+let bUnsignedGt = word.gt(wAll wZero);
+
+(* 9. Extended Bit Operations *)
+let wBits = word.bits;
+let wRotL = word.rotate(word.fromInt(1) 1);
+let wRotR = word.rotate(word.fromInt(1) ~1);
+let wRot64 = word.rotate(w1 64);
+let wRotWrap = word.rotate(word.shift(word.fromInt(1) 63) 1);
+let wExt1 = word.extract(word.fromInt(165) 4 4);
+let wExt2 = word.extract(word.fromInt(165) 0 4);
+let wExt0 = word.extract(word.fromInt(165) 0 0);
+let wRep1 = word.replace(word.fromInt(160) word.fromInt(5) 0 4);
+let wRep2 = word.replace(word.fromInt(5) word.fromInt(10) 4 4);
+let nPop0 = word.popCount(wZero);
+let nPopAll = word.popCount(wAll);
+let nPopA5 = word.popCount(word.fromInt(165));
+let nClz0 = word.countLeadingZeros(wZero);
+let nClzAll = word.countLeadingZeros(wAll);
+let nClz1 = word.countLeadingZeros(word.fromInt(1));
+let nCtz0 = word.countTrailingZeros(wZero);
+let nCtzAll = word.countTrailingZeros(wAll);
+let nCtz8 = word.countTrailingZeros(word.fromInt(8));
+let bBit0 = word.getBit(word.fromInt(5) 0);
+let bBit1 = word.getBit(word.fromInt(5) 1);
+let bBit2 = word.getBit(word.fromInt(5) 2);
+let bBit63 = word.getBit(word.fromInt(5) 63);
+let bBitOob = word.getBit(word.fromInt(5) 64);
+let wSet3 = word.setBit(wZero 3);
+let wSet63 = word.setBit(wZero 63);
+let wClr3 = word.clearBit(word.fromInt(8) 3);
+let wClr0 = word.clearBit(wZero 3);
+
+(* Output Results *)
+writer.putString(writer.output conv.int(word.toInt(wAdd)));
+writer.putString(writer.output "\n");
+writer.putString(writer.output conv.int(word.toInt(wSub)));
+writer.putString(writer.output "\n");
+writer.putString(writer.output conv.int(word.toInt(wMul)));
+writer.putString(writer.output "\n");
+writer.putString(writer.output conv.int(word.toInt(wDiv)));
+writer.putString(writer.output "\n");
+writer.putString(writer.output conv.int(word.toInt(wMod)));
+writer.putString(writer.output "\n");
+writer.putString(writer.output conv.int(word.toInt(wAddWrap)));
+writer.putString(writer.output "\n");
+writer.putString(writer.output conv.int(word.toInt(wSubWrap)));
+writer.putString(writer.output "\n");
+writer.putString(writer.output conv.int(word.toInt(wMulWrap)));
+writer.putString(writer.output "\n");
+writer.putString(writer.output conv.int(word.toInt(wShiftL)));
+writer.putString(writer.output "\n");
+writer.putString(writer.output conv.int(word.toInt(wShiftR)));
+writer.putString(writer.output "\n");
+writer.putString(writer.output conv.int(word.toInt(wShift0)));
+writer.putString(writer.output "\n");
+writer.putString(writer.output conv.int(word.toInt(wShift64)));
+writer.putString(writer.output "\n");
+writer.putString(writer.output conv.int(word.toInt(wShiftNeg64)));
+writer.putString(writer.output "\n");
+writer.putString(writer.output conv.int(word.toInt(wShift100)));
+writer.putString(writer.output "\n");
+writer.putString(writer.output conv.int(word.toInt(wShiftNeg100)));
+writer.putString(writer.output "\n");
+writer.putString(writer.output conv.int(word.toInt(wAnd)));
+writer.putString(writer.output "\n");
+writer.putString(writer.output conv.int(word.toInt(wOr)));
+writer.putString(writer.output "\n");
+writer.putString(writer.output conv.int(word.toInt(wXor)));
+writer.putString(writer.output "\n");
+writer.putString(writer.output conv.int(word.toInt(wNot)));
+writer.putString(writer.output "\n");
+writer.putString(writer.output conv.int(word.toInt(divZero)));
+writer.putString(writer.output "\n");
+writer.putString(writer.output conv.int(word.toInt(modZero)));
+writer.putString(writer.output "\n");
+writer.putString(writer.output conv.int(iZero));
+writer.putString(writer.output "\n");
+writer.putString(writer.output conv.int(iPos));
+writer.putString(writer.output "\n");
+writer.putString(writer.output conv.int(iNeg));
+writer.putString(writer.output "\n");
+writer.putString(writer.output conv.int(iMin));
+writer.putString(writer.output "\n");
+writer.putString(writer.output conv.int(iMax));
+writer.putString(writer.output "\n");
+writer.putString(writer.output conv.real(rZero));
+writer.putString(writer.output "\n");
+writer.putString(writer.output conv.real(rOne));
+writer.putString(writer.output "\n");
+writer.putString(writer.output conv.real(rPi));
+writer.putString(writer.output "\n");
+writer.putString(writer.output conv.real(rNeg));
+writer.putString(writer.output "\n");
+writer.putString(writer.output conv.bool(bLt1));
+writer.putString(writer.output "\n");
+writer.putString(writer.output conv.bool(bLt2));
+writer.putString(writer.output "\n");
+writer.putString(writer.output conv.bool(bLt3));
+writer.putString(writer.output "\n");
+writer.putString(writer.output conv.bool(bLe1));
+writer.putString(writer.output "\n");
+writer.putString(writer.output conv.bool(bLe2));
+writer.putString(writer.output "\n");
+writer.putString(writer.output conv.bool(bLe3));
+writer.putString(writer.output "\n");
+writer.putString(writer.output conv.bool(bGt1));
+writer.putString(writer.output "\n");
+writer.putString(writer.output conv.bool(bGt2));
+writer.putString(writer.output "\n");
+writer.putString(writer.output conv.bool(bGt3));
+writer.putString(writer.output "\n");
+writer.putString(writer.output conv.bool(bGe1));
+writer.putString(writer.output "\n");
+writer.putString(writer.output conv.bool(bGe2));
+writer.putString(writer.output "\n");
+writer.putString(writer.output conv.bool(bGe3));
+writer.putString(writer.output "\n");
+writer.putString(writer.output conv.bool(bUnsignedLt));
+writer.putString(writer.output "\n");
+writer.putString(writer.output conv.bool(bUnsignedGt));
+writer.putString(writer.output "\n");
+writer.putString(writer.output conv.int(wBits));
+writer.putString(writer.output "\n");
+writer.putString(writer.output conv.int(word.toInt(wRotL)));
+writer.putString(writer.output "\n");
+writer.putString(writer.output conv.int(word.toInt(wRotR)));
+writer.putString(writer.output "\n");
+writer.putString(writer.output conv.int(word.toInt(wRot64)));
+writer.putString(writer.output "\n");
+writer.putString(writer.output conv.int(word.toInt(wRotWrap)));
+writer.putString(writer.output "\n");
+writer.putString(writer.output conv.int(word.toInt(wExt1)));
+writer.putString(writer.output "\n");
+writer.putString(writer.output conv.int(word.toInt(wExt2)));
+writer.putString(writer.output "\n");
+writer.putString(writer.output conv.int(word.toInt(wExt0)));
+writer.putString(writer.output "\n");
+writer.putString(writer.output conv.int(word.toInt(wRep1)));
+writer.putString(writer.output "\n");
+writer.putString(writer.output conv.int(word.toInt(wRep2)));
+writer.putString(writer.output "\n");
+writer.putString(writer.output conv.int(nPop0));
+writer.putString(writer.output "\n");
+writer.putString(writer.output conv.int(nPopAll));
+writer.putString(writer.output "\n");
+writer.putString(writer.output conv.int(nPopA5));
+writer.putString(writer.output "\n");
+writer.putString(writer.output conv.int(nClz0));
+writer.putString(writer.output "\n");
+writer.putString(writer.output conv.int(nClzAll));
+writer.putString(writer.output "\n");
+writer.putString(writer.output conv.int(nClz1));
+writer.putString(writer.output "\n");
+writer.putString(writer.output conv.int(nCtz0));
+writer.putString(writer.output "\n");
+writer.putString(writer.output conv.int(nCtzAll));
+writer.putString(writer.output "\n");
+writer.putString(writer.output conv.int(nCtz8));
+writer.putString(writer.output "\n");
+writer.putString(writer.output conv.bool(bBit0));
+writer.putString(writer.output "\n");
+writer.putString(writer.output conv.bool(bBit1));
+writer.putString(writer.output "\n");
+writer.putString(writer.output conv.bool(bBit2));
+writer.putString(writer.output "\n");
+writer.putString(writer.output conv.bool(bBit63));
+writer.putString(writer.output "\n");
+writer.putString(writer.output conv.bool(bBitOob));
+writer.putString(writer.output "\n");
+writer.putString(writer.output conv.int(word.toInt(wSet3)));
+writer.putString(writer.output "\n");
+writer.putString(writer.output conv.int(word.toInt(wSet63)));
+writer.putString(writer.output "\n");
+writer.putString(writer.output conv.int(word.toInt(wClr3)));
+writer.putString(writer.output "\n");
+writer.putString(writer.output conv.int(word.toInt(wClr0)));
+writer.putString(writer.output "\n");

@@ -1,0 +1,103 @@
+module word : Word export
+    (* The underlying C 64-bit unsigned word type *)
+    Let T = external "uint64_t";
+
+    (* Number of bits in Word.T *)
+    let bits: Int = 64;
+
+    (* Bitwise NOT *)
+    let notBits(w: T): T = external "quest_word_not_bits";
+
+    (* Bitwise AND *)
+    let andBits(w1: T w2: T): T = external "quest_word_and_bits";
+
+    (* Bitwise OR *)
+    let orBits(w1: T w2: T): T = external "quest_word_or_bits";
+
+    (* Bitwise XOR *)
+    let xorBits(w1: T w2: T): T = external "quest_word_xor_bits";
+
+    (* Logical shift: left if count > 0, right if count < 0, 0 if |count| >= 64 *)
+    let shift(w: T count: Int): T = external "quest_word_shift_val";
+
+    (* Circular bitwise rotation: left if count > 0, right if count < 0 (modulo 64) *)
+    let rotate(w: T count: Int): T = external "quest_word_rotate_val";
+
+    (* Extract width bits starting at bit pos, returned right-aligned *)
+    let extract(w: T pos: Int width: Int): T = external "quest_word_extract_val";
+
+    (* Replace width bits in w starting at bit pos with the lowest width bits of val *)
+    let replace(w: T val: T pos: Int width: Int): T = external "quest_word_replace_val";
+
+    (* Number of set bits (population count / Hamming weight) *)
+    let popCount(w: T): Int = external "quest_word_pop_count_val";
+
+    (* Number of leading zero bits (64 if w is 0) *)
+    let countLeadingZeros(w: T): Int = external "quest_word_count_leading_zeros_val";
+
+    (* Number of trailing zero bits (64 if w is 0) *)
+    let countTrailingZeros(w: T): Int = external "quest_word_count_trailing_zeros_val";
+
+    (* Unsigned 64-bit addition modulo 2^64 *)
+    let add(w1: T w2: T): T = external "quest_word_add";
+
+    (* Unsigned 64-bit subtraction modulo 2^64 *)
+    let sub(w1: T w2: T): T = external "quest_word_sub";
+
+    (* Unsigned 64-bit multiplication modulo 2^64 *)
+    let mul(w1: T w2: T): T = external "quest_word_mul";
+
+    (* Unsigned 64-bit division, raises DivideByZero if w2 is 0 *)
+    let div(w1: T w2: T): T = external "quest_word_div_val";
+
+    (* Unsigned 64-bit modulo, raises DivideByZero if w2 is 0 *)
+    let mod(w1: T w2: T): T = external "quest_word_mod_val";
+
+    (* Convert word to signed 64-bit integer (two's complement interpretation) *)
+    let toInt(w: T): Int = external "quest_word_to_int";
+
+    (* Convert signed 64-bit integer to word (two's complement bit pattern) *)
+    let fromInt(n: Int): T = external "quest_word_from_int";
+
+    (* Returns true if w1 < w2 as unsigned 64-bit words *)
+    let lt(w1: T w2: T): Bool = external "quest_word_lt";
+
+    (* Returns true if w1 <= w2 as unsigned 64-bit words *)
+    let le(w1: T w2: T): Bool = external "quest_word_le";
+
+    (* Returns true if w1 > w2 as unsigned 64-bit words *)
+    let gt(w1: T w2: T): Bool = external "quest_word_gt";
+
+    (* Returns true if w1 >= w2 as unsigned 64-bit words *)
+    let ge(w1: T w2: T): Bool = external "quest_word_ge";
+
+    (* Convert word to 64-bit IEEE-754 floating point real *)
+    let toReal(w: T): Real = external "quest_word_to_real_val";
+
+    (* Convert 64-bit IEEE-754 floating point real to word bit pattern *)
+    let fromReal(r: Real): T = external "quest_word_from_real_val";
+
+    (* Returns true if bit at index pos (0 <= pos < 64) is set *)
+    let getBit(w: T pos: Int): Bool =
+        if {pos < 0} \/ {pos >= bits} then
+            false
+        else
+            andBits(shift(w {0 - pos}) fromInt(1)) isnot fromInt(0)
+        end;
+
+    (* Returns word with bit at index pos set to 1 *)
+    let setBit(w: T pos: Int): T =
+        if {pos < 0} \/ {pos >= bits} then
+            w
+        else
+            orBits(w shift(fromInt(1) pos))
+        end;
+
+    (* Returns word with bit at index pos cleared to 0 *)
+    let clearBit(w: T pos: Int): T =
+        if {pos < 0} \/ {pos >= bits} then
+            w
+        else
+            andBits(w notBits(shift(fromInt(1) pos)))
+        end;
+end;

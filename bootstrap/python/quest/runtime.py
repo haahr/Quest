@@ -140,6 +140,28 @@ class QInt(QValue):
         return hash(self.value)
 
 
+class QWord(QValue):
+    """Unsigned 64-bit word value."""
+
+    def __init__(self, value: int):
+        self.value = int(value) & 0xFFFF_FFFF_FFFF_FFFF
+
+    @property
+    def type_name(self) -> str:
+        return "Word.T"
+
+    def to_str(self, visited: Optional[set[int]] = None) -> str:
+        return f"16#{self.value:x}#"
+
+    def __eq__(self, other: object) -> bool:
+        if isinstance(other, QWord):
+            return self.value == other.value
+        return False
+
+    def __hash__(self) -> int:
+        return hash(self.value)
+
+
 class QReal(QValue):
     """64-bit floating point real number."""
 
@@ -720,7 +742,7 @@ def qvalue_is(v1: QValue, v2: QValue) -> bool:
         return isinstance(v2, QOk)
     if isinstance(v1, QBool):
         return v1.value is v2.value  # type: ignore[attr-defined]
-    if isinstance(v1, (QInt, QReal, QChar)):
+    if isinstance(v1, (QInt, QWord, QReal, QChar)):
         return v1.value == v2.value  # type: ignore[attr-defined]
     if isinstance(v1, QTypeValue):
         assert isinstance(v2, QTypeValue)
@@ -753,7 +775,7 @@ def qvalue_structural_eq(
     if isinstance(v1, QOk):
         return isinstance(v2, QOk)
 
-    if isinstance(v1, (QBool, QInt, QReal, QChar, QString)):
+    if isinstance(v1, (QBool, QInt, QWord, QReal, QChar, QString)):
         return v1.value == v2.value  # type: ignore[attr-defined]
 
     if isinstance(v1, QTypeValue):

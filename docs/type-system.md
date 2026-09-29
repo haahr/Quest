@@ -217,9 +217,9 @@ Compilation state is maintained across lexical scopes:
 The typechecking environment employs a two-tier root architecture:
 - **`base_scope`:** Declares primitive language types (`Int`, `Real`, `Bool`, `Char`, `String`, `Array`), kinds
   (`TYPE`, `POWER`), built-in operators, and exception constants.
-- **`global_scope`:** Inherits from `base_scope` and binds the 10 pre-linked standard library module records
-  (`arrayOp`, `ascii`, `conv`, `dynamic`, `int`, `list`, `reader`, `real`, `string`, `writer`) and their interfaces
-  (`ArrayOp`, `Ascii`, `Conv`, `Dynamic`, `IntOp`, `List`, `Reader`, `RealOp`, `StringOp`, `Writer`).
+- **`global_scope`:** Inherits from `base_scope` and binds the pre-linked standard library module records
+  (`arrayOp`, `ascii`, `conv`, `dynamic`, `int`, `list`, `reader`, `real`, `string`, `word`, `writer`) and their
+  interfaces (`ArrayOp`, `Ascii`, `Conv`, `Dynamic`, `IntOp`, `List`, `Reader`, `RealOp`, `StringOp`, `Word`, `Writer`).
 - **Module Isolation:** Top-level expressions and REPL sessions execute in `global_scope`, allowing direct access to
   standard library modules without `import`. However, standalone module declarations (`module ... end`) have their
   internal elaboration scopes parented directly to `base_scope`. Consequently, modules cannot access pre-linked

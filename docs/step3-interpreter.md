@@ -75,6 +75,7 @@ pre-linked modules and interfaces in the root environment:
 - **`conv: Conv`:** Value to string conversions (`conv.int`, `conv.real`, `conv.bool`, `conv.okay`).
 - **`ascii: Ascii`:** Ascii character encoding conversions (`ascii.char`, `ascii.val`).
 - **`int: IntOp` & `real: RealOp`:** Numeric operations and functions.
+- **`word: Word`:** 64-bit unsigned bitwise, logical shift, arithmetic, and float/int bit casting.
 - **`string: StringOp`:** String manipulation (`string.length`, `string.getSub`, `string.cat`).
 - **`arrayOp: ArrayOp`:** Array operations (`arrayOp.new`, `arrayOp.size`, `arrayOp.get`, `arrayOp.set`).
 

@@ -64,6 +64,7 @@ class TestStdlibSourceModules(unittest.TestCase):
             ("ArrayOp", "arrayop"),
             ("List", "list"),
             ("System", "system"),
+            ("Word", "word"),
         ]
         for iface_name, mod_name in modules:
             iface_path = resolve_interface_file(iface_name, None, [])
@@ -89,6 +90,7 @@ class TestStdlibSourceModules(unittest.TestCase):
             ("ArrayOp", "arrayop"),
             ("List", "list"),
             ("System", "system"),
+            ("Word", "word"),
         ]
         for iface_name, mod_name in modules:
             env = Environment()

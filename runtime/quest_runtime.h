@@ -46,10 +46,11 @@
 #endif
 
 /* 64-bit Universal Value Word (QVal) */
-typedef int64_t QInt;
-typedef double  QReal;
-typedef bool    QBool;
-typedef char    QChar;
+typedef int64_t  QInt;
+typedef double   QReal;
+typedef bool     QBool;
+typedef char     QChar;
+typedef uint64_t QWord;
 
 typedef union QVal {
     void    *p;   /* Heap pointers: strings, arrays, records, tuples, closures */
@@ -421,6 +422,35 @@ static inline double quest_real_max(double a, double b) { return a > b ? a : b; 
 double  quest_real_div(double a, double b);
 double  quest_real_exp(double a, double b);
 
+/* Word module primitives */
+uint64_t quest_word_not_bits(uint64_t w);
+uint64_t quest_word_and_bits(uint64_t w1, uint64_t w2);
+uint64_t quest_word_or_bits(uint64_t w1, uint64_t w2);
+uint64_t quest_word_xor_bits(uint64_t w1, uint64_t w2);
+uint64_t quest_word_shift_val(uint64_t w, int64_t count);
+uint64_t quest_word_rotate_val(uint64_t w, int64_t count);
+uint64_t quest_word_extract_val(uint64_t w, int64_t pos, int64_t width);
+uint64_t quest_word_replace_val(uint64_t w, uint64_t val, int64_t pos, int64_t width);
+int64_t  quest_word_pop_count_val(uint64_t w);
+int64_t  quest_word_count_leading_zeros_val(uint64_t w);
+int64_t  quest_word_count_trailing_zeros_val(uint64_t w);
+bool     quest_word_get_bit_val(uint64_t w, int64_t pos);
+uint64_t quest_word_set_bit_val(uint64_t w, int64_t pos);
+uint64_t quest_word_clear_bit_val(uint64_t w, int64_t pos);
+uint64_t quest_word_add(uint64_t w1, uint64_t w2);
+uint64_t quest_word_sub(uint64_t w1, uint64_t w2);
+uint64_t quest_word_mul(uint64_t w1, uint64_t w2);
+uint64_t quest_word_div_val(uint64_t w1, uint64_t w2);
+uint64_t quest_word_mod_val(uint64_t w1, uint64_t w2);
+int64_t  quest_word_to_int(uint64_t w);
+uint64_t quest_word_from_int(int64_t n);
+bool     quest_word_lt(uint64_t w1, uint64_t w2);
+bool     quest_word_le(uint64_t w1, uint64_t w2);
+bool     quest_word_gt(uint64_t w1, uint64_t w2);
+bool     quest_word_ge(uint64_t w1, uint64_t w2);
+double   quest_word_to_real_val(uint64_t w);
+uint64_t quest_word_from_real_val(double r);
+
 /* Global standard library initialization */
 void quest_builtins_init(int argc, char **argv);
 
@@ -474,6 +504,77 @@ static inline QInt quest_int_div(QInt a, QInt b) {
 }
 
 static inline QInt quest_int_mod(QInt a, QInt b) {
+    if (b == 0) {
+        quest_raise_divide_by_zero();
+    }
+    return a % b;
+}
+
+static inline uint64_t quest_word_shift(uint64_t w, int64_t count) {
+    if (count >= 64 || count <= -64) return 0ULL;
+    if (count > 0) return w << count;
+    if (count < 0) return w >> (-count);
+    return w;
+}
+
+static inline uint64_t quest_word_rotate(uint64_t w, int64_t count) {
+    int64_t shift = count % 64;
+    if (shift < 0) shift += 64;
+    if (shift == 0) return w;
+    return (w << shift) | (w >> (64 - shift));
+}
+
+static inline uint64_t quest_word_extract(uint64_t w, int64_t pos, int64_t width) {
+    if (pos < 0 || pos >= 64 || width <= 0) return 0ULL;
+    if (width > 64 - pos) width = 64 - pos;
+    uint64_t mask = (width == 64) ? ~0ULL : ((1ULL << width) - 1ULL);
+    return (w >> pos) & mask;
+}
+
+static inline uint64_t quest_word_replace(uint64_t w, uint64_t val, int64_t pos, int64_t width) {
+    if (pos < 0 || pos >= 64 || width <= 0) return w;
+    if (width > 64 - pos) width = 64 - pos;
+    uint64_t mask = (width == 64) ? ~0ULL : ((1ULL << width) - 1ULL);
+    return (w & ~(mask << pos)) | ((val & mask) << pos);
+}
+
+static inline int64_t quest_word_pop_count(uint64_t w) {
+    return (int64_t)__builtin_popcountll(w);
+}
+
+static inline int64_t quest_word_count_leading_zeros(uint64_t w) {
+    if (w == 0ULL) return 64;
+    return (int64_t)__builtin_clzll(w);
+}
+
+static inline int64_t quest_word_count_trailing_zeros(uint64_t w) {
+    if (w == 0ULL) return 64;
+    return (int64_t)__builtin_ctzll(w);
+}
+
+static inline bool quest_word_get_bit(uint64_t w, int64_t pos) {
+    if (pos < 0 || pos >= 64) return false;
+    return ((w >> pos) & 1ULL) != 0;
+}
+
+static inline uint64_t quest_word_set_bit(uint64_t w, int64_t pos) {
+    if (pos < 0 || pos >= 64) return w;
+    return w | (1ULL << pos);
+}
+
+static inline uint64_t quest_word_clear_bit(uint64_t w, int64_t pos) {
+    if (pos < 0 || pos >= 64) return w;
+    return w & ~(1ULL << pos);
+}
+
+static inline uint64_t quest_word_div(uint64_t a, uint64_t b) {
+    if (b == 0) {
+        quest_raise_divide_by_zero();
+    }
+    return a / b;
+}
+
+static inline uint64_t quest_word_mod(uint64_t a, uint64_t b) {
     if (b == 0) {
         quest_raise_divide_by_zero();
     }

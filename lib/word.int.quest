@@ -1,0 +1,88 @@
+interface Word export
+    (* Abstract 64-bit unsigned word type *)
+    T::TYPE
+
+    (* Number of bits in Word.T *)
+    bits: Int
+
+    (* Bitwise NOT *)
+    notBits(w: T): T
+
+    (* Bitwise AND *)
+    andBits(w1: T w2: T): T
+
+    (* Bitwise OR *)
+    orBits(w1: T w2: T): T
+
+    (* Bitwise XOR *)
+    xorBits(w1: T w2: T): T
+
+    (* Logical shift: left if count > 0, right if count < 0, 0 if |count| >= 64 *)
+    shift(w: T count: Int): T
+
+    (* Circular bitwise rotation: left if count > 0, right if count < 0 (modulo 64) *)
+    rotate(w: T count: Int): T
+
+    (* Extract width bits starting at bit pos, returned right-aligned *)
+    extract(w: T pos: Int width: Int): T
+
+    (* Replace width bits in w starting at bit pos with the lowest width bits of val *)
+    replace(w: T val: T pos: Int width: Int): T
+
+    (* Number of set bits (population count / Hamming weight) *)
+    popCount(w: T): Int
+
+    (* Number of leading zero bits (64 if w is 0) *)
+    countLeadingZeros(w: T): Int
+
+    (* Number of trailing zero bits (64 if w is 0) *)
+    countTrailingZeros(w: T): Int
+
+    (* Unsigned 64-bit addition modulo 2^64 *)
+    add(w1: T w2: T): T
+
+    (* Unsigned 64-bit subtraction modulo 2^64 *)
+    sub(w1: T w2: T): T
+
+    (* Unsigned 64-bit multiplication modulo 2^64 *)
+    mul(w1: T w2: T): T
+
+    (* Unsigned 64-bit division, raises DivideByZero if w2 is 0 *)
+    div(w1: T w2: T): T
+
+    (* Unsigned 64-bit modulo, raises DivideByZero if w2 is 0 *)
+    mod(w1: T w2: T): T
+
+    (* Convert word to signed 64-bit integer (two's complement interpretation) *)
+    toInt(w: T): Int
+
+    (* Convert signed 64-bit integer to word (two's complement bit pattern) *)
+    fromInt(n: Int): T
+
+    (* Returns true if w1 < w2 as unsigned 64-bit words *)
+    lt(w1: T w2: T): Bool
+
+    (* Returns true if w1 <= w2 as unsigned 64-bit words *)
+    le(w1: T w2: T): Bool
+
+    (* Returns true if w1 > w2 as unsigned 64-bit words *)
+    gt(w1: T w2: T): Bool
+
+    (* Returns true if w1 >= w2 as unsigned 64-bit words *)
+    ge(w1: T w2: T): Bool
+
+    (* Convert word to 64-bit IEEE-754 floating point real *)
+    toReal(w: T): Real
+
+    (* Convert 64-bit IEEE-754 floating point real to word bit pattern *)
+    fromReal(r: Real): T
+
+    (* Returns true if bit at index pos (0 <= pos < 64) is set *)
+    getBit(w: T pos: Int): Bool
+
+    (* Returns word with bit at index pos set to 1 *)
+    setBit(w: T pos: Int): T
+
+    (* Returns word with bit at index pos cleared to 0 *)
+    clearBit(w: T pos: Int): T
+end;

@@ -335,6 +335,10 @@ void quest_print_val(QVal val, const char *type_name) {
         printf("\"%s\" : String\n", s ? s->data : "");
         return;
     }
+    if (strcmp(type_name, "Word") == 0 || strcmp(type_name, "Word.T") == 0 || strcmp(type_name, "word.T") == 0) {
+        printf("16#%llx# : Word.T\n", (unsigned long long)val.u);
+        return;
+    }
     printf("<val> : %s\n", type_name);
 }
 
@@ -1444,6 +1448,115 @@ double quest_real_div(double a, double b) {
 
 double quest_real_exp(double a, double b) {
     return pow(a, b);
+}
+
+/* Word module primitives */
+uint64_t quest_word_not_bits(uint64_t w) {
+    return ~w;
+}
+
+uint64_t quest_word_and_bits(uint64_t w1, uint64_t w2) {
+    return w1 & w2;
+}
+
+uint64_t quest_word_or_bits(uint64_t w1, uint64_t w2) {
+    return w1 | w2;
+}
+
+uint64_t quest_word_xor_bits(uint64_t w1, uint64_t w2) {
+    return w1 ^ w2;
+}
+
+uint64_t quest_word_shift_val(uint64_t w, int64_t count) {
+    return quest_word_shift(w, count);
+}
+
+uint64_t quest_word_rotate_val(uint64_t w, int64_t count) {
+    return quest_word_rotate(w, count);
+}
+
+uint64_t quest_word_extract_val(uint64_t w, int64_t pos, int64_t width) {
+    return quest_word_extract(w, pos, width);
+}
+
+uint64_t quest_word_replace_val(uint64_t w, uint64_t val, int64_t pos, int64_t width) {
+    return quest_word_replace(w, val, pos, width);
+}
+
+int64_t quest_word_pop_count_val(uint64_t w) {
+    return quest_word_pop_count(w);
+}
+
+int64_t quest_word_count_leading_zeros_val(uint64_t w) {
+    return quest_word_count_leading_zeros(w);
+}
+
+int64_t quest_word_count_trailing_zeros_val(uint64_t w) {
+    return quest_word_count_trailing_zeros(w);
+}
+
+bool quest_word_get_bit_val(uint64_t w, int64_t pos) {
+    return quest_word_get_bit(w, pos);
+}
+
+uint64_t quest_word_set_bit_val(uint64_t w, int64_t pos) {
+    return quest_word_set_bit(w, pos);
+}
+
+uint64_t quest_word_clear_bit_val(uint64_t w, int64_t pos) {
+    return quest_word_clear_bit(w, pos);
+}
+
+uint64_t quest_word_add(uint64_t w1, uint64_t w2) {
+    return w1 + w2;
+}
+
+uint64_t quest_word_sub(uint64_t w1, uint64_t w2) {
+    return w1 - w2;
+}
+
+uint64_t quest_word_mul(uint64_t w1, uint64_t w2) {
+    return w1 * w2;
+}
+
+uint64_t quest_word_div_val(uint64_t w1, uint64_t w2) {
+    return quest_word_div(w1, w2);
+}
+
+uint64_t quest_word_mod_val(uint64_t w1, uint64_t w2) {
+    return quest_word_mod(w1, w2);
+}
+
+int64_t quest_word_to_int(uint64_t w) {
+    return (int64_t)w;
+}
+
+uint64_t quest_word_from_int(int64_t n) {
+    return (uint64_t)n;
+}
+
+bool quest_word_lt(uint64_t w1, uint64_t w2) {
+    return w1 < w2;
+}
+
+bool quest_word_le(uint64_t w1, uint64_t w2) {
+    return w1 <= w2;
+}
+
+bool quest_word_gt(uint64_t w1, uint64_t w2) {
+    return w1 > w2;
+}
+
+bool quest_word_ge(uint64_t w1, uint64_t w2) {
+    return w1 >= w2;
+}
+
+double quest_word_to_real_val(uint64_t w) {
+    return ((QVal){ .u = w }).r;
+}
+
+uint64_t quest_word_from_real_val(double r) {
+    return ((QVal){ .r = r }).u;
 }
 
 /* Builtins initialization */

@@ -1,0 +1,3 @@
+(* Word modulo by zero raises DivideByZero. *)
+import word: Word;
+let x = word.mod(word.fromInt(10) word.fromInt(0));

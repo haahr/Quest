@@ -472,7 +472,7 @@ def analyze_program_for_c(
 
     known_builtins = {
         "writer", "reader", "conv", "ascii", "int", "real", "string", "system",
-        "arrayOp", "dynamic", "list",
+        "arrayOp", "dynamic", "list", "word",
     }
     needed_builtin_modules: list[str] = []
 

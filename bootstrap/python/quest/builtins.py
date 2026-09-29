@@ -15,12 +15,14 @@ Provides implementations of the 9 standard library interfaces and modules:
 from __future__ import annotations
 
 import math
+import struct
 import sys
 from typing import Any, Callable, Optional
 
 from quest.env import Environment, Scope, TypeSymbol, ValueSymbol, allocate_symbol_id
 from quest.interpreter import (
     ARRAY_OP_ERROR_EXC,
+    DIVIDE_BY_ZERO_EXC,
     DYNAMIC_ERROR_EXC,
     QuestException,
     QuestRuntimeError,
@@ -44,6 +46,7 @@ from quest.runtime import (
     QRecord,
     QString,
     QValue,
+    QWord,
     QWriter,
 )
 from quest.types import (
@@ -1311,6 +1314,260 @@ class BuiltinModuleRegistry:
             c_symbol="quest_system_file_exists",
         )
         sys_b.finish()
+
+        # --------------------------------------------------------------------
+        # 12. Word Interface & Module
+        # --------------------------------------------------------------------
+        word_t_id = e.fresh_symbol_id()
+        word_t = QTypeVar(name="Word.T", symbol_id=word_t_id, bound=TYPE_KIND)
+        word_b = ModuleBuilder("word", "Word", cls)
+        word_b.def_external_type("T", word_t_id, TYPE_KIND, "uint64_t")
+        word_b.def_const("bits", INT_TYPE, QInt(64), c_val="64")
+
+        def _word_not_bits(w: QWord) -> QWord:
+            return QWord((~w.value) & 0xFFFF_FFFF_FFFF_FFFF)
+
+        def _word_and_bits(w1: QWord, w2: QWord) -> QWord:
+            return QWord(w1.value & w2.value)
+
+        def _word_or_bits(w1: QWord, w2: QWord) -> QWord:
+            return QWord(w1.value | w2.value)
+
+        def _word_xor_bits(w1: QWord, w2: QWord) -> QWord:
+            return QWord(w1.value ^ w2.value)
+
+        def _word_shift(w: QWord, count: QInt) -> QWord:
+            cnt = count.value
+            if cnt >= 64 or cnt <= -64:
+                return QWord(0)
+            if cnt > 0:
+                return QWord((w.value << cnt) & 0xFFFF_FFFF_FFFF_FFFF)
+            if cnt < 0:
+                return QWord(w.value >> (-cnt))
+            return w
+
+        def _word_rotate(w: QWord, count: QInt) -> QWord:
+            cnt = count.value % 64
+            if cnt == 0:
+                return w
+            val = ((w.value << cnt) & 0xFFFF_FFFF_FFFF_FFFF) | (w.value >> (64 - cnt))
+            return QWord(val)
+
+        def _word_extract(w: QWord, pos: QInt, width: QInt) -> QWord:
+            p = pos.value
+            wd = width.value
+            if p < 0 or p >= 64 or wd <= 0:
+                return QWord(0)
+            if wd > 64 - p:
+                wd = 64 - p
+            mask = 0xFFFF_FFFF_FFFF_FFFF if wd == 64 else ((1 << wd) - 1)
+            return QWord((w.value >> p) & mask)
+
+        def _word_replace(w: QWord, val: QWord, pos: QInt, width: QInt) -> QWord:
+            p = pos.value
+            wd = width.value
+            if p < 0 or p >= 64 or wd <= 0:
+                return w
+            if wd > 64 - p:
+                wd = 64 - p
+            mask = 0xFFFF_FFFF_FFFF_FFFF if wd == 64 else ((1 << wd) - 1)
+            cleared = w.value & ~(mask << p)
+            inserted = (val.value & mask) << p
+            return QWord((cleared | inserted) & 0xFFFF_FFFF_FFFF_FFFF)
+
+        def _word_pop_count(w: QWord) -> QInt:
+            return QInt(w.value.bit_count())
+
+        def _word_count_leading_zeros(w: QWord) -> QInt:
+            if w.value == 0:
+                return QInt(64)
+            return QInt(64 - w.value.bit_length())
+
+        def _word_count_trailing_zeros(w: QWord) -> QInt:
+            if w.value == 0:
+                return QInt(64)
+            return QInt((w.value & -w.value).bit_length() - 1)
+
+        def _word_get_bit(w: QWord, pos: QInt) -> QBool:
+            p = pos.value
+            if p < 0 or p >= 64:
+                return FALSE_VALUE
+            return TRUE_VALUE if ((w.value >> p) & 1) != 0 else FALSE_VALUE
+
+        def _word_set_bit(w: QWord, pos: QInt) -> QWord:
+            p = pos.value
+            if p < 0 or p >= 64:
+                return w
+            return QWord(w.value | (1 << p))
+
+        def _word_clear_bit(w: QWord, pos: QInt) -> QWord:
+            p = pos.value
+            if p < 0 or p >= 64:
+                return w
+            return QWord(w.value & ~(1 << p))
+
+        def _word_add(w1: QWord, w2: QWord) -> QWord:
+            return QWord((w1.value + w2.value) & 0xFFFF_FFFF_FFFF_FFFF)
+
+        def _word_sub(w1: QWord, w2: QWord) -> QWord:
+            return QWord((w1.value - w2.value) & 0xFFFF_FFFF_FFFF_FFFF)
+
+        def _word_mul(w1: QWord, w2: QWord) -> QWord:
+            return QWord((w1.value * w2.value) & 0xFFFF_FFFF_FFFF_FFFF)
+
+        def _word_div(w1: QWord, w2: QWord) -> QWord:
+            if w2.value == 0:
+                raise QuestException(DIVIDE_BY_ZERO_EXC, OK_VALUE)
+            return QWord(w1.value // w2.value)
+
+        def _word_mod(w1: QWord, w2: QWord) -> QWord:
+            if w2.value == 0:
+                raise QuestException(DIVIDE_BY_ZERO_EXC, OK_VALUE)
+            return QWord(w1.value % w2.value)
+
+        def _word_to_int(w: QWord) -> QInt:
+            val = w.value
+            if val >= (1 << 63):
+                val -= (1 << 64)
+            return QInt(val)
+
+        def _word_from_int(n: QInt) -> QWord:
+            return QWord(n.value & 0xFFFF_FFFF_FFFF_FFFF)
+
+        def _word_to_real(w: QWord) -> QReal:
+            r = struct.unpack(">d", struct.pack(">Q", w.value))[0]
+            return QReal(r)
+
+        def _word_from_real(r: QReal) -> QWord:
+            w = struct.unpack(">Q", struct.pack(">d", r.value))[0]
+            return QWord(w)
+
+        def _word_lt(w1: QWord, w2: QWord) -> QBool:
+            return TRUE_VALUE if w1.value < w2.value else FALSE_VALUE
+
+        def _word_le(w1: QWord, w2: QWord) -> QBool:
+            return TRUE_VALUE if w1.value <= w2.value else FALSE_VALUE
+
+        def _word_gt(w1: QWord, w2: QWord) -> QBool:
+            return TRUE_VALUE if w1.value > w2.value else FALSE_VALUE
+
+        def _word_ge(w1: QWord, w2: QWord) -> QBool:
+            return TRUE_VALUE if w1.value >= w2.value else FALSE_VALUE
+
+        word_b.def_fn(
+            "notBits", [("w", word_t)], word_t, _word_not_bits,
+            c_symbol="quest_word_not_bits", inline_template="(~({0}))",
+        )
+        word_b.def_fn(
+            "andBits", [("w1", word_t), ("w2", word_t)], word_t, _word_and_bits,
+            c_symbol="quest_word_and_bits", inline_template="(({0}) & ({1}))",
+        )
+        word_b.def_fn(
+            "orBits", [("w1", word_t), ("w2", word_t)], word_t, _word_or_bits,
+            c_symbol="quest_word_or_bits", inline_template="(({0}) | ({1}))",
+        )
+        word_b.def_fn(
+            "xorBits", [("w1", word_t), ("w2", word_t)], word_t, _word_xor_bits,
+            c_symbol="quest_word_xor_bits", inline_template="(({0}) ^ ({1}))",
+        )
+        word_b.def_fn(
+            "shift", [("w", word_t), ("count", INT_TYPE)], word_t, _word_shift,
+            c_symbol="quest_word_shift_val", inline_template="quest_word_shift({0}, {1})",
+        )
+        word_b.def_fn(
+            "rotate", [("w", word_t), ("count", INT_TYPE)], word_t, _word_rotate,
+            c_symbol="quest_word_rotate_val", inline_template="quest_word_rotate({0}, {1})",
+        )
+        word_b.def_fn(
+            "extract", [("w", word_t), ("pos", INT_TYPE), ("width", INT_TYPE)], word_t, _word_extract,
+            c_symbol="quest_word_extract_val", inline_template="quest_word_extract({0}, {1}, {2})",
+        )
+        word_b.def_fn(
+            "replace",
+            [("w", word_t), ("val", word_t), ("pos", INT_TYPE), ("width", INT_TYPE)],
+            word_t,
+            _word_replace,
+            c_symbol="quest_word_replace_val",
+            inline_template="quest_word_replace({0}, {1}, {2}, {3})",
+        )
+        word_b.def_fn(
+            "popCount", [("w", word_t)], INT_TYPE, _word_pop_count,
+            c_symbol="quest_word_pop_count_val", inline_template="quest_word_pop_count({0})",
+        )
+        word_b.def_fn(
+            "countLeadingZeros", [("w", word_t)], INT_TYPE, _word_count_leading_zeros,
+            c_symbol="quest_word_count_leading_zeros_val", inline_template="quest_word_count_leading_zeros({0})",
+        )
+        word_b.def_fn(
+            "countTrailingZeros", [("w", word_t)], INT_TYPE, _word_count_trailing_zeros,
+            c_symbol="quest_word_count_trailing_zeros_val", inline_template="quest_word_count_trailing_zeros({0})",
+        )
+        word_b.def_fn(
+            "add", [("w1", word_t), ("w2", word_t)], word_t, _word_add,
+            c_symbol="quest_word_add", inline_template="(({0}) + ({1}))",
+        )
+        word_b.def_fn(
+            "sub", [("w1", word_t), ("w2", word_t)], word_t, _word_sub,
+            c_symbol="quest_word_sub", inline_template="(({0}) - ({1}))",
+        )
+        word_b.def_fn(
+            "mul", [("w1", word_t), ("w2", word_t)], word_t, _word_mul,
+            c_symbol="quest_word_mul", inline_template="(({0}) * ({1}))",
+        )
+        word_b.def_fn(
+            "div", [("w1", word_t), ("w2", word_t)], word_t, _word_div,
+            c_symbol="quest_word_div_val", inline_template="quest_word_div({0}, {1})",
+        )
+        word_b.def_fn(
+            "mod", [("w1", word_t), ("w2", word_t)], word_t, _word_mod,
+            c_symbol="quest_word_mod_val", inline_template="quest_word_mod({0}, {1})",
+        )
+        word_b.def_fn(
+            "toInt", [("w", word_t)], INT_TYPE, _word_to_int,
+            c_symbol="quest_word_to_int", inline_template="((int64_t)({0}))",
+        )
+        word_b.def_fn(
+            "fromInt", [("n", INT_TYPE)], word_t, _word_from_int,
+            c_symbol="quest_word_from_int", inline_template="((uint64_t)({0}))",
+        )
+        word_b.def_fn(
+            "lt", [("w1", word_t), ("w2", word_t)], BOOL_TYPE, _word_lt,
+            c_symbol="quest_word_lt", inline_template="(({0}) < ({1}))",
+        )
+        word_b.def_fn(
+            "le", [("w1", word_t), ("w2", word_t)], BOOL_TYPE, _word_le,
+            c_symbol="quest_word_le", inline_template="(({0}) <= ({1}))",
+        )
+        word_b.def_fn(
+            "gt", [("w1", word_t), ("w2", word_t)], BOOL_TYPE, _word_gt,
+            c_symbol="quest_word_gt", inline_template="(({0}) > ({1}))",
+        )
+        word_b.def_fn(
+            "ge", [("w1", word_t), ("w2", word_t)], BOOL_TYPE, _word_ge,
+            c_symbol="quest_word_ge", inline_template="(({0}) >= ({1}))",
+        )
+        word_b.def_fn(
+            "toReal", [("w", word_t)], REAL_TYPE, _word_to_real,
+            c_symbol="quest_word_to_real_val", inline_template="(((QVal){{ .u = ({0}) }}).r)",
+        )
+        word_b.def_fn(
+            "fromReal", [("r", REAL_TYPE)], word_t, _word_from_real,
+            c_symbol="quest_word_from_real_val", inline_template="(((QVal){{ .r = ({0}) }}).u)",
+        )
+        word_b.def_fn(
+            "getBit", [("w", word_t), ("pos", INT_TYPE)], BOOL_TYPE, _word_get_bit,
+            c_symbol="quest_word_get_bit_val", inline_template="quest_word_get_bit({0}, {1})",
+        )
+        word_b.def_fn(
+            "setBit", [("w", word_t), ("pos", INT_TYPE)], word_t, _word_set_bit,
+            c_symbol="quest_word_set_bit_val", inline_template="quest_word_set_bit({0}, {1})",
+        )
+        word_b.def_fn(
+            "clearBit", [("w", word_t), ("pos", INT_TYPE)], word_t, _word_clear_bit,
+            c_symbol="quest_word_clear_bit_val", inline_template="quest_word_clear_bit({0}, {1})",
+        )
+        word_b.finish()
+
         cls._symbol_bridge.update({
             "QUEST_INT_MAX": QInt(9223372036854775807),
             "QUEST_INT_MIN": QInt(-9223372036854775808),
@@ -1337,6 +1594,23 @@ class BuiltinModuleRegistry:
             "quest_array_size": lambda arr: QInt(len(arr.elements)),
             "quest_string_length": lambda s: QInt(len(s.value)),
             "quest_real_from_int": lambda n: QReal(float(n.value)),
+            "quest_word_not_bits": _word_not_bits,
+            "quest_word_and_bits": _word_and_bits,
+            "quest_word_or_bits": _word_or_bits,
+            "quest_word_xor_bits": _word_xor_bits,
+            "quest_word_shift_val": _word_shift,
+            "quest_word_shift": _word_shift,
+            "quest_word_add": _word_add,
+            "quest_word_sub": _word_sub,
+            "quest_word_mul": _word_mul,
+            "quest_word_div_val": _word_div,
+            "quest_word_div": _word_div,
+            "quest_word_mod_val": _word_mod,
+            "quest_word_mod": _word_mod,
+            "quest_word_to_int": _word_to_int,
+            "quest_word_from_int": _word_from_int,
+            "quest_word_to_real_val": _word_to_real,
+            "quest_word_from_real_val": _word_from_real,
         })
 
     @classmethod

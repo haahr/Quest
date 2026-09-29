@@ -140,11 +140,27 @@ def resolve_type_bound(t: QType) -> QType:
     return curr
 
 
+def is_word_type(t: QType) -> bool:
+    """Returns True if t is the standard library Word.T type."""
+    t = t.prune() if hasattr(t, "prune") else t
+    t = resolve_type_bound(t)
+    t = normalize_type(t)
+    if isinstance(t, QTypeVar) and t.name in ("Word.T", "word.T"):
+        return True
+    if isinstance(t, QPathType) and t.field_name == "T" and t.root_name in ("Word", "word"):
+        return True
+    if isinstance(t, QExternalType) and (t.name in ("Word.T", "word.T") or t.c_type == "uint64_t"):
+        return True
+    return False
+
+
 def type_to_c_tag(t: QType) -> str:
     """Produces a deterministic, valid C identifier component for a QType."""
     t = t.prune() if hasattr(t, "prune") else t
     t = resolve_type_bound(t)
     t = normalize_type(t)
+    if is_word_type(t):
+        return "Word"
     if t == INT_TYPE:
         return "Int"
     if t == REAL_TYPE:
@@ -269,6 +285,8 @@ def qtype_to_c_type(t: QType, ctx: Optional[RecordNamingContext] = None) -> str:
     t = t.prune() if hasattr(t, "prune") else t
     t = resolve_type_bound(t)
     t = normalize_type(t)
+    if is_word_type(t):
+        return "uint64_t"
     if t == INT_TYPE:
         return "QInt"
     if t == REAL_TYPE:
@@ -319,6 +337,8 @@ def qtype_to_c_type(t: QType, ctx: Optional[RecordNamingContext] = None) -> str:
 def qtype_to_name_str(t: QType) -> str:
     """Returns the human-readable Quest type name string for runtime diagnostics and printing."""
     t = t.prune() if hasattr(t, "prune") else t
+    if is_word_type(t):
+        return "Word.T"
     if t == INT_TYPE:
         return "Int"
     if t == REAL_TYPE:
@@ -387,6 +407,8 @@ def qval_wrap(expr_str: str, t: QType) -> str:
         return f"((QVal){{ .p = (void *)quest_record_box({expr_str}) }})"
     if isinstance(t, QVariantType) or resolve_variant_bound(t) is not None:
         return f"((QVal){{ .p = (void *)quest_variant_box({expr_str}) }})"
+    if is_word_type(t):
+        return f"((QVal){{ .u = (uint64_t)({expr_str}) }})"
     if t == INT_TYPE or t == BOOL_TYPE or t == CHAR_TYPE:
         return f"((QVal){{ .i = (int64_t)({expr_str}) }})"
     if t == REAL_TYPE:
@@ -405,6 +427,8 @@ def qval_unwrap(qval_expr: str, t: QType, ctx: Optional[RecordNamingContext] = N
         return f"(*((QRecordVal *)({qval_expr}.p)))"
     if isinstance(t, QVariantType) or resolve_variant_bound(t) is not None:
         return f"(*((QVariantVal *)({qval_expr}.p)))"
+    if is_word_type(t):
+        return f"({qval_expr}.u)"
     if t in (INT_TYPE, BOOL_TYPE, CHAR_TYPE):
         return f"({qval_expr}.i)"
     if t == REAL_TYPE:

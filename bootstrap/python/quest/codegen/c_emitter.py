@@ -1130,11 +1130,22 @@ class CEmitter:
                         isinstance(b_val, TypedExternal)
                         and isinstance(b_sym.type_val, (QFunType, QAllType))
                     ):
+                        builtin_ast = BuiltinModuleRegistry.get_module_ast(mod.name)
+                        inline_tmpl = None
+                        if builtin_ast is not None:
+                            for b_item in builtin_ast.bindings:
+                                if (
+                                    isinstance(b_item, TypedNativeBinding)
+                                    and b_item.name == b_name
+                                    and b_item.inline_template
+                                ):
+                                    inline_tmpl = b_item.inline_template
+                                    break
                         mod_native_funs.append(
                             TypedNativeBinding(
                                 name=b_name,
                                 symbol=b_val.symbol,
-                                inline_template=None,
+                                inline_template=inline_tmpl,
                                 c_val=None,
                                 type_val=b_sym.type_val,
                             )
@@ -1322,6 +1333,7 @@ class CEmitter:
         mod_emitter = CEmitter(echo=False, module_prefix=clean_mod)
         mod_emitter.top_fun_names = {fname for fname, _, _ in mod_funs}
         mod_emitter.top_funs_dict = {fname: (ffun, fsym) for fname, ffun, fsym in mod_funs}
+        mod_emitter.module_native_bindings = {nb.name: nb for nb in mod_native_funs}
         mod_emitter.record_ctx = self.record_ctx
         mod_emitter.all_modules = self.all_modules
 
@@ -2164,6 +2176,53 @@ class CEmitter:
                     elif self.c_type(ret_type) == "QVal" and self.c_type(expr.type_val) != "QVal":
                         call_str = _qval_unwrap(call_str, expr.type_val, self)
                     return call_str
+                elif (
+                    isinstance(effective_func, TypedVar)
+                    and effective_func.name in getattr(self, "module_native_bindings", {})
+                ):
+                    binding = self.module_native_bindings[effective_func.name]
+                    quants, inner_t = self._collect_fun_quantifiers(binding.type_val)
+                    c_args = []
+                    if type_args and quants and getattr(binding, "pass_type_descriptors", False):
+                        for targ in type_args:
+                            c_args.append(self.c_type_descriptor(targ))
+                    if isinstance(inner_t, QFunType):
+                        formal_params = inner_t.params
+                        for i, a in enumerate(args):
+                            formal_t = (
+                                formal_params[i].type_val
+                                if i < len(formal_params)
+                                else a.type_val
+                            )
+                            is_r = (
+                                getattr(formal_params[i], "is_out", False)
+                                or getattr(formal_params[i], "is_var", False)
+                            ) if i < len(formal_params) else False
+                            is_o = (
+                                getattr(formal_params[i], "is_out", False)
+                                if i < len(formal_params)
+                                else False
+                            )
+                            c_args.append(
+                                self._emit_call_arg(formal_t, a, lines, is_ref=is_r, is_out=is_o)
+                            )
+                    else:
+                        c_args.extend([self.emit_val(a, lines) for a in args])
+
+                    if binding.inline_template:
+                        return binding.inline_template.format(*c_args)
+                    elif binding.symbol:
+                        call_str = f"{binding.symbol}({', '.join(c_args)})"
+                        if expr.type_val == OK_TYPE:
+                            lines.append(f"{call_str};")
+                            return "((void)0)"
+                        if (
+                            isinstance(inner_t, QFunType)
+                            and self.c_type(inner_t.result_type) == "QVal"
+                            and self.c_type(expr.type_val) != "QVal"
+                        ):
+                            return _qval_unwrap(call_str, expr.type_val, self)
+                        return call_str
                 elif isinstance(effective_func, TypedVar) and effective_func.name in self.top_fun_names:
                     c_func = self.current_env_vars.get(
                         effective_func.name, self.mangle_ident(effective_func.name)

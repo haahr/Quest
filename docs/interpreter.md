@@ -217,12 +217,12 @@ The evaluator in `quest/interpreter.py` evaluates typed expressions and bindings
   - `reader: Reader`: `getString`, `getChar`, `getInt`, `getReal`, `isEof`.
   - `conv: Conv`: String-to-number and number-to-string conversions.
   - `ascii: Ascii`: Character classification and ASCII conversions.
-  - `int: IntOp`, `real: RealOp`, `string: StringOp`, `arrayOp: ArrayOp`: Dedicated operations.
+  - `int: IntOp`, `real: RealOp`, `string: StringOp`, `arrayOp: ArrayOp`, `word: Word`: Dedicated operations.
 - Runtime I/O functions write directly to `sys.stdout` and `sys.stderr` as unbuffered operational side effects.
 
 ### 4.3. Cardelli Identity vs. Content Equality (`is` / `isnot`)
 - Implements Luca Cardelli's exact specification from *Typeful Programming* (Section 3.1):
-  - **Ordinary Value Equality:** Applied to primitive types `Ok`, `Bool`, `Char`, `Int`, and `Real`.
+  - **Ordinary Value Equality:** Applied to scalar/primitive types `Ok`, `Bool`, `Char`, `Int`, `Real`, and `Word.T`.
   - **Object Identity ("Same Memory Location"):** Applied to all other types (`String`, `Array`, `Record`, `Tuple`,
     `Variant`, `Option`, `Closure`, `Ref`). Distinct string instances compare as `false` under `is`.
   - Content equality for strings is handled via `string.equal(s1, s2)`.
@@ -287,12 +287,12 @@ The evaluator in `quest/interpreter.py` evaluates typed expressions and bindings
 ### 4.11. Standard Library Modules & Import System
 - **Module Pre-linking & Import Semantics (Cardelli §11.3):**
   - Standard library modules (`arrayOp`, `ascii`, `conv`, `dynamic`, `int`, `list`, `reader`, `real`, `string`,
-    `writer`) and their interfaces (`ArrayOp`, `Ascii`, `Conv`, `Dynamic`, `IntOp`, `List`, `Reader`, `RealOp`,
-    `StringOp`, `Writer`) are pre-linked at the top level and in the interactive REPL. They can be used directly
+    `word`, `writer`) and their interfaces (`ArrayOp`, `Ascii`, `Conv`, `Dynamic`, `IntOp`, `List`, `Reader`, `RealOp`,
+    `StringOp`, `Word`, `Writer`) are pre-linked at the top level and in the interactive REPL. They can be used directly
     without an `import` statement outside of modules.
   - Standalone modules (`module ... end`) are isolated from top-level pre-linked module records and must explicitly
     import any required modules using `import mod: Interface`.
-  - `BuiltinModuleRegistry` resolves all 10 standard interfaces and runtime module records.
+  - `BuiltinModuleRegistry` resolves all 11 standard interfaces and runtime module records.
 - **List Operations (`list: List`):**
   - Built-in `list` module backed by runtime `QList` values.
   - Provides `nil`, `cons`, `null`, `head`, `tail`, `length`, `enum`, and `error`.

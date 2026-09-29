@@ -22,6 +22,7 @@ from quest.runtime import (
     QString,
     QTuple,
     QVariant,
+    QWord,
     qvalue_is,
     qvalue_structural_eq,
     qvalue_to_str,
@@ -61,6 +62,29 @@ class TestRuntimePrimitives(unittest.TestCase):
         self.assertEqual(r1.type_name, "Real")
         self.assertEqual(qvalue_to_str(r1), "3.14")
         self.assertEqual(qvalue_to_str(r2), "2.0")
+
+    def test_word(self):
+        w1 = QWord(42)
+        self.assertEqual(w1.value, 42)
+        self.assertEqual(w1.type_name, "Word.T")
+        self.assertEqual(qvalue_to_str(w1), "16#2a#")
+
+        # Masking to 64 bits
+        w2 = QWord(0x1_0000_0000_0000_002A)
+        self.assertEqual(w2.value, 42)
+        self.assertEqual(w1, w2)
+        self.assertEqual(hash(w1), hash(w2))
+
+        # Negative value wraps modulo 2^64
+        w_neg = QWord(-1)
+        self.assertEqual(w_neg.value, 0xFFFF_FFFF_FFFF_FFFF)
+        self.assertEqual(qvalue_to_str(w_neg), "16#ffffffffffffffff#")
+
+        # Identity and structural equality
+        w3 = QWord(42)
+        self.assertTrue(qvalue_is(w1, w3))
+        self.assertTrue(qvalue_structural_eq(w1, w3))
+        self.assertFalse(qvalue_is(w1, w_neg))
 
     def test_char(self):
         c1 = QChar("a")

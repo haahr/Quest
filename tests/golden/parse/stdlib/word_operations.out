@@ -1,0 +1,4334 @@
+(Program
+  :phrases (
+    (ImportPhrase
+      :items (
+        (ImportItem ('word') 'Word')
+      )
+    )
+    (ImportPhrase
+      :items (
+        (ImportItem ('conv') 'Conv')
+      )
+    )
+    (ImportPhrase
+      :items (
+        (ImportItem ('writer') 'Writer')
+      )
+    )
+    (LetValueBinding
+      :name 'w1'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'word')
+          :field 'fromInt'
+        )
+        :args (
+          (ExprInt 100 '100')
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'w2'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'word')
+          :field 'fromInt'
+        )
+        :args (
+          (ExprInt 25 '25')
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'wAdd'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'word')
+          :field 'add'
+        )
+        :args (
+          (ExprId 'w1')
+          (ExprId 'w2')
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'wSub'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'word')
+          :field 'sub'
+        )
+        :args (
+          (ExprId 'w1')
+          (ExprId 'w2')
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'wMul'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'word')
+          :field 'mul'
+        )
+        :args (
+          (ExprId 'w1')
+          (ExprId 'w2')
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'wDiv'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'word')
+          :field 'div'
+        )
+        :args (
+          (ExprId 'w1')
+          (ExprId 'w2')
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'wMod'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'word')
+          :field 'mod'
+        )
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'word')
+              :field 'fromInt'
+            )
+            :args (
+              (ExprInt 103 '103')
+            )
+          )
+          (ExprId 'w2')
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'wZero'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'word')
+          :field 'fromInt'
+        )
+        :args (
+          (ExprInt 0 '0')
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'wAll'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'word')
+          :field 'notBits'
+        )
+        :args (
+          (ExprId 'wZero')
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'wAddWrap'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'word')
+          :field 'add'
+        )
+        :args (
+          (ExprId 'wAll')
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'word')
+              :field 'fromInt'
+            )
+            :args (
+              (ExprInt 1 '1')
+            )
+          )
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'wSubWrap'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'word')
+          :field 'sub'
+        )
+        :args (
+          (ExprId 'wZero')
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'word')
+              :field 'fromInt'
+            )
+            :args (
+              (ExprInt 1 '1')
+            )
+          )
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'wMulWrap'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'word')
+          :field 'mul'
+        )
+        :args (
+          (ExprId 'wAll')
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'word')
+              :field 'fromInt'
+            )
+            :args (
+              (ExprInt 2 '2')
+            )
+          )
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'wShiftL'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'word')
+          :field 'shift'
+        )
+        :args (
+          (ExprId 'w1')
+          (ExprInt 2 '2')
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'wShiftR'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'word')
+          :field 'shift'
+        )
+        :args (
+          (ExprId 'w1')
+          (ExprInt -2 '~2')
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'wShift0'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'word')
+          :field 'shift'
+        )
+        :args (
+          (ExprId 'w1')
+          (ExprInt 0 '0')
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'wShift64'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'word')
+          :field 'shift'
+        )
+        :args (
+          (ExprId 'w1')
+          (ExprInt 64 '64')
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'wShiftNeg64'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'word')
+          :field 'shift'
+        )
+        :args (
+          (ExprId 'w1')
+          (ExprInt -64 '~64')
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'wShift100'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'word')
+          :field 'shift'
+        )
+        :args (
+          (ExprId 'w1')
+          (ExprInt 100 '100')
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'wShiftNeg100'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'word')
+          :field 'shift'
+        )
+        :args (
+          (ExprId 'w1')
+          (ExprInt -100 '~100')
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'wAnd'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'word')
+          :field 'andBits'
+        )
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'word')
+              :field 'fromInt'
+            )
+            :args (
+              (ExprInt 3855 '3855')
+            )
+          )
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'word')
+              :field 'fromInt'
+            )
+            :args (
+              (ExprInt 255 '255')
+            )
+          )
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'wOr'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'word')
+          :field 'orBits'
+        )
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'word')
+              :field 'fromInt'
+            )
+            :args (
+              (ExprInt 3855 '3855')
+            )
+          )
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'word')
+              :field 'fromInt'
+            )
+            :args (
+              (ExprInt 255 '255')
+            )
+          )
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'wXor'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'word')
+          :field 'xorBits'
+        )
+        :args (
+          (ExprId 'w1')
+          (ExprId 'w1')
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'wNot'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'word')
+          :field 'notBits'
+        )
+        :args (
+          (ExprId 'wZero')
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'divZero'
+      :value (ExprTry
+        :body (ExprStmt
+          :expr (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'word')
+              :field 'div'
+            )
+            :args (
+              (ExprId 'w1')
+              (ExprId 'wZero')
+            )
+          )
+        )
+        :branches (
+          (TryBranch
+            :exc_pattern (ExprId 'DivideByZero')
+            :body (ExprStmt
+              :expr (ExprApp
+                :func (ExprSelect
+                  :target (ExprId 'word')
+                  :field 'fromInt'
+                )
+                :args (
+                  (ExprInt 777 '777')
+                )
+              )
+            )
+          )
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'modZero'
+      :value (ExprTry
+        :body (ExprStmt
+          :expr (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'word')
+              :field 'mod'
+            )
+            :args (
+              (ExprId 'w1')
+              (ExprId 'wZero')
+            )
+          )
+        )
+        :branches (
+          (TryBranch
+            :exc_pattern (ExprId 'DivideByZero')
+            :body (ExprStmt
+              :expr (ExprApp
+                :func (ExprSelect
+                  :target (ExprId 'word')
+                  :field 'fromInt'
+                )
+                :args (
+                  (ExprInt 888 '888')
+                )
+              )
+            )
+          )
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'iZero'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'word')
+          :field 'toInt'
+        )
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'word')
+              :field 'fromInt'
+            )
+            :args (
+              (ExprInt 0 '0')
+            )
+          )
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'iPos'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'word')
+          :field 'toInt'
+        )
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'word')
+              :field 'fromInt'
+            )
+            :args (
+              (ExprInt 12345 '12345')
+            )
+          )
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'iNeg'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'word')
+          :field 'toInt'
+        )
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'word')
+              :field 'fromInt'
+            )
+            :args (
+              (ExprInt -54321 '~54321')
+            )
+          )
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'iMin'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'word')
+          :field 'toInt'
+        )
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'word')
+              :field 'fromInt'
+            )
+            :args (
+              (ExprInfix
+                :left (ExprInt -9223372036854775807 '~9223372036854775807')
+                :op '-'
+                :right (ExprInt 1 '1')
+              )
+            )
+          )
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'iMax'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'word')
+          :field 'toInt'
+        )
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'word')
+              :field 'fromInt'
+            )
+            :args (
+              (ExprInt 9223372036854775807 '9223372036854775807')
+            )
+          )
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'rZero'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'word')
+          :field 'toReal'
+        )
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'word')
+              :field 'fromReal'
+            )
+            :args (
+              (ExprReal 0.0 '0.0')
+            )
+          )
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'rOne'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'word')
+          :field 'toReal'
+        )
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'word')
+              :field 'fromReal'
+            )
+            :args (
+              (ExprReal 1.0 '1.0')
+            )
+          )
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'rPi'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'word')
+          :field 'toReal'
+        )
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'word')
+              :field 'fromReal'
+            )
+            :args (
+              (ExprReal 3.14159 '3.14159')
+            )
+          )
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'rNeg'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'word')
+          :field 'toReal'
+        )
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'word')
+              :field 'fromReal'
+            )
+            :args (
+              (ExprReal -42.5 '~42.5')
+            )
+          )
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'bLt1'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'word')
+          :field 'lt'
+        )
+        :args (
+          (ExprId 'w2')
+          (ExprId 'w1')
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'bLt2'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'word')
+          :field 'lt'
+        )
+        :args (
+          (ExprId 'w1')
+          (ExprId 'w2')
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'bLt3'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'word')
+          :field 'lt'
+        )
+        :args (
+          (ExprId 'w1')
+          (ExprId 'w1')
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'bLe1'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'word')
+          :field 'le'
+        )
+        :args (
+          (ExprId 'w2')
+          (ExprId 'w1')
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'bLe2'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'word')
+          :field 'le'
+        )
+        :args (
+          (ExprId 'w1')
+          (ExprId 'w1')
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'bLe3'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'word')
+          :field 'le'
+        )
+        :args (
+          (ExprId 'w1')
+          (ExprId 'w2')
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'bGt1'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'word')
+          :field 'gt'
+        )
+        :args (
+          (ExprId 'w1')
+          (ExprId 'w2')
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'bGt2'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'word')
+          :field 'gt'
+        )
+        :args (
+          (ExprId 'w2')
+          (ExprId 'w1')
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'bGt3'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'word')
+          :field 'gt'
+        )
+        :args (
+          (ExprId 'w1')
+          (ExprId 'w1')
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'bGe1'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'word')
+          :field 'ge'
+        )
+        :args (
+          (ExprId 'w1')
+          (ExprId 'w2')
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'bGe2'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'word')
+          :field 'ge'
+        )
+        :args (
+          (ExprId 'w1')
+          (ExprId 'w1')
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'bGe3'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'word')
+          :field 'ge'
+        )
+        :args (
+          (ExprId 'w2')
+          (ExprId 'w1')
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'bUnsignedLt'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'word')
+          :field 'lt'
+        )
+        :args (
+          (ExprId 'wZero')
+          (ExprId 'wAll')
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'bUnsignedGt'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'word')
+          :field 'gt'
+        )
+        :args (
+          (ExprId 'wAll')
+          (ExprId 'wZero')
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'wBits'
+      :value (ExprSelect
+        :target (ExprId 'word')
+        :field 'bits'
+      )
+    )
+    (LetValueBinding
+      :name 'wRotL'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'word')
+          :field 'rotate'
+        )
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'word')
+              :field 'fromInt'
+            )
+            :args (
+              (ExprInt 1 '1')
+            )
+          )
+          (ExprInt 1 '1')
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'wRotR'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'word')
+          :field 'rotate'
+        )
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'word')
+              :field 'fromInt'
+            )
+            :args (
+              (ExprInt 1 '1')
+            )
+          )
+          (ExprInt -1 '~1')
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'wRot64'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'word')
+          :field 'rotate'
+        )
+        :args (
+          (ExprId 'w1')
+          (ExprInt 64 '64')
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'wRotWrap'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'word')
+          :field 'rotate'
+        )
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'word')
+              :field 'shift'
+            )
+            :args (
+              (ExprApp
+                :func (ExprSelect
+                  :target (ExprId 'word')
+                  :field 'fromInt'
+                )
+                :args (
+                  (ExprInt 1 '1')
+                )
+              )
+              (ExprInt 63 '63')
+            )
+          )
+          (ExprInt 1 '1')
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'wExt1'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'word')
+          :field 'extract'
+        )
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'word')
+              :field 'fromInt'
+            )
+            :args (
+              (ExprInt 165 '165')
+            )
+          )
+          (ExprInt 4 '4')
+          (ExprInt 4 '4')
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'wExt2'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'word')
+          :field 'extract'
+        )
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'word')
+              :field 'fromInt'
+            )
+            :args (
+              (ExprInt 165 '165')
+            )
+          )
+          (ExprInt 0 '0')
+          (ExprInt 4 '4')
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'wExt0'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'word')
+          :field 'extract'
+        )
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'word')
+              :field 'fromInt'
+            )
+            :args (
+              (ExprInt 165 '165')
+            )
+          )
+          (ExprInt 0 '0')
+          (ExprInt 0 '0')
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'wRep1'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'word')
+          :field 'replace'
+        )
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'word')
+              :field 'fromInt'
+            )
+            :args (
+              (ExprInt 160 '160')
+            )
+          )
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'word')
+              :field 'fromInt'
+            )
+            :args (
+              (ExprInt 5 '5')
+            )
+          )
+          (ExprInt 0 '0')
+          (ExprInt 4 '4')
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'wRep2'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'word')
+          :field 'replace'
+        )
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'word')
+              :field 'fromInt'
+            )
+            :args (
+              (ExprInt 5 '5')
+            )
+          )
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'word')
+              :field 'fromInt'
+            )
+            :args (
+              (ExprInt 10 '10')
+            )
+          )
+          (ExprInt 4 '4')
+          (ExprInt 4 '4')
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'nPop0'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'word')
+          :field 'popCount'
+        )
+        :args (
+          (ExprId 'wZero')
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'nPopAll'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'word')
+          :field 'popCount'
+        )
+        :args (
+          (ExprId 'wAll')
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'nPopA5'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'word')
+          :field 'popCount'
+        )
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'word')
+              :field 'fromInt'
+            )
+            :args (
+              (ExprInt 165 '165')
+            )
+          )
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'nClz0'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'word')
+          :field 'countLeadingZeros'
+        )
+        :args (
+          (ExprId 'wZero')
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'nClzAll'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'word')
+          :field 'countLeadingZeros'
+        )
+        :args (
+          (ExprId 'wAll')
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'nClz1'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'word')
+          :field 'countLeadingZeros'
+        )
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'word')
+              :field 'fromInt'
+            )
+            :args (
+              (ExprInt 1 '1')
+            )
+          )
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'nCtz0'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'word')
+          :field 'countTrailingZeros'
+        )
+        :args (
+          (ExprId 'wZero')
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'nCtzAll'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'word')
+          :field 'countTrailingZeros'
+        )
+        :args (
+          (ExprId 'wAll')
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'nCtz8'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'word')
+          :field 'countTrailingZeros'
+        )
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'word')
+              :field 'fromInt'
+            )
+            :args (
+              (ExprInt 8 '8')
+            )
+          )
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'bBit0'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'word')
+          :field 'getBit'
+        )
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'word')
+              :field 'fromInt'
+            )
+            :args (
+              (ExprInt 5 '5')
+            )
+          )
+          (ExprInt 0 '0')
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'bBit1'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'word')
+          :field 'getBit'
+        )
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'word')
+              :field 'fromInt'
+            )
+            :args (
+              (ExprInt 5 '5')
+            )
+          )
+          (ExprInt 1 '1')
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'bBit2'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'word')
+          :field 'getBit'
+        )
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'word')
+              :field 'fromInt'
+            )
+            :args (
+              (ExprInt 5 '5')
+            )
+          )
+          (ExprInt 2 '2')
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'bBit63'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'word')
+          :field 'getBit'
+        )
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'word')
+              :field 'fromInt'
+            )
+            :args (
+              (ExprInt 5 '5')
+            )
+          )
+          (ExprInt 63 '63')
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'bBitOob'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'word')
+          :field 'getBit'
+        )
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'word')
+              :field 'fromInt'
+            )
+            :args (
+              (ExprInt 5 '5')
+            )
+          )
+          (ExprInt 64 '64')
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'wSet3'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'word')
+          :field 'setBit'
+        )
+        :args (
+          (ExprId 'wZero')
+          (ExprInt 3 '3')
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'wSet63'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'word')
+          :field 'setBit'
+        )
+        :args (
+          (ExprId 'wZero')
+          (ExprInt 63 '63')
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'wClr3'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'word')
+          :field 'clearBit'
+        )
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'word')
+              :field 'fromInt'
+            )
+            :args (
+              (ExprInt 8 '8')
+            )
+          )
+          (ExprInt 3 '3')
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'wClr0'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'word')
+          :field 'clearBit'
+        )
+        :args (
+          (ExprId 'wZero')
+          (ExprInt 3 '3')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'conv')
+              :field 'int'
+            )
+            :args (
+              (ExprApp
+                :func (ExprSelect
+                  :target (ExprId 'word')
+                  :field 'toInt'
+                )
+                :args (
+                  (ExprId 'wAdd')
+                )
+              )
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprString '\n' '"\\n"')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'conv')
+              :field 'int'
+            )
+            :args (
+              (ExprApp
+                :func (ExprSelect
+                  :target (ExprId 'word')
+                  :field 'toInt'
+                )
+                :args (
+                  (ExprId 'wSub')
+                )
+              )
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprString '\n' '"\\n"')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'conv')
+              :field 'int'
+            )
+            :args (
+              (ExprApp
+                :func (ExprSelect
+                  :target (ExprId 'word')
+                  :field 'toInt'
+                )
+                :args (
+                  (ExprId 'wMul')
+                )
+              )
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprString '\n' '"\\n"')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'conv')
+              :field 'int'
+            )
+            :args (
+              (ExprApp
+                :func (ExprSelect
+                  :target (ExprId 'word')
+                  :field 'toInt'
+                )
+                :args (
+                  (ExprId 'wDiv')
+                )
+              )
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprString '\n' '"\\n"')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'conv')
+              :field 'int'
+            )
+            :args (
+              (ExprApp
+                :func (ExprSelect
+                  :target (ExprId 'word')
+                  :field 'toInt'
+                )
+                :args (
+                  (ExprId 'wMod')
+                )
+              )
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprString '\n' '"\\n"')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'conv')
+              :field 'int'
+            )
+            :args (
+              (ExprApp
+                :func (ExprSelect
+                  :target (ExprId 'word')
+                  :field 'toInt'
+                )
+                :args (
+                  (ExprId 'wAddWrap')
+                )
+              )
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprString '\n' '"\\n"')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'conv')
+              :field 'int'
+            )
+            :args (
+              (ExprApp
+                :func (ExprSelect
+                  :target (ExprId 'word')
+                  :field 'toInt'
+                )
+                :args (
+                  (ExprId 'wSubWrap')
+                )
+              )
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprString '\n' '"\\n"')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'conv')
+              :field 'int'
+            )
+            :args (
+              (ExprApp
+                :func (ExprSelect
+                  :target (ExprId 'word')
+                  :field 'toInt'
+                )
+                :args (
+                  (ExprId 'wMulWrap')
+                )
+              )
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprString '\n' '"\\n"')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'conv')
+              :field 'int'
+            )
+            :args (
+              (ExprApp
+                :func (ExprSelect
+                  :target (ExprId 'word')
+                  :field 'toInt'
+                )
+                :args (
+                  (ExprId 'wShiftL')
+                )
+              )
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprString '\n' '"\\n"')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'conv')
+              :field 'int'
+            )
+            :args (
+              (ExprApp
+                :func (ExprSelect
+                  :target (ExprId 'word')
+                  :field 'toInt'
+                )
+                :args (
+                  (ExprId 'wShiftR')
+                )
+              )
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprString '\n' '"\\n"')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'conv')
+              :field 'int'
+            )
+            :args (
+              (ExprApp
+                :func (ExprSelect
+                  :target (ExprId 'word')
+                  :field 'toInt'
+                )
+                :args (
+                  (ExprId 'wShift0')
+                )
+              )
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprString '\n' '"\\n"')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'conv')
+              :field 'int'
+            )
+            :args (
+              (ExprApp
+                :func (ExprSelect
+                  :target (ExprId 'word')
+                  :field 'toInt'
+                )
+                :args (
+                  (ExprId 'wShift64')
+                )
+              )
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprString '\n' '"\\n"')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'conv')
+              :field 'int'
+            )
+            :args (
+              (ExprApp
+                :func (ExprSelect
+                  :target (ExprId 'word')
+                  :field 'toInt'
+                )
+                :args (
+                  (ExprId 'wShiftNeg64')
+                )
+              )
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprString '\n' '"\\n"')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'conv')
+              :field 'int'
+            )
+            :args (
+              (ExprApp
+                :func (ExprSelect
+                  :target (ExprId 'word')
+                  :field 'toInt'
+                )
+                :args (
+                  (ExprId 'wShift100')
+                )
+              )
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprString '\n' '"\\n"')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'conv')
+              :field 'int'
+            )
+            :args (
+              (ExprApp
+                :func (ExprSelect
+                  :target (ExprId 'word')
+                  :field 'toInt'
+                )
+                :args (
+                  (ExprId 'wShiftNeg100')
+                )
+              )
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprString '\n' '"\\n"')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'conv')
+              :field 'int'
+            )
+            :args (
+              (ExprApp
+                :func (ExprSelect
+                  :target (ExprId 'word')
+                  :field 'toInt'
+                )
+                :args (
+                  (ExprId 'wAnd')
+                )
+              )
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprString '\n' '"\\n"')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'conv')
+              :field 'int'
+            )
+            :args (
+              (ExprApp
+                :func (ExprSelect
+                  :target (ExprId 'word')
+                  :field 'toInt'
+                )
+                :args (
+                  (ExprId 'wOr')
+                )
+              )
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprString '\n' '"\\n"')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'conv')
+              :field 'int'
+            )
+            :args (
+              (ExprApp
+                :func (ExprSelect
+                  :target (ExprId 'word')
+                  :field 'toInt'
+                )
+                :args (
+                  (ExprId 'wXor')
+                )
+              )
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprString '\n' '"\\n"')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'conv')
+              :field 'int'
+            )
+            :args (
+              (ExprApp
+                :func (ExprSelect
+                  :target (ExprId 'word')
+                  :field 'toInt'
+                )
+                :args (
+                  (ExprId 'wNot')
+                )
+              )
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprString '\n' '"\\n"')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'conv')
+              :field 'int'
+            )
+            :args (
+              (ExprApp
+                :func (ExprSelect
+                  :target (ExprId 'word')
+                  :field 'toInt'
+                )
+                :args (
+                  (ExprId 'divZero')
+                )
+              )
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprString '\n' '"\\n"')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'conv')
+              :field 'int'
+            )
+            :args (
+              (ExprApp
+                :func (ExprSelect
+                  :target (ExprId 'word')
+                  :field 'toInt'
+                )
+                :args (
+                  (ExprId 'modZero')
+                )
+              )
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprString '\n' '"\\n"')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'conv')
+              :field 'int'
+            )
+            :args (
+              (ExprId 'iZero')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprString '\n' '"\\n"')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'conv')
+              :field 'int'
+            )
+            :args (
+              (ExprId 'iPos')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprString '\n' '"\\n"')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'conv')
+              :field 'int'
+            )
+            :args (
+              (ExprId 'iNeg')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprString '\n' '"\\n"')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'conv')
+              :field 'int'
+            )
+            :args (
+              (ExprId 'iMin')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprString '\n' '"\\n"')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'conv')
+              :field 'int'
+            )
+            :args (
+              (ExprId 'iMax')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprString '\n' '"\\n"')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'conv')
+              :field 'real'
+            )
+            :args (
+              (ExprId 'rZero')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprString '\n' '"\\n"')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'conv')
+              :field 'real'
+            )
+            :args (
+              (ExprId 'rOne')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprString '\n' '"\\n"')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'conv')
+              :field 'real'
+            )
+            :args (
+              (ExprId 'rPi')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprString '\n' '"\\n"')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'conv')
+              :field 'real'
+            )
+            :args (
+              (ExprId 'rNeg')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprString '\n' '"\\n"')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'conv')
+              :field 'bool'
+            )
+            :args (
+              (ExprId 'bLt1')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprString '\n' '"\\n"')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'conv')
+              :field 'bool'
+            )
+            :args (
+              (ExprId 'bLt2')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprString '\n' '"\\n"')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'conv')
+              :field 'bool'
+            )
+            :args (
+              (ExprId 'bLt3')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprString '\n' '"\\n"')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'conv')
+              :field 'bool'
+            )
+            :args (
+              (ExprId 'bLe1')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprString '\n' '"\\n"')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'conv')
+              :field 'bool'
+            )
+            :args (
+              (ExprId 'bLe2')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprString '\n' '"\\n"')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'conv')
+              :field 'bool'
+            )
+            :args (
+              (ExprId 'bLe3')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprString '\n' '"\\n"')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'conv')
+              :field 'bool'
+            )
+            :args (
+              (ExprId 'bGt1')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprString '\n' '"\\n"')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'conv')
+              :field 'bool'
+            )
+            :args (
+              (ExprId 'bGt2')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprString '\n' '"\\n"')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'conv')
+              :field 'bool'
+            )
+            :args (
+              (ExprId 'bGt3')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprString '\n' '"\\n"')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'conv')
+              :field 'bool'
+            )
+            :args (
+              (ExprId 'bGe1')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprString '\n' '"\\n"')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'conv')
+              :field 'bool'
+            )
+            :args (
+              (ExprId 'bGe2')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprString '\n' '"\\n"')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'conv')
+              :field 'bool'
+            )
+            :args (
+              (ExprId 'bGe3')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprString '\n' '"\\n"')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'conv')
+              :field 'bool'
+            )
+            :args (
+              (ExprId 'bUnsignedLt')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprString '\n' '"\\n"')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'conv')
+              :field 'bool'
+            )
+            :args (
+              (ExprId 'bUnsignedGt')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprString '\n' '"\\n"')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'conv')
+              :field 'int'
+            )
+            :args (
+              (ExprId 'wBits')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprString '\n' '"\\n"')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'conv')
+              :field 'int'
+            )
+            :args (
+              (ExprApp
+                :func (ExprSelect
+                  :target (ExprId 'word')
+                  :field 'toInt'
+                )
+                :args (
+                  (ExprId 'wRotL')
+                )
+              )
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprString '\n' '"\\n"')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'conv')
+              :field 'int'
+            )
+            :args (
+              (ExprApp
+                :func (ExprSelect
+                  :target (ExprId 'word')
+                  :field 'toInt'
+                )
+                :args (
+                  (ExprId 'wRotR')
+                )
+              )
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprString '\n' '"\\n"')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'conv')
+              :field 'int'
+            )
+            :args (
+              (ExprApp
+                :func (ExprSelect
+                  :target (ExprId 'word')
+                  :field 'toInt'
+                )
+                :args (
+                  (ExprId 'wRot64')
+                )
+              )
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprString '\n' '"\\n"')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'conv')
+              :field 'int'
+            )
+            :args (
+              (ExprApp
+                :func (ExprSelect
+                  :target (ExprId 'word')
+                  :field 'toInt'
+                )
+                :args (
+                  (ExprId 'wRotWrap')
+                )
+              )
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprString '\n' '"\\n"')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'conv')
+              :field 'int'
+            )
+            :args (
+              (ExprApp
+                :func (ExprSelect
+                  :target (ExprId 'word')
+                  :field 'toInt'
+                )
+                :args (
+                  (ExprId 'wExt1')
+                )
+              )
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprString '\n' '"\\n"')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'conv')
+              :field 'int'
+            )
+            :args (
+              (ExprApp
+                :func (ExprSelect
+                  :target (ExprId 'word')
+                  :field 'toInt'
+                )
+                :args (
+                  (ExprId 'wExt2')
+                )
+              )
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprString '\n' '"\\n"')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'conv')
+              :field 'int'
+            )
+            :args (
+              (ExprApp
+                :func (ExprSelect
+                  :target (ExprId 'word')
+                  :field 'toInt'
+                )
+                :args (
+                  (ExprId 'wExt0')
+                )
+              )
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprString '\n' '"\\n"')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'conv')
+              :field 'int'
+            )
+            :args (
+              (ExprApp
+                :func (ExprSelect
+                  :target (ExprId 'word')
+                  :field 'toInt'
+                )
+                :args (
+                  (ExprId 'wRep1')
+                )
+              )
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprString '\n' '"\\n"')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'conv')
+              :field 'int'
+            )
+            :args (
+              (ExprApp
+                :func (ExprSelect
+                  :target (ExprId 'word')
+                  :field 'toInt'
+                )
+                :args (
+                  (ExprId 'wRep2')
+                )
+              )
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprString '\n' '"\\n"')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'conv')
+              :field 'int'
+            )
+            :args (
+              (ExprId 'nPop0')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprString '\n' '"\\n"')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'conv')
+              :field 'int'
+            )
+            :args (
+              (ExprId 'nPopAll')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprString '\n' '"\\n"')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'conv')
+              :field 'int'
+            )
+            :args (
+              (ExprId 'nPopA5')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprString '\n' '"\\n"')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'conv')
+              :field 'int'
+            )
+            :args (
+              (ExprId 'nClz0')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprString '\n' '"\\n"')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'conv')
+              :field 'int'
+            )
+            :args (
+              (ExprId 'nClzAll')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprString '\n' '"\\n"')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'conv')
+              :field 'int'
+            )
+            :args (
+              (ExprId 'nClz1')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprString '\n' '"\\n"')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'conv')
+              :field 'int'
+            )
+            :args (
+              (ExprId 'nCtz0')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprString '\n' '"\\n"')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'conv')
+              :field 'int'
+            )
+            :args (
+              (ExprId 'nCtzAll')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprString '\n' '"\\n"')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'conv')
+              :field 'int'
+            )
+            :args (
+              (ExprId 'nCtz8')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprString '\n' '"\\n"')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'conv')
+              :field 'bool'
+            )
+            :args (
+              (ExprId 'bBit0')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprString '\n' '"\\n"')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'conv')
+              :field 'bool'
+            )
+            :args (
+              (ExprId 'bBit1')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprString '\n' '"\\n"')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'conv')
+              :field 'bool'
+            )
+            :args (
+              (ExprId 'bBit2')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprString '\n' '"\\n"')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'conv')
+              :field 'bool'
+            )
+            :args (
+              (ExprId 'bBit63')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprString '\n' '"\\n"')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'conv')
+              :field 'bool'
+            )
+            :args (
+              (ExprId 'bBitOob')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprString '\n' '"\\n"')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'conv')
+              :field 'int'
+            )
+            :args (
+              (ExprApp
+                :func (ExprSelect
+                  :target (ExprId 'word')
+                  :field 'toInt'
+                )
+                :args (
+                  (ExprId 'wSet3')
+                )
+              )
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprString '\n' '"\\n"')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'conv')
+              :field 'int'
+            )
+            :args (
+              (ExprApp
+                :func (ExprSelect
+                  :target (ExprId 'word')
+                  :field 'toInt'
+                )
+                :args (
+                  (ExprId 'wSet63')
+                )
+              )
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprString '\n' '"\\n"')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'conv')
+              :field 'int'
+            )
+            :args (
+              (ExprApp
+                :func (ExprSelect
+                  :target (ExprId 'word')
+                  :field 'toInt'
+                )
+                :args (
+                  (ExprId 'wClr3')
+                )
+              )
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprString '\n' '"\\n"')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'conv')
+              :field 'int'
+            )
+            :args (
+              (ExprApp
+                :func (ExprSelect
+                  :target (ExprId 'word')
+                  :field 'toInt'
+                )
+                :args (
+                  (ExprId 'wClr0')
+                )
+              )
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprSelect
+            :target (ExprId 'writer')
+            :field 'output'
+          )
+          (ExprString '\n' '"\\n"')
+        )
+      )
+    )
+  )
+)

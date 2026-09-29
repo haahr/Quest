@@ -428,6 +428,7 @@ class Environment:
             "arrayOp": "ArrayOp",
             "dynamic": "Dynamic",
             "list": "List",
+            "word": "Word",
         }
         for iface_name, iface_scope in BuiltinModuleRegistry._interfaces.items():
             self.register_interface(iface_name, iface_scope)

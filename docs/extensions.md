@@ -166,3 +166,143 @@ In emitted C code and precompiled object files, slashes are mangled to `__` (dou
 - Direct functions: `qv_util__random_next`
 Single underscores (`_`) continue to separate module prefixes from member names, preventing symbol collisions.
 
+---
+
+## The `Word` Interface & Module
+
+Cardelli's *Typeful Programming* (§9.3, *Type violations*) observes:
+> "Bit and word operations could be provided through a sound built-in `Word` interface."
+
+Following Modula-3's `Word` package design and Cardelli's specification, this implementation provides
+`word : Word` as a top-level standard library module and interface. It exposes 64-bit unsigned bitwise,
+logical shift, arithmetic, and machine-level representation conversions with zero abstraction overhead.
+
+### 1. The `Word` Interface (`lib/word.int.quest`)
+
+```quest
+interface Word export
+    (* Abstract 64-bit unsigned word type *)
+    T::TYPE
+
+    (* Number of bits in Word.T *)
+    bits: Int
+
+    (* Bitwise NOT (~w) *)
+    notBits(w: T): T
+
+    (* Bitwise AND (w1 & w2) *)
+    andBits(w1: T w2: T): T
+
+    (* Bitwise OR (w1 | w2) *)
+    orBits(w1: T w2: T): T
+
+    (* Bitwise XOR (w1 ^ w2) *)
+    xorBits(w1: T w2: T): T
+
+    (* Logical bit shift: left if count > 0, right if count < 0, 0 if |count| >= 64 *)
+    shift(w: T count: Int): T
+
+    (* Circular bitwise rotation: left if count > 0, right if count < 0 (modulo 64) *)
+    rotate(w: T count: Int): T
+
+    (* Extract width bits starting at bit pos, returned right-aligned *)
+    extract(w: T pos: Int width: Int): T
+
+    (* Replace width bits in w starting at bit pos with the lowest width bits of val *)
+    replace(w: T val: T pos: Int width: Int): T
+
+    (* Number of set bits (population count / Hamming weight) *)
+    popCount(w: T): Int
+
+    (* Number of leading zero bits (64 if w is 0) *)
+    countLeadingZeros(w: T): Int
+
+    (* Number of trailing zero bits (64 if w is 0) *)
+    countTrailingZeros(w: T): Int
+
+    (* Unsigned 64-bit addition modulo 2^64 *)
+    add(w1: T w2: T): T
+
+    (* Unsigned 64-bit subtraction modulo 2^64 *)
+    sub(w1: T w2: T): T
+
+    (* Unsigned 64-bit multiplication modulo 2^64 *)
+    mul(w1: T w2: T): T
+
+    (* Unsigned 64-bit division; raises DivideByZero if w2 is 0 *)
+    div(w1: T w2: T): T
+
+    (* Unsigned 64-bit modulo; raises DivideByZero if w2 is 0 *)
+    mod(w1: T w2: T): T
+
+    (* Convert word to signed 64-bit integer (two's complement interpretation) *)
+    toInt(w: T): Int
+
+    (* Convert signed 64-bit integer to word (two's complement bit pattern) *)
+    fromInt(n: Int): T
+
+    (* Returns true if w1 < w2 as unsigned 64-bit words *)
+    lt(w1: T w2: T): Bool
+
+    (* Returns true if w1 <= w2 as unsigned 64-bit words *)
+    le(w1: T w2: T): Bool
+
+    (* Returns true if w1 > w2 as unsigned 64-bit words *)
+    gt(w1: T w2: T): Bool
+
+    (* Returns true if w1 >= w2 as unsigned 64-bit words *)
+    ge(w1: T w2: T): Bool
+
+    (* Convert word bit pattern to 64-bit IEEE-754 floating point real *)
+    toReal(w: T): Real
+
+    (* Convert 64-bit IEEE-754 floating point real to word bit pattern *)
+    fromReal(r: Real): T
+
+    (* Returns true if bit at index pos (0 <= pos < 64) is set *)
+    getBit(w: T pos: Int): Bool
+
+    (* Returns word with bit at index pos set to 1 *)
+    setBit(w: T pos: Int): T
+
+    (* Returns word with bit at index pos cleared to 0 *)
+    clearBit(w: T pos: Int): T
+end;
+```
+
+### 2. Concrete C Representation and Direct Expression Inlining
+- **Underlying Type**: `Word.T` is backed in C by `uint64_t` (`typedef uint64_t QWord;`).
+- **Word Size Constant**: `word.bits` evaluates to `64`.
+- **Universal Word Boxing (`QVal`)**: In `QVal`, `Word.T` maps to the raw unsigned 64-bit word member `uint64_t u;`.
+  Boxing is performed via `((QVal){ .u = (expr) })` and unboxing via `(expr).u`.
+- **Pure Quest Functions**: `getBit`, `setBit`, and `clearBit` are implemented directly in Quest source code
+  within `lib/word.mod.quest`, composed from `shift`, `andBits`, `orBits`, and `notBits`.
+- **Direct Expression Inlining**: Builtin calls on the `word` module are directly inlined into C expressions:
+  - `notBits(w)` $\to$ `(~(w))`
+  - `andBits(w1 w2)` $\to$ `((w1) & (w2))`
+  - `orBits(w1 w2)` $\to$ `((w1) | (w2))`
+  - `xorBits(w1 w2)` $\to$ `((w1) ^ (w2))`
+  - `add(w1 w2)` $\to$ `((w1) + (w2))` (unsigned wrapping modulo $2^{64}$ is guaranteed by standard C)
+  - `sub(w1 w2)` $\to$ `((w1) - (w2))`
+  - `mul(w1 w2)` $\to$ `((w1) * (w2))`
+  - `div(w1 w2)` $\to$ `quest_word_div(w1, w2)` (checks for divisor `0` and raises `DivideByZero`)
+  - `mod(w1 w2)` $\to$ `quest_word_mod(w1, w2)` (checks for divisor `0` and raises `DivideByZero`)
+  - `lt(w1 w2)` $\to$ `((w1) < (w2))` (unsigned 64-bit comparison)
+  - `le(w1 w2)` $\to$ `((w1) <= (w2))` (unsigned 64-bit comparison)
+  - `gt(w1 w2)` $\to$ `((w1) > (w2))` (unsigned 64-bit comparison)
+  - `ge(w1 w2)` $\to$ `((w1) >= (w2))` (unsigned 64-bit comparison)
+  - `shift(w count)` $\to$ `quest_word_shift(w, count)` (logical right shift for negative counts, logical left shift
+    for positive counts, returning `0` if $|count| \ge 64$ to avoid C undefined behavior)
+  - `rotate(w count)` $\to$ `quest_word_rotate(w, count)` (circular rotation modulo 64)
+  - `extract(w pos width)` $\to$ `quest_word_extract(w, pos, width)` (extracts `width` bits right-aligned)
+  - `replace(w val pos width)` $\to$ `quest_word_replace(w, val, pos, width)` (replaces `width` bits starting at `pos`)
+  - `popCount(w)` $\to$ `quest_word_pop_count(w)` (`__builtin_popcountll`)
+  - `countLeadingZeros(w)` $\to$ `quest_word_count_leading_zeros(w)` (`__builtin_clzll`; 64 if $w = 0$)
+  - `countTrailingZeros(w)` $\to$ `quest_word_count_trailing_zeros(w)` (`__builtin_ctzll`; 64 if $w = 0$)
+  - `toInt(w)` $\to$ `((int64_t)(w))`
+  - `fromInt(n)` $\to$ `((uint64_t)(n))`
+  - `toReal(w)` $\to$ `(((QVal){ .u = (w) }).r)` (direct C99 union compound literal punning)
+  - `fromReal(r)` $\to$ `(((QVal){ .r = (r) }).u)` (direct C99 union compound literal punning)
+- **First-Class Closures**: When `word` functions are passed as first-class values or through records,
+  the compiler generates closure trampolines (`qv_word_<op>_trampoline`) ensuring seamless higher-order interop.
+
