@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
-from typing import Any, Callable, Optional
+from typing import Any, Callable, Optional, Sequence
 
 from quest.typed_ast import TypedExpr, TypedFun, TypedRecord
 from quest.codegen.c_analysis import CLambdaInfo, CProgramAnalysis
 from quest.codegen.c_types import (
     RecordNamingContext,
+    collect_fun_quantifiers,
     mangle_ident,
     mangle_module_ident,
     mangle_module_name,
@@ -43,6 +44,35 @@ from quest.types import (
 )
 
 
+def emit_trampoline(
+    tramp_name: str,
+    ret_c: str,
+    param_decls: Sequence[str],
+    call_expr: str,
+    is_void: bool,
+    unused: bool = False,
+    unused_vars: Sequence[str] = (),
+) -> list[str]:
+    """Generates C definition for a trampoline function forwarding to a target implementation."""
+    attr = "Q_UNUSED " if unused else ""
+    param_sigs = ["void *env"] + list(param_decls)
+    sig = ", ".join(param_sigs)
+    lines = [
+        f"static {attr}{ret_c} {tramp_name}({sig}) {{",
+        "    (void)env;",
+    ]
+    for uv in unused_vars:
+        lines.append(f"    (void){uv};")
+    if is_void:
+        lines.append(f"    {call_expr};")
+        if unused:
+            lines.append("    return;")
+    else:
+        lines.append(f"    return {call_expr};")
+    lines.append("}")
+    return lines
+
+
 class CDeclarationEmitter:
     """Emits forward declarations, structs, typedefs, evidence dictionaries, and trampolines."""
 
@@ -51,14 +81,16 @@ class CDeclarationEmitter:
         record_ctx: RecordNamingContext,
         c_type_fn: Callable[[QType], str],
         param_sigs_fn: Callable[[list[Any], tuple[QQuantifier, ...]], tuple[list[str], list[str]]],
-        collect_quants_fn: Callable[[QType], tuple[tuple[QQuantifier, ...], QType]],
-        is_exact_record_literal_fn: Callable[[QType, TypedExpr], bool],
+        collect_quants_fn: Optional[
+            Callable[[QType], tuple[tuple[QQuantifier, ...], QType]]
+        ] = None,
+        is_exact_record_literal_fn: Optional[Callable[[QType, TypedExpr], bool]] = None,
     ):
         self.record_ctx = record_ctx
         self.c_type = c_type_fn
         self.param_signatures = param_sigs_fn
-        self.collect_fun_quantifiers = collect_quants_fn
-        self.is_exact_record_literal = is_exact_record_literal_fn
+        self.collect_fun_quantifiers = collect_quants_fn or collect_fun_quantifiers
+        self.is_exact_record_literal = is_exact_record_literal_fn or (lambda _t, _e: False)
         self.emitted_descriptor_tags: list[str] = []
 
     def emit_forward_typedefs(self, agg_types: list[tuple[str, QType]]) -> list[str]:
@@ -616,17 +648,16 @@ class CDeclarationEmitter:
                     else self.c_type(ret_type)
                 )
                 decls, forward_args = self.param_signatures(fun.params, quants)
-                param_sigs = ["void *env"] + decls
-                sig = ", ".join(param_sigs)
-                args_str = ", ".join(forward_args)
-                lines.append(f"static Q_UNUSED {ret_c} {tramp_name}({sig}) {{")
-                lines.append("    (void)env;")
-                if ret_type == OK_TYPE:
-                    lines.append(f"    {c_name}({args_str});")
-                    lines.append("    return;")
-                else:
-                    lines.append(f"    return {c_name}({args_str});")
-                lines.append("}")
+                lines.extend(
+                    emit_trampoline(
+                        tramp_name,
+                        ret_c,
+                        decls,
+                        f"{c_name}({', '.join(forward_args)})",
+                        ret_type == OK_TYPE,
+                        unused=True,
+                    )
+                )
                 lines.append(f"static Q_UNUSED QClosure {c_name}_closure = {{ (void *){tramp_name}, NULL }};")
                 lines.append("")
         return lines

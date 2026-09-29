@@ -20,6 +20,7 @@ from quest.types import (
     QOptionType,
     QPathType,
     QPowerKind,
+    QQuantifier,
     QRecordField,
     QRecordType,
     QTupleField,
@@ -508,3 +509,13 @@ def is_variant_subtype(s: QType, t: QType) -> bool:
         if v.name not in t_map or v.type_val != t_map[v.name]:
             return False
     return True
+
+
+def collect_fun_quantifiers(fun_type: QType) -> tuple[tuple[QQuantifier, ...], QType]:
+    """Extracts any universal quantifiers wrapping a function type."""
+    quants: tuple[QQuantifier, ...] = ()
+    curr = fun_type
+    while isinstance(curr, QAllType):
+        quants = quants + curr.quantifiers
+        curr = curr.body
+    return quants, curr

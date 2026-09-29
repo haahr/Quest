@@ -27,6 +27,7 @@ from quest.typed_ast import (
 )
 from quest.codegen.c_types import (
     RecordNamingContext,
+    collect_fun_quantifiers,
     is_record_subtype,
     is_tuple_subtype,
     is_variant_subtype,
@@ -148,16 +149,6 @@ def find_val_referenced_top_funs(prog: TypedProgram, top_fun_names: set[str]) ->
 
     scan(prog)
     return referenced
-
-
-def collect_fun_quantifiers(fun_type: QType) -> tuple[tuple[QQuantifier, ...], QType]:
-    """Extracts any universal quantifiers wrapping a function type."""
-    quants: tuple[QQuantifier, ...] = ()
-    curr = fun_type
-    while isinstance(curr, QAllType):
-        quants = quants + curr.quantifiers
-        curr = curr.body
-    return quants, curr
 
 
 def is_specialization_needed(t: QType) -> bool:
