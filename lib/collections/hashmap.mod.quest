@@ -1,0 +1,420 @@
+(* Standard Library: Polymorphic Hash Map implementation
+ *
+ * Implements a compact, insertion-order preserving hash table using the Python 3.6+
+ * indexing scheme:
+ * - A sparse power-of-two table of integers 'indices: Array(Int)' holding slot references:
+ *     EMPTY = -1
+ *     TOMBSTONE = -2
+ *     >= 0: index into the dense parallel vectors.
+ * - Dense parallel vectors:
+ *     'keys: vector.T(K)'
+ *     'values: vector.T(V)'
+ *     'hashes: vector.T(word.T)'
+ *     'deleted: vector.T(Bool)'
+ * - Perturbation recurrence for collision resolution:
+ *     pert := pert >> 5
+ *     i := (5 * i + 1 + pert) & mask
+ * - When tombstones accumulate (deletedCount >= count / 2), the dense vectors are compacted
+ *   and 'indices' is rebuilt, preserving surviving elements in exact insertion order.
+ *)
+
+module hashMap : HashMap
+import
+    util/maybe : util/Maybe
+    collections/vector : collections/Vector
+    word: Word
+export
+    let emptySlot: Int = ~1;
+    let tombstoneSlot: Int = ~2;
+    let minCapacity: Int = 8;
+
+    Let Entry = Fun(K::TYPE V::TYPE) Record
+        key: K
+        value: V
+    end;
+
+    Let T = Fun(K::TYPE V::TYPE) Tuple
+        var indices: Array(Int)
+        var mask: word.T
+        var keys: vector.T(K)
+        var values: vector.T(V)
+        var hashes: vector.T(word.T)
+        var deleted: vector.T(Bool)
+        var count: Int
+        var deletedCount: Int
+        equal: All(k1: K k2: K) Bool
+        hash: All(k: K) word.T
+    end;
+
+    let error: Exception = exception error: Ok end;
+
+    let nextPowerOfTwo(n: Int): Int =
+        begin
+            let var p = minCapacity;
+            while p < n do
+                p := p * 2;
+            end;
+            p
+        end;
+
+    let makeIndices(capacity: Int): Array(Int) =
+        array of(capacity emptySlot);
+
+    let newWithCapacity(K::TYPE V::TYPE)(capacity: Int equal: All(k1: K k2: K) Bool hash: All(k: K) word.T): T(K V) =
+        begin
+            let cap = nextPowerOfTwo(if capacity > minCapacity then capacity else minCapacity end);
+            tuple
+                var indices = makeIndices(cap)
+                var mask = word.fromInt(cap - 1)
+                var keys = vector.newWithCapacity(:K cap)
+                var values = vector.newWithCapacity(:V cap)
+                var hashes = vector.newWithCapacity(:word.T cap)
+                var deleted = vector.newWithCapacity(:Bool cap)
+                var count = 0
+                var deletedCount = 0
+                let equal = equal
+                let hash = hash
+            end
+        end;
+
+    let new(K::TYPE V::TYPE)(equal: All(k1: K k2: K) Bool hash: All(k: K) word.T): T(K V) =
+        newWithCapacity(minCapacity equal hash);
+
+    let size(K::TYPE V::TYPE)(m: T(K V)): Int =
+        m.count;
+
+    let empty(K::TYPE V::TYPE)(m: T(K V)): Bool =
+        m.count == 0;
+
+    let findIndex(K::TYPE V::TYPE)(m: T(K V) key: K h: word.T): Int =
+        begin
+            let numIndices = extent m.indices;
+            let mask = m.mask;
+            let var i = word.toInt(word.andBits(h mask));
+            let var pert = h;
+            let var result = emptySlot;
+            let var searching = true;
+
+            while searching do
+                let slot = m.indices[i];
+                if slot == emptySlot then
+                    searching := false;
+                else if slot == tombstoneSlot then
+                    (* Skip tombstone, continue probing *)
+                    pert := word.shift(pert ~5);
+                    let nextI = word.andBits(
+                        word.add(word.add(word.mul(word.fromInt(5) word.fromInt(i)) word.fromInt(1)) pert)
+                        mask
+                    );
+                    i := word.toInt(nextI);
+                else
+                    if word.toInt(word.xorBits(vector.get(m.hashes slot) h)) == 0 then
+                        if not(vector.get(m.deleted slot)) andif m.equal(vector.get(m.keys slot) key) then
+                            result := slot;
+                            searching := false;
+                        end;
+                    end;
+                    if searching then
+                        pert := word.shift(pert ~5);
+                        let nextI = word.andBits(
+                            word.add(word.add(word.mul(word.fromInt(5) word.fromInt(i)) word.fromInt(1)) pert)
+                            mask
+                        );
+                        i := word.toInt(nextI);
+                    end;
+                end end;
+            end;
+            result
+        end;
+
+    let get(K::TYPE V::TYPE)(m: T(K V) key: K): maybe.T(V) =
+        begin
+            let h = m.hash(key);
+            let idx = findIndex(m key h);
+            if idx >= 0 then
+                maybe.some(vector.get(m.values idx))
+            else
+                maybe.none(:V)
+            end
+        end;
+
+    let contains(K::TYPE V::TYPE)(m: T(K V) key: K): Bool =
+        begin
+            let h = m.hash(key);
+            findIndex(m key h) >= 0
+        end;
+
+    let find(K::TYPE V::TYPE)(m: T(K V) key: K): V =
+        begin
+            let h = m.hash(key);
+            let idx = findIndex(m key h);
+            if idx >= 0 then
+                vector.get(m.values idx)
+            else
+                raise error end
+            end
+        end;
+
+    let rebuildIndices(K::TYPE V::TYPE)(m: T(K V) newCapacity: Int): Ok =
+        begin
+            let newIndices = makeIndices(newCapacity);
+            let newMask = word.fromInt(newCapacity - 1);
+            let totalDense = vector.length(m.hashes);
+
+            for idx = 0 upto {totalDense - 1} do
+                if not(vector.get(m.deleted idx)) then
+                    let h = vector.get(m.hashes idx);
+                    let var i = word.toInt(word.andBits(h newMask));
+                    let var pert = h;
+                    let var searching = true;
+                    while searching do
+                        if newIndices[i] == emptySlot then
+                            newIndices[i] := idx;
+                            searching := false;
+                        else
+                            pert := word.shift(pert ~5);
+                            let nextI = word.andBits(
+                                word.add(word.add(word.mul(word.fromInt(5) word.fromInt(i)) word.fromInt(1)) pert)
+                                newMask
+                            );
+                            i := word.toInt(nextI);
+                        end;
+                    end;
+                end;
+            end;
+
+            m.indices := newIndices;
+            m.mask := newMask;
+            ok
+        end;
+
+    let compactDense(K::TYPE V::TYPE)(m: T(K V) newCapacity: Int): Ok =
+        begin
+            let totalDense = vector.length(m.hashes);
+            let newKeys = vector.newWithCapacity(:K newCapacity);
+            let newValues = vector.newWithCapacity(:V newCapacity);
+            let newHashes = vector.newWithCapacity(:word.T newCapacity);
+            let newDeleted = vector.newWithCapacity(:Bool newCapacity);
+
+            for idx = 0 upto {totalDense - 1} do
+                if not(vector.get(m.deleted idx)) then
+                    vector.append(newKeys vector.get(m.keys idx));
+                    vector.append(newValues vector.get(m.values idx));
+                    vector.append(newHashes vector.get(m.hashes idx));
+                    vector.append(newDeleted false);
+                end;
+            end;
+
+            m.keys := newKeys;
+            m.values := newValues;
+            m.hashes := newHashes;
+            m.deleted := newDeleted;
+            m.deletedCount := 0;
+
+            rebuildIndices(m newCapacity);
+            ok
+        end;
+
+    let resizeIfNeeded(K::TYPE V::TYPE)(m: T(K V)): Ok =
+        begin
+            let totalDense = vector.length(m.hashes);
+            let cap = extent m.indices;
+
+            (* 2/3 load factor threshold: totalDense * 3 >= cap * 2 *)
+            if {totalDense * 3} >= {cap * 2} then
+                if m.deletedCount > {m.count / 3} then
+                    (* Many tombstones: compact in-place at current capacity *)
+                    compactDense(m cap);
+                else
+                    (* Grow capacity by 2x *)
+                    compactDense(m {cap * 2});
+                end;
+            end;
+            ok
+        end;
+
+    let insert(K::TYPE V::TYPE)(m: T(K V) key: K value: V): Bool =
+        begin
+            let h = m.hash(key);
+            let numIndices = extent m.indices;
+            let mask = m.mask;
+            let var i = word.toInt(word.andBits(h mask));
+            let var pert = h;
+            let var existingIdx = emptySlot;
+            let var firstTombstone = emptySlot;
+            let var searching = true;
+
+            while searching do
+                let slot = m.indices[i];
+                if slot == emptySlot then
+                    searching := false;
+                else if slot == tombstoneSlot then
+                    if firstTombstone == emptySlot then
+                        firstTombstone := i;
+                    end;
+                    pert := word.shift(pert ~5);
+                    let nextI = word.andBits(
+                        word.add(word.add(word.mul(word.fromInt(5) word.fromInt(i)) word.fromInt(1)) pert)
+                        mask
+                    );
+                    i := word.toInt(nextI);
+                else
+                    if word.toInt(word.xorBits(vector.get(m.hashes slot) h)) == 0 then
+                        if not(vector.get(m.deleted slot)) andif m.equal(vector.get(m.keys slot) key) then
+                            existingIdx := slot;
+                            searching := false;
+                        end;
+                    end;
+                    if searching then
+                        pert := word.shift(pert ~5);
+                        let nextI = word.andBits(
+                            word.add(word.add(word.mul(word.fromInt(5) word.fromInt(i)) word.fromInt(1)) pert)
+                            mask
+                        );
+                        i := word.toInt(nextI);
+                    end;
+                end end;
+            end;
+
+            if existingIdx >= 0 then
+                vector.set(m.values existingIdx value);
+                false
+            else
+                let targetSlot = if firstTombstone >= 0 then firstTombstone else i end;
+                let newDenseIdx = vector.length(m.hashes);
+
+                vector.append(m.keys key);
+                vector.append(m.values value);
+                vector.append(m.hashes h);
+                vector.append(m.deleted false);
+
+                m.indices[targetSlot] := newDenseIdx;
+                m.count := m.count + 1;
+
+                resizeIfNeeded(m);
+                true
+            end
+        end;
+
+    let delete(K::TYPE V::TYPE)(m: T(K V) key: K): maybe.T(V) =
+        begin
+            let h = m.hash(key);
+            let numIndices = extent m.indices;
+            let mask = m.mask;
+            let var i = word.toInt(word.andBits(h mask));
+            let var pert = h;
+            let var foundSlot = emptySlot;
+            let var denseIdx = emptySlot;
+            let var searching = true;
+
+            while searching do
+                let slot = m.indices[i];
+                if slot == emptySlot then
+                    searching := false;
+                else if slot == tombstoneSlot then
+                    pert := word.shift(pert ~5);
+                    let nextI = word.andBits(
+                        word.add(word.add(word.mul(word.fromInt(5) word.fromInt(i)) word.fromInt(1)) pert)
+                        mask
+                    );
+                    i := word.toInt(nextI);
+                else
+                    if word.toInt(word.xorBits(vector.get(m.hashes slot) h)) == 0 then
+                        if not(vector.get(m.deleted slot)) andif m.equal(vector.get(m.keys slot) key) then
+                            foundSlot := i;
+                            denseIdx := slot;
+                            searching := false;
+                        end;
+                    end;
+                    if searching then
+                        pert := word.shift(pert ~5);
+                        let nextI = word.andBits(
+                            word.add(word.add(word.mul(word.fromInt(5) word.fromInt(i)) word.fromInt(1)) pert)
+                            mask
+                        );
+                        i := word.toInt(nextI);
+                    end;
+                end end;
+            end;
+
+            if denseIdx >= 0 then
+                let val = vector.get(m.values denseIdx);
+                vector.set(m.deleted denseIdx true);
+                m.indices[foundSlot] := tombstoneSlot;
+                m.count := m.count - 1;
+                m.deletedCount := m.deletedCount + 1;
+
+                (* Periodic compaction if tombstones exceed active elements *)
+                if {m.deletedCount > 8} /\ {m.deletedCount >= m.count} then
+                    compactDense(m extent m.indices);
+                end;
+
+                maybe.some(val)
+            else
+                maybe.none(:V)
+            end
+        end;
+
+    let clear(K::TYPE V::TYPE)(m: T(K V)): Ok =
+        begin
+            let cap = minCapacity;
+            m.indices := makeIndices(cap);
+            m.mask := word.fromInt(cap - 1);
+            m.keys := vector.newWithCapacity(:K cap);
+            m.values := vector.newWithCapacity(:V cap);
+            m.hashes := vector.newWithCapacity(:word.T cap);
+            m.deleted := vector.newWithCapacity(:Bool cap);
+            m.count := 0;
+            m.deletedCount := 0;
+            ok
+        end;
+
+    let keys(K::TYPE V::TYPE)(m: T(K V)): vector.T(K) =
+        begin
+            let res = vector.newWithCapacity(:K m.count);
+            let total = vector.length(m.hashes);
+            for i = 0 upto {total - 1} do
+                if not(vector.get(m.deleted i)) then
+                    vector.append(res vector.get(m.keys i));
+                end;
+            end;
+            res
+        end;
+
+    let values(K::TYPE V::TYPE)(m: T(K V)): vector.T(V) =
+        begin
+            let res = vector.newWithCapacity(:V m.count);
+            let total = vector.length(m.hashes);
+            for i = 0 upto {total - 1} do
+                if not(vector.get(m.deleted i)) then
+                    vector.append(res vector.get(m.values i));
+                end;
+            end;
+            res
+        end;
+
+    let entries(K::TYPE V::TYPE)(m: T(K V)): vector.T(Entry(K V)) =
+        begin
+            let res = vector.newWithCapacity(:Entry(K V) m.count);
+            let total = vector.length(m.hashes);
+            for i = 0 upto {total - 1} do
+                if not(vector.get(m.deleted i)) then
+                    let k = vector.get(m.keys i);
+                    let v = vector.get(m.values i);
+                    vector.append(res record key = k value = v end);
+                end;
+            end;
+            res
+        end;
+
+    let forEach(K::TYPE V::TYPE)(m: T(K V) action: All(k: K v: V) Ok): Ok =
+        begin
+            let total = vector.length(m.hashes);
+            for i = 0 upto {total - 1} do
+                if not(vector.get(m.deleted i)) then
+                    action(vector.get(m.keys i) vector.get(m.values i));
+                end;
+            end;
+            ok
+        end;
+end;

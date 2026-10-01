@@ -20,6 +20,7 @@ export
     Let T = Fun(A::TYPE) Tuple
         var data: Array(A)
         var length: Int
+        var capacityHint: Int
     end;
 
     (* Exception raised on out-of-bounds access or empty vector operations *)
@@ -30,6 +31,15 @@ export
         tuple
             var data = array of :A end
             var length = 0
+            var capacityHint = 0
+        end;
+
+    (* Create a new empty vector with preallocated capacity hint *)
+    let newWithCapacity(A::TYPE)(capacity: Int): T(A) =
+        tuple
+            var data = array of :A end
+            var length = 0
+            var capacityHint = if capacity > 0 then capacity else 0 end
         end;
 
     (* Return the number of elements in a vector *)
@@ -80,7 +90,9 @@ export
                 let var newCap: Int = floorSize;
                 if cap > 0 then
                     newCap := cap + {cap / 2};
-                end;
+                else if v.capacityHint > 0 then
+                    newCap := if v.capacityHint > floorSize then v.capacityHint else floorSize end;
+                end end;
                 let newData: Array(A) = array of(newCap value);
                 if cap > 0 then
                     for i = 0 upto {cap - 1} do
@@ -170,6 +182,7 @@ export
                 tuple
                     var data = newData
                     var length = n
+                    var capacityHint = 0
                 end
             end
         end;
@@ -207,6 +220,7 @@ export
                 tuple
                     var data = newData
                     var length = total
+                    var capacityHint = 0
                 end
             end
         end;
@@ -229,6 +243,7 @@ export
                 tuple
                     var data = newData
                     var length = n
+                    var capacityHint = 0
                 end
             end
         end;
@@ -246,5 +261,17 @@ export
                 end;
                 res
             end
+        end;
+
+    (* Iterate over all elements of a vector *)
+    let forEach(A::TYPE)(v: T(A) action: All(elem: A) Ok): Ok =
+        begin
+            let n: Int = v.length;
+            if n > 0 then
+                for i = 0 upto {n - 1} do
+                    action(v.data[i]);
+                end;
+            end;
+            ok
         end;
 end;

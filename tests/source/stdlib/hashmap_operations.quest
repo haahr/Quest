@@ -1,0 +1,131 @@
+(* Standard library: Polymorphic HashMap operations *)
+
+import collections/hashMap : collections/HashMap;
+import collections/vector : collections/Vector;
+import util/maybe : util/Maybe;
+import word: Word;
+import writer: Writer;
+import conv: Conv;
+
+let wOut = writer.output;
+
+let printInt(n: Int): Ok =
+    begin
+        writer.putString(wOut conv.int(n));
+        writer.putString(wOut " ");
+    end;
+
+let printBool(b: Bool): Ok =
+    begin
+        writer.putString(wOut conv.bool(b));
+        writer.putString(wOut " ");
+    end;
+
+let printString(s: String): Ok =
+    begin
+        writer.putString(wOut s);
+        writer.putString(wOut " ");
+    end;
+
+let printNewline(dummy: Int): Ok =
+    writer.putString(wOut "\n");
+
+(* Simple int hash and equality *)
+let intEqual(a: Int b: Int): Bool = a == b;
+let intHash(a: Int): word.T =
+    word.mul(word.fromInt(a) word.fromInt(2654435761));
+
+(* 1. Creation, empty, size *)
+let m = hashMap.new(:Int :String intEqual intHash);
+printBool(hashMap.empty(m));
+printInt(hashMap.size(m));
+printNewline(0);
+
+(* 2. Insertion & Overwrite *)
+printBool(hashMap.insert(m 1 "one"));
+printBool(hashMap.insert(m 2 "two"));
+printBool(hashMap.insert(m 3 "three"));
+printBool(hashMap.insert(m 1 "ONE")); (* overwrite *)
+printInt(hashMap.size(m));
+printBool(hashMap.empty(m));
+printNewline(0);
+
+(* 3. Retrieval (get, find, contains) *)
+printBool(hashMap.contains(m 1));
+printBool(hashMap.contains(m 2));
+printBool(hashMap.contains(m 4));
+printString(hashMap.find(m 1));
+printString(hashMap.find(m 2));
+let g1 = hashMap.get(m 3);
+printBool(maybe.isSome(g1));
+printString(maybe.unwrap(g1));
+let g4 = hashMap.get(m 4);
+printBool(maybe.isNone(g4));
+printNewline(0);
+
+(* 4. Order-preserving iteration (keys, values, forEach) *)
+let ks = hashMap.keys(m);
+printInt(vector.length(:Int ks));
+vector.forEach(:Int ks fun(k: Int): Ok printInt(k));
+printNewline(0);
+
+let vs = hashMap.values(m);
+printInt(vector.length(:String vs));
+vector.forEach(:String vs fun(v: String): Ok printString(v));
+printNewline(0);
+
+hashMap.forEach(m fun(k: Int v: String): Ok begin
+    printInt(k);
+    printString(v);
+end);
+printNewline(0);
+
+(* 5. Deletion & Tombstones *)
+let d2 = hashMap.delete(m 2);
+printBool(maybe.isSome(d2));
+printString(maybe.unwrap(d2));
+printInt(hashMap.size(m));
+printBool(hashMap.contains(m 2));
+let d4 = hashMap.delete(m 4);
+printBool(maybe.isNone(d4));
+printNewline(0);
+
+(* Check order after deletion: surviving elements 1 and 3 in insertion order *)
+let ksAfter = hashMap.keys(m);
+printInt(vector.length(:Int ksAfter));
+vector.forEach(:Int ksAfter fun(k: Int): Ok printInt(k));
+printNewline(0);
+
+(* Re-inserting deleted key 2 appends to end of insertion order *)
+printBool(hashMap.insert(m 2 "two_reinserted"));
+let ksReinserted = hashMap.keys(m);
+vector.forEach(:Int ksReinserted fun(k: Int): Ok printInt(k));
+printNewline(0);
+
+(* 6. Larger workload triggering growth & compaction *)
+let m2 = hashMap.newWithCapacity(:Int :Int 8 intEqual intHash);
+for i = 1 upto 50 do
+    hashMap.insert(m2 i {i * 10});
+end;
+printInt(hashMap.size(m2));
+printInt(hashMap.find(m2 25));
+printInt(hashMap.find(m2 50));
+printNewline(0);
+
+(* Delete even keys *)
+for i = 1 upto 50 do
+    if {i % 2} == 0 then
+        hashMap.delete(m2 i);
+    end;
+end;
+printInt(hashMap.size(m2));
+printBool(hashMap.contains(m2 2));
+printBool(hashMap.contains(m2 3));
+printInt(hashMap.find(m2 3));
+printNewline(0);
+
+(* 7. Clear *)
+hashMap.clear(m2);
+printInt(hashMap.size(m2));
+printBool(hashMap.empty(m2));
+printNewline(0);

@@ -295,7 +295,9 @@ def compile_interface_to_header(decl: ast.InterfaceDecl, iface_scope: Scope) -> 
     if decl.imports:
         lines.append("/* --- Imported Interfaces --- */")
         for imp in decl.imports:
-            lines.append(f'#include "{imp.effective_interface_path.lower()}.h"')
+            path = imp.effective_interface_path.lower()
+            if path not in ("word",):
+                lines.append(f'#include "{path}.h"')
         lines.append("")
 
     # Abstract types (erased to QVal in C)

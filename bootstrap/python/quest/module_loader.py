@@ -417,10 +417,21 @@ def _load_precompiled_transitive_deps(
                                 if cand.is_file():
                                     dep_obj = cand.resolve()
                                     break
-                        if dep_obj is None and DEFAULT_LIB_DIR.is_dir():
-                            cand = DEFAULT_LIB_DIR / prereq
-                            if cand.is_file():
-                                dep_obj = cand.resolve()
+                        if dep_obj is None:
+                            mod_name = prereq[:-2] if prereq.endswith(".o") else prereq
+                            mod_file = resolve_module_file(mod_name, env.current_dir, env.include_paths)
+                            if mod_file and mod_file.is_file():
+                                from quest.module_compiler import compile_hierarchical_module
+                                root = out_root if out_root is not None else DEFAULT_LIB_DIR
+                                _, compiled_o = compile_hierarchical_module(
+                                    mod_name,
+                                    output_dir=root,
+                                    current_dir=env.current_dir,
+                                    include_paths=env.include_paths,
+                                    emit_deps=True,
+                                )
+                                if compiled_o and compiled_o.is_file():
+                                    dep_obj = compiled_o.resolve()
 
                         if dep_obj is not None and dep_obj.is_file():
                             if dep_obj not in env.linked_objects:

@@ -1,0 +1,1295 @@
+(Program
+  :phrases (
+    (ImportPhrase
+      :items (
+        (ImportItem ('hashMap') 'HashMap' ('collections/hashMap') 'collections/HashMap')
+      )
+    )
+    (ImportPhrase
+      :items (
+        (ImportItem ('vector') 'Vector' ('collections/vector') 'collections/Vector')
+      )
+    )
+    (ImportPhrase
+      :items (
+        (ImportItem ('maybe') 'Maybe' ('util/maybe') 'util/Maybe')
+      )
+    )
+    (ImportPhrase
+      :items (
+        (ImportItem ('word') 'Word')
+      )
+    )
+    (ImportPhrase
+      :items (
+        (ImportItem ('writer') 'Writer')
+      )
+    )
+    (ImportPhrase
+      :items (
+        (ImportItem ('conv') 'Conv')
+      )
+    )
+    (LetValueBinding
+      :name 'wOut'
+      :value (ExprSelect
+        :target (ExprId 'writer')
+        :field 'output'
+      )
+    )
+    (LetValueBinding
+      :name 'printInt'
+      :value (ExprBlock
+        :bindings (
+          (ExprStmt
+            :expr (ExprApp
+              :func (ExprSelect
+                :target (ExprId 'writer')
+                :field 'putString'
+              )
+              :args (
+                (ExprId 'wOut')
+                (ExprApp
+                  :func (ExprSelect
+                    :target (ExprId 'conv')
+                    :field 'int'
+                  )
+                  :args (
+                    (ExprId 'n')
+                  )
+                )
+              )
+            )
+          )
+          (ExprStmt
+            :expr (ExprApp
+              :func (ExprSelect
+                :target (ExprId 'writer')
+                :field 'putString'
+              )
+              :args (
+                (ExprId 'wOut')
+                (ExprString ' ' '" "')
+              )
+            )
+          )
+        )
+      )
+      :params (
+        (FormalParam
+          :name 'n'
+          :type_annot (TypePath ('Int'))
+          :mode VALUE
+        )
+      )
+      :type_annot (TypePath ('Ok'))
+    )
+    (LetValueBinding
+      :name 'printBool'
+      :value (ExprBlock
+        :bindings (
+          (ExprStmt
+            :expr (ExprApp
+              :func (ExprSelect
+                :target (ExprId 'writer')
+                :field 'putString'
+              )
+              :args (
+                (ExprId 'wOut')
+                (ExprApp
+                  :func (ExprSelect
+                    :target (ExprId 'conv')
+                    :field 'bool'
+                  )
+                  :args (
+                    (ExprId 'b')
+                  )
+                )
+              )
+            )
+          )
+          (ExprStmt
+            :expr (ExprApp
+              :func (ExprSelect
+                :target (ExprId 'writer')
+                :field 'putString'
+              )
+              :args (
+                (ExprId 'wOut')
+                (ExprString ' ' '" "')
+              )
+            )
+          )
+        )
+      )
+      :params (
+        (FormalParam
+          :name 'b'
+          :type_annot (TypePath ('Bool'))
+          :mode VALUE
+        )
+      )
+      :type_annot (TypePath ('Ok'))
+    )
+    (LetValueBinding
+      :name 'printString'
+      :value (ExprBlock
+        :bindings (
+          (ExprStmt
+            :expr (ExprApp
+              :func (ExprSelect
+                :target (ExprId 'writer')
+                :field 'putString'
+              )
+              :args (
+                (ExprId 'wOut')
+                (ExprId 's')
+              )
+            )
+          )
+          (ExprStmt
+            :expr (ExprApp
+              :func (ExprSelect
+                :target (ExprId 'writer')
+                :field 'putString'
+              )
+              :args (
+                (ExprId 'wOut')
+                (ExprString ' ' '" "')
+              )
+            )
+          )
+        )
+      )
+      :params (
+        (FormalParam
+          :name 's'
+          :type_annot (TypePath ('String'))
+          :mode VALUE
+        )
+      )
+      :type_annot (TypePath ('Ok'))
+    )
+    (LetValueBinding
+      :name 'printNewline'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprId 'wOut')
+          (ExprString '\n' '"\\n"')
+        )
+      )
+      :params (
+        (FormalParam
+          :name 'dummy'
+          :type_annot (TypePath ('Int'))
+          :mode VALUE
+        )
+      )
+      :type_annot (TypePath ('Ok'))
+    )
+    (LetValueBinding
+      :name 'intEqual'
+      :value (ExprInfix
+        :left (ExprId 'a')
+        :op '=='
+        :right (ExprId 'b')
+      )
+      :params (
+        (FormalParam
+          :name 'a'
+          :type_annot (TypePath ('Int'))
+          :mode VALUE
+        )
+        (FormalParam
+          :name 'b'
+          :type_annot (TypePath ('Int'))
+          :mode VALUE
+        )
+      )
+      :type_annot (TypePath ('Bool'))
+    )
+    (LetValueBinding
+      :name 'intHash'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'word')
+          :field 'mul'
+        )
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'word')
+              :field 'fromInt'
+            )
+            :args (
+              (ExprId 'a')
+            )
+          )
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'word')
+              :field 'fromInt'
+            )
+            :args (
+              (ExprInt 2654435761 '2654435761')
+            )
+          )
+        )
+      )
+      :params (
+        (FormalParam
+          :name 'a'
+          :type_annot (TypePath ('Int'))
+          :mode VALUE
+        )
+      )
+      :type_annot (TypePath ('word' 'T'))
+    )
+    (LetValueBinding
+      :name 'm'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'hashMap')
+          :field 'new'
+        )
+        :args (
+          (TypeArgument
+            :type_val (TypePath ('Int'))
+          )
+          (TypeArgument
+            :type_val (TypePath ('String'))
+          )
+          (ExprId 'intEqual')
+          (ExprId 'intHash')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printBool')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'hashMap')
+              :field 'empty'
+            )
+            :args (
+              (ExprId 'm')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printInt')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'hashMap')
+              :field 'size'
+            )
+            :args (
+              (ExprId 'm')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printNewline')
+        :args (
+          (ExprInt 0 '0')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printBool')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'hashMap')
+              :field 'insert'
+            )
+            :args (
+              (ExprId 'm')
+              (ExprInt 1 '1')
+              (ExprString 'one' '"one"')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printBool')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'hashMap')
+              :field 'insert'
+            )
+            :args (
+              (ExprId 'm')
+              (ExprInt 2 '2')
+              (ExprString 'two' '"two"')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printBool')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'hashMap')
+              :field 'insert'
+            )
+            :args (
+              (ExprId 'm')
+              (ExprInt 3 '3')
+              (ExprString 'three' '"three"')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printBool')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'hashMap')
+              :field 'insert'
+            )
+            :args (
+              (ExprId 'm')
+              (ExprInt 1 '1')
+              (ExprString 'ONE' '"ONE"')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printInt')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'hashMap')
+              :field 'size'
+            )
+            :args (
+              (ExprId 'm')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printBool')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'hashMap')
+              :field 'empty'
+            )
+            :args (
+              (ExprId 'm')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printNewline')
+        :args (
+          (ExprInt 0 '0')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printBool')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'hashMap')
+              :field 'contains'
+            )
+            :args (
+              (ExprId 'm')
+              (ExprInt 1 '1')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printBool')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'hashMap')
+              :field 'contains'
+            )
+            :args (
+              (ExprId 'm')
+              (ExprInt 2 '2')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printBool')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'hashMap')
+              :field 'contains'
+            )
+            :args (
+              (ExprId 'm')
+              (ExprInt 4 '4')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printString')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'hashMap')
+              :field 'find'
+            )
+            :args (
+              (ExprId 'm')
+              (ExprInt 1 '1')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printString')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'hashMap')
+              :field 'find'
+            )
+            :args (
+              (ExprId 'm')
+              (ExprInt 2 '2')
+            )
+          )
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'g1'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'hashMap')
+          :field 'get'
+        )
+        :args (
+          (ExprId 'm')
+          (ExprInt 3 '3')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printBool')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'maybe')
+              :field 'isSome'
+            )
+            :args (
+              (ExprId 'g1')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printString')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'maybe')
+              :field 'unwrap'
+            )
+            :args (
+              (ExprId 'g1')
+            )
+          )
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'g4'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'hashMap')
+          :field 'get'
+        )
+        :args (
+          (ExprId 'm')
+          (ExprInt 4 '4')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printBool')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'maybe')
+              :field 'isNone'
+            )
+            :args (
+              (ExprId 'g4')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printNewline')
+        :args (
+          (ExprInt 0 '0')
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'ks'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'hashMap')
+          :field 'keys'
+        )
+        :args (
+          (ExprId 'm')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printInt')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'vector')
+              :field 'length'
+            )
+            :args (
+              (TypeArgument
+                :type_val (TypePath ('Int'))
+              )
+              (ExprId 'ks')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'vector')
+          :field 'forEach'
+        )
+        :args (
+          (TypeArgument
+            :type_val (TypePath ('Int'))
+          )
+          (ExprId 'ks')
+          (ExprFun
+            :params (
+              (FormalParam
+                :name 'k'
+                :type_annot (TypePath ('Int'))
+                :mode VALUE
+              )
+            )
+            :return_type (TypePath ('Ok'))
+            :body (ExprApp
+              :func (ExprId 'printInt')
+              :args (
+                (ExprId 'k')
+              )
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printNewline')
+        :args (
+          (ExprInt 0 '0')
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'vs'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'hashMap')
+          :field 'values'
+        )
+        :args (
+          (ExprId 'm')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printInt')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'vector')
+              :field 'length'
+            )
+            :args (
+              (TypeArgument
+                :type_val (TypePath ('String'))
+              )
+              (ExprId 'vs')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'vector')
+          :field 'forEach'
+        )
+        :args (
+          (TypeArgument
+            :type_val (TypePath ('String'))
+          )
+          (ExprId 'vs')
+          (ExprFun
+            :params (
+              (FormalParam
+                :name 'v'
+                :type_annot (TypePath ('String'))
+                :mode VALUE
+              )
+            )
+            :return_type (TypePath ('Ok'))
+            :body (ExprApp
+              :func (ExprId 'printString')
+              :args (
+                (ExprId 'v')
+              )
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printNewline')
+        :args (
+          (ExprInt 0 '0')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'hashMap')
+          :field 'forEach'
+        )
+        :args (
+          (ExprId 'm')
+          (ExprFun
+            :params (
+              (FormalParam
+                :name 'k'
+                :type_annot (TypePath ('Int'))
+                :mode VALUE
+              )
+              (FormalParam
+                :name 'v'
+                :type_annot (TypePath ('String'))
+                :mode VALUE
+              )
+            )
+            :return_type (TypePath ('Ok'))
+            :body (ExprBlock
+              :bindings (
+                (ExprStmt
+                  :expr (ExprApp
+                    :func (ExprId 'printInt')
+                    :args (
+                      (ExprId 'k')
+                    )
+                  )
+                )
+                (ExprStmt
+                  :expr (ExprApp
+                    :func (ExprId 'printString')
+                    :args (
+                      (ExprId 'v')
+                    )
+                  )
+                )
+              )
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printNewline')
+        :args (
+          (ExprInt 0 '0')
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'd2'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'hashMap')
+          :field 'delete'
+        )
+        :args (
+          (ExprId 'm')
+          (ExprInt 2 '2')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printBool')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'maybe')
+              :field 'isSome'
+            )
+            :args (
+              (ExprId 'd2')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printString')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'maybe')
+              :field 'unwrap'
+            )
+            :args (
+              (ExprId 'd2')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printInt')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'hashMap')
+              :field 'size'
+            )
+            :args (
+              (ExprId 'm')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printBool')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'hashMap')
+              :field 'contains'
+            )
+            :args (
+              (ExprId 'm')
+              (ExprInt 2 '2')
+            )
+          )
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'd4'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'hashMap')
+          :field 'delete'
+        )
+        :args (
+          (ExprId 'm')
+          (ExprInt 4 '4')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printBool')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'maybe')
+              :field 'isNone'
+            )
+            :args (
+              (ExprId 'd4')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printNewline')
+        :args (
+          (ExprInt 0 '0')
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'ksAfter'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'hashMap')
+          :field 'keys'
+        )
+        :args (
+          (ExprId 'm')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printInt')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'vector')
+              :field 'length'
+            )
+            :args (
+              (TypeArgument
+                :type_val (TypePath ('Int'))
+              )
+              (ExprId 'ksAfter')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'vector')
+          :field 'forEach'
+        )
+        :args (
+          (TypeArgument
+            :type_val (TypePath ('Int'))
+          )
+          (ExprId 'ksAfter')
+          (ExprFun
+            :params (
+              (FormalParam
+                :name 'k'
+                :type_annot (TypePath ('Int'))
+                :mode VALUE
+              )
+            )
+            :return_type (TypePath ('Ok'))
+            :body (ExprApp
+              :func (ExprId 'printInt')
+              :args (
+                (ExprId 'k')
+              )
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printNewline')
+        :args (
+          (ExprInt 0 '0')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printBool')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'hashMap')
+              :field 'insert'
+            )
+            :args (
+              (ExprId 'm')
+              (ExprInt 2 '2')
+              (ExprString 'two_reinserted' '"two_reinserted"')
+            )
+          )
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'ksReinserted'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'hashMap')
+          :field 'keys'
+        )
+        :args (
+          (ExprId 'm')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'vector')
+          :field 'forEach'
+        )
+        :args (
+          (TypeArgument
+            :type_val (TypePath ('Int'))
+          )
+          (ExprId 'ksReinserted')
+          (ExprFun
+            :params (
+              (FormalParam
+                :name 'k'
+                :type_annot (TypePath ('Int'))
+                :mode VALUE
+              )
+            )
+            :return_type (TypePath ('Ok'))
+            :body (ExprApp
+              :func (ExprId 'printInt')
+              :args (
+                (ExprId 'k')
+              )
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printNewline')
+        :args (
+          (ExprInt 0 '0')
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'm2'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'hashMap')
+          :field 'newWithCapacity'
+        )
+        :args (
+          (TypeArgument
+            :type_val (TypePath ('Int'))
+          )
+          (TypeArgument
+            :type_val (TypePath ('Int'))
+          )
+          (ExprInt 8 '8')
+          (ExprId 'intEqual')
+          (ExprId 'intHash')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprFor
+        :var_name 'i'
+        :start (ExprInt 1 '1')
+        :stop (ExprInt 50 '50')
+        :body (ExprStmt
+          :expr (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'hashMap')
+              :field 'insert'
+            )
+            :args (
+              (ExprId 'm2')
+              (ExprId 'i')
+              (ExprInfix
+                :left (ExprId 'i')
+                :op '*'
+                :right (ExprInt 10 '10')
+              )
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printInt')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'hashMap')
+              :field 'size'
+            )
+            :args (
+              (ExprId 'm2')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printInt')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'hashMap')
+              :field 'find'
+            )
+            :args (
+              (ExprId 'm2')
+              (ExprInt 25 '25')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printInt')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'hashMap')
+              :field 'find'
+            )
+            :args (
+              (ExprId 'm2')
+              (ExprInt 50 '50')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printNewline')
+        :args (
+          (ExprInt 0 '0')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprFor
+        :var_name 'i'
+        :start (ExprInt 1 '1')
+        :stop (ExprInt 50 '50')
+        :body (ExprStmt
+          :expr (ExprIf
+            :cond (ExprInfix
+              :left (ExprInfix
+                :left (ExprId 'i')
+                :op '%'
+                :right (ExprInt 2 '2')
+              )
+              :op '=='
+              :right (ExprInt 0 '0')
+            )
+            :then_branch (ExprStmt
+              :expr (ExprApp
+                :func (ExprSelect
+                  :target (ExprId 'hashMap')
+                  :field 'delete'
+                )
+                :args (
+                  (ExprId 'm2')
+                  (ExprId 'i')
+                )
+              )
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printInt')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'hashMap')
+              :field 'size'
+            )
+            :args (
+              (ExprId 'm2')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printBool')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'hashMap')
+              :field 'contains'
+            )
+            :args (
+              (ExprId 'm2')
+              (ExprInt 2 '2')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printBool')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'hashMap')
+              :field 'contains'
+            )
+            :args (
+              (ExprId 'm2')
+              (ExprInt 3 '3')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printInt')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'hashMap')
+              :field 'find'
+            )
+            :args (
+              (ExprId 'm2')
+              (ExprInt 3 '3')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printNewline')
+        :args (
+          (ExprInt 0 '0')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'hashMap')
+          :field 'clear'
+        )
+        :args (
+          (ExprId 'm2')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printInt')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'hashMap')
+              :field 'size'
+            )
+            :args (
+              (ExprId 'm2')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printBool')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'hashMap')
+              :field 'empty'
+            )
+            :args (
+              (ExprId 'm2')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printNewline')
+        :args (
+          (ExprInt 0 '0')
+        )
+      )
+    )
+  )
+)

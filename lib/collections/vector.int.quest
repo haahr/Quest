@@ -8,6 +8,9 @@ interface Vector export
     (* Create a new empty vector *)
     new: All(A::TYPE) T(A)
 
+    (* Create a new empty vector with preallocated capacity hint *)
+    newWithCapacity: All(A::TYPE) All(capacity: Int) T(A)
+
     (* Return the number of elements in a vector *)
     length: All(A::TYPE) All(v: T(A)) Int
 
@@ -49,4 +52,7 @@ interface Vector export
 
     (* Create an array containing the elements of a vector *)
     toArray: All(A::TYPE) All(v: T(A)) Array(A)
+
+    (* Iterate over all elements of a vector *)
+    forEach: All(A::TYPE) All(v: T(A) action: All(elem: A) Ok) Ok
 end;

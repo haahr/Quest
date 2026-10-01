@@ -44,6 +44,9 @@ interface Vector export
     (* Create a new empty vector *)
     new: All(A::TYPE) T(A)
 
+    (* Create a new empty vector with preallocated capacity hint *)
+    newWithCapacity: All(A::TYPE) All(capacity: Int) T(A)
+
     (* Return the number of elements in a vector *)
     length: All(A::TYPE) All(v: T(A)) Int
 
@@ -85,6 +88,9 @@ interface Vector export
 
     (* Create an array containing the elements of a vector *)
     toArray: All(A::TYPE) All(v: T(A)) Array(A)
+
+    (* Iterate over all elements of a vector *)
+    forEach: All(A::TYPE) All(v: T(A) action: All(elem: A) Ok) Ok
 end;
 ```
 
@@ -250,7 +256,86 @@ end;
 
 ---
 
-## 5. Module Dependency Tracking (`.deps/` and `--emit-deps`)
+## 5. `collections/hashMap : collections/HashMap`
+
+Compact, insertion-order preserving polymorphic hash table parameterized over key type `K` and value type `V`.
+Uses the Python 3.6+ / PyPy architecture (sparse power-of-two index array with dense parallel vectors)
+with secondary perturbation probing and periodic tombstone compaction.
+
+### Interface Summary
+
+```quest
+interface HashMap
+import
+    util/maybe : util/Maybe
+    collections/vector : collections/Vector
+    word: Word
+export
+    (* The polymorphic hash map type constructor *)
+    T::ALL(K::TYPE) ALL(V::TYPE) TYPE
+
+    (* Key-value pair entry *)
+    Entry::ALL(K::TYPE) ALL(V::TYPE) TYPE
+
+    (* Exception raised on lookup failure when using unwrap-style access *)
+    error: Exception
+
+    (* Create a new empty hash map with custom equality and hash functions *)
+    new: All(K::TYPE V::TYPE)
+        All(equal: All(k1: K k2: K) Bool
+            hash: All(k: K) word.T)
+        T(K V)
+
+    (* Create a new hash map with preallocated initial capacity *)
+    newWithCapacity: All(K::TYPE V::TYPE)
+        All(capacity: Int
+            equal: All(k1: K k2: K) Bool
+            hash: All(k: K) word.T)
+        T(K V)
+
+    (* Return the number of active key-value pairs stored in the map *)
+    size: All(K::TYPE V::TYPE) All(m: T(K V)) Int
+
+    (* Check if the map is empty *)
+    empty: All(K::TYPE V::TYPE) All(m: T(K V)) Bool
+
+    (* Retrieve value associated with key, returning maybe.some(v) or maybe.none *)
+    get: All(K::TYPE V::TYPE) All(m: T(K V) key: K) maybe.T(V)
+
+    (* Check if key exists in the map *)
+    contains: All(K::TYPE V::TYPE) All(m: T(K V) key: K) Bool
+
+    (* Retrieve value or raise error if key is not present *)
+    find: All(K::TYPE V::TYPE) All(m: T(K V) key: K) V
+
+    (* Insert or overwrite key-value pair. Returns true if key was newly inserted *)
+    insert: All(K::TYPE V::TYPE) All(m: T(K V) key: K value: V) Bool
+
+    (* Remove a key and its associated value. Returns maybe.some(v) if found, else none *)
+    delete: All(K::TYPE V::TYPE) All(m: T(K V) key: K) maybe.T(V)
+
+    (* Clear all key-value pairs in the map *)
+    clear: All(K::TYPE V::TYPE) All(m: T(K V)) Ok
+
+    (* Return all keys as a vector in insertion order *)
+    keys: All(K::TYPE V::TYPE) All(m: T(K V)) vector.T(K)
+
+    (* Return all values as a vector in insertion order *)
+    values: All(K::TYPE V::TYPE) All(m: T(K V)) vector.T(V)
+
+    (* Return all entries as a vector of (key, value) records in insertion order *)
+    entries: All(K::TYPE V::TYPE) All(m: T(K V)) vector.T(Entry(K V))
+
+    (* Iterate over all key-value pairs in insertion order *)
+    forEach: All(K::TYPE V::TYPE)
+        All(m: T(K V) action: All(k: K v: V) Ok)
+        Ok
+end;
+```
+
+---
+
+## 6. Module Dependency Tracking (`.deps/` and `--emit-deps`)
 
 Quest supports recording and resolving module dependencies using make-compatible `.d` dependency files:
 
