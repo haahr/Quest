@@ -81,12 +81,10 @@ export
             let pLen = stringOp.length(prefix);
             if pLen > sLen then
                 false
+            elsif pLen == 0 then
+                true
             else
-                if pLen == 0 then
-                    true
-                else
-                    stringOp.equalSub(s 0 pLen prefix 0 pLen)
-                end
+                stringOp.equalSub(s 0 pLen prefix 0 pLen)
             end
         end;
 
@@ -96,12 +94,10 @@ export
             let sufLen = stringOp.length(suffix);
             if sufLen > sLen then
                 false
+            elsif sufLen == 0 then
+                true
             else
-                if sufLen == 0 then
-                    true
-                else
-                    stringOp.equalSub(s {sLen - sufLen} sufLen suffix 0 sufLen)
-                end
+                stringOp.equalSub(s {sLen - sufLen} sufLen suffix 0 sufLen)
             end
         end;
 
@@ -165,12 +161,10 @@ export
             end;
             if i >= sLen then
                 ""
+            elsif i == 0 then
+                s
             else
-                if i == 0 then
-                    s
-                else
-                    stringOp.getSub(s i {sLen - i})
-                end
+                stringOp.getSub(s i {sLen - i})
             end
         end;
 
@@ -183,12 +177,10 @@ export
             end;
             if i < 0 then
                 ""
+            elsif i == {sLen - 1} then
+                s
             else
-                if i == {sLen - 1} then
-                    s
-                else
-                    stringOp.getSub(s 0 {i + 1})
-                end
+                stringOp.getSub(s 0 {i + 1})
             end
         end;
 
@@ -265,7 +257,7 @@ export
                         vector.append(:String res stringOp.getSub(s start {i - start}));
                         i := i + 1;
                         start := i;
-                    else if c == '\r' then
+                    elsif c == '\r' then
                         vector.append(:String res stringOp.getSub(s start {i - start}));
                         if {{i + 1} < sLen} andif {stringOp.getChar(s {i + 1}) == '\n'} then
                             i := i + 2;
@@ -275,7 +267,7 @@ export
                         start := i;
                     else
                         i := i + 1;
-                    end end;
+                    end;
                 end;
                 if start < sLen then
                     vector.append(:String res stringOp.getSub(s start {sLen - start}));
@@ -289,7 +281,7 @@ export
             let count = vector.length(:String items);
             if count == 0 then
                 ""
-            else if count == 1 then
+            elsif count == 1 then
                 vector.get(:String items 0)
             else
                 let b = stringBuilder.new();
@@ -301,7 +293,7 @@ export
                     stringBuilder.append(b vector.get(:String items i));
                 end;
                 stringBuilder.toString(b)
-            end end
+            end
         end;
 
     let joinArray(delim: String items: Array(String)): String =
@@ -309,7 +301,7 @@ export
             let count = extent items;
             if count == 0 then
                 ""
-            else if count == 1 then
+            elsif count == 1 then
                 items[0]
             else
                 let b = stringBuilder.new();
@@ -321,7 +313,7 @@ export
                     stringBuilder.append(b items[i]);
                 end;
                 stringBuilder.toString(b)
-            end end
+            end
         end;
 
     (* =========================================================================
@@ -366,19 +358,19 @@ export
                 let c = stringOp.getChar(s i);
                 if c == '\\' then
                     stringBuilder.append(b "\\\\");
-                else if c == '"' then
+                elsif c == '"' then
                     stringBuilder.append(b "\\\"");
-                else if c == '\n' then
+                elsif c == '\n' then
                     stringBuilder.append(b "\\n");
-                else if c == '\t' then
+                elsif c == '\t' then
                     stringBuilder.append(b "\\t");
-                else if c == '\r' then
+                elsif c == '\r' then
                     stringBuilder.append(b "\\r");
-                else if c == '\0' then
+                elsif c == '\0' then
                     stringBuilder.append(b "\\0");
                 else
                     stringBuilder.appendChar(b c);
-                end end end end end end;
+                end;
             end;
             stringBuilder.toString(b)
         end;
@@ -394,21 +386,21 @@ export
                     let next = stringOp.getChar(s {i + 1});
                     if next == 'n' then
                         stringBuilder.appendChar(b '\n'); i := i + 2;
-                    else if next == 't' then
+                    elsif next == 't' then
                         stringBuilder.appendChar(b '\t'); i := i + 2;
-                    else if next == 'r' then
+                    elsif next == 'r' then
                         stringBuilder.appendChar(b '\r'); i := i + 2;
-                    else if next == '0' then
+                    elsif next == '0' then
                         stringBuilder.appendChar(b '\0'); i := i + 2;
-                    else if next == '\\' then
+                    elsif next == '\\' then
                         stringBuilder.appendChar(b '\\'); i := i + 2;
-                    else if next == '"' then
+                    elsif next == '"' then
                         stringBuilder.appendChar(b '"'); i := i + 2;
-                    else if next == '\'' then
+                    elsif next == '\'' then
                         stringBuilder.appendChar(b '\''); i := i + 2;
                     else
                         stringBuilder.appendChar(b next); i := i + 2;
-                    end end end end end end end;
+                    end;
                 else
                     stringBuilder.appendChar(b c);
                     i := i + 1;
@@ -432,9 +424,9 @@ export
                 let firstChar = stringOp.getChar(s 0);
                 if {firstChar == '-'} \/ {firstChar == '~'} then
                     negative := true; i := 1;
-                else if firstChar == '+' then
+                elsif firstChar == '+' then
                     i := 1;
-                end end;
+                end;
                 if i >= sLen then
                     maybe.none(:Int)
                 else
@@ -446,11 +438,11 @@ export
                         let var d = ~1;
                         if {v >= 48} /\ {v <= 57} then
                             d := v - 48;
-                        else if {v >= 65} /\ {v <= 90} then
+                        elsif {v >= 65} /\ {v <= 90} then
                             d := v - 55;
-                        else if {v >= 97} /\ {v <= 122} then
+                        elsif {v >= 97} /\ {v <= 122} then
                             d := v - 87;
-                        end end end;
+                        end;
                         if {d < 0} \/ {d >= base} then
                             valid := false;
                         else
@@ -467,13 +459,15 @@ export
             end
         end;
 
-    let toIntBase(s: String base: Int): Int = begin 
-        let res = tryToIntBase(s base);
-        if maybe.isSome(:Int res) then
-            maybe.unwrap(:Int res)
-        else
-            raise error end
-        end end;
+    let toIntBase(s: String base: Int): Int =
+        begin 
+            let res = tryToIntBase(s base);
+            if maybe.isSome(:Int res) then
+                maybe.unwrap(:Int res)
+            else
+                raise error end
+            end
+        end;
 
     let tryToInt(s: String): maybe.T(Int) =
         tryToIntBase(s 10);
@@ -504,11 +498,11 @@ export
                         let var d = ~1;
                         if {v >= 48} /\ {v <= 57} then
                             d := v - 48;
-                        else if {v >= 65} /\ {v <= 90} then
+                        elsif {v >= 65} /\ {v <= 90} then
                             d := v - 55;
-                        else if {v >= 97} /\ {v <= 122} then
+                        elsif {v >= 97} /\ {v <= 122} then
                             d := v - 87;
-                        end end end;
+                        end;
                         if {d < 0} \/ {d >= base} then
                             valid := false;
                         else
@@ -525,13 +519,15 @@ export
             end
         end;
 
-    let toWordBase(s: String base: Int): word.T = begin 
-        let res = tryToWordBase(s base);
-        if maybe.isSome(:word.T res) then
-            maybe.unwrap(:word.T res)
-        else
-            raise error end
-        end end;
+    let toWordBase(s: String base: Int): word.T =
+        begin 
+            let res = tryToWordBase(s base);
+            if maybe.isSome(:word.T res) then
+                maybe.unwrap(:word.T res)
+            else
+                raise error end
+            end
+        end;
 
     let tryToWord(s: String): maybe.T(word.T) =
         tryToWordBase(s 10);
@@ -550,9 +546,9 @@ export
                 let firstChar = stringOp.getChar(s 0);
                 if {firstChar == '-'} \/ {firstChar == '~'} then
                     negative := true; i := 1;
-                else if firstChar == '+' then
+                elsif firstChar == '+' then
                     i := 1;
-                end end;
+                end;
                 let var intPart = 0.0;
                 let var hasIntDigits = false;
                 while {i < sLen} andif isDigit(stringOp.getChar(s i)) do
@@ -586,9 +582,9 @@ export
                             let expSign = stringOp.getChar(s i);
                             if {expSign == '-'} \/ {expSign == '~'} then
                                 expNeg := true; i := i + 1;
-                            else if expSign == '+' then
+                            elsif expSign == '+' then
                                 i := i + 1;
-                            end end;
+                            end;
                         end;
                         let var expVal = 0;
                         let var hasExpDigits = false;
@@ -620,28 +616,32 @@ export
             end
         end;
 
-    let toReal(s: String): Real = begin 
-        let res = tryToReal(s);
-        if maybe.isSome(:Real res) then
-            maybe.unwrap(:Real res)
-        else
-            raise error end
-        end end;
+    let toReal(s: String): Real =
+        begin 
+            let res = tryToReal(s);
+            if maybe.isSome(:Real res) then
+                maybe.unwrap(:Real res)
+            else
+                raise error end
+            end
+        end;
 
     let tryToBool(s: String): maybe.T(Bool) =
         if stringOp.equal(s "true") then
             maybe.some(:Bool true)
-        else if stringOp.equal(s "false") then
+        elsif stringOp.equal(s "false") then
             maybe.some(:Bool false)
         else
             maybe.none(:Bool)
-        end end;
+        end;
 
-    let toBool(s: String): Bool = begin 
-        let res = tryToBool(s);
-        if maybe.isSome(:Bool res) then
-            maybe.unwrap(:Bool res)
-        else
-            raise error end
-        end end;
+    let toBool(s: String): Bool =
+        begin 
+            let res = tryToBool(s);
+            if maybe.isSome(:Bool res) then
+                maybe.unwrap(:Bool res)
+            else
+                raise error end
+            end
+        end;
 end;

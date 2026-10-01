@@ -99,7 +99,7 @@ export
                 let slot = m.indices[i];
                 if slot == emptySlot then
                     searching := false;
-                else if slot == tombstoneSlot then
+                elsif slot == tombstoneSlot then
                     (* Skip tombstone, continue probing *)
                     pert := word.shift(pert ~5);
                     let nextI = word.andBits(
@@ -122,7 +122,7 @@ export
                         );
                         i := word.toInt(nextI);
                     end;
-                end end;
+                end;
             end;
             result
         end;
@@ -248,7 +248,7 @@ export
                 let slot = m.indices[i];
                 if slot == emptySlot then
                     searching := false;
-                else if slot == tombstoneSlot then
+                elsif slot == tombstoneSlot then
                     if firstTombstone == emptySlot then
                         firstTombstone := i;
                     end;
@@ -273,7 +273,7 @@ export
                         );
                         i := word.toInt(nextI);
                     end;
-                end end;
+                end;
             end;
 
             if existingIdx >= 0 then
@@ -311,7 +311,7 @@ export
                 let slot = m.indices[i];
                 if slot == emptySlot then
                     searching := false;
-                else if slot == tombstoneSlot then
+                elsif slot == tombstoneSlot then
                     pert := word.shift(pert ~5);
                     let nextI = word.andBits(
                         word.add(word.add(word.mul(word.fromInt(5) word.fromInt(i)) word.fromInt(1)) pert)
@@ -334,7 +334,7 @@ export
                         );
                         i := word.toInt(nextI);
                     end;
-                end end;
+                end;
             end;
 
             if denseIdx >= 0 then

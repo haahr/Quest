@@ -90,9 +90,9 @@ export
                 let var newCap: Int = floorSize;
                 if cap > 0 then
                     newCap := cap + {cap / 2};
-                else if v.capacityHint > 0 then
+                elsif v.capacityHint > 0 then
                     newCap := if v.capacityHint > floorSize then v.capacityHint else floorSize end;
-                end end;
+                end;
                 let newData: Array(A) = array of(newCap value);
                 if cap > 0 then
                     for i = 0 upto {cap - 1} do
