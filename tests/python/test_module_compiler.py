@@ -250,6 +250,81 @@ class TestModuleCompiler(unittest.TestCase):
         self.assertTrue(c_file.is_file())
         self.assertTrue(o_file.is_file())
 
+    def test_emit_deps_flag(self) -> None:
+        """Tests that --emit-deps generates .deps/<stem>.d with correct prerequisites."""
+        intf_c = self.dir_path / "depc.int.quest"
+        intf_c.write_text("interface DepC export val: Int end;\n", encoding="utf-8")
+        self.assertEqual(quest_driver.run_driver(["-c", str(intf_c), "-I", str(self.dir_path)]), 0)
+
+        mod_c = self.dir_path / "depc.mod.quest"
+        mod_c.write_text("module depc: DepC export let val: Int = 10; end;\n", encoding="utf-8")
+        ret_c = quest_driver.run_driver(["--emit-deps", "-c", str(mod_c), "-I", str(self.dir_path)])
+        self.assertEqual(ret_c, 0)
+        dep_c_file = self.dir_path / ".deps" / "depc.d"
+        self.assertTrue(dep_c_file.is_file())
+        self.assertEqual(dep_c_file.read_text(encoding="utf-8").strip(), "depc.o:")
+
+        intf_b = self.dir_path / "depb.int.quest"
+        intf_b.write_text(
+            "interface DepB import c = depc : DepC export val: Int end;\n",
+            encoding="utf-8",
+        )
+        self.assertEqual(quest_driver.run_driver(["-c", str(intf_b), "-I", str(self.dir_path)]), 0)
+
+        mod_b = self.dir_path / "depb.mod.quest"
+        mod_b.write_text(
+            "module depb: DepB import c = depc : DepC export let val: Int = c.val + 20; end;\n",
+            encoding="utf-8",
+        )
+        ret_b = quest_driver.run_driver(["--emit-deps", "-c", str(mod_b), "-I", str(self.dir_path)])
+        self.assertEqual(ret_b, 0)
+        dep_b_file = self.dir_path / ".deps" / "depb.d"
+        self.assertTrue(dep_b_file.is_file())
+        self.assertIn("depb.o:", dep_b_file.read_text(encoding="utf-8"))
+        self.assertIn("depc.o", dep_b_file.read_text(encoding="utf-8"))
+
+    def test_transitive_deps_linking(self) -> None:
+        """Tests that compiler driver reads .d files to transitively link dependent .o files."""
+        intf_c = self.dir_path / "basec.int.quest"
+        intf_c.write_text("interface BaseC export getVal(): Int end;\n", encoding="utf-8")
+        self.assertEqual(quest_driver.run_driver(["-c", str(intf_c), "-I", str(self.dir_path)]), 0)
+
+        mod_c = self.dir_path / "basec.mod.quest"
+        mod_c.write_text("module basec: BaseC export let getVal(): Int = 42; end;\n", encoding="utf-8")
+        self.assertEqual(
+            quest_driver.run_driver(["--emit-deps", "-c", str(mod_c), "-I", str(self.dir_path)]),
+            0,
+        )
+
+        intf_b = self.dir_path / "midb.int.quest"
+        intf_b.write_text("interface MidB import c = basec : BaseC export compute(): Int end;\n", encoding="utf-8")
+        self.assertEqual(quest_driver.run_driver(["-c", str(intf_b), "-I", str(self.dir_path)]), 0)
+
+        mod_b = self.dir_path / "midb.mod.quest"
+        mod_b.write_text(
+            "module midb: MidB import c = basec : BaseC export let compute(): Int = c.getVal() * 2; end;\n",
+            encoding="utf-8",
+        )
+        self.assertEqual(
+            quest_driver.run_driver(["--emit-deps", "-c", str(mod_b), "-I", str(self.dir_path)]),
+            0,
+        )
+
+        main_file = self.dir_path / "main.quest"
+        main_file.write_text(
+            "import b = midb : MidB;\n"
+            "import writer: Writer;\n"
+            "import conv: Conv;\n"
+            "writer.putString(writer.output conv.int(b.compute()));\n",
+            encoding="utf-8",
+        )
+        res = quest_driver.run_driver([
+            "--stop-after", "run_c_compiled",
+            str(main_file),
+            "-I", str(self.dir_path),
+        ])
+        self.assertEqual(res, 0)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -39,57 +39,58 @@
               :right (TypedInt 0 :type Int))
             :then (TypedInt 0 :type Int)
             :else (TypedVar 'n' :type Int)))))
-    (TypedLetValue 'testLoop' :type Ok
-      :value (TypedBlock :type Ok
-        :bindings (
-          (TypedLetValue 'i' :type Int
-            :value (TypedInt 0 :type Int))
-          (TypedExprStmt
-            :expr (TypedWhile
-              :cond (TypedInfix '<' :type Bool
-                :left (TypedDerefCell :type Int
-                  :target (TypedVar 'i' :type Var(Int)))
-                :right (TypedInt 10 :type Int))
-              :body (TypedAssign
-                :target (TypedVar 'i' :type Var(Int))
-                :value (TypedInfix '+' :type Int
+    (TypedLetValue 'testLoop' :type Fun(): Ok
+      :value (TypedFun :params () :type Fun(): Ok
+        :body (TypedBlock :type Ok
+          :bindings (
+            (TypedLetValue 'i' :type Int
+              :value (TypedInt 0 :type Int))
+            (TypedExprStmt
+              :expr (TypedWhile
+                :cond (TypedInfix '<' :type Bool
                   :left (TypedDerefCell :type Int
                     :target (TypedVar 'i' :type Var(Int)))
-                  :right (TypedInt 1 :type Int)))))
-          (TypedExprStmt
-            :expr (TypedLoop
-              :body (TypedIf :type Ok
-                :cond (TypedInfix 'is' :type Bool
-                  :left (TypedDerefCell :type Int
-                    :target (TypedVar 'i' :type Var(Int)))
-                  :right (TypedInt 20 :type Int))
-                :then (TypedExit)
-                :else (TypedAssign
+                  :right (TypedInt 10 :type Int))
+                :body (TypedAssign
                   :target (TypedVar 'i' :type Var(Int))
                   :value (TypedInfix '+' :type Int
                     :left (TypedDerefCell :type Int
                       :target (TypedVar 'i' :type Var(Int)))
-                    :right (TypedInt 1 :type Int))))))
-          (TypedExprStmt
-            :expr (TypedFor 'k' :upto
-              :start (TypedInt 1 :type Int)
-              :stop (TypedInt 5 :type Int)
-              :body (TypedAssign
-                :target (TypedVar 'i' :type Var(Int))
-                :value (TypedInfix '+' :type Int
-                  :left (TypedDerefCell :type Int
-                    :target (TypedVar 'i' :type Var(Int)))
-                  :right (TypedVar 'k' :type Int)))))
-          (TypedExprStmt
-            :expr (TypedFor 'k' :downto
-              :start (TypedInt 5 :type Int)
-              :stop (TypedInt 1 :type Int)
-              :body (TypedAssign
-                :target (TypedVar 'i' :type Var(Int))
-                :value (TypedInfix '-' :type Int
-                  :left (TypedDerefCell :type Int
-                    :target (TypedVar 'i' :type Var(Int)))
-                  :right (TypedVar 'k' :type Int)))))
-        )
-        :result (TypedOk)))
+                    :right (TypedInt 1 :type Int)))))
+            (TypedExprStmt
+              :expr (TypedLoop
+                :body (TypedIf :type Ok
+                  :cond (TypedInfix 'is' :type Bool
+                    :left (TypedDerefCell :type Int
+                      :target (TypedVar 'i' :type Var(Int)))
+                    :right (TypedInt 20 :type Int))
+                  :then (TypedExit)
+                  :else (TypedAssign
+                    :target (TypedVar 'i' :type Var(Int))
+                    :value (TypedInfix '+' :type Int
+                      :left (TypedDerefCell :type Int
+                        :target (TypedVar 'i' :type Var(Int)))
+                      :right (TypedInt 1 :type Int))))))
+            (TypedExprStmt
+              :expr (TypedFor 'k' :upto
+                :start (TypedInt 1 :type Int)
+                :stop (TypedInt 5 :type Int)
+                :body (TypedAssign
+                  :target (TypedVar 'i' :type Var(Int))
+                  :value (TypedInfix '+' :type Int
+                    :left (TypedDerefCell :type Int
+                      :target (TypedVar 'i' :type Var(Int)))
+                    :right (TypedVar 'k' :type Int)))))
+            (TypedExprStmt
+              :expr (TypedFor 'k' :downto
+                :start (TypedInt 5 :type Int)
+                :stop (TypedInt 1 :type Int)
+                :body (TypedAssign
+                  :target (TypedVar 'i' :type Var(Int))
+                  :value (TypedInfix '-' :type Int
+                    :left (TypedDerefCell :type Int
+                      :target (TypedVar 'i' :type Var(Int)))
+                    :right (TypedVar 'k' :type Int)))))
+          )
+          :result (TypedOk))))
   ))

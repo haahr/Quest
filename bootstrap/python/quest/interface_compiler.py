@@ -68,6 +68,17 @@ QI_SCHEMA_TYPE_STR = (
     "end"
 )
 
+C_KEYWORDS = {
+    "auto", "break", "case", "char", "const", "continue", "default", "do",
+    "double", "else", "enum", "extern", "float", "for", "goto", "if",
+    "inline", "int", "long", "register", "restrict", "return", "short",
+    "signed", "sizeof", "static", "struct", "switch", "typedef", "union",
+    "unsigned", "void", "volatile", "while", "_Alignas", "_Alignof",
+    "_Atomic", "_Bool", "_Complex", "_Generic", "_Imaginary", "_Noreturn",
+    "_Static_assert", "_Thread_local",
+}
+
+
 
 def format_type_for_qi(t: QType) -> str:
     """Formats a semantic QType into canonical Quest type syntax for .qi metadata."""
@@ -189,7 +200,18 @@ def _parse_and_elaborate_type_in_env(type_str: str, env: Environment) -> QType:
 
 def compile_interface_to_qi(decl: ast.InterfaceDecl, iface_scope: Scope) -> str:
     """Serializes interface declarations to portable JSON/JSOG .qi format using shadow Quest records."""
-    imports_elems = [QString(imp.interface_name) for imp in decl.imports]
+    imports_elems: list[QString] = []
+    for imp in decl.imports:
+        if not imp.names:
+            imports_elems.append(QString(f":{imp.effective_interface_path}"))
+        elif imp.module_paths:
+            imports_elems.append(
+                QString(f"{','.join(imp.names)}={','.join(imp.module_paths)}:{imp.effective_interface_path}")
+            )
+        else:
+            imports_elems.append(
+                QString(f"{','.join(imp.names)}:{imp.effective_interface_path}")
+            )
     imports_arr = QArray(imports_elems)
 
     type_records: list[QRecord] = []
@@ -328,7 +350,10 @@ def compile_interface_to_header(decl: ast.InterfaceDecl, iface_scope: Scope) -> 
                         param_c_types.append(f"const QTypeDescriptor *desc_{q.name}")
                 if isinstance(inner_fn, QFunType):
                     for p in inner_fn.params:
-                        param_c_types.append(f"{qtype_to_c_type(p.type_val)} {p.name or 'arg'}")
+                        p_name = p.name or "arg"
+                        if p_name in C_KEYWORDS:
+                            p_name = f"q_{p_name}"
+                        param_c_types.append(f"{qtype_to_c_type(p.type_val)} {p_name}")
                 params_decl = ", ".join(param_c_types) if param_c_types else "void"
                 lines.append(f"/* {sig.name}: {format_type_for_qi(val_t)} */")
                 lines.append(
@@ -420,21 +445,79 @@ def load_interface_from_qi_file(file_path: Path, env: Environment) -> Scope:
 
     rec = dyn.value
     name = str(rec.fields["name"].value) if "name" in rec.fields else file_path.stem
-    iface_scope = Scope(name=f"interface_{name}", parent=env.current_scope)
+    imp_scope_frame = Scope(name=f"imports_{name}", parent=env.current_scope)
 
     # 1. Resolve imported interfaces
     if "imports" in rec.fields and isinstance(rec.fields["imports"], QArray):
         from quest.module_loader import load_interface
 
         for imp_elem in rec.fields["imports"].elements:
-            imp_name = str(imp_elem.value)
-            imp_scope = env.lookup_interface(imp_name)
-            if imp_scope is None:
-                imp_scope = load_interface(imp_name, env)
-            for t_name, t_sym in imp_scope.types.items():
-                iface_scope.declare_type(t_sym)
-            for k_name, k_sym in imp_scope.kinds.items():
-                iface_scope.declare_kind(k_sym)
+            imp_str = str(imp_elem.value)
+            if imp_str.startswith(":"):
+                imp_name = imp_str[1:]
+                imp_scope = env.lookup_interface(imp_name)
+                if imp_scope is None:
+                    imp_scope = load_interface(imp_name, env)
+                for t_name, t_sym in imp_scope.types.items():
+                    imp_scope_frame.declare_type(t_sym)
+                for k_name, k_sym in imp_scope.kinds.items():
+                    imp_scope_frame.declare_kind(k_sym)
+            else:
+                if "=" in imp_str:
+                    names_part, rest = imp_str.split("=", 1)
+                    mpaths_part, iface_part = rest.split(":", 1)
+                    names = tuple(names_part.split(","))
+                    mpaths = tuple(mpaths_part.split(","))
+                    imp_name = iface_part
+                elif ":" in imp_str:
+                    names_part, iface_part = imp_str.split(":", 1)
+                    names = tuple(names_part.split(","))
+                    mpaths = names
+                    imp_name = iface_part
+                else:
+                    names = ()
+                    mpaths = ()
+                    imp_name = imp_str
+
+                imp_scope = env.lookup_interface(imp_name)
+                if imp_scope is None:
+                    imp_scope = load_interface(imp_name, env)
+
+                if not names:
+                    for t_name, t_sym in imp_scope.types.items():
+                        imp_scope_frame.declare_type(t_sym)
+                    for k_name, k_sym in imp_scope.kinds.items():
+                        imp_scope_frame.declare_kind(k_sym)
+                else:
+                    for iname, mod_path in zip(names, mpaths):
+                        from quest.module_loader import (
+                            load_module,
+                            resolve_module_file,
+                            resolve_object_file,
+                        )
+                        mod_scope = None
+                        if (
+                            mod_path in env.loaded_modules_ast
+                            or mod_path in env.precompiled_modules
+                            or resolve_module_file(mod_path, env.current_dir, env.include_paths) is not None
+                            or resolve_object_file(mod_path, env.current_dir, env.include_paths) is not None
+                        ):
+                            try:
+                                typed_mod = load_module(mod_path, imp_name, env)
+                                mod_scope = typed_mod.scope
+                            except Exception:
+                                mod_scope = None
+
+                        registered_scope = mod_scope if mod_scope is not None else imp_scope
+                        env.register_module(iname, registered_scope)
+                        env.register_module(mod_path, registered_scope)
+                        env.register_module(imp_name, registered_scope)
+
+    iface_scope = Scope(name=f"interface_{name}", parent=imp_scope_frame)
+    for t_name, t_sym in imp_scope_frame.types.items():
+        iface_scope.declare_type(t_sym)
+    for k_name, k_sym in imp_scope_frame.kinds.items():
+        iface_scope.declare_kind(k_sym)
 
     # 2. Declare types
     saved_scope = env.current_scope

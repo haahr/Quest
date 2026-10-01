@@ -1,0 +1,152 @@
+interface Strutil
+import
+    util/maybe : util/Maybe
+    collections/vector : collections/Vector
+    word: Word
+export
+    (* Exception raised on string parsing or invalid argument errors *)
+    error: Exception
+
+    (* =========================================================================
+     * Splitting & Joining
+     * ========================================================================= *)
+
+    (* Split string s by delimiter delim into a growable vector of strings.
+     * - If delim is empty (""), splits s into single-character strings.
+     * - If delim does not occur, returns a vector with s as its single element.
+     *)
+    split(s: String delim: String): vector.T(String)
+
+    (* Split string s into lines, recognizing "\n", "\r\n", and "\r".
+     * Follows Python/Rust line semantics: trailing terminators are absorbed,
+     * and an empty string produces an empty vector.
+     *)
+    splitlines(s: String): vector.T(String)
+
+    (* Join elements of vector items with delimiter delim *)
+    join(delim: String items: vector.T(String)): String
+
+    (* Join elements of array items with delimiter delim *)
+    joinArray(delim: String items: Array(String)): String
+
+    (* =========================================================================
+     * Searching & Substring Predicates
+     * ========================================================================= *)
+
+    (* Test if string s begins with prefix *)
+    startsWith(s: String prefix: String): Bool
+
+    (* Test if string s ends with suffix *)
+    endsWith(s: String suffix: String): Bool
+
+    (* Find first occurrence of sub in s starting at index 0. Returns -1 if not found *)
+    find(s: String sub: String): Int
+
+    (* Find first occurrence of sub in s starting at start. Returns -1 if not found *)
+    findFrom(s: String sub: String start: Int): Int
+
+    (* Find last occurrence of sub in s. Returns -1 if not found *)
+    rfind(s: String sub: String): Int
+
+    (* Test whether sub occurs anywhere within s *)
+    contains(s: String sub: String): Bool
+
+    (* Trim leading and trailing whitespace (' ', '\t', '\r', '\n') from s *)
+    strip(s: String): String
+
+    (* Trim leading whitespace from s *)
+    stripLeading(s: String): String
+
+    (* Trim trailing whitespace from s *)
+    stripTrailing(s: String): String
+
+    (* =========================================================================
+     * Replacement & Literal Escaping
+     * ========================================================================= *)
+
+    (* Replace all occurrences of oldSub with newSub in s *)
+    replace(s: String oldSub: String newSub: String): String
+
+    (* Escape characters in s suitable for C string and character literals:
+     * converts '\', '"', '\n', '\t', '\r', '\0' to C escape sequences.
+     *)
+    escapeC(s: String): String
+
+    (* Unescape standard C escape sequences (\n, \t, \r, \", \\, \0) in s *)
+    unescapeC(s: String): String
+
+    (* =========================================================================
+     * Character Classification
+     * ========================================================================= *)
+
+    (* Test if character is an ASCII decimal digit ('0' .. '9') *)
+    isDigit(c: Char): Bool
+
+    (* Test if character is an ASCII alphabetic letter ('a'..'z', 'A'..'Z') *)
+    isAlpha(c: Char): Bool
+
+    (* Test if character is alphanumeric (isAlpha or isDigit) *)
+    isAlnum(c: Char): Bool
+
+    (* Test if character is ASCII whitespace (' ', '\t', '\r', '\n') *)
+    isSpace(c: Char): Bool
+
+    (* =========================================================================
+     * String Parsing (Inverse of Conv)
+     * ========================================================================= *)
+
+    (* Parse an integer from string s in decimal radix (optional '+' or '-').
+     * Raises error if s is empty or contains non-digit characters.
+     *)
+    toInt(s: String): Int
+
+    (* Non-throwing variant of toInt *)
+    tryToInt(s: String): maybe.T(Int)
+
+    (* Parse an integer from string s in radix base (2 to 36).
+     * Raises error on invalid format or base.
+     *)
+    toIntBase(s: String base: Int): Int
+
+    (* Non-throwing variant of toIntBase *)
+    tryToIntBase(s: String base: Int): maybe.T(Int)
+
+    (* Parse an unsigned 64-bit word from string s in decimal radix.
+     * Raises error if s is empty or contains non-digit characters.
+     *)
+    toWord(s: String): word.T
+
+    (* Non-throwing variant of toWord *)
+    tryToWord(s: String): maybe.T(word.T)
+
+    (* Parse an unsigned 64-bit word from string s in radix base (2 to 36).
+     * Useful for hexadecimal (base 16) masks and addresses.
+     *)
+    toWordBase(s: String base: Int): word.T
+
+    (* Non-throwing variant of toWordBase *)
+    tryToWordBase(s: String base: Int): maybe.T(word.T)
+
+    (* Format an unsigned 64-bit word as a string in radix base (2 to 36) *)
+    formatWord(w: word.T base: Int): String
+
+    (* Format an unsigned 64-bit word as a decimal string *)
+    wordToString(w: word.T): String
+
+    (* Parse an IEEE-754 double precision real number from string s.
+     * Supports optional sign (+/-), integer part, fractional part (.123),
+     * and optional exponent (e/E (+/-) exp). Raises error on invalid format.
+     *)
+    toReal(s: String): Real
+
+    (* Non-throwing variant of toReal *)
+    tryToReal(s: String): maybe.T(Real)
+
+    (* Parse boolean from string: "true" -> true, "false" -> false.
+     * Raises error for any other string value.
+     *)
+    toBool(s: String): Bool
+
+    (* Non-throwing variant of toBool *)
+    tryToBool(s: String): maybe.T(Bool)
+end;

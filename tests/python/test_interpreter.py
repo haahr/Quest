@@ -285,6 +285,7 @@ class TestExpressionsControlFlowSource(unittest.TestCase):
         let r1 = testIf({0 - 5});
         let r2 = testIf(0);
         let r3 = testIf(42);
+        let r4 = testLoop();
         """
 
         env = RuntimeEnvironment.create_root_env()
@@ -299,7 +300,7 @@ class TestExpressionsControlFlowSource(unittest.TestCase):
         self.assertEqual(env.lookup("r1"), QInt(5))
         self.assertEqual(env.lookup("r2"), QInt(0))
         self.assertEqual(env.lookup("r3"), QInt(42))
-        self.assertEqual(env.lookup("testLoop"), OK_VALUE)
+        self.assertEqual(env.lookup("r4"), OK_VALUE)
 
     def test_recursive_function(self):
         code = """

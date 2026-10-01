@@ -447,6 +447,7 @@ def analyze_program_for_c(
     prog: TypedProgram,
     record_ctx: RecordNamingContext,
     loaded_modules: Optional[dict[str, TypedModule]] = None,
+    env: Optional[Any] = None,
 ) -> CProgramAnalysis:
     """Performs full program analysis required for C code generation."""
     from quest.builtins import BuiltinModuleRegistry
@@ -463,7 +464,7 @@ def analyze_program_for_c(
 
     known_builtins = {
         "writer", "reader", "conv", "ascii", "int", "real", "string", "system",
-        "arrayOp", "dynamic", "list", "word",
+        "arrayOp", "dynamic", "word",
     }
     needed_builtin_modules: list[str] = []
 
@@ -495,10 +496,27 @@ def analyze_program_for_c(
                         all_module_map[mpath] = all_module_map[target]
         _scan_for_builtin_vars(phrase)
 
+    has_precompiled = any(getattr(m, "is_precompiled", False) for m in all_module_map.values())
+    if has_precompiled:
+        for bmod in known_builtins:
+            if bmod not in needed_builtin_modules:
+                needed_builtin_modules.append(bmod)
+
+    linked_stems = {
+        obj.stem
+        for obj in (
+            getattr(env, "linked_objects", [])
+            + getattr(getattr(env, "options", None), "extra_objects", [])
+        )
+    } if env is not None else set()
+
     for bmod in needed_builtin_modules:
         if bmod not in all_module_map:
             bast = BuiltinModuleRegistry.get_module_ast(bmod)
             if bast is not None:
+                if bmod in linked_stems or (env and bmod in env.precompiled_modules):
+                    from dataclasses import replace
+                    bast = replace(bast, is_precompiled=True)
                 all_module_map[bmod] = bast
 
     changed = True
@@ -512,10 +530,23 @@ def analyze_program_for_c(
                             if iname in known_builtins and iname not in all_module_map:
                                 bast = BuiltinModuleRegistry.get_module_ast(iname)
                                 if bast is not None:
+                                    if iname in linked_stems or (env and iname in env.precompiled_modules):
+                                        from dataclasses import replace
+                                        bast = replace(bast, is_precompiled=True)
                                     all_module_map[iname] = bast
                                     if iname not in needed_builtin_modules:
                                         needed_builtin_modules.append(iname)
                                     changed = True
+
+    for k, mod in list(all_module_map.items()):
+        if not getattr(mod, "is_precompiled", False):
+            if (
+                mod.name.lower() in linked_stems
+                or mangle_module_name(mod.name) in linked_stems
+                or (env and (mod.name in env.precompiled_modules or mod.name.lower() in env.precompiled_modules))
+            ):
+                from dataclasses import replace
+                all_module_map[k] = replace(mod, is_precompiled=True)
 
     sorted_modules = topological_sort_modules(list(all_module_map.values()))
 

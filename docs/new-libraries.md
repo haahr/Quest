@@ -1,0 +1,275 @@
+# Extended Standard Libraries
+
+This document specifies the extended standard libraries for Quest that reside in hierarchical namespaces
+(subdirectories of `lib/`) rather than the flat Cardelli standard library (`lib/*.{int,mod}.quest`).
+
+These libraries provide data structures, optional values, string building, text manipulation, and dependency
+tracking essential for writing complex applications and the self-hosted Quest compiler (`questc`).
+
+---
+
+## Namespace and Import Conventions
+
+Hierarchical libraries are organized by domain under `lib/<category>/`:
+- Source files: `lib/<category>/<module>.int.quest` (interface) and
+  `lib/<category>/<module>.mod.quest` (implementation).
+- Filenames are strictly lowercase (e.g. `opt.int.quest`, `stringbuilder.mod.quest`, `strutil.mod.quest`).
+- Import syntax:
+  ```quest
+  import category/module : category/Interface;
+  ```
+  or aliased:
+  ```quest
+  import m = category/module : category/Interface;
+  ```
+- Compiled artifacts (`.qi`, `.h`, `.c`, `.o`) are placed mirror-wise under `.build/<category>/` or alongside source.
+- Type functors follow Cardelli's convention: `Vector.T(A)`, `Opt.T(A)`, `StringBuilder.T`.
+
+---
+
+## 1. `collections/vector : collections/Vector`
+
+Growable, dynamically-resizing array collection parameterized over element type `A`.
+
+### Interface Summary
+
+```quest
+interface Vector export
+    (* The polymorphic growable vector type constructor *)
+    T::ALL(A::TYPE) TYPE
+
+    (* Exception raised on out-of-bounds access or empty vector operations *)
+    error: Exception
+
+    (* Create a new empty vector *)
+    new: All(A::TYPE) T(A)
+
+    (* Return the number of elements in a vector *)
+    length: All(A::TYPE) All(v: T(A)) Int
+
+    (* Test whether a vector is empty *)
+    empty: All(A::TYPE) All(v: T(A)) Bool
+
+    (* Return the element at the specified index, or raise error *)
+    get: All(A::TYPE) All(v: T(A) index: Int) A
+
+    (* Update the element at the specified index, or raise error *)
+    set: All(A::TYPE) All(v: T(A) index: Int value: A) Ok
+
+    (* Return the first element of a vector, or raise error if empty *)
+    first: All(A::TYPE) All(v: T(A)) A
+
+    (* Return the last element of a vector, or raise error if empty *)
+    last: All(A::TYPE) All(v: T(A)) A
+
+    (* Append a new element to the end of a vector *)
+    append: All(A::TYPE) All(v: T(A) value: A) Ok
+
+    (* Remove and return the last element of a vector, or raise error if empty *)
+    pop: All(A::TYPE) All(v: T(A)) A
+
+    (* Delete element at index and shift subsequent elements left; linear time *)
+    delete: All(A::TYPE) All(v: T(A) index: Int) Ok
+
+    (* Remove all elements from a vector *)
+    clear: All(A::TYPE) All(v: T(A)) Ok
+
+    (* Create a shallow copy of a vector *)
+    copy: All(A::TYPE) All(v: T(A)) T(A)
+
+    (* Concatenate two vectors into a new vector *)
+    concat: All(A::TYPE) All(v1: T(A) v2: T(A)) T(A)
+
+    (* Create a new vector containing the elements of an array *)
+    fromArray: All(A::TYPE) All(arr: Array(A)) T(A)
+
+    (* Create an array containing the elements of a vector *)
+    toArray: All(A::TYPE) All(v: T(A)) Array(A)
+end;
+```
+
+### Memory and Growth Strategy
+
+- **Initial Floor**: When appending to an empty vector, initial capacity is allocated to 6 elements.
+- **Growth Factor**: When capacity is exceeded, storage grows by $1.5\times$ (`cap + cap / 2`),
+  ensuring $O(1)$ amortized append time.
+- **Shrinking**: When utilization drops to 25% or below (`length * 4 <= capacity`), the backing array shrinks by 50%
+  (bounded below by the floor of 6).
+- **GC Safety**: Vacated slots on `pop` and `delete` are overwritten to prevent reference leaks. Emptying a vector
+  via `clear` resets the backing array to zero elements.
+
+---
+
+## 2. `util/maybe : util/Maybe`
+
+Standalone polymorphic option type functor and constructors for optional values and non-throwing operations.
+
+### Interface Summary
+
+```quest
+interface Maybe export
+    (* Polymorphic optional value type *)
+    T::ALL(A::TYPE) TYPE
+
+    (* Exception raised on invalid option unwrapping *)
+    error: Exception
+
+    (* Test if an option value is present *)
+    isSome: All(A::TYPE) All(o: T(A)) Bool
+
+    (* Test if an option value is absent *)
+    isNone: All(A::TYPE) All(o: T(A)) Bool
+
+    (* Extract the payload from an option, or raise error if none *)
+    unwrap: All(A::TYPE) All(o: T(A)) A
+
+    (* Extract the payload from an option, or return default if none *)
+    unwrapOr: All(A::TYPE) All(o: T(A) default: A) A
+
+    (* Construct a some option value *)
+    some: All(A::TYPE) All(val: A) T(A)
+
+    (* Construct a none option value *)
+    none: All(A::TYPE) T(A)
+end;
+```
+
+---
+
+## 3. `util/stringBuilder : util/StringBuilder`
+
+High-performance chunked string accumulator providing $O(N)$ string construction without quadratic reallocation.
+
+### Interface Summary
+
+```quest
+interface StringBuilder
+    import word: Word
+export
+    (* Opaque growable string builder type *)
+    T::TYPE
+
+    (* Create a new empty string builder *)
+    new(): T
+
+    (* Create a new string builder with preallocated chunk capacity *)
+    newWithCapacity(capacity: Int): T
+
+    (* Append a string to the builder *)
+    append(b: T s: String): Ok
+
+    (* Append a single character to the builder *)
+    appendChar(b: T c: Char): Ok
+
+    (* Append an integer formatted in decimal to the builder *)
+    appendInt(b: T n: Int): Ok
+
+    (* Append a real number formatted as string to the builder *)
+    appendReal(b: T r: Real): Ok
+
+    (* Append a boolean ("true" or "false") to the builder *)
+    appendBool(b: T val: Bool): Ok
+
+    (* Append an unsigned 64-bit word formatted in decimal to the builder *)
+    appendWord(b: T w: word.T): Ok
+
+    (* Return the total accumulated character length of the builder *)
+    length(b: T): Int
+
+    (* Reset the builder to empty *)
+    clear(b: T): Ok
+
+    (* Materialize accumulated chunks into a single string in O(N) time *)
+    toString(b: T): String
+end;
+```
+
+---
+
+## 4. `util/strutil : util/Strutil`
+
+Comprehensive string utilities: text splitting, joining, pattern search, whitespace trimming, C escaping,
+and numerical string parsing.
+
+### Interface Summary
+
+```quest
+interface Strutil
+import
+    util/maybe : util/Maybe
+    collections/vector : collections/Vector
+    word: Word
+export
+    error: Exception
+
+    (* Splitting & Joining *)
+    split(s: String delim: String): vector.T(String)
+    splitlines(s: String): vector.T(String)
+    join(delim: String items: vector.T(String)): String
+    joinArray(delim: String items: Array(String)): String
+
+    (* Searching & Predicates *)
+    startsWith(s: String prefix: String): Bool
+    endsWith(s: String suffix: String): Bool
+    find(s: String sub: String): Int
+    findFrom(s: String sub: String start: Int): Int
+    rfind(s: String sub: String): Int
+    contains(s: String sub: String): Bool
+    strip(s: String): String
+    stripLeading(s: String): String
+    stripTrailing(s: String): String
+
+    (* Replacement & Escaping *)
+    replace(s: String oldSub: String newSub: String): String
+    escapeC(s: String): String
+    unescapeC(s: String): String
+
+    (* Character Classification *)
+    isDigit(c: Char): Bool
+    isAlpha(c: Char): Bool
+    isAlnum(c: Char): Bool
+    isSpace(c: Char): Bool
+
+    (* Parsing *)
+    toInt(s: String): Int
+    tryToInt(s: String): maybe.T(Int)
+    toIntBase(s: String base: Int): Int
+    tryToIntBase(s: String base: Int): maybe.T(Int)
+    toWord(s: String): word.T
+    tryToWord(s: String): maybe.T(word.T)
+    toWordBase(s: String base: Int): word.T
+    tryToWordBase(s: String base: Int): maybe.T(word.T)
+    formatWord(w: word.T base: Int): String
+    wordToString(w: word.T): String
+    toReal(s: String): Real
+    tryToReal(s: String): maybe.T(Real)
+    toBool(s: String): Bool
+    tryToBool(s: String): maybe.T(Bool)
+end;
+```
+
+---
+
+## 5. Module Dependency Tracking (`.deps/` and `--emit-deps`)
+
+Quest supports recording and resolving module dependencies using make-compatible `.d` dependency files:
+
+### Emitting Dependency Files
+
+When compiling modules with `--emit-deps`:
+```bash
+quest --emit-deps -c lib/util/strutil.mod.quest
+```
+The compiler creates a `.deps/` subdirectory in the module's target output directory and writes `<stem>.d`:
+```make
+util/strutil.o: util/maybe.o util/stringbuilder.o collections/vector.o word.o
+```
+Each entry lists the target `.o` file and its immediate prerequisite module `.o` files.
+
+### Transitive Linker Resolution
+
+When the compiler driver links a binary:
+1. It discovers the directly imported modules from the compilation unit.
+2. For each `.o` file, it looks for `.deps/<stem>.d` (or `<stem>.d` alongside the object).
+3. It recursively parses prerequisite `.o` files to form the transitive closure of all required objects.
+4. All prerequisite object files are supplied to clang during final binary linking.

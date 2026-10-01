@@ -141,6 +141,12 @@ def run_driver(args: list[str]) -> int:
         action="store_true",
         help="Force whole-program compilation (inline all modules from source).",
     )
+    arg_parser.add_argument(
+        "--emit-deps", "--emit_deps",
+        dest="emit_deps",
+        action="store_true",
+        help="Emit Makefile dependency files (.d) in .deps/ directories for compiled modules.",
+    )
 
     parsed_args = arg_parser.parse_args(driver_args)
 
@@ -191,7 +197,12 @@ def run_driver(args: list[str]) -> int:
             try:
                 include_paths = [Path(p) for p in parsed_args.include_paths]
                 output_dir = Path(parsed_args.output).parent if parsed_args.output else None
-                compile_module_file(file_path, output_dir=output_dir, include_paths=include_paths)
+                compile_module_file(
+                    file_path,
+                    output_dir=output_dir,
+                    include_paths=include_paths,
+                    emit_deps=parsed_args.emit_deps,
+                )
                 return 0
             except Exception as err:
                 sys.stderr.write(f"quest: error: {err}\n")
@@ -238,6 +249,7 @@ def run_driver(args: list[str]) -> int:
         extra_objects=extra_objects,
         build_dir=Path(parsed_args.build_dir) if parsed_args.build_dir else None,
         whole_program=parsed_args.whole_program,
+        emit_deps=parsed_args.emit_deps,
     )
 
     sys.argv = [file_name] + target_args
@@ -414,6 +426,12 @@ def run_compile(args: list[str]) -> int:
         action="store_true",
         help="Force whole-program compilation (inline all modules from source).",
     )
+    arg_parser.add_argument(
+        "--emit-deps", "--emit_deps",
+        dest="emit_deps",
+        action="store_true",
+        help="Emit Makefile dependency files (.d) in .deps/ directories for compiled modules.",
+    )
 
     parsed_args = arg_parser.parse_args(args)
 
@@ -467,7 +485,12 @@ def run_compile(args: list[str]) -> int:
             try:
                 include_paths = [Path(p) for p in parsed_args.include_paths]
                 output_dir = Path(parsed_args.output).parent if parsed_args.output else None
-                compile_module_file(file_path, output_dir=output_dir, include_paths=include_paths)
+                compile_module_file(
+                    file_path,
+                    output_dir=output_dir,
+                    include_paths=include_paths,
+                    emit_deps=parsed_args.emit_deps,
+                )
                 return 0
             except Exception as err:
                 sys.stderr.write(f"quest compile: error: {err}\n")

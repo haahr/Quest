@@ -24,6 +24,14 @@ htmlcov/
 *.dylib
 *.out
 *.qi
+*.d
+.deps/
+lib/**/*.c
+lib/**/*.h
+!runtime/quest_runtime.c
+!runtime/quest_runtime.h
+!runtime/quest_serialization.c
+!runtime/quest_serialization.h
 !tests/golden/**/*.out
 !tests/golden/**/*.error
 build/

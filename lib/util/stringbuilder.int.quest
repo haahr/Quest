@@ -1,0 +1,43 @@
+interface StringBuilder
+    import word: Word
+export
+    (* =========================================================================
+     * Fast String Building (StringBuilder)
+     * ========================================================================= *)
+
+    (* Opaque growable string builder type *)
+    T::TYPE
+
+    (* Create a new empty string builder *)
+    new(): T
+
+    (* Create a new string builder with preallocated chunk capacity *)
+    newWithCapacity(capacity: Int): T
+
+    (* Append a string to the builder *)
+    append(b: T s: String): Ok
+
+    (* Append a single character to the builder *)
+    appendChar(b: T c: Char): Ok
+
+    (* Append an integer formatted in decimal to the builder *)
+    appendInt(b: T n: Int): Ok
+
+    (* Append a real number formatted as string to the builder *)
+    appendReal(b: T r: Real): Ok
+
+    (* Append a boolean ("true" or "false") to the builder *)
+    appendBool(b: T val: Bool): Ok
+
+    (* Append an unsigned 64-bit word formatted in decimal to the builder *)
+    appendWord(b: T w: word.T): Ok
+
+    (* Return the total accumulated character length of the builder *)
+    length(b: T): Int
+
+    (* Reset the builder to empty *)
+    clear(b: T): Ok
+
+    (* Materialize the accumulated chunks into a single string in O(N) time *)
+    toString(b: T): String
+end;

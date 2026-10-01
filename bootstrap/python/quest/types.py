@@ -1037,6 +1037,12 @@ def is_subtype(
     # 2. Reflexivity & identical instances
     if sub_lazy == sup_lazy:
         return True
+    if (
+        isinstance(sub_lazy, (QTypeVar, QAbstractType))
+        and isinstance(sup_lazy, (QTypeVar, QAbstractType))
+        and sub_lazy.symbol_id == sup_lazy.symbol_id
+    ):
+        return True
 
     # 2b. Bottom type: subtype of all types
     if isinstance(sub_lazy, QBottomType):
@@ -1223,7 +1229,7 @@ def is_subtype(
             QTypeApp(constructor=s_c, arguments=s_args),
             QTypeApp(constructor=t_c, arguments=t_args),
         ):
-            if len(s_args) != len(t_args) or s_c != t_c:
+            if len(s_args) != len(t_args) or not is_type_equal(s_c, t_c, env):
                 return False
             return all(
                 is_subtype(sa, ta, env, trail) and is_subtype(ta, sa, env, trail)

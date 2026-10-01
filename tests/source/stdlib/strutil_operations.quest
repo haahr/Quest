@@ -1,0 +1,208 @@
+(* Standard library: Pure Quest String Utilities module operations *)
+
+import util/strutil : util/Strutil;
+import util/maybe : util/Maybe;
+import collections/vector : collections/Vector;
+import word: Word;
+import writer: Writer;
+import conv: Conv;
+
+let wOut = writer.output;
+
+let printInt(n: Int): Ok =
+    begin
+        writer.putString(wOut conv.int(n));
+        writer.putString(wOut " ");
+    end;
+
+let printBool(b: Bool): Ok =
+    begin
+        writer.putString(wOut conv.bool(b));
+        writer.putString(wOut " ");
+    end;
+
+let printString(s: String): Ok =
+    begin
+        writer.putString(wOut s);
+        writer.putString(wOut " ");
+    end;
+
+let printNewline(dummy: Int): Ok =
+    writer.putString(wOut "\n");
+
+(* 1. Split, Splitlines, Join, JoinArray *)
+let sp = strutil.split("apple,banana,cherry" ",");
+printInt(vector.length(:String sp));
+printString(vector.get(:String sp 0));
+printString(vector.get(:String sp 1));
+printString(vector.get(:String sp 2));
+printNewline(0);
+
+let spChars = strutil.split("abc" "");
+printInt(vector.length(:String spChars));
+printString(vector.get(:String spChars 0));
+printString(vector.get(:String spChars 1));
+printString(vector.get(:String spChars 2));
+printNewline(0);
+
+let spEmpty = strutil.split("" ",");
+printInt(vector.length(:String spEmpty));
+printString(vector.get(:String spEmpty 0));
+printNewline(0);
+
+let lines = strutil.splitlines("line1\nline2\r\nline3\rline4\n");
+printInt(vector.length(:String lines));
+printString(vector.get(:String lines 0));
+printString(vector.get(:String lines 1));
+printString(vector.get(:String lines 2));
+printString(vector.get(:String lines 3));
+printNewline(0);
+
+let linesEmpty = strutil.splitlines("");
+printInt(vector.length(:String linesEmpty));
+printNewline(0);
+
+printString(strutil.join(" - " sp));
+printNewline(0);
+
+let arr = array of "one" "two" "three" end;
+printString(strutil.joinArray("/" arr));
+printNewline(0);
+
+(* 3. Search & Inspection *)
+printBool(strutil.startsWith("hello world" "hello"));
+printBool(strutil.startsWith("hello world" "world"));
+printNewline(0);
+
+printBool(strutil.endsWith("hello world" "world"));
+printBool(strutil.endsWith("hello world" "hello"));
+printNewline(0);
+
+printInt(strutil.find("banana" "an"));
+printInt(strutil.findFrom("banana" "an" 2));
+printInt(strutil.findFrom("banana" "an" 4));
+printInt(strutil.rfind("banana" "an"));
+printBool(strutil.contains("banana" "nan"));
+printBool(strutil.contains("banana" "xyz"));
+printNewline(0);
+
+(* 4. Stripping *)
+printString(strutil.strip("  \t\n hello world \r\n "));
+printString(strutil.stripLeading("   left   "));
+printString(strutil.stripTrailing("   right   "));
+printNewline(0);
+
+(* 5. Replace, escapeC, unescapeC *)
+printString(strutil.replace("a-b-c" "-" ":"));
+printString(strutil.escapeC("hello\n\"world\"\t\\"));
+printString(strutil.unescapeC("hello\\n\\\"world\\\"\\t\\\\"));
+printNewline(0);
+
+(* 6. Character Classification *)
+printBool(strutil.isDigit('5'));
+printBool(strutil.isDigit('a'));
+printBool(strutil.isAlpha('x'));
+printBool(strutil.isAlpha('9'));
+printBool(strutil.isAlnum('Z'));
+printBool(strutil.isAlnum('3'));
+printBool(strutil.isAlnum('!'));
+printBool(strutil.isSpace(' '));
+printBool(strutil.isSpace('\t'));
+printBool(strutil.isSpace('a'));
+printNewline(0);
+
+(* 7. Word formatting & parsing *)
+let w42 = word.fromInt(42);
+printString(strutil.formatWord(w42 10));
+printString(strutil.formatWord(w42 16));
+printString(strutil.formatWord(w42 2));
+printString(strutil.wordToString(w42));
+let parsedW = strutil.toWord("42");
+printBool(parsedW is w42);
+let parsedHexW = strutil.toWordBase("2a" 16);
+printBool(parsedHexW is w42);
+printNewline(0);
+
+(* 8. Parsing & Option Handling *)
+printInt(strutil.toInt("12345"));
+printInt(strutil.toInt("~678"));
+printInt(strutil.toInt("-678"));
+printInt(strutil.toInt("+99"));
+printInt(strutil.toIntBase("ff" 16));
+printInt(strutil.toIntBase("1010" 2));
+printNewline(0);
+
+let maybeInt1 = strutil.tryToInt("456");
+let maybeInt2 = strutil.tryToInt("not_an_int");
+printBool(maybe.isSome(maybeInt1));
+printInt(maybe.unwrap(maybeInt1));
+printBool(maybe.isNone(maybeInt2));
+printInt(maybe.unwrapOr(maybeInt2 9999));
+printNewline(0);
+
+let maybeW1 = strutil.tryToWord("100");
+let maybeW2 = strutil.tryToWord("bad_word");
+printBool(maybe.isSome(maybeW1));
+printBool(maybe.isNone(:word.T maybeW2));
+printNewline(0);
+
+let maybeR1 = strutil.tryToReal("3.14");
+let maybeR2 = strutil.tryToReal("-2.5e2");
+let maybeR3 = strutil.tryToReal("invalid_real");
+printBool(maybe.isSome(maybeR1));
+printBool(maybe.isSome(:Real maybeR2));
+printBool(maybe.isNone(maybeR3));
+printNewline(0);
+
+printBool(strutil.toBool("true"));
+printBool(strutil.toBool("false"));
+let maybeB1 = strutil.tryToBool("true");
+let maybeB2 = strutil.tryToBool("false");
+let maybeB3 = strutil.tryToBool("maybe");
+printBool(maybe.isSome(:Bool maybeB1));
+printBool(maybe.unwrap(maybeB1));
+printBool(maybe.isSome(maybeB2));
+printBool(maybe.unwrap(:Bool maybeB2));
+printBool(maybe.isNone(:Bool maybeB3));
+printNewline(0);
+
+(* 9. Error handling with exceptions *)
+try
+    begin
+        let bad = strutil.toInt("invalid");
+        printInt(bad)
+    end
+when strutil.error then
+    printString("caught_int_error")
+end;
+printNewline(0);
+
+try
+    begin
+        let badW = strutil.toWord("not_a_word");
+        printString("should_not_reach")
+    end
+when strutil.error then
+    printString("caught_word_error")
+end;
+printNewline(0);
+
+try
+    begin
+        let badR = strutil.toReal("not_a_real");
+        printString("should_not_reach")
+    end
+when strutil.error then
+    printString("caught_real_error")
+end;
+printNewline(0);
+
+try
+    begin
+        let badB = strutil.toBool("not_a_bool");
+        printString("should_not_reach")
+    end
+when strutil.error then
+    printString("caught_bool_error")
+end;
+printNewline(0);

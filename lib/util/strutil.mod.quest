@@ -1,0 +1,647 @@
+(* Standard Library: Pure Quest String Utilities module *)
+
+module strutil : Strutil
+import
+    util/maybe : util/Maybe
+    util/stringBuilder : util/StringBuilder
+    collections/vector : collections/Vector
+    stringOp = string : StringOp
+    ascii: Ascii
+    conv: Conv
+    real: RealOp
+    word: Word
+export
+    (* Exception raised on string parsing or invalid argument errors *)
+    let error: Exception = exception error: Ok end;
+
+    let formatWord(w: word.T base: Int): String =
+        begin
+            let zero = word.fromInt(0);
+            if w is zero then
+                "0"
+            else
+                let wBase = word.fromInt(base);
+                let digits = vector.new(:Char);
+                let var cur = w;
+                while cur isnot zero do
+                    let rem = word.toInt(word.mod(cur wBase));
+                    let ch =
+                        if rem < 10 then
+                            ascii.char(48 + rem)
+                        else
+                            ascii.char(87 + rem)
+                        end;
+                    vector.append(:Char digits ch);
+                    cur := word.div(cur wBase);
+                end;
+                let n = vector.length(:Char digits);
+                let res = stringOp.new(n ' ');
+                for i = 0 upto {n - 1} do
+                    stringOp.setChar(res i vector.get(:Char digits {{n - 1} - i}));
+                end;
+                res
+            end
+        end;
+
+    let wordToString(w: word.T): String =
+        formatWord(w 10);
+
+    (* =========================================================================
+     * Character Classification
+     * ========================================================================= *)
+
+    let isDigit(c: Char): Bool =
+        begin
+            let v = ascii.val(c);
+            {v >= 48} /\ {v <= 57}
+        end;
+
+    let isAlpha(c: Char): Bool =
+        begin
+            let v = ascii.val(c);
+            {{v >= 65} /\ {v <= 90}} \/ {{v >= 97} /\ {v <= 122}}
+        end;
+
+    let isAlnum(c: Char): Bool =
+        isAlpha(c) \/ isDigit(c);
+
+    let isSpace(c: Char): Bool =
+        begin
+            let v = ascii.val(c);
+            {v == 32} \/ {v == 9} \/ {v == 10} \/ {v == 13}
+        end;
+
+    (* =========================================================================
+     * Searching & Substring Predicates
+     * ========================================================================= *)
+
+    let startsWith(s: String prefix: String): Bool =
+        begin
+            let sLen = stringOp.length(s);
+            let pLen = stringOp.length(prefix);
+            if pLen > sLen then
+                false
+            else
+                if pLen == 0 then
+                    true
+                else
+                    stringOp.equalSub(s 0 pLen prefix 0 pLen)
+                end
+            end
+        end;
+
+    let endsWith(s: String suffix: String): Bool =
+        begin
+            let sLen = stringOp.length(s);
+            let sufLen = stringOp.length(suffix);
+            if sufLen > sLen then
+                false
+            else
+                if sufLen == 0 then
+                    true
+                else
+                    stringOp.equalSub(s {sLen - sufLen} sufLen suffix 0 sufLen)
+                end
+            end
+        end;
+
+    let findFrom(s: String sub: String start: Int): Int =
+        begin
+            let sLen = stringOp.length(s);
+            let subLen = stringOp.length(sub);
+            if subLen == 0 then
+                if start <= sLen then
+                    if start < 0 then 0 else start end
+                else
+                    ~1
+                end
+            else
+                let var cur = if start < 0 then 0 else start end;
+                let maxPos = sLen - subLen;
+                let var found = ~1;
+                while {cur <= maxPos} /\ {found == ~1} do
+                    if stringOp.equalSub(s cur subLen sub 0 subLen) then
+                        found := cur;
+                    else
+                        cur := cur + 1;
+                    end;
+                end;
+                found
+            end
+        end;
+
+    let find(s: String sub: String): Int =
+        findFrom(s sub 0);
+
+    let rfind(s: String sub: String): Int =
+        begin
+            let sLen = stringOp.length(s);
+            let subLen = stringOp.length(sub);
+            if subLen == 0 then
+                sLen
+            else
+                let var cur = sLen - subLen;
+                let var found = ~1;
+                while {cur >= 0} /\ {found == ~1} do
+                    if stringOp.equalSub(s cur subLen sub 0 subLen) then
+                        found := cur;
+                    else
+                        cur := cur - 1;
+                    end;
+                end;
+                found
+            end
+        end;
+
+    let contains(s: String sub: String): Bool =
+        find(s sub) >= 0;
+
+    let stripLeading(s: String): String =
+        begin
+            let sLen = stringOp.length(s);
+            let var i = 0;
+            while {i < sLen} andif isSpace(stringOp.getChar(s i)) do
+                i := i + 1;
+            end;
+            if i >= sLen then
+                ""
+            else
+                if i == 0 then
+                    s
+                else
+                    stringOp.getSub(s i {sLen - i})
+                end
+            end
+        end;
+
+    let stripTrailing(s: String): String =
+        begin
+            let sLen = stringOp.length(s);
+            let var i = sLen - 1;
+            while {i >= 0} andif isSpace(stringOp.getChar(s i)) do
+                i := i - 1;
+            end;
+            if i < 0 then
+                ""
+            else
+                if i == {sLen - 1} then
+                    s
+                else
+                    stringOp.getSub(s 0 {i + 1})
+                end
+            end
+        end;
+
+    let strip(s: String): String =
+        begin
+            let sLen = stringOp.length(s);
+            let var start = 0;
+            while {start < sLen} andif isSpace(stringOp.getChar(s start)) do
+                start := start + 1;
+            end;
+            if start >= sLen then
+                ""
+            else
+                let var finish = sLen - 1;
+                while {finish >= start} andif isSpace(stringOp.getChar(s finish)) do
+                    finish := finish - 1;
+                end;
+                if finish < start then
+                    ""
+                else
+                    stringOp.getSub(s start {{finish - start} + 1})
+                end
+            end
+        end;
+
+    (* =========================================================================
+     * Splitting & Joining
+     * ========================================================================= *)
+
+    let split(s: String delim: String): vector.T(String) =
+        begin
+            let res = vector.new(:String);
+            let sLen = stringOp.length(s);
+            let dLen = stringOp.length(delim);
+            if dLen == 0 then
+                if sLen == 0 then
+                    res
+                else
+                    for i = 0 upto {sLen - 1} do
+                        vector.append(:String res stringOp.new(1 stringOp.getChar(s i)));
+                    end;
+                    res
+                end
+            else
+                if sLen == 0 then
+                    vector.append(:String res "");
+                    res
+                else
+                    let var start = 0;
+                    let var matchPos = findFrom(s delim start);
+                    while matchPos >= 0 do
+                        vector.append(:String res stringOp.getSub(s start {matchPos - start}));
+                        start := matchPos + dLen;
+                        matchPos := findFrom(s delim start);
+                    end;
+                    vector.append(:String res stringOp.getSub(s start {sLen - start}));
+                    res
+                end
+            end
+        end;
+
+    let splitlines(s: String): vector.T(String) =
+        begin
+            let res = vector.new(:String);
+            let sLen = stringOp.length(s);
+            if sLen == 0 then
+                res
+            else
+                let var start = 0;
+                let var i = 0;
+                while i < sLen do
+                    let c = stringOp.getChar(s i);
+                    if c == '\n' then
+                        vector.append(:String res stringOp.getSub(s start {i - start}));
+                        i := i + 1;
+                        start := i;
+                    else if c == '\r' then
+                        vector.append(:String res stringOp.getSub(s start {i - start}));
+                        if {{i + 1} < sLen} andif {stringOp.getChar(s {i + 1}) == '\n'} then
+                            i := i + 2;
+                        else
+                            i := i + 1;
+                        end;
+                        start := i;
+                    else
+                        i := i + 1;
+                    end end;
+                end;
+                if start < sLen then
+                    vector.append(:String res stringOp.getSub(s start {sLen - start}));
+                end;
+                res
+            end
+        end;
+
+    let join(delim: String items: vector.T(String)): String =
+        begin
+            let count = vector.length(:String items);
+            if count == 0 then
+                ""
+            else if count == 1 then
+                vector.get(:String items 0)
+            else
+                let b = stringBuilder.new();
+                stringBuilder.append(b vector.get(:String items 0));
+                for i = 1 upto {count - 1} do
+                    if stringOp.length(delim) > 0 then
+                        stringBuilder.append(b delim);
+                    end;
+                    stringBuilder.append(b vector.get(:String items i));
+                end;
+                stringBuilder.toString(b)
+            end end
+        end;
+
+    let joinArray(delim: String items: Array(String)): String =
+        begin
+            let count = extent items;
+            if count == 0 then
+                ""
+            else if count == 1 then
+                items[0]
+            else
+                let b = stringBuilder.new();
+                stringBuilder.append(b items[0]);
+                for i = 1 upto {count - 1} do
+                    if stringOp.length(delim) > 0 then
+                        stringBuilder.append(b delim);
+                    end;
+                    stringBuilder.append(b items[i]);
+                end;
+                stringBuilder.toString(b)
+            end end
+        end;
+
+    (* =========================================================================
+     * Replacement & Literal Escaping
+     * ========================================================================= *)
+
+    let replace(s: String oldSub: String newSub: String): String =
+        begin
+            let oldLen = stringOp.length(oldSub);
+            if oldLen == 0 then
+                s
+            else
+                let sLen = stringOp.length(s);
+                let firstMatch = findFrom(s oldSub 0);
+                if firstMatch == ~1 then
+                    s
+                else
+                    let b = stringBuilder.new();
+                    let var start = 0;
+                    let var matchPos = firstMatch;
+                    while matchPos >= 0 do
+                        if matchPos > start then
+                            stringBuilder.append(b stringOp.getSub(s start {matchPos - start}));
+                        end;
+                        stringBuilder.append(b newSub);
+                        start := matchPos + oldLen;
+                        matchPos := findFrom(s oldSub start);
+                    end;
+                    if start < sLen then
+                        stringBuilder.append(b stringOp.getSub(s start {sLen - start}));
+                    end;
+                    stringBuilder.toString(b)
+                end
+            end
+        end;
+
+    let escapeC(s: String): String =
+        begin
+            let sLen = stringOp.length(s);
+            let b = stringBuilder.new();
+            for i = 0 upto {sLen - 1} do
+                let c = stringOp.getChar(s i);
+                if c == '\\' then
+                    stringBuilder.append(b "\\\\");
+                else if c == '"' then
+                    stringBuilder.append(b "\\\"");
+                else if c == '\n' then
+                    stringBuilder.append(b "\\n");
+                else if c == '\t' then
+                    stringBuilder.append(b "\\t");
+                else if c == '\r' then
+                    stringBuilder.append(b "\\r");
+                else if c == '\0' then
+                    stringBuilder.append(b "\\0");
+                else
+                    stringBuilder.appendChar(b c);
+                end end end end end end;
+            end;
+            stringBuilder.toString(b)
+        end;
+
+    let unescapeC(s: String): String =
+        begin
+            let sLen = stringOp.length(s);
+            let b = stringBuilder.new();
+            let var i = 0;
+            while i < sLen do
+                let c = stringOp.getChar(s i);
+                if {c == '\\'} andif {{i + 1} < sLen} then
+                    let next = stringOp.getChar(s {i + 1});
+                    if next == 'n' then
+                        stringBuilder.appendChar(b '\n'); i := i + 2;
+                    else if next == 't' then
+                        stringBuilder.appendChar(b '\t'); i := i + 2;
+                    else if next == 'r' then
+                        stringBuilder.appendChar(b '\r'); i := i + 2;
+                    else if next == '0' then
+                        stringBuilder.appendChar(b '\0'); i := i + 2;
+                    else if next == '\\' then
+                        stringBuilder.appendChar(b '\\'); i := i + 2;
+                    else if next == '"' then
+                        stringBuilder.appendChar(b '"'); i := i + 2;
+                    else if next == '\'' then
+                        stringBuilder.appendChar(b '\''); i := i + 2;
+                    else
+                        stringBuilder.appendChar(b next); i := i + 2;
+                    end end end end end end end;
+                else
+                    stringBuilder.appendChar(b c);
+                    i := i + 1;
+                end;
+            end;
+            stringBuilder.toString(b)
+        end;
+
+    (* =========================================================================
+     * String Parsing (Inverse of Conv)
+     * ========================================================================= *)
+
+    let tryToIntBase(s: String base: Int): maybe.T(Int) =
+        begin
+            let sLen = stringOp.length(s);
+            if {base < 2} \/ {base > 36} \/ {sLen == 0} then
+                maybe.none(:Int)
+            else
+                let var i = 0;
+                let var negative = false;
+                let firstChar = stringOp.getChar(s 0);
+                if {firstChar == '-'} \/ {firstChar == '~'} then
+                    negative := true; i := 1;
+                else if firstChar == '+' then
+                    i := 1;
+                end end;
+                if i >= sLen then
+                    maybe.none(:Int)
+                else
+                    let var acc = 0;
+                    let var valid = true;
+                    while {i < sLen} /\ valid do
+                        let c = stringOp.getChar(s i);
+                        let v = ascii.val(c);
+                        let var d = ~1;
+                        if {v >= 48} /\ {v <= 57} then
+                            d := v - 48;
+                        else if {v >= 65} /\ {v <= 90} then
+                            d := v - 55;
+                        else if {v >= 97} /\ {v <= 122} then
+                            d := v - 87;
+                        end end end;
+                        if {d < 0} \/ {d >= base} then
+                            valid := false;
+                        else
+                            acc := {acc * base} + d;
+                            i := i + 1;
+                        end;
+                    end;
+                    if valid then
+                        maybe.some(:Int if negative then 0 - acc else acc end)
+                    else
+                        maybe.none(:Int)
+                    end
+                end
+            end
+        end;
+
+    let toIntBase(s: String base: Int): Int = begin 
+        let res = tryToIntBase(s base);
+        if maybe.isSome(:Int res) then
+            maybe.unwrap(:Int res)
+        else
+            raise error end
+        end end;
+
+    let tryToInt(s: String): maybe.T(Int) =
+        tryToIntBase(s 10);
+
+    let toInt(s: String): Int =
+        toIntBase(s 10);
+
+    let tryToWordBase(s: String base: Int): maybe.T(word.T) =
+        begin
+            let sLen = stringOp.length(s);
+            if {base < 2} \/ {base > 36} \/ {sLen == 0} then
+                maybe.none(:word.T)
+            else
+                let var i = 0;
+                let firstChar = stringOp.getChar(s 0);
+                if firstChar == '+' then
+                    i := 1;
+                end;
+                if i >= sLen then
+                    maybe.none(:word.T)
+                else
+                    let wBase = word.fromInt(base);
+                    let var acc = word.fromInt(0);
+                    let var valid = true;
+                    while {i < sLen} /\ valid do
+                        let c = stringOp.getChar(s i);
+                        let v = ascii.val(c);
+                        let var d = ~1;
+                        if {v >= 48} /\ {v <= 57} then
+                            d := v - 48;
+                        else if {v >= 65} /\ {v <= 90} then
+                            d := v - 55;
+                        else if {v >= 97} /\ {v <= 122} then
+                            d := v - 87;
+                        end end end;
+                        if {d < 0} \/ {d >= base} then
+                            valid := false;
+                        else
+                            acc := word.add(word.mul(acc wBase) word.fromInt(d));
+                            i := i + 1;
+                        end;
+                    end;
+                    if valid then
+                        maybe.some(:word.T acc)
+                    else
+                        maybe.none(:word.T)
+                    end
+                end
+            end
+        end;
+
+    let toWordBase(s: String base: Int): word.T = begin 
+        let res = tryToWordBase(s base);
+        if maybe.isSome(:word.T res) then
+            maybe.unwrap(:word.T res)
+        else
+            raise error end
+        end end;
+
+    let tryToWord(s: String): maybe.T(word.T) =
+        tryToWordBase(s 10);
+
+    let toWord(s: String): word.T =
+        toWordBase(s 10);
+
+    let tryToReal(s: String): maybe.T(Real) =
+        begin
+            let sLen = stringOp.length(s);
+            if sLen == 0 then
+                maybe.none(:Real)
+            else
+                let var i = 0;
+                let var negative = false;
+                let firstChar = stringOp.getChar(s 0);
+                if {firstChar == '-'} \/ {firstChar == '~'} then
+                    negative := true; i := 1;
+                else if firstChar == '+' then
+                    i := 1;
+                end end;
+                let var intPart = 0.0;
+                let var hasIntDigits = false;
+                while {i < sLen} andif isDigit(stringOp.getChar(s i)) do
+                    let d = ascii.val(stringOp.getChar(s i)) - 48;
+                    intPart := {intPart ** 10.0} ++ real.int(d);
+                    hasIntDigits := true;
+                    i := i + 1;
+                end;
+                let var fracPart = 0.0;
+                let var fracDiv = 1.0;
+                let var hasFracDigits = false;
+                if {i < sLen} andif {stringOp.getChar(s i) == '.'} then
+                    i := i + 1;
+                    while {i < sLen} andif isDigit(stringOp.getChar(s i)) do
+                        let d = ascii.val(stringOp.getChar(s i)) - 48;
+                        fracDiv := fracDiv ** 10.0;
+                        fracPart := fracPart ++ {real.int(d) // fracDiv};
+                        hasFracDigits := true;
+                        i := i + 1;
+                    end;
+                end;
+                if not(hasIntDigits) /\ not(hasFracDigits) then
+                    maybe.none(:Real)
+                else
+                    let var rVal = intPart ++ fracPart;
+                    let var valid = true;
+                    if {i < sLen} andif {{stringOp.getChar(s i) == 'e'} orif {stringOp.getChar(s i) == 'E'}} then
+                        i := i + 1;
+                        let var expNeg = false;
+                        if i < sLen then
+                            let expSign = stringOp.getChar(s i);
+                            if {expSign == '-'} \/ {expSign == '~'} then
+                                expNeg := true; i := i + 1;
+                            else if expSign == '+' then
+                                i := i + 1;
+                            end end;
+                        end;
+                        let var expVal = 0;
+                        let var hasExpDigits = false;
+                        while {i < sLen} andif isDigit(stringOp.getChar(s i)) do
+                            let d = ascii.val(stringOp.getChar(s i)) - 48;
+                            expVal := {expVal * 10} + d;
+                            hasExpDigits := true;
+                            i := i + 1;
+                        end;
+                        if not(hasExpDigits) then
+                            valid := false;
+                        else
+                            for k = 1 upto expVal do
+                                if expNeg then
+                                    rVal := rVal // 10.0;
+                                else
+                                    rVal := rVal ** 10.0;
+                                end;
+                            end;
+                        end;
+                    end;
+                    if valid /\ {i == sLen} then
+                        let finalVal = if negative then 0.0 -- rVal else rVal end;
+                        maybe.some(:Real finalVal)
+                    else
+                        maybe.none(:Real)
+                    end
+                end
+            end
+        end;
+
+    let toReal(s: String): Real = begin 
+        let res = tryToReal(s);
+        if maybe.isSome(:Real res) then
+            maybe.unwrap(:Real res)
+        else
+            raise error end
+        end end;
+
+    let tryToBool(s: String): maybe.T(Bool) =
+        if stringOp.equal(s "true") then
+            maybe.some(:Bool true)
+        else if stringOp.equal(s "false") then
+            maybe.some(:Bool false)
+        else
+            maybe.none(:Bool)
+        end end;
+
+    let toBool(s: String): Bool = begin 
+        let res = tryToBool(s);
+        if maybe.isSome(:Bool res) then
+            maybe.unwrap(:Bool res)
+        else
+            raise error end
+        end end;
+end;

@@ -389,7 +389,7 @@ def _build_curried_value_decl(
         )
         g_ret_type = return_type_node if i == len(param_groups) - 1 else None
 
-        if i == 0 and len(param_groups) == 1 and not type_params:
+        if i == 0 and len(param_groups) == 1 and not type_params and value_params:
             return ast.LetValueBinding(
                 name=ident_token.lexeme,
                 value=current_body,

@@ -1,0 +1,78 @@
+module stringBuilder : StringBuilder
+import
+    collections/vector : collections/Vector
+    stringOp = string : StringOp
+    conv: Conv
+    word: Word
+export
+    Let T = Tuple
+        chunks: vector.T(String)
+        var totalLen: Int
+    end;
+
+    let new(): T =
+        tuple
+            let chunks = vector.new(:String)
+            var totalLen = 0
+        end;
+
+    let newWithCapacity(capacity: Int): T =
+        tuple
+            let chunks = vector.new(:String)
+            var totalLen = 0
+        end;
+
+    let append(b: T s: String): Ok =
+        begin
+            let sLen = stringOp.length(s);
+            if sLen > 0 then
+                vector.append(:String b.chunks s);
+                b.totalLen := b.totalLen + sLen;
+                ok
+            else
+                ok
+            end
+        end;
+
+    let appendChar(b: T c: Char): Ok =
+        begin
+            let s = stringOp.new(1 c);
+            vector.append(:String b.chunks s);
+            b.totalLen := b.totalLen + 1;
+            ok
+        end;
+
+    let appendInt(b: T n: Int): Ok =
+        append(b conv.int(n));
+
+    let appendReal(b: T r: Real): Ok =
+        append(b conv.real(r));
+
+    let appendBool(b: T val: Bool): Ok =
+        append(b conv.bool(val));
+
+    let appendWord(b: T w: word.T): Ok =
+        append(b conv.int(word.toInt(w)));
+
+    let length(b: T): Int =
+        b.totalLen;
+
+    let clear(b: T): Ok =
+        begin
+            vector.clear(:String b.chunks);
+            b.totalLen := 0;
+            ok
+        end;
+
+    let toString(b: T): String =
+        if b.totalLen == 0 then
+            ""
+        else
+            let numChunks = vector.length(:String b.chunks);
+            if numChunks == 1 then
+                vector.get(:String b.chunks 0)
+            else
+                stringOp.conc(vector.toArray(:String b.chunks))
+            end
+        end;
+end;

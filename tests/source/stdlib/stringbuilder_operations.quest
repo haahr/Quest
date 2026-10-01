@@ -1,0 +1,55 @@
+(* Standard library: StringBuilder operations *)
+
+import util/stringBuilder : util/StringBuilder;
+import word: Word;
+import writer: Writer;
+import conv: Conv;
+
+let wOut = writer.output;
+
+let printInt(n: Int): Ok =
+    begin
+        writer.putString(wOut conv.int(n));
+        writer.putString(wOut " ");
+    end;
+
+let printString(s: String): Ok =
+    begin
+        writer.putString(wOut s);
+        writer.putString(wOut " ");
+    end;
+
+let printNewline(dummy: Int): Ok =
+    writer.putString(wOut "\n");
+
+(* 1. Basic new, append, length, toString *)
+let b = stringBuilder.new();
+stringBuilder.append(b "Hello");
+stringBuilder.appendChar(b ' ');
+stringBuilder.append(b "World: ");
+stringBuilder.appendInt(b 42);
+stringBuilder.appendChar(b ' ');
+stringBuilder.appendBool(b true);
+stringBuilder.appendChar(b ' ');
+stringBuilder.appendWord(b word.fromInt(255));
+printInt(stringBuilder.length(b));
+printString(stringBuilder.toString(b));
+printNewline(0);
+
+(* 2. Clear and reuse *)
+stringBuilder.clear(b);
+printInt(stringBuilder.length(b));
+printString(stringBuilder.toString(b));
+printNewline(0);
+
+stringBuilder.append(b "Reused");
+printInt(stringBuilder.length(b));
+printString(stringBuilder.toString(b));
+printNewline(0);
+
+(* 3. newWithCapacity *)
+let b2 = stringBuilder.newWithCapacity(32);
+stringBuilder.append(b2 "Capacity test");
+printInt(stringBuilder.length(b2));
+printString(stringBuilder.toString(b2));
+printNewline(0);

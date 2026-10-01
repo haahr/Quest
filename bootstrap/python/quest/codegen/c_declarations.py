@@ -108,12 +108,17 @@ class CDeclarationEmitter:
     def emit_module_declarations(self, analysis: CProgramAnalysis) -> list[str]:
         lines: list[str] = []
         if analysis.sorted_modules:
+            has_precompiled = any(getattr(m, "is_precompiled", False) for m in analysis.sorted_modules)
             lines.append("/* Forward declarations and state for compiled modules */")
             for mod in analysis.sorted_modules:
                 clean_mod = mangle_module_name(mod.name)
                 if getattr(mod, "is_precompiled", False):
                     lines.append(f"extern QRecordVal qv_{clean_mod};")
                     lines.append(f"extern void qv_mod_{clean_mod}_init(void);")
+                elif has_precompiled:
+                    lines.append(f"QRecordVal qv_{clean_mod};")
+                    lines.append(f"static bool qv_mod_{clean_mod}_initialized = false;")
+                    lines.append(f"void qv_mod_{clean_mod}_init(void);")
                 else:
                     lines.append(f"static QRecordVal qv_{clean_mod};")
                     lines.append(f"static bool qv_mod_{clean_mod}_initialized = false;")

@@ -1,1 +1,1 @@
-let testLoop:Ok = ok
+let testLoop:Fun(): Ok = <fun>

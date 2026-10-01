@@ -104,7 +104,7 @@ def mangle_ident(name: str) -> str:
 
 def mangle_module_name(module_name: str) -> str:
     """Mangles a hierarchical module name into a C-safe identifier using __ for slashes."""
-    return module_name.replace("/", "__").replace(".", "_")
+    return module_name.lower().replace("/", "__").replace(".", "_")
 
 
 def mangle_module_ident(module_name: str, name: str) -> str:

@@ -406,7 +406,11 @@ def elaborate_type(ast_type: ast.Type, env: Environment) -> QType:
                         )
                         quants.append(QQuantifier(name=q.name, symbol_id=symbol_id, bound=bound_kind))
                 body = elaborate_type(res_type, env)
-                fn_body: QType = QFunType(params=tuple(val_params), result_type=body) if val_params else body
+                fn_body: QType = (
+                    QFunType(params=tuple(val_params), result_type=body)
+                    if (val_params or not quants_ast)
+                    else body
+                )
                 if quants:
                     return QAllType(quantifiers=tuple(quants), body=fn_body)
                 return fn_body

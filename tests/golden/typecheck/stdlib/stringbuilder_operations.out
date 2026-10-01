@@ -1,0 +1,292 @@
+(TypedProgram
+  :phrases (
+    (TypedImport
+      :items (
+        (TypedImportItem ('stringBuilder') : 'StringBuilder')
+      ))
+    (TypedImport
+      :items (
+        (TypedImportItem ('word') : 'Word')
+      ))
+    (TypedImport
+      :items (
+        (TypedImportItem ('writer') : 'Writer')
+      ))
+    (TypedImport
+      :items (
+        (TypedImportItem ('conv') : 'Conv')
+      ))
+    (TypedLetValue 'wOut' :type Writer.T
+      :value (TypedSelect 'output' :type Writer.T
+        :target (TypedVar 'writer' :type Record error: Exception output: Writer.T err: Writer.T file: Fun(name: String): Writer.T putString: Fun(writer: Writer.T string: String): Ok putChar: Fun(writer: Writer.T char: Char): Ok putSubString: Fun(writer: Writer.T string: String start: Int size: Int): Ok flush: Fun(writer: Writer.T): Ok close: Fun(writer: Writer.T): Ok end)))
+    (TypedLetValue 'printInt' :type Fun(n: Int): Ok
+      :value (TypedFun :params (('n' : Int)) :type Fun(n: Int): Ok
+        :body (TypedBlock :type Ok
+          :bindings (
+            (TypedExprStmt
+              :expr (TypedApp :type Ok
+                :func (TypedSelect 'putString' :type Fun(writer: Writer.T string: String): Ok
+                  :target (TypedVar 'writer' :type Record error: Exception output: Writer.T err: Writer.T file: Fun(name: String): Writer.T putString: Fun(writer: Writer.T string: String): Ok putChar: Fun(writer: Writer.T char: Char): Ok putSubString: Fun(writer: Writer.T string: String start: Int size: Int): Ok flush: Fun(writer: Writer.T): Ok close: Fun(writer: Writer.T): Ok end))
+                :args (
+                  (TypedVar 'wOut' :type Writer.T)
+                  (TypedApp :type String
+                    :func (TypedSelect 'int' :type Fun(n: Int): String
+                      :target (TypedVar 'conv' :type Record okay: Fun(): String bool: Fun(b: Bool): String int: Fun(n: Int): String real: Fun(r: Real): String char: Fun(c: Char): String string: Fun(s: String): String end))
+                    :args (
+                      (TypedVar 'n' :type Int)
+                    ))
+                )))
+          )
+          :result (TypedApp :type Ok
+            :func (TypedSelect 'putString' :type Fun(writer: Writer.T string: String): Ok
+              :target (TypedVar 'writer' :type Record error: Exception output: Writer.T err: Writer.T file: Fun(name: String): Writer.T putString: Fun(writer: Writer.T string: String): Ok putChar: Fun(writer: Writer.T char: Char): Ok putSubString: Fun(writer: Writer.T string: String start: Int size: Int): Ok flush: Fun(writer: Writer.T): Ok close: Fun(writer: Writer.T): Ok end))
+            :args (
+              (TypedVar 'wOut' :type Writer.T)
+              (TypedString ' ' :type String)
+            )))))
+    (TypedLetValue 'printString' :type Fun(s: String): Ok
+      :value (TypedFun :params (('s' : String)) :type Fun(s: String): Ok
+        :body (TypedBlock :type Ok
+          :bindings (
+            (TypedExprStmt
+              :expr (TypedApp :type Ok
+                :func (TypedSelect 'putString' :type Fun(writer: Writer.T string: String): Ok
+                  :target (TypedVar 'writer' :type Record error: Exception output: Writer.T err: Writer.T file: Fun(name: String): Writer.T putString: Fun(writer: Writer.T string: String): Ok putChar: Fun(writer: Writer.T char: Char): Ok putSubString: Fun(writer: Writer.T string: String start: Int size: Int): Ok flush: Fun(writer: Writer.T): Ok close: Fun(writer: Writer.T): Ok end))
+                :args (
+                  (TypedVar 'wOut' :type Writer.T)
+                  (TypedVar 's' :type String)
+                )))
+          )
+          :result (TypedApp :type Ok
+            :func (TypedSelect 'putString' :type Fun(writer: Writer.T string: String): Ok
+              :target (TypedVar 'writer' :type Record error: Exception output: Writer.T err: Writer.T file: Fun(name: String): Writer.T putString: Fun(writer: Writer.T string: String): Ok putChar: Fun(writer: Writer.T char: Char): Ok putSubString: Fun(writer: Writer.T string: String start: Int size: Int): Ok flush: Fun(writer: Writer.T): Ok close: Fun(writer: Writer.T): Ok end))
+            :args (
+              (TypedVar 'wOut' :type Writer.T)
+              (TypedString ' ' :type String)
+            )))))
+    (TypedLetValue 'printNewline' :type Fun(dummy: Int): Ok
+      :value (TypedFun :params (('dummy' : Int)) :type Fun(dummy: Int): Ok
+        :body (TypedApp :type Ok
+          :func (TypedSelect 'putString' :type Fun(writer: Writer.T string: String): Ok
+            :target (TypedVar 'writer' :type Record error: Exception output: Writer.T err: Writer.T file: Fun(name: String): Writer.T putString: Fun(writer: Writer.T string: String): Ok putChar: Fun(writer: Writer.T char: Char): Ok putSubString: Fun(writer: Writer.T string: String start: Int size: Int): Ok flush: Fun(writer: Writer.T): Ok close: Fun(writer: Writer.T): Ok end))
+          :args (
+            (TypedVar 'wOut' :type Writer.T)
+            (TypedString '\n' :type String)
+          ))))
+    (TypedLetValue 'b' :type T
+      :value (TypedApp :type T
+        :func (TypedSelect 'new' :type Fun(): T
+          :target (TypedVar 'stringBuilder' :type Record new: Fun(): T newWithCapacity: Fun(capacity: Int): T append: Fun(b: T s: String): Ok appendChar: Fun(b: T c: Char): Ok appendInt: Fun(b: T n: Int): Ok appendReal: Fun(b: T r: Real): Ok appendBool: Fun(b: T val: Bool): Ok appendWord: Fun(b: T w: Word.T): Ok length: Fun(b: T): Int clear: Fun(b: T): Ok toString: Fun(b: T): String end))
+        :args ()))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedSelect 'append' :type Fun(b: T s: String): Ok
+          :target (TypedVar 'stringBuilder' :type Record new: Fun(): T newWithCapacity: Fun(capacity: Int): T append: Fun(b: T s: String): Ok appendChar: Fun(b: T c: Char): Ok appendInt: Fun(b: T n: Int): Ok appendReal: Fun(b: T r: Real): Ok appendBool: Fun(b: T val: Bool): Ok appendWord: Fun(b: T w: Word.T): Ok length: Fun(b: T): Int clear: Fun(b: T): Ok toString: Fun(b: T): String end))
+        :args (
+          (TypedVar 'b' :type T)
+          (TypedString 'Hello' :type String)
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedSelect 'appendChar' :type Fun(b: T c: Char): Ok
+          :target (TypedVar 'stringBuilder' :type Record new: Fun(): T newWithCapacity: Fun(capacity: Int): T append: Fun(b: T s: String): Ok appendChar: Fun(b: T c: Char): Ok appendInt: Fun(b: T n: Int): Ok appendReal: Fun(b: T r: Real): Ok appendBool: Fun(b: T val: Bool): Ok appendWord: Fun(b: T w: Word.T): Ok length: Fun(b: T): Int clear: Fun(b: T): Ok toString: Fun(b: T): String end))
+        :args (
+          (TypedVar 'b' :type T)
+          (TypedChar ' ' :type Char)
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedSelect 'append' :type Fun(b: T s: String): Ok
+          :target (TypedVar 'stringBuilder' :type Record new: Fun(): T newWithCapacity: Fun(capacity: Int): T append: Fun(b: T s: String): Ok appendChar: Fun(b: T c: Char): Ok appendInt: Fun(b: T n: Int): Ok appendReal: Fun(b: T r: Real): Ok appendBool: Fun(b: T val: Bool): Ok appendWord: Fun(b: T w: Word.T): Ok length: Fun(b: T): Int clear: Fun(b: T): Ok toString: Fun(b: T): String end))
+        :args (
+          (TypedVar 'b' :type T)
+          (TypedString 'World: ' :type String)
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedSelect 'appendInt' :type Fun(b: T n: Int): Ok
+          :target (TypedVar 'stringBuilder' :type Record new: Fun(): T newWithCapacity: Fun(capacity: Int): T append: Fun(b: T s: String): Ok appendChar: Fun(b: T c: Char): Ok appendInt: Fun(b: T n: Int): Ok appendReal: Fun(b: T r: Real): Ok appendBool: Fun(b: T val: Bool): Ok appendWord: Fun(b: T w: Word.T): Ok length: Fun(b: T): Int clear: Fun(b: T): Ok toString: Fun(b: T): String end))
+        :args (
+          (TypedVar 'b' :type T)
+          (TypedInt 42 :type Int)
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedSelect 'appendChar' :type Fun(b: T c: Char): Ok
+          :target (TypedVar 'stringBuilder' :type Record new: Fun(): T newWithCapacity: Fun(capacity: Int): T append: Fun(b: T s: String): Ok appendChar: Fun(b: T c: Char): Ok appendInt: Fun(b: T n: Int): Ok appendReal: Fun(b: T r: Real): Ok appendBool: Fun(b: T val: Bool): Ok appendWord: Fun(b: T w: Word.T): Ok length: Fun(b: T): Int clear: Fun(b: T): Ok toString: Fun(b: T): String end))
+        :args (
+          (TypedVar 'b' :type T)
+          (TypedChar ' ' :type Char)
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedSelect 'appendBool' :type Fun(b: T val: Bool): Ok
+          :target (TypedVar 'stringBuilder' :type Record new: Fun(): T newWithCapacity: Fun(capacity: Int): T append: Fun(b: T s: String): Ok appendChar: Fun(b: T c: Char): Ok appendInt: Fun(b: T n: Int): Ok appendReal: Fun(b: T r: Real): Ok appendBool: Fun(b: T val: Bool): Ok appendWord: Fun(b: T w: Word.T): Ok length: Fun(b: T): Int clear: Fun(b: T): Ok toString: Fun(b: T): String end))
+        :args (
+          (TypedVar 'b' :type T)
+          (TypedBool true)
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedSelect 'appendChar' :type Fun(b: T c: Char): Ok
+          :target (TypedVar 'stringBuilder' :type Record new: Fun(): T newWithCapacity: Fun(capacity: Int): T append: Fun(b: T s: String): Ok appendChar: Fun(b: T c: Char): Ok appendInt: Fun(b: T n: Int): Ok appendReal: Fun(b: T r: Real): Ok appendBool: Fun(b: T val: Bool): Ok appendWord: Fun(b: T w: Word.T): Ok length: Fun(b: T): Int clear: Fun(b: T): Ok toString: Fun(b: T): String end))
+        :args (
+          (TypedVar 'b' :type T)
+          (TypedChar ' ' :type Char)
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedSelect 'appendWord' :type Fun(b: T w: Word.T): Ok
+          :target (TypedVar 'stringBuilder' :type Record new: Fun(): T newWithCapacity: Fun(capacity: Int): T append: Fun(b: T s: String): Ok appendChar: Fun(b: T c: Char): Ok appendInt: Fun(b: T n: Int): Ok appendReal: Fun(b: T r: Real): Ok appendBool: Fun(b: T val: Bool): Ok appendWord: Fun(b: T w: Word.T): Ok length: Fun(b: T): Int clear: Fun(b: T): Ok toString: Fun(b: T): String end))
+        :args (
+          (TypedVar 'b' :type T)
+          (TypedApp :type Word.T
+            :func (TypedSelect 'fromInt' :type Fun(n: Int): Word.T
+              :target (TypedVar 'word' :type Record bits: Int notBits: Fun(w: Word.T): Word.T andBits: Fun(w1: Word.T w2: Word.T): Word.T orBits: Fun(w1: Word.T w2: Word.T): Word.T xorBits: Fun(w1: Word.T w2: Word.T): Word.T shift: Fun(w: Word.T count: Int): Word.T rotate: Fun(w: Word.T count: Int): Word.T extract: Fun(w: Word.T pos: Int width: Int): Word.T replace: Fun(w: Word.T val: Word.T pos: Int width: Int): Word.T popCount: Fun(w: Word.T): Int countLeadingZeros: Fun(w: Word.T): Int countTrailingZeros: Fun(w: Word.T): Int add: Fun(w1: Word.T w2: Word.T): Word.T sub: Fun(w1: Word.T w2: Word.T): Word.T mul: Fun(w1: Word.T w2: Word.T): Word.T div: Fun(w1: Word.T w2: Word.T): Word.T mod: Fun(w1: Word.T w2: Word.T): Word.T toInt: Fun(w: Word.T): Int fromInt: Fun(n: Int): Word.T lt: Fun(w1: Word.T w2: Word.T): Bool le: Fun(w1: Word.T w2: Word.T): Bool gt: Fun(w1: Word.T w2: Word.T): Bool ge: Fun(w1: Word.T w2: Word.T): Bool toReal: Fun(w: Word.T): Real fromReal: Fun(r: Real): Word.T getBit: Fun(w: Word.T pos: Int): Bool setBit: Fun(w: Word.T pos: Int): Word.T clearBit: Fun(w: Word.T pos: Int): Word.T end))
+            :args (
+              (TypedInt 255 :type Int)
+            ))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printInt' :type Fun(n: Int): Ok)
+        :args (
+          (TypedApp :type Int
+            :func (TypedSelect 'length' :type Fun(b: T): Int
+              :target (TypedVar 'stringBuilder' :type Record new: Fun(): T newWithCapacity: Fun(capacity: Int): T append: Fun(b: T s: String): Ok appendChar: Fun(b: T c: Char): Ok appendInt: Fun(b: T n: Int): Ok appendReal: Fun(b: T r: Real): Ok appendBool: Fun(b: T val: Bool): Ok appendWord: Fun(b: T w: Word.T): Ok length: Fun(b: T): Int clear: Fun(b: T): Ok toString: Fun(b: T): String end))
+            :args (
+              (TypedVar 'b' :type T)
+            ))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printString' :type Fun(s: String): Ok)
+        :args (
+          (TypedApp :type String
+            :func (TypedSelect 'toString' :type Fun(b: T): String
+              :target (TypedVar 'stringBuilder' :type Record new: Fun(): T newWithCapacity: Fun(capacity: Int): T append: Fun(b: T s: String): Ok appendChar: Fun(b: T c: Char): Ok appendInt: Fun(b: T n: Int): Ok appendReal: Fun(b: T r: Real): Ok appendBool: Fun(b: T val: Bool): Ok appendWord: Fun(b: T w: Word.T): Ok length: Fun(b: T): Int clear: Fun(b: T): Ok toString: Fun(b: T): String end))
+            :args (
+              (TypedVar 'b' :type T)
+            ))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printNewline' :type Fun(dummy: Int): Ok)
+        :args (
+          (TypedInt 0 :type Int)
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedSelect 'clear' :type Fun(b: T): Ok
+          :target (TypedVar 'stringBuilder' :type Record new: Fun(): T newWithCapacity: Fun(capacity: Int): T append: Fun(b: T s: String): Ok appendChar: Fun(b: T c: Char): Ok appendInt: Fun(b: T n: Int): Ok appendReal: Fun(b: T r: Real): Ok appendBool: Fun(b: T val: Bool): Ok appendWord: Fun(b: T w: Word.T): Ok length: Fun(b: T): Int clear: Fun(b: T): Ok toString: Fun(b: T): String end))
+        :args (
+          (TypedVar 'b' :type T)
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printInt' :type Fun(n: Int): Ok)
+        :args (
+          (TypedApp :type Int
+            :func (TypedSelect 'length' :type Fun(b: T): Int
+              :target (TypedVar 'stringBuilder' :type Record new: Fun(): T newWithCapacity: Fun(capacity: Int): T append: Fun(b: T s: String): Ok appendChar: Fun(b: T c: Char): Ok appendInt: Fun(b: T n: Int): Ok appendReal: Fun(b: T r: Real): Ok appendBool: Fun(b: T val: Bool): Ok appendWord: Fun(b: T w: Word.T): Ok length: Fun(b: T): Int clear: Fun(b: T): Ok toString: Fun(b: T): String end))
+            :args (
+              (TypedVar 'b' :type T)
+            ))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printString' :type Fun(s: String): Ok)
+        :args (
+          (TypedApp :type String
+            :func (TypedSelect 'toString' :type Fun(b: T): String
+              :target (TypedVar 'stringBuilder' :type Record new: Fun(): T newWithCapacity: Fun(capacity: Int): T append: Fun(b: T s: String): Ok appendChar: Fun(b: T c: Char): Ok appendInt: Fun(b: T n: Int): Ok appendReal: Fun(b: T r: Real): Ok appendBool: Fun(b: T val: Bool): Ok appendWord: Fun(b: T w: Word.T): Ok length: Fun(b: T): Int clear: Fun(b: T): Ok toString: Fun(b: T): String end))
+            :args (
+              (TypedVar 'b' :type T)
+            ))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printNewline' :type Fun(dummy: Int): Ok)
+        :args (
+          (TypedInt 0 :type Int)
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedSelect 'append' :type Fun(b: T s: String): Ok
+          :target (TypedVar 'stringBuilder' :type Record new: Fun(): T newWithCapacity: Fun(capacity: Int): T append: Fun(b: T s: String): Ok appendChar: Fun(b: T c: Char): Ok appendInt: Fun(b: T n: Int): Ok appendReal: Fun(b: T r: Real): Ok appendBool: Fun(b: T val: Bool): Ok appendWord: Fun(b: T w: Word.T): Ok length: Fun(b: T): Int clear: Fun(b: T): Ok toString: Fun(b: T): String end))
+        :args (
+          (TypedVar 'b' :type T)
+          (TypedString 'Reused' :type String)
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printInt' :type Fun(n: Int): Ok)
+        :args (
+          (TypedApp :type Int
+            :func (TypedSelect 'length' :type Fun(b: T): Int
+              :target (TypedVar 'stringBuilder' :type Record new: Fun(): T newWithCapacity: Fun(capacity: Int): T append: Fun(b: T s: String): Ok appendChar: Fun(b: T c: Char): Ok appendInt: Fun(b: T n: Int): Ok appendReal: Fun(b: T r: Real): Ok appendBool: Fun(b: T val: Bool): Ok appendWord: Fun(b: T w: Word.T): Ok length: Fun(b: T): Int clear: Fun(b: T): Ok toString: Fun(b: T): String end))
+            :args (
+              (TypedVar 'b' :type T)
+            ))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printString' :type Fun(s: String): Ok)
+        :args (
+          (TypedApp :type String
+            :func (TypedSelect 'toString' :type Fun(b: T): String
+              :target (TypedVar 'stringBuilder' :type Record new: Fun(): T newWithCapacity: Fun(capacity: Int): T append: Fun(b: T s: String): Ok appendChar: Fun(b: T c: Char): Ok appendInt: Fun(b: T n: Int): Ok appendReal: Fun(b: T r: Real): Ok appendBool: Fun(b: T val: Bool): Ok appendWord: Fun(b: T w: Word.T): Ok length: Fun(b: T): Int clear: Fun(b: T): Ok toString: Fun(b: T): String end))
+            :args (
+              (TypedVar 'b' :type T)
+            ))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printNewline' :type Fun(dummy: Int): Ok)
+        :args (
+          (TypedInt 0 :type Int)
+        )))
+    (TypedLetValue 'b2' :type T
+      :value (TypedApp :type T
+        :func (TypedSelect 'newWithCapacity' :type Fun(capacity: Int): T
+          :target (TypedVar 'stringBuilder' :type Record new: Fun(): T newWithCapacity: Fun(capacity: Int): T append: Fun(b: T s: String): Ok appendChar: Fun(b: T c: Char): Ok appendInt: Fun(b: T n: Int): Ok appendReal: Fun(b: T r: Real): Ok appendBool: Fun(b: T val: Bool): Ok appendWord: Fun(b: T w: Word.T): Ok length: Fun(b: T): Int clear: Fun(b: T): Ok toString: Fun(b: T): String end))
+        :args (
+          (TypedInt 32 :type Int)
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedSelect 'append' :type Fun(b: T s: String): Ok
+          :target (TypedVar 'stringBuilder' :type Record new: Fun(): T newWithCapacity: Fun(capacity: Int): T append: Fun(b: T s: String): Ok appendChar: Fun(b: T c: Char): Ok appendInt: Fun(b: T n: Int): Ok appendReal: Fun(b: T r: Real): Ok appendBool: Fun(b: T val: Bool): Ok appendWord: Fun(b: T w: Word.T): Ok length: Fun(b: T): Int clear: Fun(b: T): Ok toString: Fun(b: T): String end))
+        :args (
+          (TypedVar 'b2' :type T)
+          (TypedString 'Capacity test' :type String)
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printInt' :type Fun(n: Int): Ok)
+        :args (
+          (TypedApp :type Int
+            :func (TypedSelect 'length' :type Fun(b: T): Int
+              :target (TypedVar 'stringBuilder' :type Record new: Fun(): T newWithCapacity: Fun(capacity: Int): T append: Fun(b: T s: String): Ok appendChar: Fun(b: T c: Char): Ok appendInt: Fun(b: T n: Int): Ok appendReal: Fun(b: T r: Real): Ok appendBool: Fun(b: T val: Bool): Ok appendWord: Fun(b: T w: Word.T): Ok length: Fun(b: T): Int clear: Fun(b: T): Ok toString: Fun(b: T): String end))
+            :args (
+              (TypedVar 'b2' :type T)
+            ))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printString' :type Fun(s: String): Ok)
+        :args (
+          (TypedApp :type String
+            :func (TypedSelect 'toString' :type Fun(b: T): String
+              :target (TypedVar 'stringBuilder' :type Record new: Fun(): T newWithCapacity: Fun(capacity: Int): T append: Fun(b: T s: String): Ok appendChar: Fun(b: T c: Char): Ok appendInt: Fun(b: T n: Int): Ok appendReal: Fun(b: T r: Real): Ok appendBool: Fun(b: T val: Bool): Ok appendWord: Fun(b: T w: Word.T): Ok length: Fun(b: T): Int clear: Fun(b: T): Ok toString: Fun(b: T): String end))
+            :args (
+              (TypedVar 'b2' :type T)
+            ))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printNewline' :type Fun(dummy: Int): Ok)
+        :args (
+          (TypedInt 0 :type Int)
+        )))
+  ))

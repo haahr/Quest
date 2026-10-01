@@ -96,6 +96,37 @@ def resolve_interface_file(
     return None
 
 
+def resolve_interface_source_file(
+    name: str,
+    current_dir: Optional[Path],
+    include_paths: list[Path],
+) -> Optional[Path]:
+    """Finds <name.lower()>.int.quest in current_dir, include_paths, or DEFAULT_LIB_DIR."""
+    filename = f"{name.lower()}.int.quest"
+    if current_dir is not None:
+        candidate = current_dir / filename
+        if candidate.is_file():
+            return candidate.resolve()
+
+    for inc in include_paths:
+        candidate = Path(inc) / filename
+        if candidate.is_file():
+            return candidate.resolve()
+
+    env_lib = os.environ.get("QUEST_LIB")
+    if env_lib:
+        candidate = Path(env_lib) / filename
+        if candidate.is_file():
+            return candidate.resolve()
+
+    if DEFAULT_LIB_DIR.is_dir():
+        candidate = DEFAULT_LIB_DIR / filename
+        if candidate.is_file():
+            return candidate.resolve()
+
+    return None
+
+
 def resolve_module_file(
     name: str,
     current_dir: Optional[Path],
@@ -239,6 +270,7 @@ def load_interface(name: str, env: Environment) -> Scope:
                 output_dir=out_root,
                 current_dir=env.current_dir,
                 include_paths=env.include_paths,
+                emit_deps=True,
             )
 
         if qi_file.is_file():
@@ -270,7 +302,15 @@ def load_interface(name: str, env: Environment) -> Scope:
 
     if file_path.suffix == ".qi":
         from quest.interface_compiler import load_interface_from_qi_file
-        return load_interface_from_qi_file(file_path, env)
+        scope = load_interface_from_qi_file(file_path, env)
+        env.register_interface(name, scope)
+        decl_name = name.split("/")[-1]
+        if decl_name != name:
+            env.register_interface(decl_name, scope)
+        canon_name = canonicalize_module_path(file_path, env.include_paths)
+        if canon_name != name:
+            env.register_interface(canon_name, scope)
+        return scope
 
     try:
         source_text = file_path.read_text(encoding="utf-8")
@@ -322,6 +362,98 @@ def load_interface(name: str, env: Environment) -> Scope:
         env.current_dir = saved_dir
 
 
+def parse_dep_file(dep_file: Path) -> list[str]:
+    """Parses a Makefile .d file and returns the list of prerequisite paths."""
+    text = dep_file.read_text(encoding="utf-8")
+    prereqs: list[str] = []
+    in_prereqs = False
+    for line in text.splitlines():
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        if ":" in line and not in_prereqs:
+            _, rhs = line.split(":", 1)
+            in_prereqs = True
+            line = rhs.strip()
+        if in_prereqs:
+            if line.endswith("\\"):
+                line = line[:-1].strip()
+            for part in line.split():
+                if part.endswith(".o") and part not in prereqs:
+                    prereqs.append(part)
+    return prereqs
+
+
+def _load_precompiled_transitive_deps(
+    obj_file: Optional[Path],
+    file_path: Optional[Path],
+    env: Environment,
+    out_root: Optional[Path] = None,
+) -> None:
+    """Discovers and loads transitive module dependencies from a .d file or fallback source."""
+    # 1. Try reading from .deps/<stem>.d (or alongside .o)
+    if obj_file is not None and obj_file.is_file():
+        dep_candidates = [
+            obj_file.parent / ".deps" / f"{obj_file.stem}.d",
+            obj_file.with_suffix(".d"),
+        ]
+        for dep_file in dep_candidates:
+            if dep_file.is_file():
+                try:
+                    prereqs = parse_dep_file(dep_file)
+                    for prereq in prereqs:
+                        dep_obj: Optional[Path] = None
+                        if out_root is not None:
+                            cand = out_root / prereq
+                            if cand.is_file():
+                                dep_obj = cand.resolve()
+                        if dep_obj is None and env.current_dir is not None:
+                            cand = env.current_dir / prereq
+                            if cand.is_file():
+                                dep_obj = cand.resolve()
+                        if dep_obj is None:
+                            for inc in env.include_paths:
+                                cand = Path(inc) / prereq
+                                if cand.is_file():
+                                    dep_obj = cand.resolve()
+                                    break
+                        if dep_obj is None and DEFAULT_LIB_DIR.is_dir():
+                            cand = DEFAULT_LIB_DIR / prereq
+                            if cand.is_file():
+                                dep_obj = cand.resolve()
+
+                        if dep_obj is not None and dep_obj.is_file():
+                            if dep_obj not in env.linked_objects:
+                                env.linked_objects.append(dep_obj)
+                            mod_name = prereq[:-2] if prereq.endswith(".o") else prereq
+                            env.precompiled_modules.add(mod_name)
+                            _load_precompiled_transitive_deps(dep_obj, None, env, out_root)
+                    return
+                except Exception:
+                    pass
+
+    # 2. Fallback: parse .mod.quest if available
+    if file_path and file_path.is_file():
+        try:
+            source_text = file_path.read_text(encoding="utf-8")
+            source_map = SourceMap(source_text, str(file_path))
+            tokenizer = Tokenizer(source_text, str(file_path))
+            tokens = tokenizer.tokenize_all()
+            prog = parse_quest_program(tokens, source_map)
+            if (
+                isinstance(prog, ast.Program)
+                and len(prog.phrases) == 1
+                and isinstance(prog.phrases[0], ast.ModuleDecl)
+            ):
+                for imp in prog.phrases[0].imports:
+                    iface_path = imp.effective_interface_path
+                    for iname, mpath in zip(imp.names, imp.effective_module_paths):
+                        if mpath not in env.precompiled_modules and mpath not in env.loaded_modules_ast:
+                            load_module(mpath, iface_path, env)
+        except Exception:
+            pass
+
+
 def load_module(name: str, expected_interface: str, env: Environment) -> TypedModule:
     """Loads, validates, and elaborates a module from a .mod.quest file."""
     if name in env.loaded_modules_ast:
@@ -335,29 +467,6 @@ def load_module(name: str, expected_interface: str, env: Environment) -> TypedMo
             f"Cyclic dependency detected in module imports: {' -> '.join(chain)}"
         )
 
-    def _synthesize_precompiled_module() -> TypedModule:
-        target_interface_scope = env.lookup_interface(expected_interface)
-        if target_interface_scope is None:
-            target_interface_scope = load_interface(expected_interface, env)
-
-        from quest.modules import create_module_export_scope
-        module_export_scope = create_module_export_scope(name, target_interface_scope, env)
-        env.register_module(name, module_export_scope)
-
-        from quest.typed_ast import TypedModule
-        typed_mod = TypedModule(
-            name=name,
-            interface_name=expected_interface,
-            bindings=(),
-            scope=module_export_scope,
-            is_precompiled=True,
-        )
-        env.loaded_modules_ast[name] = typed_mod
-        return typed_mod
-
-    if name in env.precompiled_modules:
-        return _synthesize_precompiled_module()
-
     file_path = resolve_module_file(name, env.current_dir, env.include_paths)
     canon_name = canonicalize_module_path(file_path, env.include_paths) if file_path else name
     if canon_name in env.loaded_modules_ast:
@@ -365,6 +474,38 @@ def load_module(name: str, expected_interface: str, env: Environment) -> TypedMo
         if name != canon_name:
             env.loaded_modules_ast[name] = typed_mod
         return typed_mod
+
+    def _synthesize_precompiled_module() -> TypedModule:
+        target_interface_scope = env.lookup_interface(expected_interface)
+        if target_interface_scope is None:
+            target_interface_scope = load_interface(expected_interface, env)
+
+        from quest.modules import create_module_export_scope
+        module_export_scope = create_module_export_scope(canon_name, target_interface_scope, env)
+        env.register_module(canon_name, module_export_scope)
+        if name != canon_name:
+            env.register_module(name, module_export_scope)
+        short_name = canon_name.split("/")[-1]
+        if short_name != canon_name and short_name != name:
+            env.register_module(short_name, module_export_scope)
+
+        from quest.typed_ast import TypedModule
+        typed_mod = TypedModule(
+            name=canon_name,
+            interface_name=expected_interface,
+            bindings=(),
+            scope=module_export_scope,
+            is_precompiled=True,
+        )
+        env.loaded_modules_ast[canon_name] = typed_mod
+        if name != canon_name:
+            env.loaded_modules_ast[name] = typed_mod
+        if short_name != canon_name and short_name != name:
+            env.loaded_modules_ast[short_name] = typed_mod
+        return typed_mod
+
+    if name in env.precompiled_modules or canon_name in env.precompiled_modules:
+        return _synthesize_precompiled_module()
 
     # Hierarchical module separate compilation in C compilation mode
     if is_c_compilation_mode(env) and ("/" in canon_name or "/" in name):
@@ -393,6 +534,7 @@ def load_module(name: str, expected_interface: str, env: Environment) -> TypedMo
                 output_dir=out_root,
                 current_dir=env.current_dir,
                 include_paths=env.include_paths,
+                emit_deps=True,
             )
 
         if obj_file.is_file():
@@ -402,6 +544,7 @@ def load_module(name: str, expected_interface: str, env: Environment) -> TypedMo
             env.precompiled_modules.add(canon_name)
             if out_root not in env.include_paths:
                 env.include_paths.insert(0, out_root)
+            _load_precompiled_transitive_deps(obj_file, file_path, env, out_root)
             return _synthesize_precompiled_module()
 
     if file_path is None:
@@ -416,6 +559,8 @@ def load_module(name: str, expected_interface: str, env: Environment) -> TypedMo
             if obj_file is not None and obj_file not in env.linked_objects:
                 env.linked_objects.append(obj_file)
             env.precompiled_modules.add(name)
+            src_file = resolve_module_file(name, env.current_dir, env.include_paths)
+            _load_precompiled_transitive_deps(obj_file, src_file, env, None)
             return _synthesize_precompiled_module()
 
         searched = [str(env.current_dir)] if env.current_dir else []

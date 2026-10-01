@@ -67,6 +67,7 @@ class CompilerOptions:
     extra_objects: list[Path] = field(default_factory=list)
     build_dir: Optional[Path] = None
     whole_program: bool = False
+    emit_deps: bool = False
 
 
 @dataclass
@@ -332,6 +333,7 @@ class CodegenCPhase(Phase):
             emitter = CEmitter(
                 echo=ctx.options.echo,
                 print_result=getattr(ctx.options, "print_result", False),
+                env=ctx.env,
             )
             loaded_mods = ctx.env.loaded_modules_ast if ctx.env else None
             match input_data:

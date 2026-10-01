@@ -46,25 +46,41 @@ from quest.types import (
 
 def elaborate_interface(decl: ast.InterfaceDecl, env: Environment) -> TypedInterface:
     """Elaborates an interface declaration into a specification scope and TypedInterface."""
-    interface_scope = Scope(name=f"interface_{decl.name}", parent=env.current_scope)
+    import_scope = Scope(name=f"interface_imports_{decl.name}", parent=env.current_scope)
+    interface_scope = Scope(name=f"interface_{decl.name}", parent=import_scope)
 
-    # 1. Resolve imports into interface_scope
+    # 1. Resolve imports into import_scope (available for signatures, not exported by interface)
     for imp in decl.imports:
-        source_interface_scope = env.lookup_interface(imp.interface_name)
+        iface_path = imp.effective_interface_path
+        source_interface_scope = env.lookup_interface(iface_path)
+        if source_interface_scope is None:
+            source_interface_scope = env.lookup_interface(imp.interface_name)
+        if source_interface_scope is None:
+            source_interface_scope = BuiltinModuleRegistry.get_interface(iface_path, env)
+            if source_interface_scope is not None:
+                env.register_interface(iface_path, source_interface_scope)
         if source_interface_scope is None:
             source_interface_scope = BuiltinModuleRegistry.get_interface(imp.interface_name, env)
             if source_interface_scope is not None:
                 env.register_interface(imp.interface_name, source_interface_scope)
         if source_interface_scope is None:
             from quest.module_loader import load_interface
-            source_interface_scope = load_interface(imp.interface_name, env)
+            source_interface_scope = load_interface(iface_path, env)
+
+        env.register_interface(imp.interface_name, source_interface_scope)
+        if iface_path != imp.interface_name:
+            env.register_interface(iface_path, source_interface_scope)
+
         if not imp.names:
+            # Unaliased interface import / interface inheritance
+            is_alias = imp.interface_path is not None and imp.interface_name != imp.effective_interface_path
+            target_scope = import_scope if is_alias else interface_scope
             for type_name, type_sym in source_interface_scope.types.items():
-                interface_scope.declare_type(type_sym)
+                target_scope.declare_type(type_sym)
             for kind_name, kind_sym in source_interface_scope.kinds.items():
-                interface_scope.declare_kind(kind_sym)
+                target_scope.declare_kind(kind_sym)
         else:
-            for name in imp.names:
+            for name, mod_path in zip(imp.names, imp.effective_module_paths):
                 type_symbol = source_interface_scope.lookup_type_local(name)
                 if type_symbol is not None:
                     interface_scope.declare_type(type_symbol)
@@ -77,13 +93,33 @@ def elaborate_interface(decl: ast.InterfaceDecl, env: Environment) -> TypedInter
                 if kind_symbol is not None:
                     interface_scope.declare_kind(kind_symbol)
                     continue
+
+                from quest.module_loader import (
+                    load_module,
+                    resolve_module_file,
+                    resolve_object_file,
+                )
+                mod_scope = None
+                if (
+                    mod_path in env.loaded_modules_ast
+                    or mod_path in env.precompiled_modules
+                    or resolve_module_file(mod_path, env.current_dir, env.include_paths) is not None
+                    or resolve_object_file(mod_path, env.current_dir, env.include_paths) is not None
+                ):
+                    try:
+                        typed_mod = load_module(mod_path, iface_path, env)
+                        mod_scope = typed_mod.scope
+                    except Exception:
+                        mod_scope = None
+
+                registered_scope = mod_scope if mod_scope is not None else source_interface_scope
+                env.register_module(name, registered_scope)
+                if mod_path != name:
+                    env.register_module(mod_path, registered_scope)
                 mod_type = BuiltinModuleRegistry.get_module_type(name, env)
                 if mod_type is None:
-                    mod_type = BuiltinModuleRegistry._build_record_type_from_scope(
-                        source_interface_scope
-                    )
-                env.register_module(name, source_interface_scope)
-                interface_scope.declare_value(ValueSymbol(name=name, type_val=mod_type))
+                    mod_type = BuiltinModuleRegistry._build_record_type_from_scope(registered_scope)
+                import_scope.declare_value(ValueSymbol(name=name, type_val=mod_type))
 
     # 2. Elaborate signatures in a child scope of the interface
     saved_scope = env.current_scope

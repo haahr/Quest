@@ -1,0 +1,34 @@
+module maybe : Maybe export
+    let error: Exception = exception error: Ok end;
+
+    Let T = Fun(A::TYPE) Option
+        none
+        some with val: A end
+    end;
+
+    let isSome(A::TYPE)(o: T(A)): Bool =
+        o?some;
+
+    let isNone(A::TYPE)(o: T(A)): Bool =
+        o?none;
+
+    let unwrap(A::TYPE)(o: T(A)): A =
+        if o?some then
+            o!some.val
+        else
+            raise error end
+        end;
+
+    let unwrapOr(A::TYPE)(o: T(A) default: A): A =
+        if o?some then
+            o!some.val
+        else
+            default
+        end;
+
+    let some(A::TYPE)(val: A): T(A) =
+        option some of T(A) with let val = val end;
+
+    let none(A::TYPE): T(A) =
+        option none of T(A) end;
+end;

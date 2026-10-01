@@ -1,0 +1,24 @@
+3 apple banana cherry 
+3 a b c 
+1  
+4 line1 line2 line3 line4 
+0 
+apple - banana - cherry 
+one/two/three 
+true false 
+true false 
+1 3 ~1 3 true false 
+hello world left       right 
+a:b:c hello\n\"world\"\t\\ hello
+"world"	\ 
+true false true false true true false true true false 
+42 2a 101010 42 true true 
+12345 ~678 ~678 99 255 10 
+true 456 true 9999 
+true true 
+true true true 
+true false true true true false true 
+caught_int_error 
+caught_word_error 
+caught_real_error 
+caught_bool_error 

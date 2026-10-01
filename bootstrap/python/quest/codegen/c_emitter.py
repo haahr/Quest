@@ -166,10 +166,12 @@ class CEmitter:
         echo: bool = False,
         print_result: bool = False,
         module_prefix: Optional[str] = None,
+        env: Optional[Any] = None,
     ):
         self.echo = echo
         self.print_result = print_result
         self.module_prefix = module_prefix
+        self.env = env
         self._tmp_id = 0
         self.top_fun_names: set[str] = set()
         self.top_var_names: set[str] = set()
@@ -192,6 +194,18 @@ class CEmitter:
         self.pointer_params: set[str] = set()
         self.adapter_defs: list[str] = []
         self.adapter_cache: dict[tuple[QType, QType], str] = {}
+        self.analysis: Optional[CProgramAnalysis] = None
+
+    @staticmethod
+    def _find_module(module_map: dict[str, TypedModule], key: Optional[str]) -> Optional[TypedModule]:
+        """Looks up a module in module_map with case-insensitive fallback."""
+        if not key:
+            return None
+        if key in module_map:
+            return module_map[key]
+        if key.lower() in module_map:
+            return module_map[key.lower()]
+        return None
 
     def c_type(self, t: QType) -> str:
         return qtype_to_c_type(t, self.record_ctx)
@@ -1001,6 +1015,7 @@ class CEmitter:
         self.top_funs_dict = analysis.top_funs_dict
         self.specializations = analysis.specializations
         self.specialization_origin_modules = analysis.specialization_origin_modules
+        self.analysis = analysis
 
     def _create_decl_emitter(self) -> CDeclarationEmitter:
         """Constructs a CDeclarationEmitter initialized with the emitter's configuration."""
@@ -1043,7 +1058,7 @@ class CEmitter:
         loaded_modules: Optional[dict[str, TypedModule]] = None,
     ) -> str:
         """Translates a TypedProgram into a full standard C99 source file string."""
-        analysis = analyze_program_for_c(prog, self.record_ctx, loaded_modules)
+        analysis = analyze_program_for_c(prog, self.record_ctx, loaded_modules, env=self.env)
         self._apply_analysis(analysis)
         decl_emitter = self._create_decl_emitter()
 
@@ -1071,23 +1086,36 @@ class CEmitter:
         top_vars = analysis.top_vars
         sorted_modules = analysis.sorted_modules
 
-        all_module_map: dict[str, TypedModule] = {m.name: m for m in sorted_modules}
+        all_module_map: dict[str, TypedModule] = {}
+        if sorted_modules:
+            for mod in sorted_modules:
+                if isinstance(mod, TypedModule):
+                    all_module_map[mod.name] = mod
+                    all_module_map[mod.name.lower()] = mod
         if loaded_modules:
             for mod in loaded_modules.values():
                 if isinstance(mod, TypedModule):
                     all_module_map[mod.name] = mod
+                    all_module_map[mod.name.lower()] = mod
         for phrase in prog.phrases:
             if isinstance(phrase, TypedModule):
                 all_module_map[phrase.name] = phrase
+                all_module_map[phrase.name.lower()] = phrase
             elif isinstance(phrase, TypedImport):
                 for it in phrase.items:
                     for iname, mpath in zip(it.names, it.effective_module_paths):
-                        target = mpath if mpath in all_module_map else (iname if iname in all_module_map else None)
-                        if target is not None:
-                            all_module_map[iname] = all_module_map[target]
-                            all_module_map[mpath] = all_module_map[target]
-                            self.current_env_vars[iname] = f"qv_{mangle_module_name(all_module_map[target].name)}"
-                            self.current_env_vars[mpath] = f"qv_{mangle_module_name(all_module_map[target].name)}"
+                        mod = (
+                            self._find_module(all_module_map, mpath)
+                            or self._find_module(all_module_map, iname)
+                        )
+                        mod_ref = mpath if mpath else (mod.name if mod is not None else iname)
+                        if mod is not None:
+                            all_module_map[iname] = mod
+                            all_module_map[mpath] = mod
+                            all_module_map[iname.lower()] = mod
+                            all_module_map[mpath.lower()] = mod
+                        self.current_env_vars[iname] = f"qv_{mangle_module_name(mod_ref)}"
+                        self.current_env_vars[mpath] = f"qv_{mangle_module_name(mod_ref)}"
         self.all_modules = all_module_map
         # 7. Emit module functions and initializers
         if sorted_modules:
@@ -1134,14 +1162,17 @@ class CEmitter:
                                 case TypedImport():
                                     for it in b.items:
                                         for iname, mpath in zip(it.names, it.effective_module_paths):
-                                            target = (
-                                                mpath if mpath in self.all_modules
-                                                else (iname if iname in self.all_modules else None)
+                                            mod = (
+                                                self._find_module(self.all_modules, mpath)
+                                                or self._find_module(self.all_modules, iname)
                                             )
-                                            if target is not None:
-                                                self.current_env_vars[iname] = (
-                                                    f"qv_{mangle_module_name(self.all_modules[target].name)}"
-                                                )
+                                            mod_ref = mpath if mpath else (mod.name if mod is not None else iname)
+                                            self.current_env_vars[iname] = (
+                                                f"qv_{mangle_module_name(mod_ref)}"
+                                            )
+                                            self.current_env_vars[mpath] = (
+                                                f"qv_{mangle_module_name(mod_ref)}"
+                                            )
                         if orig_mod_name in self.module_fun_adapters:
                             for fn_k, fn_impl in self.module_fun_adapters[orig_mod_name].items():
                                 self.current_env_vars[fn_k] = fn_impl
@@ -1256,7 +1287,7 @@ class CEmitter:
     ) -> str:
         """Translates a standalone TypedModule into a C99 source string (no main function)."""
         prog = TypedProgram(phrases=(mod,))
-        analysis = analyze_program_for_c(prog, self.record_ctx, loaded_modules)
+        analysis = analyze_program_for_c(prog, self.record_ctx, loaded_modules, env=self.env)
         self._apply_analysis(analysis)
         decl_emitter = self._create_decl_emitter()
 
@@ -1275,12 +1306,19 @@ class CEmitter:
         )
 
 
-        all_module_map: dict[str, TypedModule] = {m.name: m for m in analysis.sorted_modules}
+        all_module_map: dict[str, TypedModule] = {}
+        if analysis.sorted_modules:
+            for m in analysis.sorted_modules:
+                if isinstance(m, TypedModule):
+                    all_module_map[m.name] = m
+                    all_module_map[m.name.lower()] = m
         if loaded_modules:
             for m in loaded_modules.values():
                 if isinstance(m, TypedModule):
                     all_module_map[m.name] = m
+                    all_module_map[m.name.lower()] = m
         all_module_map[mod.name] = mod
+        all_module_map[mod.name.lower()] = mod
         self.all_modules = all_module_map
 
         lines.append("/* Compiled module definitions and initializers */")
@@ -1313,6 +1351,7 @@ class CEmitter:
         mod_native_funs: list[TypedNativeBinding] = []
         mod_native_vals: list[TypedNativeBinding] = []
         mod_imported_mods: list[str] = []
+        mod_imported_env: dict[str, str] = {}
         for b in mod.bindings:
             match b:
                 case TypedLetValue(name=b_name, value=b_val, symbol=b_sym):
@@ -1330,7 +1369,7 @@ class CEmitter:
                                     isinstance(b_item, TypedNativeBinding)
                                     and b_item.name == b_name
                                     and b_item.inline_template
-                                ):
+                                    ):
                                     inline_tmpl = b_item.inline_template
                                     break
                         mod_native_funs.append(
@@ -1354,9 +1393,15 @@ class CEmitter:
                 case TypedImport(items=items):
                     for it in items:
                         for iname, mpath in zip(it.names, it.effective_module_paths):
-                            target = mpath if (mpath in all_module_map or standalone) else iname
-                            if standalone or target in all_module_map or iname in all_module_map:
-                                mod_imported_mods.append(target)
+                            imp_mod = (
+                                self._find_module(all_module_map, mpath)
+                                or self._find_module(all_module_map, iname)
+                            )
+                            mod_ref = mpath if mpath else (imp_mod.name if imp_mod is not None else iname)
+                            if (standalone or imp_mod is not None) and mod_ref not in mod_imported_mods:
+                                mod_imported_mods.append(mod_ref)
+                            mod_imported_env[iname] = f"qv_{mangle_module_name(mod_ref)}"
+                            mod_imported_env[mpath] = f"qv_{mangle_module_name(mod_ref)}"
                 case TypedException(name=b_name, type_val=b_t) as exc_n:
                     if b_name:
                         mod_vars.append(
@@ -1549,9 +1594,10 @@ class CEmitter:
                     mod_emitter.in_scope_type_descriptors[q.name] = f"descriptor_{q.name}"
                     fn_lines.append(f"(void)descriptor_{q.name};")
                 prev_env = mod_emitter.current_env_vars
-                mod_emitter.current_env_vars = {
-                    p.name: mangle_module_ident(clean_mod, p.name) for p in params
-                }
+                mod_emitter.current_env_vars = dict(mod_imported_env)
+                mod_emitter.current_env_vars.update(
+                    {p.name: mangle_module_ident(clean_mod, p.name) for p in params}
+                )
                 for vname, _, _ in mod_vars:
                     mod_emitter.current_env_vars[vname] = mangle_module_ident(clean_mod, vname)
                 for fn_k, (fn_impl, *_) in fun_adapters.items():
@@ -1608,9 +1654,10 @@ class CEmitter:
                     mod_emitter.in_scope_type_descriptors[q.name] = f"descriptor_{q.name}"
                     fn_lines.append(f"(void)descriptor_{q.name};")
                 prev_env = mod_emitter.current_env_vars
-                mod_emitter.current_env_vars = {
-                    p.name: mangle_module_ident(clean_mod, p.name) for p in params
-                }
+                mod_emitter.current_env_vars = dict(mod_imported_env)
+                mod_emitter.current_env_vars.update(
+                    {p.name: mangle_module_ident(clean_mod, p.name) for p in params}
+                )
                 for vname, _, _ in mod_vars:
                     mod_emitter.current_env_vars[vname] = mangle_module_ident(clean_mod, vname)
                 for fn_k, (fn_impl, *_) in fun_adapters.items():
@@ -1626,9 +1673,14 @@ class CEmitter:
                 lines.append("}")
                 lines.append("")
 
+        has_precompiled = bool(
+            self.analysis and any(getattr(m, "is_precompiled", False) for m in self.analysis.sorted_modules)
+        )
         if standalone:
             lines.append(f"QRecordVal qv_{clean_mod};")
             lines.append(f"static bool qv_mod_{clean_mod}_initialized = false;")
+            lines.append(f"void qv_mod_{clean_mod}_init(void) {{")
+        elif has_precompiled:
             lines.append(f"void qv_mod_{clean_mod}_init(void) {{")
         else:
             lines.append(f"static void qv_mod_{clean_mod}_init(void) {{")
@@ -1653,17 +1705,17 @@ class CEmitter:
             if isinstance(b, TypedImport):
                 for it in b.items:
                     for iname, mpath in zip(it.names, it.effective_module_paths):
-                        target = (
-                            mpath if mpath in self.all_modules
-                            else (iname if iname in self.all_modules else None)
+                        mod_obj = (
+                            self._find_module(self.all_modules, mpath)
+                            or self._find_module(self.all_modules, iname)
                         )
-                        if target is not None:
-                            mod_emitter.current_env_vars[iname] = (
-                                f"qv_{mangle_module_name(self.all_modules[target].name)}"
-                            )
-                            mod_emitter.current_env_vars[mpath] = (
-                                f"qv_{mangle_module_name(self.all_modules[target].name)}"
-                            )
+                        mod_ref = mpath if mpath else (mod_obj.name if mod_obj is not None else iname)
+                        mod_emitter.current_env_vars[iname] = (
+                            f"qv_{mangle_module_name(mod_ref)}"
+                        )
+                        mod_emitter.current_env_vars[mpath] = (
+                            f"qv_{mangle_module_name(mod_ref)}"
+                        )
         for b in mod.bindings:
             match b:
                 case TypedLetValue(name=vname, value=vval, symbol=vsym):

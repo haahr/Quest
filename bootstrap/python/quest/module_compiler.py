@@ -41,6 +41,7 @@ def compile_module(
     source_map: Optional[SourceMap] = None,
     stem_name: Optional[str] = None,
     canonical_name: Optional[str] = None,
+    emit_deps: bool = False,
 ) -> tuple[Path, Path]:
     """Compiles an AST ModuleDecl into .c and .o files."""
     if output_dir is None:
@@ -104,7 +105,7 @@ def compile_module(
         typed_mod = replace(typed_mod, name=mod_name)
 
     # 6. Emit C source
-    emitter = CEmitter(echo=False, module_prefix=mod_name)
+    emitter = CEmitter(echo=False, module_prefix=mod_name, env=env)
     c_source = emitter.emit_module(
         typed_mod,
         loaded_modules=env.loaded_modules_ast,
@@ -131,6 +132,35 @@ def compile_module(
         extra_flags=extra_c_flags,
     )
 
+    if emit_deps:
+        from quest.module_loader import (
+            canonicalize_module_path,
+            resolve_object_file,
+        )
+        dep_objects: list[str] = []
+        for imp in module_decl.imports:
+            for iname, mpath in zip(imp.names, imp.effective_module_paths):
+                mod_ref = mpath if mpath else iname
+                f_path = resolve_module_file(mod_ref, env.current_dir, env.include_paths)
+                canon = canonicalize_module_path(f_path, env.include_paths) if f_path else mod_ref
+                if "/" in canon:
+                    obj_rel = f"{canon.lower()}.o"
+                    if obj_rel not in dep_objects:
+                        dep_objects.append(obj_rel)
+                else:
+                    obj_cand = resolve_object_file(canon, env.current_dir, env.include_paths)
+                    if obj_cand is not None:
+                        obj_rel = f"{canon.lower()}.o"
+                        if obj_rel not in dep_objects:
+                            dep_objects.append(obj_rel)
+
+        target_rel = f"{mod_name.lower()}.o"
+        deps_dir = o_file.parent / ".deps"
+        deps_dir.mkdir(parents=True, exist_ok=True)
+        dep_file = deps_dir / f"{o_file.stem}.d"
+        prereqs_str = " ".join(dep_objects)
+        dep_file.write_text(f"{target_rel}: {prereqs_str}\n", encoding="utf-8")
+
     return c_file, o_file
 
 
@@ -141,6 +171,7 @@ def compile_module_file(
     compiler_path: Optional[str] = None,
     nogc: bool = False,
     extra_c_flags: Optional[list[str]] = None,
+    emit_deps: bool = False,
 ) -> tuple[Path, Path]:
     """Compiles a Quest module file (.mod.quest) into .c and .o files."""
     mod_path = Path(mod_path).resolve()
@@ -195,6 +226,7 @@ def compile_module_file(
         source_map=source_map,
         stem_name=stem,
         canonical_name=canon_name,
+        emit_deps=emit_deps,
     )
 
 
@@ -206,18 +238,26 @@ def compile_hierarchical_module(
     compiler_path: Optional[str] = None,
     nogc: bool = False,
     extra_c_flags: Optional[list[str]] = None,
+    emit_deps: bool = False,
 ) -> tuple[Path, Path, Path, Path]:
     """Compiles a hierarchical interface and module by canonical name into output_dir.
 
     Returns (qi_file, h_file, c_file, o_file).
     """
     from quest.interface_compiler import compile_interface_file
+    from quest.module_loader import (
+        resolve_interface_file,
+        resolve_interface_source_file,
+        resolve_module_file,
+    )
 
     inc_paths = list(include_paths) if include_paths else []
     out_dir = Path(output_dir).resolve()
 
-    intf_path = resolve_interface_file(canonical_name, current_dir, inc_paths)
-    if intf_path is None:
+    intf_src_path = resolve_interface_source_file(canonical_name, current_dir, inc_paths)
+    if intf_src_path is None:
+        intf_src_path = resolve_interface_file(canonical_name, current_dir, inc_paths)
+    if intf_src_path is None:
         raise QuestTypeError(f"Cannot resolve interface file for '{canonical_name}'")
 
     mod_path = resolve_module_file(canonical_name, current_dir, inc_paths)
@@ -231,11 +271,26 @@ def compile_hierarchical_module(
     if out_dir not in search_paths:
         search_paths.append(out_dir)
 
-    h_file, qi_file = compile_interface_file(
-        intf_path,
-        output_dir=target_subdir,
-        include_paths=search_paths,
-    )
+    stem = Path(canonical_name).name.lower()
+    target_h = target_subdir / f"{stem}.h"
+    target_qi = target_subdir / f"{stem}.qi"
+    if intf_src_path.suffix == ".qi":
+        h_file = target_h
+        qi_file = target_qi
+    elif (
+        target_h.is_file()
+        and target_qi.is_file()
+        and target_h.stat().st_mtime >= intf_src_path.stat().st_mtime
+        and target_qi.stat().st_mtime >= intf_src_path.stat().st_mtime
+    ):
+        h_file = target_h
+        qi_file = target_qi
+    else:
+        h_file, qi_file = compile_interface_file(
+            intf_src_path,
+            output_dir=target_subdir,
+            include_paths=search_paths,
+        )
     c_file, o_file = compile_module_file(
         mod_path,
         output_dir=target_subdir,
@@ -243,6 +298,7 @@ def compile_hierarchical_module(
         compiler_path=compiler_path,
         nogc=nogc,
         extra_c_flags=extra_c_flags,
+        emit_deps=emit_deps,
     )
     return (qi_file, h_file, c_file, o_file)
 

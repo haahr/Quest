@@ -1,0 +1,25 @@
+interface Maybe export
+    (* Polymorphic optional value type *)
+    T::ALL(A::TYPE) TYPE
+
+    (* Exception raised on invalid option unwrapping *)
+    error: Exception
+
+    (* Test if an option value is present *)
+    isSome: All(A::TYPE) All(o: T(A)) Bool
+
+    (* Test if an option value is absent *)
+    isNone: All(A::TYPE) All(o: T(A)) Bool
+
+    (* Extract the payload from an option, or raise error if none *)
+    unwrap: All(A::TYPE) All(o: T(A)) A
+
+    (* Extract the payload from an option, or return default if none *)
+    unwrapOr: All(A::TYPE) All(o: T(A) default: A) A
+
+    (* Construct a some option value *)
+    some: All(A::TYPE) All(val: A) T(A)
+
+    (* Construct a none option value *)
+    none: All(A::TYPE) T(A)
+end;
