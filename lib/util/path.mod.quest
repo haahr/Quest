@@ -1,0 +1,306 @@
+(* Standard Library: Pure Quest Path Utilities module *)
+
+module path : Path
+import
+    util/strutil : util/Strutil
+    util/stringBuilder : util/StringBuilder
+    collections/vector : collections/Vector
+    stringOp = string : StringOp
+    system: System
+export
+    (* Exception raised on invalid path operations *)
+    let error: Exception = exception error: Ok end;
+
+    let separator: Char = '/';
+    let separatorString: String = "/";
+
+    let isAbsolute(path: String): Bool =
+        if stringOp.length(path) is 0 then
+            false
+        else
+            stringOp.getChar(path 0) is '/'
+        end;
+
+    let isRelative(path: String): Bool =
+        not(isAbsolute(path));
+
+    (* Strip trailing slashes unless path is only "/" or "//" etc. *)
+    let privateStripTrailingSlashes(path: String): String =
+        begin
+            let n = stringOp.length(path);
+            if n <= 1 then
+                path
+            else
+                let var endIdx = n;
+                while {endIdx > 1} andif {stringOp.getChar(path {endIdx - 1}) is '/'} do
+                    endIdx := endIdx - 1;
+                end;
+                if endIdx is n then
+                    path
+                else
+                    stringOp.getSub(path 0 endIdx)
+                end
+            end
+        end;
+
+    let dirName(path: String): String =
+        begin
+            let p = privateStripTrailingSlashes(path);
+            let n = stringOp.length(p);
+            if n is 0 then
+                "."
+            else
+                let lastSlash = strutil.rfind(p "/");
+                if lastSlash is ~1 then
+                    "."
+                elsif lastSlash is 0 then
+                    "/"
+                else
+                    let var endIdx = lastSlash;
+                    while {endIdx > 1} andif {stringOp.getChar(p {endIdx - 1}) is '/'} do
+                        endIdx := endIdx - 1;
+                    end;
+                    stringOp.getSub(p 0 endIdx)
+                end
+            end
+        end;
+
+    let baseName(path: String): String =
+        begin
+            let p = privateStripTrailingSlashes(path);
+            let n = stringOp.length(p);
+            if n is 0 then
+                ""
+            elsif stringOp.equal(p "/") then
+                "/"
+            else
+                let lastSlash = strutil.rfind(p "/");
+                if lastSlash is ~1 then
+                    p
+                else
+                    stringOp.getSub(p {lastSlash + 1} {n - {lastSlash + 1}})
+                end
+            end
+        end;
+
+    let extension(path: String): String =
+        begin
+            let base = baseName(path);
+            let n = stringOp.length(base);
+            if n <= 1 then
+                ""
+            else
+                let lastDot = strutil.rfind(base ".");
+                if lastDot <= 0 then
+                    ""
+                else
+                    stringOp.getSub(base lastDot {n - lastDot})
+                end
+            end
+        end;
+
+    let stem(path: String): String =
+        begin
+            let base = baseName(path);
+            let ext = extension(path);
+            let extLen = stringOp.length(ext);
+            if extLen is 0 then
+                base
+            else
+                stringOp.getSub(base 0 {stringOp.length(base) - extLen})
+            end
+        end;
+
+    let hasExtension(path: String): Bool =
+        stringOp.length(extension(path)) > 0;
+
+    let parts(path: String): vector.T(String) =
+        begin
+            let res = vector.new(:String);
+            let n = stringOp.length(path);
+            if n is 0 then
+                res
+            else
+                let isAbs = isAbsolute(path);
+                if isAbs then
+                    vector.append(:String res "/");
+                end;
+                let rawParts = strutil.split(path "/");
+                let count = vector.length(:String rawParts);
+                for i = 0 upto {count - 1} do
+                    let seg = vector.get(:String rawParts i);
+                    if stringOp.length(seg) > 0 then
+                        vector.append(:String res seg);
+                    end;
+                end;
+                res
+            end
+        end;
+
+    let join(part1: String part2: String): String =
+        if stringOp.length(part2) is 0 then
+            part1
+        elsif {stringOp.length(part1) is 0} orif isAbsolute(part2) then
+            part2
+        else
+            let p1Ends = strutil.endsWith(part1 "/");
+            let p2Starts = strutil.startsWith(part2 "/");
+            if p1Ends andif p2Starts then
+                part1 <> stringOp.getSub(part2 1 {stringOp.length(part2) - 1})
+            elsif p1Ends orif p2Starts then
+                part1 <> part2
+            else
+                part1 <> "/" <> part2
+            end
+        end;
+
+    let joinVector(items: vector.T(String)): String =
+        begin
+            let count = vector.length(:String items);
+            if count is 0 then
+                ""
+            else
+                let var cur = vector.get(:String items 0);
+                for i = 1 upto {count - 1} do
+                    cur := join(cur vector.get(:String items i));
+                end;
+                cur
+            end
+        end;
+
+    let joinArray(items: Array(String)): String =
+        begin
+            let count = extent items;
+            if count is 0 then
+                ""
+            else
+                let var cur = items[0];
+                for i = 1 upto {count - 1} do
+                    cur := join(cur items[i]);
+                end;
+                cur
+            end
+        end;
+
+    let withExtension(path: String newExt: String): String =
+        begin
+            let s = stem(path);
+            let dir = dirName(path);
+            let actualExt =
+                if stringOp.length(newExt) is 0 then
+                    ""
+                elsif strutil.startsWith(newExt ".") then
+                    newExt
+                else
+                    "." <> newExt
+                end;
+            let newBase = s <> actualExt;
+            if stringOp.equal(dir ".") andif not(strutil.startsWith(path "./")) then
+                newBase
+            else
+                join(dir newBase)
+            end
+        end;
+
+    let normalize(path: String): String =
+        begin
+            let n = stringOp.length(path);
+            if n is 0 then
+                "."
+            else
+                let isAbs = isAbsolute(path);
+                let rawParts = strutil.split(path "/");
+                let count = vector.length(:String rawParts);
+                let stack = vector.new(:String);
+                for i = 0 upto {count - 1} do
+                    let seg = vector.get(:String rawParts i);
+                    if {stringOp.length(seg) is 0} orif stringOp.equal(seg ".") then
+                        (* skip *)
+                        ok
+                    elsif stringOp.equal(seg "..") then
+                        let stLen = vector.length(:String stack);
+                        if stLen > 0 then
+                            let top = vector.get(:String stack {stLen - 1});
+                            if stringOp.equal(top "..") then
+                                vector.append(:String stack seg);
+                            else
+                                let popped = vector.pop(:String stack);
+                                ok
+                            end;
+                        elsif not(isAbs) then
+                            vector.append(:String stack seg);
+                        else
+                            (* For absolute path, /.. collapses to / *)
+                            ok
+                        end;
+                    else
+                        vector.append(:String stack seg);
+                    end;
+                end;
+                let stCount = vector.length(:String stack);
+                if stCount is 0 then
+                    if isAbs then "/" else "." end
+                else
+                    let b = stringBuilder.new();
+                    if isAbs then
+                        stringBuilder.appendChar(b '/');
+                    end;
+                    for i = 0 upto {stCount - 1} do
+                        if i > 0 then
+                            stringBuilder.appendChar(b '/');
+                        end;
+                        stringBuilder.append(b vector.get(:String stack i));
+                    end;
+                    stringBuilder.toString(b)
+                end
+            end
+        end;
+
+    let relativeTo(path: String base: String): String =
+        begin
+            let normPath = normalize(path);
+            let normBase = normalize(base);
+            let pathAbs = isAbsolute(normPath);
+            let baseAbs = isAbsolute(normBase);
+            if pathAbs isnot baseAbs then
+                raise error end
+            else
+                let pParts = parts(normPath);
+                let bParts = parts(normBase);
+                let pLen = vector.length(:String pParts);
+                let bLen = vector.length(:String bParts);
+
+                (* Find length of shared prefix *)
+                let var common = 0;
+                while {common < pLen} andif {common < bLen} andif
+                      stringOp.equal(vector.get(:String pParts common) vector.get(:String bParts common)) do
+                    common := common + 1;
+                end;
+
+                (* For each remaining segment in base, go up with '..' *)
+                let res = vector.new(:String);
+                for i = common upto {bLen - 1} do
+                    vector.append(:String res "..");
+                end;
+
+                (* Then append remaining segments from path *)
+                for i = common upto {pLen - 1} do
+                    vector.append(:String res vector.get(:String pParts i));
+                end;
+
+                if vector.length(:String res) is 0 then
+                    "."
+                else
+                    strutil.join("/" res)
+                end
+            end
+        end;
+
+    let resolve(path: String): String =
+        if isAbsolute(path) then
+            normalize(path)
+        else
+            let cwd = system.currentDirectory();
+            normalize(join(cwd path))
+        end;
+end;

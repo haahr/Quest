@@ -179,6 +179,50 @@ end;
 
 ---
 
+### 1.4. `util/path : util/Path`
+
+Cross-platform POSIX filesystem path manipulation, decomposition, normalization, and relative path resolution.
+
+#### Interface Summary
+
+```quest
+interface Path
+import
+    collections/vector : collections/Vector
+export
+    error: Exception
+
+    (* Constants *)
+    separator: Char
+    separatorString: String
+
+    (* Decomposition & Components *)
+    dirName(path: String): String
+    baseName(path: String): String
+    extension(path: String): String
+    stem(path: String): String
+    parts(path: String): vector.T(String)
+
+    (* Composition & Joining *)
+    join(part1: String part2: String): String
+    joinVector(items: vector.T(String)): String
+    joinArray(items: Array(String)): String
+    withExtension(path: String newExt: String): String
+
+    (* Inspection & Predicates *)
+    isAbsolute(path: String): Bool
+    isRelative(path: String): Bool
+    hasExtension(path: String): Bool
+
+    (* Normalization & Relationships *)
+    normalize(path: String): String
+    relativeTo(path: String base: String): String
+    resolve(path: String): String
+end;
+```
+
+---
+
 ## 2. Collections (`lib/collections/`)
 
 ### 2.1. `collections/vector : collections/Vector`

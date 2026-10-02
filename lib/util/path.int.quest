@@ -1,0 +1,130 @@
+interface Path
+import
+    collections/vector : collections/Vector
+export
+    (* Exception raised on invalid path operations *)
+    error: Exception
+
+    (* =========================================================================
+     * Path Constants & Separators
+     * ========================================================================= *)
+
+    (* Directory separator character '/' *)
+    separator: Char
+
+    (* Directory separator string "/" *)
+    separatorString: String
+
+    (* =========================================================================
+     * Decomposition & Components
+     * ========================================================================= *)
+
+    (* Return the directory portion of a path.
+     * Examples:
+     *   dirName("/a/b/c.txt") => "/a/b"
+     *   dirName("a/b")        => "a"
+     *   dirName("a")          => "."
+     *   dirName("/a")         => "/"
+     *   dirName("/")          => "/"
+     *)
+    dirName(path: String): String
+
+    (* Return the final component of a path.
+     * Examples:
+     *   baseName("/a/b/c.txt") => "c.txt"
+     *   baseName("a/b/")       => "b"
+     *   baseName("/")          => "/"
+     *   baseName("")           => ""
+     *)
+    baseName(path: String): String
+
+    (* Return the file extension including the leading dot, or empty string.
+     * Examples:
+     *   extension("foo.txt")        => ".txt"
+     *   extension("archive.tar.gz") => ".gz"
+     *   extension(".gitignore")     => ""
+     *   extension("foo")            => ""
+     *)
+    extension(path: String): String
+
+    (* Return the base filename without its final extension (stem).
+     * Guaranteed: stem(p) <> extension(p) == baseName(p)
+     * Examples:
+     *   stem("foo.txt")        => "foo"
+     *   stem("archive.tar.gz") => "archive.tar"
+     *   stem(".gitignore")     => ".gitignore"
+     *   stem("foo")            => "foo"
+     *)
+    stem(path: String): String
+
+    (* Split path into its constituent component segments.
+     * Consecutive separators are coalesced and empty segments dropped
+     * (except leading "/" for root).
+     * Examples:
+     *   parts("/a/b/c") => ["/", "a", "b", "c"]
+     *   parts("a/b/c")  => ["a", "b", "c"]
+     *)
+    parts(path: String): vector.T(String)
+
+    (* =========================================================================
+     * Composition & Joining
+     * ========================================================================= *)
+
+    (* Join two path components with a separator.
+     * If part2 is absolute, part2 is returned.
+     *)
+    join(part1: String part2: String): String
+
+    (* Join multiple path components from a Vector.
+     * If an absolute component is encountered, previous components are discarded.
+     *)
+    joinVector(items: vector.T(String)): String
+
+    (* Join multiple path components from an Array *)
+    joinArray(items: Array(String)): String
+
+    (* Return path with its extension replaced or appended.
+     * Accepts either "ext" or ".ext" equivalently.
+     * If newExt is empty (""), removes existing extension.
+     *)
+    withExtension(path: String newExt: String): String
+
+    (* =========================================================================
+     * Inspection & Predicates
+     * ========================================================================= *)
+
+    (* Test whether path starts with '/' *)
+    isAbsolute(path: String): Bool
+
+    (* Test whether path does not start with '/' *)
+    isRelative(path: String): Bool
+
+    (* Test whether path has a non-empty extension *)
+    hasExtension(path: String): Bool
+
+    (* =========================================================================
+     * Normalization & Relationships
+     * ========================================================================= *)
+
+    (* Normalize path by collapsing redundant '/' and resolving '.' and '..' segments.
+     * Pure lexical normalization; does not access the filesystem.
+     * Examples:
+     *   normalize("a//b/./c/../d") => "a/b/d"
+     *   normalize("/../a")         => "/a"
+     *   normalize("")              => "."
+     *)
+    normalize(path: String): String
+
+    (* Compute path relative to a given base directory.
+     * Raises error if one path is absolute and the other relative.
+     * Examples:
+     *   relativeTo("/a/b/c" "/a") => "b/c"
+     *   relativeTo("/a/b" "/a/c") => "../b"
+     *)
+    relativeTo(path: String base: String): String
+
+    (* Make path absolute relative to cwd if relative, and normalize.
+     * Uses system.currentDirectory() when relative.
+     *)
+    resolve(path: String): String
+end;

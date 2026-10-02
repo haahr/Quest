@@ -1,0 +1,114 @@
+import
+    util/path : util/Path
+    collections/vector : collections/Vector
+    writer: Writer
+    conv: Conv
+    stringOp = string : StringOp
+;
+
+let printStr(s: String): Ok =
+    begin
+        writer.putString(writer.output s);
+        writer.putString(writer.output "\n");
+    end;
+
+let printBool(b: Bool): Ok =
+    printStr(conv.bool(b));
+
+let printInt(n: Int): Ok =
+    printStr(conv.int(n));
+
+(* 1. Constants & Predicates *)
+printBool(path.separator is '/');
+printStr(path.separatorString);
+printBool(path.isAbsolute("/foo/bar"));
+printBool(path.isAbsolute("foo/bar"));
+printBool(path.isRelative("foo/bar"));
+printBool(path.isRelative("/foo/bar"));
+
+(* 2. Decomposition *)
+printStr(path.dirName("/a/b/c.txt"));
+printStr(path.dirName("a/b"));
+printStr(path.dirName("a"));
+printStr(path.dirName("/a"));
+printStr(path.dirName("/"));
+
+printStr(path.baseName("/a/b/c.txt"));
+printStr(path.baseName("a/b/"));
+printStr(path.baseName("/"));
+printStr(path.baseName(""));
+
+printStr(path.extension("foo.txt"));
+printStr(path.extension("archive.tar.gz"));
+printStr(path.extension(".gitignore"));
+printStr(path.extension("foo"));
+printBool(path.hasExtension("foo.txt"));
+printBool(path.hasExtension("foo"));
+
+printStr(path.stem("foo.txt"));
+printStr(path.stem("archive.tar.gz"));
+printStr(path.stem(".gitignore"));
+printStr(path.stem("foo"));
+
+(* Invariant: stem <> extension == baseName *)
+let s1 = path.stem("foo.txt") <> path.extension("foo.txt");
+printBool(stringOp.equal(s1 path.baseName("foo.txt")));
+let s2 = path.stem("archive.tar.gz") <> path.extension("archive.tar.gz");
+printBool(stringOp.equal(s2 path.baseName("archive.tar.gz")));
+let s3 = path.stem(".gitignore") <> path.extension(".gitignore");
+printBool(stringOp.equal(s3 path.baseName(".gitignore")));
+
+(* 3. Parts *)
+let pList = path.parts("/a/b/c");
+printInt(vector.length(:String pList));
+printStr(vector.get(:String pList 0));
+printStr(vector.get(:String pList 1));
+printStr(vector.get(:String pList 2));
+printStr(vector.get(:String pList 3));
+
+(* 4. Composition & Joining *)
+printStr(path.join("a" "b"));
+printStr(path.join("a/" "b"));
+printStr(path.join("a" "/b"));
+printStr(path.join("" "b"));
+printStr(path.join("a" ""));
+
+let vParts = vector.new(:String);
+vector.append(:String vParts "a");
+vector.append(:String vParts "b");
+vector.append(:String vParts "c");
+printStr(path.joinVector(vParts));
+
+let arrParts = array of "x" "y" "z" end;
+printStr(path.joinArray(arrParts));
+
+(* withExtension *)
+printStr(path.withExtension("foo.txt" "md"));
+printStr(path.withExtension("foo.txt" ".md"));
+printStr(path.withExtension("foo.txt" ""));
+printStr(path.withExtension("/dir/foo" "o"));
+
+(* 5. Normalization *)
+printStr(path.normalize("a//b/./c/../d"));
+printStr(path.normalize("/../a"));
+printStr(path.normalize(""));
+printStr(path.normalize("/a/b/../../c"));
+printStr(path.normalize("a/b/../../../c"));
+
+(* 6. Relative Path *)
+printStr(path.relativeTo("/a/b/c" "/a"));
+printStr(path.relativeTo("/a/b" "/a/c"));
+printStr(path.relativeTo("/a/b/c" "/a/b/c"));
+printStr(path.relativeTo("a/b" "a"));
+
+try
+    let dummy = path.relativeTo("/a/b" "a/b");
+    printStr("FAILED: should have raised error");
+when path.error then
+    printStr("CAUGHT: path.error");
+end;
+
+(* 7. Resolve *)
+let resolved = path.resolve("foo/bar");
+printBool(path.isAbsolute(resolved));
+printBool(stringOp.equal(path.normalize(resolved) resolved));

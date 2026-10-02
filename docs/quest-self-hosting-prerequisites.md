@@ -42,16 +42,7 @@ remaining OS primitive is:
   Returns the process exit code (0 for success, non-zero for failure). Can be implemented using standard C POSIX
   `system()` or `fork`/`execvp`.
 
-### 2.5. Path Utility Library (`Path`)
-- **Python Usage**: `pathlib.Path` for dirname, basename, extension, path concatenation, and normalization.
-- **Implementation**: Can be implemented in pure Quest on top of string utilities:
-  - `join(dir: String, file: String): String`
-  - `dirName(path: String): String`
-  - `baseName(path: String): String`
-  - `extension(path: String): String`
-  - `normalize(path: String): String`
-
-### 2.6. Host Toolchain Discovery (`shutil.which`)
+### 2.2. Host Toolchain Discovery (`shutil.which`)
 - **Python Usage**: Locating `clang` or `gcc` in the host `$PATH`.
 - **Implementation**: Pure Quest function reading `system.getEnv("PATH")`, splitting on `:`, and checking
   `system.fileExists`.
@@ -117,13 +108,12 @@ Migrating the Python object-oriented codebase to Quest requires structural adapt
 ## 6. Implementation Roadmap & Priority Matrix
 
 Completed subsystems (`collections/vector`, `collections/hashMap`, `collections/hashSet`, `util/maybe`,
-`util/stringBuilder`, and `util/strutil`) are documented in `docs/new-libraries.md`.
+`util/stringBuilder`, `util/strutil`, and `util/path`) are documented in `docs/new-libraries.md`.
 Remaining prerequisites:
 
 | Subsystem | Components | Priority | Strategy |
 | :--- | :--- | :--- | :--- |
 | **OS Primitives** | `system.exec` | **P1** | Extend `System` (native C backing) |
-| **Path Library** | `join`, `dirName`, `baseName`, `normalize` | **P1** | Pure Quest path module |
 | **Algorithms** | Binary search, Quicksort, Topological sort | **P1** | Pure Quest algorithms |
 | **CLI Parser** | Flag and option parsing over `system.args` | **P2** | Pure Quest CLI library |
 | **AST & Type Models** | Recursive `Variant` definitions | **P2** | Compiler architecture |

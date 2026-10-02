@@ -1,0 +1,1260 @@
+(Program
+  :phrases (
+    (ImportPhrase
+      :items (
+        (ImportItem ('path') 'Path' ('util/path') 'util/Path')
+        (ImportItem ('vector') 'Vector' ('collections/vector') 'collections/Vector')
+        (ImportItem ('writer') 'Writer')
+        (ImportItem ('conv') 'Conv')
+        (ImportItem ('stringOp') 'StringOp' ('string'))
+      )
+    )
+    (LetValueBinding
+      :name 'printStr'
+      :value (ExprBlock
+        :bindings (
+          (ExprStmt
+            :expr (ExprApp
+              :func (ExprSelect
+                :target (ExprId 'writer')
+                :field 'putString'
+              )
+              :args (
+                (ExprSelect
+                  :target (ExprId 'writer')
+                  :field 'output'
+                )
+                (ExprId 's')
+              )
+            )
+          )
+          (ExprStmt
+            :expr (ExprApp
+              :func (ExprSelect
+                :target (ExprId 'writer')
+                :field 'putString'
+              )
+              :args (
+                (ExprSelect
+                  :target (ExprId 'writer')
+                  :field 'output'
+                )
+                (ExprString '\n' '"\\n"')
+              )
+            )
+          )
+        )
+      )
+      :params (
+        (FormalParam
+          :name 's'
+          :type_annot (TypePath ('String'))
+          :mode VALUE
+        )
+      )
+      :type_annot (TypePath ('Ok'))
+    )
+    (LetValueBinding
+      :name 'printBool'
+      :value (ExprApp
+        :func (ExprId 'printStr')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'conv')
+              :field 'bool'
+            )
+            :args (
+              (ExprId 'b')
+            )
+          )
+        )
+      )
+      :params (
+        (FormalParam
+          :name 'b'
+          :type_annot (TypePath ('Bool'))
+          :mode VALUE
+        )
+      )
+      :type_annot (TypePath ('Ok'))
+    )
+    (LetValueBinding
+      :name 'printInt'
+      :value (ExprApp
+        :func (ExprId 'printStr')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'conv')
+              :field 'int'
+            )
+            :args (
+              (ExprId 'n')
+            )
+          )
+        )
+      )
+      :params (
+        (FormalParam
+          :name 'n'
+          :type_annot (TypePath ('Int'))
+          :mode VALUE
+        )
+      )
+      :type_annot (TypePath ('Ok'))
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printBool')
+        :args (
+          (ExprInfix
+            :left (ExprSelect
+              :target (ExprId 'path')
+              :field 'separator'
+            )
+            :op 'is'
+            :right (ExprChar '/' "'/'")
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printStr')
+        :args (
+          (ExprSelect
+            :target (ExprId 'path')
+            :field 'separatorString'
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printBool')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'path')
+              :field 'isAbsolute'
+            )
+            :args (
+              (ExprString '/foo/bar' '"/foo/bar"')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printBool')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'path')
+              :field 'isAbsolute'
+            )
+            :args (
+              (ExprString 'foo/bar' '"foo/bar"')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printBool')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'path')
+              :field 'isRelative'
+            )
+            :args (
+              (ExprString 'foo/bar' '"foo/bar"')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printBool')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'path')
+              :field 'isRelative'
+            )
+            :args (
+              (ExprString '/foo/bar' '"/foo/bar"')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printStr')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'path')
+              :field 'dirName'
+            )
+            :args (
+              (ExprString '/a/b/c.txt' '"/a/b/c.txt"')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printStr')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'path')
+              :field 'dirName'
+            )
+            :args (
+              (ExprString 'a/b' '"a/b"')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printStr')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'path')
+              :field 'dirName'
+            )
+            :args (
+              (ExprString 'a' '"a"')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printStr')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'path')
+              :field 'dirName'
+            )
+            :args (
+              (ExprString '/a' '"/a"')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printStr')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'path')
+              :field 'dirName'
+            )
+            :args (
+              (ExprString '/' '"/"')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printStr')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'path')
+              :field 'baseName'
+            )
+            :args (
+              (ExprString '/a/b/c.txt' '"/a/b/c.txt"')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printStr')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'path')
+              :field 'baseName'
+            )
+            :args (
+              (ExprString 'a/b/' '"a/b/"')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printStr')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'path')
+              :field 'baseName'
+            )
+            :args (
+              (ExprString '/' '"/"')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printStr')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'path')
+              :field 'baseName'
+            )
+            :args (
+              (ExprString '' '""')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printStr')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'path')
+              :field 'extension'
+            )
+            :args (
+              (ExprString 'foo.txt' '"foo.txt"')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printStr')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'path')
+              :field 'extension'
+            )
+            :args (
+              (ExprString 'archive.tar.gz' '"archive.tar.gz"')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printStr')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'path')
+              :field 'extension'
+            )
+            :args (
+              (ExprString '.gitignore' '".gitignore"')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printStr')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'path')
+              :field 'extension'
+            )
+            :args (
+              (ExprString 'foo' '"foo"')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printBool')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'path')
+              :field 'hasExtension'
+            )
+            :args (
+              (ExprString 'foo.txt' '"foo.txt"')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printBool')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'path')
+              :field 'hasExtension'
+            )
+            :args (
+              (ExprString 'foo' '"foo"')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printStr')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'path')
+              :field 'stem'
+            )
+            :args (
+              (ExprString 'foo.txt' '"foo.txt"')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printStr')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'path')
+              :field 'stem'
+            )
+            :args (
+              (ExprString 'archive.tar.gz' '"archive.tar.gz"')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printStr')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'path')
+              :field 'stem'
+            )
+            :args (
+              (ExprString '.gitignore' '".gitignore"')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printStr')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'path')
+              :field 'stem'
+            )
+            :args (
+              (ExprString 'foo' '"foo"')
+            )
+          )
+        )
+      )
+    )
+    (LetValueBinding
+      :name 's1'
+      :value (ExprInfix
+        :left (ExprApp
+          :func (ExprSelect
+            :target (ExprId 'path')
+            :field 'stem'
+          )
+          :args (
+            (ExprString 'foo.txt' '"foo.txt"')
+          )
+        )
+        :op '<>'
+        :right (ExprApp
+          :func (ExprSelect
+            :target (ExprId 'path')
+            :field 'extension'
+          )
+          :args (
+            (ExprString 'foo.txt' '"foo.txt"')
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printBool')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'stringOp')
+              :field 'equal'
+            )
+            :args (
+              (ExprId 's1')
+              (ExprApp
+                :func (ExprSelect
+                  :target (ExprId 'path')
+                  :field 'baseName'
+                )
+                :args (
+                  (ExprString 'foo.txt' '"foo.txt"')
+                )
+              )
+            )
+          )
+        )
+      )
+    )
+    (LetValueBinding
+      :name 's2'
+      :value (ExprInfix
+        :left (ExprApp
+          :func (ExprSelect
+            :target (ExprId 'path')
+            :field 'stem'
+          )
+          :args (
+            (ExprString 'archive.tar.gz' '"archive.tar.gz"')
+          )
+        )
+        :op '<>'
+        :right (ExprApp
+          :func (ExprSelect
+            :target (ExprId 'path')
+            :field 'extension'
+          )
+          :args (
+            (ExprString 'archive.tar.gz' '"archive.tar.gz"')
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printBool')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'stringOp')
+              :field 'equal'
+            )
+            :args (
+              (ExprId 's2')
+              (ExprApp
+                :func (ExprSelect
+                  :target (ExprId 'path')
+                  :field 'baseName'
+                )
+                :args (
+                  (ExprString 'archive.tar.gz' '"archive.tar.gz"')
+                )
+              )
+            )
+          )
+        )
+      )
+    )
+    (LetValueBinding
+      :name 's3'
+      :value (ExprInfix
+        :left (ExprApp
+          :func (ExprSelect
+            :target (ExprId 'path')
+            :field 'stem'
+          )
+          :args (
+            (ExprString '.gitignore' '".gitignore"')
+          )
+        )
+        :op '<>'
+        :right (ExprApp
+          :func (ExprSelect
+            :target (ExprId 'path')
+            :field 'extension'
+          )
+          :args (
+            (ExprString '.gitignore' '".gitignore"')
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printBool')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'stringOp')
+              :field 'equal'
+            )
+            :args (
+              (ExprId 's3')
+              (ExprApp
+                :func (ExprSelect
+                  :target (ExprId 'path')
+                  :field 'baseName'
+                )
+                :args (
+                  (ExprString '.gitignore' '".gitignore"')
+                )
+              )
+            )
+          )
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'pList'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'path')
+          :field 'parts'
+        )
+        :args (
+          (ExprString '/a/b/c' '"/a/b/c"')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printInt')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'vector')
+              :field 'length'
+            )
+            :args (
+              (TypeArgument
+                :type_val (TypePath ('String'))
+              )
+              (ExprId 'pList')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printStr')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'vector')
+              :field 'get'
+            )
+            :args (
+              (TypeArgument
+                :type_val (TypePath ('String'))
+              )
+              (ExprId 'pList')
+              (ExprInt 0 '0')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printStr')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'vector')
+              :field 'get'
+            )
+            :args (
+              (TypeArgument
+                :type_val (TypePath ('String'))
+              )
+              (ExprId 'pList')
+              (ExprInt 1 '1')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printStr')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'vector')
+              :field 'get'
+            )
+            :args (
+              (TypeArgument
+                :type_val (TypePath ('String'))
+              )
+              (ExprId 'pList')
+              (ExprInt 2 '2')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printStr')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'vector')
+              :field 'get'
+            )
+            :args (
+              (TypeArgument
+                :type_val (TypePath ('String'))
+              )
+              (ExprId 'pList')
+              (ExprInt 3 '3')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printStr')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'path')
+              :field 'join'
+            )
+            :args (
+              (ExprString 'a' '"a"')
+              (ExprString 'b' '"b"')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printStr')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'path')
+              :field 'join'
+            )
+            :args (
+              (ExprString 'a/' '"a/"')
+              (ExprString 'b' '"b"')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printStr')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'path')
+              :field 'join'
+            )
+            :args (
+              (ExprString 'a' '"a"')
+              (ExprString '/b' '"/b"')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printStr')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'path')
+              :field 'join'
+            )
+            :args (
+              (ExprString '' '""')
+              (ExprString 'b' '"b"')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printStr')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'path')
+              :field 'join'
+            )
+            :args (
+              (ExprString 'a' '"a"')
+              (ExprString '' '""')
+            )
+          )
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'vParts'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'vector')
+          :field 'new'
+        )
+        :args (
+          (TypeArgument
+            :type_val (TypePath ('String'))
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'vector')
+          :field 'append'
+        )
+        :args (
+          (TypeArgument
+            :type_val (TypePath ('String'))
+          )
+          (ExprId 'vParts')
+          (ExprString 'a' '"a"')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'vector')
+          :field 'append'
+        )
+        :args (
+          (TypeArgument
+            :type_val (TypePath ('String'))
+          )
+          (ExprId 'vParts')
+          (ExprString 'b' '"b"')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'vector')
+          :field 'append'
+        )
+        :args (
+          (TypeArgument
+            :type_val (TypePath ('String'))
+          )
+          (ExprId 'vParts')
+          (ExprString 'c' '"c"')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printStr')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'path')
+              :field 'joinVector'
+            )
+            :args (
+              (ExprId 'vParts')
+            )
+          )
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'arrParts'
+      :value (ExprArray
+        :elements (
+          (ExprString 'x' '"x"')
+          (ExprString 'y' '"y"')
+          (ExprString 'z' '"z"')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printStr')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'path')
+              :field 'joinArray'
+            )
+            :args (
+              (ExprId 'arrParts')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printStr')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'path')
+              :field 'withExtension'
+            )
+            :args (
+              (ExprString 'foo.txt' '"foo.txt"')
+              (ExprString 'md' '"md"')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printStr')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'path')
+              :field 'withExtension'
+            )
+            :args (
+              (ExprString 'foo.txt' '"foo.txt"')
+              (ExprString '.md' '".md"')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printStr')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'path')
+              :field 'withExtension'
+            )
+            :args (
+              (ExprString 'foo.txt' '"foo.txt"')
+              (ExprString '' '""')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printStr')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'path')
+              :field 'withExtension'
+            )
+            :args (
+              (ExprString '/dir/foo' '"/dir/foo"')
+              (ExprString 'o' '"o"')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printStr')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'path')
+              :field 'normalize'
+            )
+            :args (
+              (ExprString 'a//b/./c/../d' '"a//b/./c/../d"')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printStr')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'path')
+              :field 'normalize'
+            )
+            :args (
+              (ExprString '/../a' '"/../a"')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printStr')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'path')
+              :field 'normalize'
+            )
+            :args (
+              (ExprString '' '""')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printStr')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'path')
+              :field 'normalize'
+            )
+            :args (
+              (ExprString '/a/b/../../c' '"/a/b/../../c"')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printStr')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'path')
+              :field 'normalize'
+            )
+            :args (
+              (ExprString 'a/b/../../../c' '"a/b/../../../c"')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printStr')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'path')
+              :field 'relativeTo'
+            )
+            :args (
+              (ExprString '/a/b/c' '"/a/b/c"')
+              (ExprString '/a' '"/a"')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printStr')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'path')
+              :field 'relativeTo'
+            )
+            :args (
+              (ExprString '/a/b' '"/a/b"')
+              (ExprString '/a/c' '"/a/c"')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printStr')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'path')
+              :field 'relativeTo'
+            )
+            :args (
+              (ExprString '/a/b/c' '"/a/b/c"')
+              (ExprString '/a/b/c' '"/a/b/c"')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printStr')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'path')
+              :field 'relativeTo'
+            )
+            :args (
+              (ExprString 'a/b' '"a/b"')
+              (ExprString 'a' '"a"')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprTry
+        :body (ExprBlock
+          :bindings (
+            (LetValueBinding
+              :name 'dummy'
+              :value (ExprApp
+                :func (ExprSelect
+                  :target (ExprId 'path')
+                  :field 'relativeTo'
+                )
+                :args (
+                  (ExprString '/a/b' '"/a/b"')
+                  (ExprString 'a/b' '"a/b"')
+                )
+              )
+            )
+            (ExprStmt
+              :expr (ExprApp
+                :func (ExprId 'printStr')
+                :args (
+                  (ExprString 'FAILED: should have raised error' '"FAILED: should have raised error"')
+                )
+              )
+            )
+          )
+        )
+        :branches (
+          (TryBranch
+            :exc_pattern (ExprSelect
+              :target (ExprId 'path')
+              :field 'error'
+            )
+            :body (ExprStmt
+              :expr (ExprApp
+                :func (ExprId 'printStr')
+                :args (
+                  (ExprString 'CAUGHT: path.error' '"CAUGHT: path.error"')
+                )
+              )
+            )
+          )
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'resolved'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'path')
+          :field 'resolve'
+        )
+        :args (
+          (ExprString 'foo/bar' '"foo/bar"')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printBool')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'path')
+              :field 'isAbsolute'
+            )
+            :args (
+              (ExprId 'resolved')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printBool')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'stringOp')
+              :field 'equal'
+            )
+            :args (
+              (ExprApp
+                :func (ExprSelect
+                  :target (ExprId 'path')
+                  :field 'normalize'
+                )
+                :args (
+                  (ExprId 'resolved')
+                )
+              )
+              (ExprId 'resolved')
+            )
+          )
+        )
+      )
+    )
+  )
+)

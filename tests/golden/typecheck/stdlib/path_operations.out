@@ -1,0 +1,824 @@
+(TypedProgram
+  :phrases (
+    (TypedImport
+      :items (
+        (TypedImportItem ('path') : 'Path')
+        (TypedImportItem ('vector') : 'Vector')
+        (TypedImportItem ('writer') : 'Writer')
+        (TypedImportItem ('conv') : 'Conv')
+        (TypedImportItem ('stringOp') : 'StringOp')
+      ))
+    (TypedLetValue 'printStr' :type Fun(s: String): Ok
+      :value (TypedFun :params (('s' : String)) :type Fun(s: String): Ok
+        :body (TypedBlock :type Ok
+          :bindings (
+            (TypedExprStmt
+              :expr (TypedApp :type Ok
+                :func (TypedSelect 'putString' :type Fun(writer: Writer.T string: String): Ok
+                  :target (TypedVar 'writer' :type Record error: Exception output: Writer.T err: Writer.T file: Fun(name: String): Writer.T putString: Fun(writer: Writer.T string: String): Ok putChar: Fun(writer: Writer.T char: Char): Ok putSubString: Fun(writer: Writer.T string: String start: Int size: Int): Ok flush: Fun(writer: Writer.T): Ok close: Fun(writer: Writer.T): Ok end))
+                :args (
+                  (TypedSelect 'output' :type Writer.T
+                    :target (TypedVar 'writer' :type Record error: Exception output: Writer.T err: Writer.T file: Fun(name: String): Writer.T putString: Fun(writer: Writer.T string: String): Ok putChar: Fun(writer: Writer.T char: Char): Ok putSubString: Fun(writer: Writer.T string: String start: Int size: Int): Ok flush: Fun(writer: Writer.T): Ok close: Fun(writer: Writer.T): Ok end))
+                  (TypedVar 's' :type String)
+                )))
+          )
+          :result (TypedApp :type Ok
+            :func (TypedSelect 'putString' :type Fun(writer: Writer.T string: String): Ok
+              :target (TypedVar 'writer' :type Record error: Exception output: Writer.T err: Writer.T file: Fun(name: String): Writer.T putString: Fun(writer: Writer.T string: String): Ok putChar: Fun(writer: Writer.T char: Char): Ok putSubString: Fun(writer: Writer.T string: String start: Int size: Int): Ok flush: Fun(writer: Writer.T): Ok close: Fun(writer: Writer.T): Ok end))
+            :args (
+              (TypedSelect 'output' :type Writer.T
+                :target (TypedVar 'writer' :type Record error: Exception output: Writer.T err: Writer.T file: Fun(name: String): Writer.T putString: Fun(writer: Writer.T string: String): Ok putChar: Fun(writer: Writer.T char: Char): Ok putSubString: Fun(writer: Writer.T string: String start: Int size: Int): Ok flush: Fun(writer: Writer.T): Ok close: Fun(writer: Writer.T): Ok end))
+              (TypedString '\n' :type String)
+            )))))
+    (TypedLetValue 'printBool' :type Fun(b: Bool): Ok
+      :value (TypedFun :params (('b' : Bool)) :type Fun(b: Bool): Ok
+        :body (TypedApp :type Ok
+          :func (TypedVar 'printStr' :type Fun(s: String): Ok)
+          :args (
+            (TypedApp :type String
+              :func (TypedSelect 'bool' :type Fun(b: Bool): String
+                :target (TypedVar 'conv' :type Record okay: Fun(): String bool: Fun(b: Bool): String int: Fun(n: Int): String real: Fun(r: Real): String char: Fun(c: Char): String string: Fun(s: String): String end))
+              :args (
+                (TypedVar 'b' :type Bool)
+              ))
+          ))))
+    (TypedLetValue 'printInt' :type Fun(n: Int): Ok
+      :value (TypedFun :params (('n' : Int)) :type Fun(n: Int): Ok
+        :body (TypedApp :type Ok
+          :func (TypedVar 'printStr' :type Fun(s: String): Ok)
+          :args (
+            (TypedApp :type String
+              :func (TypedSelect 'int' :type Fun(n: Int): String
+                :target (TypedVar 'conv' :type Record okay: Fun(): String bool: Fun(b: Bool): String int: Fun(n: Int): String real: Fun(r: Real): String char: Fun(c: Char): String string: Fun(s: String): String end))
+              :args (
+                (TypedVar 'n' :type Int)
+              ))
+          ))))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printBool' :type Fun(b: Bool): Ok)
+        :args (
+          (TypedInfix 'is' :type Bool
+            :left (TypedSelect 'separator' :type Char
+              :target (TypedVar 'path' :type Record error: Exception separator: Char separatorString: String dirName: Fun(path: String): String baseName: Fun(path: String): String extension: Fun(path: String): String stem: Fun(path: String): String parts: Fun(path: String): vector.T(String) join: Fun(part1: String part2: String): String joinVector: Fun(items: vector.T(String)): String joinArray: Fun(items: Array(String)): String withExtension: Fun(path: String newExt: String): String isAbsolute: Fun(path: String): Bool isRelative: Fun(path: String): Bool hasExtension: Fun(path: String): Bool normalize: Fun(path: String): String relativeTo: Fun(path: String base: String): String resolve: Fun(path: String): String end))
+            :right (TypedChar '/' :type Char))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printStr' :type Fun(s: String): Ok)
+        :args (
+          (TypedSelect 'separatorString' :type String
+            :target (TypedVar 'path' :type Record error: Exception separator: Char separatorString: String dirName: Fun(path: String): String baseName: Fun(path: String): String extension: Fun(path: String): String stem: Fun(path: String): String parts: Fun(path: String): vector.T(String) join: Fun(part1: String part2: String): String joinVector: Fun(items: vector.T(String)): String joinArray: Fun(items: Array(String)): String withExtension: Fun(path: String newExt: String): String isAbsolute: Fun(path: String): Bool isRelative: Fun(path: String): Bool hasExtension: Fun(path: String): Bool normalize: Fun(path: String): String relativeTo: Fun(path: String base: String): String resolve: Fun(path: String): String end))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printBool' :type Fun(b: Bool): Ok)
+        :args (
+          (TypedApp :type Bool
+            :func (TypedSelect 'isAbsolute' :type Fun(path: String): Bool
+              :target (TypedVar 'path' :type Record error: Exception separator: Char separatorString: String dirName: Fun(path: String): String baseName: Fun(path: String): String extension: Fun(path: String): String stem: Fun(path: String): String parts: Fun(path: String): vector.T(String) join: Fun(part1: String part2: String): String joinVector: Fun(items: vector.T(String)): String joinArray: Fun(items: Array(String)): String withExtension: Fun(path: String newExt: String): String isAbsolute: Fun(path: String): Bool isRelative: Fun(path: String): Bool hasExtension: Fun(path: String): Bool normalize: Fun(path: String): String relativeTo: Fun(path: String base: String): String resolve: Fun(path: String): String end))
+            :args (
+              (TypedString '/foo/bar' :type String)
+            ))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printBool' :type Fun(b: Bool): Ok)
+        :args (
+          (TypedApp :type Bool
+            :func (TypedSelect 'isAbsolute' :type Fun(path: String): Bool
+              :target (TypedVar 'path' :type Record error: Exception separator: Char separatorString: String dirName: Fun(path: String): String baseName: Fun(path: String): String extension: Fun(path: String): String stem: Fun(path: String): String parts: Fun(path: String): vector.T(String) join: Fun(part1: String part2: String): String joinVector: Fun(items: vector.T(String)): String joinArray: Fun(items: Array(String)): String withExtension: Fun(path: String newExt: String): String isAbsolute: Fun(path: String): Bool isRelative: Fun(path: String): Bool hasExtension: Fun(path: String): Bool normalize: Fun(path: String): String relativeTo: Fun(path: String base: String): String resolve: Fun(path: String): String end))
+            :args (
+              (TypedString 'foo/bar' :type String)
+            ))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printBool' :type Fun(b: Bool): Ok)
+        :args (
+          (TypedApp :type Bool
+            :func (TypedSelect 'isRelative' :type Fun(path: String): Bool
+              :target (TypedVar 'path' :type Record error: Exception separator: Char separatorString: String dirName: Fun(path: String): String baseName: Fun(path: String): String extension: Fun(path: String): String stem: Fun(path: String): String parts: Fun(path: String): vector.T(String) join: Fun(part1: String part2: String): String joinVector: Fun(items: vector.T(String)): String joinArray: Fun(items: Array(String)): String withExtension: Fun(path: String newExt: String): String isAbsolute: Fun(path: String): Bool isRelative: Fun(path: String): Bool hasExtension: Fun(path: String): Bool normalize: Fun(path: String): String relativeTo: Fun(path: String base: String): String resolve: Fun(path: String): String end))
+            :args (
+              (TypedString 'foo/bar' :type String)
+            ))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printBool' :type Fun(b: Bool): Ok)
+        :args (
+          (TypedApp :type Bool
+            :func (TypedSelect 'isRelative' :type Fun(path: String): Bool
+              :target (TypedVar 'path' :type Record error: Exception separator: Char separatorString: String dirName: Fun(path: String): String baseName: Fun(path: String): String extension: Fun(path: String): String stem: Fun(path: String): String parts: Fun(path: String): vector.T(String) join: Fun(part1: String part2: String): String joinVector: Fun(items: vector.T(String)): String joinArray: Fun(items: Array(String)): String withExtension: Fun(path: String newExt: String): String isAbsolute: Fun(path: String): Bool isRelative: Fun(path: String): Bool hasExtension: Fun(path: String): Bool normalize: Fun(path: String): String relativeTo: Fun(path: String base: String): String resolve: Fun(path: String): String end))
+            :args (
+              (TypedString '/foo/bar' :type String)
+            ))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printStr' :type Fun(s: String): Ok)
+        :args (
+          (TypedApp :type String
+            :func (TypedSelect 'dirName' :type Fun(path: String): String
+              :target (TypedVar 'path' :type Record error: Exception separator: Char separatorString: String dirName: Fun(path: String): String baseName: Fun(path: String): String extension: Fun(path: String): String stem: Fun(path: String): String parts: Fun(path: String): vector.T(String) join: Fun(part1: String part2: String): String joinVector: Fun(items: vector.T(String)): String joinArray: Fun(items: Array(String)): String withExtension: Fun(path: String newExt: String): String isAbsolute: Fun(path: String): Bool isRelative: Fun(path: String): Bool hasExtension: Fun(path: String): Bool normalize: Fun(path: String): String relativeTo: Fun(path: String base: String): String resolve: Fun(path: String): String end))
+            :args (
+              (TypedString '/a/b/c.txt' :type String)
+            ))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printStr' :type Fun(s: String): Ok)
+        :args (
+          (TypedApp :type String
+            :func (TypedSelect 'dirName' :type Fun(path: String): String
+              :target (TypedVar 'path' :type Record error: Exception separator: Char separatorString: String dirName: Fun(path: String): String baseName: Fun(path: String): String extension: Fun(path: String): String stem: Fun(path: String): String parts: Fun(path: String): vector.T(String) join: Fun(part1: String part2: String): String joinVector: Fun(items: vector.T(String)): String joinArray: Fun(items: Array(String)): String withExtension: Fun(path: String newExt: String): String isAbsolute: Fun(path: String): Bool isRelative: Fun(path: String): Bool hasExtension: Fun(path: String): Bool normalize: Fun(path: String): String relativeTo: Fun(path: String base: String): String resolve: Fun(path: String): String end))
+            :args (
+              (TypedString 'a/b' :type String)
+            ))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printStr' :type Fun(s: String): Ok)
+        :args (
+          (TypedApp :type String
+            :func (TypedSelect 'dirName' :type Fun(path: String): String
+              :target (TypedVar 'path' :type Record error: Exception separator: Char separatorString: String dirName: Fun(path: String): String baseName: Fun(path: String): String extension: Fun(path: String): String stem: Fun(path: String): String parts: Fun(path: String): vector.T(String) join: Fun(part1: String part2: String): String joinVector: Fun(items: vector.T(String)): String joinArray: Fun(items: Array(String)): String withExtension: Fun(path: String newExt: String): String isAbsolute: Fun(path: String): Bool isRelative: Fun(path: String): Bool hasExtension: Fun(path: String): Bool normalize: Fun(path: String): String relativeTo: Fun(path: String base: String): String resolve: Fun(path: String): String end))
+            :args (
+              (TypedString 'a' :type String)
+            ))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printStr' :type Fun(s: String): Ok)
+        :args (
+          (TypedApp :type String
+            :func (TypedSelect 'dirName' :type Fun(path: String): String
+              :target (TypedVar 'path' :type Record error: Exception separator: Char separatorString: String dirName: Fun(path: String): String baseName: Fun(path: String): String extension: Fun(path: String): String stem: Fun(path: String): String parts: Fun(path: String): vector.T(String) join: Fun(part1: String part2: String): String joinVector: Fun(items: vector.T(String)): String joinArray: Fun(items: Array(String)): String withExtension: Fun(path: String newExt: String): String isAbsolute: Fun(path: String): Bool isRelative: Fun(path: String): Bool hasExtension: Fun(path: String): Bool normalize: Fun(path: String): String relativeTo: Fun(path: String base: String): String resolve: Fun(path: String): String end))
+            :args (
+              (TypedString '/a' :type String)
+            ))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printStr' :type Fun(s: String): Ok)
+        :args (
+          (TypedApp :type String
+            :func (TypedSelect 'dirName' :type Fun(path: String): String
+              :target (TypedVar 'path' :type Record error: Exception separator: Char separatorString: String dirName: Fun(path: String): String baseName: Fun(path: String): String extension: Fun(path: String): String stem: Fun(path: String): String parts: Fun(path: String): vector.T(String) join: Fun(part1: String part2: String): String joinVector: Fun(items: vector.T(String)): String joinArray: Fun(items: Array(String)): String withExtension: Fun(path: String newExt: String): String isAbsolute: Fun(path: String): Bool isRelative: Fun(path: String): Bool hasExtension: Fun(path: String): Bool normalize: Fun(path: String): String relativeTo: Fun(path: String base: String): String resolve: Fun(path: String): String end))
+            :args (
+              (TypedString '/' :type String)
+            ))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printStr' :type Fun(s: String): Ok)
+        :args (
+          (TypedApp :type String
+            :func (TypedSelect 'baseName' :type Fun(path: String): String
+              :target (TypedVar 'path' :type Record error: Exception separator: Char separatorString: String dirName: Fun(path: String): String baseName: Fun(path: String): String extension: Fun(path: String): String stem: Fun(path: String): String parts: Fun(path: String): vector.T(String) join: Fun(part1: String part2: String): String joinVector: Fun(items: vector.T(String)): String joinArray: Fun(items: Array(String)): String withExtension: Fun(path: String newExt: String): String isAbsolute: Fun(path: String): Bool isRelative: Fun(path: String): Bool hasExtension: Fun(path: String): Bool normalize: Fun(path: String): String relativeTo: Fun(path: String base: String): String resolve: Fun(path: String): String end))
+            :args (
+              (TypedString '/a/b/c.txt' :type String)
+            ))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printStr' :type Fun(s: String): Ok)
+        :args (
+          (TypedApp :type String
+            :func (TypedSelect 'baseName' :type Fun(path: String): String
+              :target (TypedVar 'path' :type Record error: Exception separator: Char separatorString: String dirName: Fun(path: String): String baseName: Fun(path: String): String extension: Fun(path: String): String stem: Fun(path: String): String parts: Fun(path: String): vector.T(String) join: Fun(part1: String part2: String): String joinVector: Fun(items: vector.T(String)): String joinArray: Fun(items: Array(String)): String withExtension: Fun(path: String newExt: String): String isAbsolute: Fun(path: String): Bool isRelative: Fun(path: String): Bool hasExtension: Fun(path: String): Bool normalize: Fun(path: String): String relativeTo: Fun(path: String base: String): String resolve: Fun(path: String): String end))
+            :args (
+              (TypedString 'a/b/' :type String)
+            ))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printStr' :type Fun(s: String): Ok)
+        :args (
+          (TypedApp :type String
+            :func (TypedSelect 'baseName' :type Fun(path: String): String
+              :target (TypedVar 'path' :type Record error: Exception separator: Char separatorString: String dirName: Fun(path: String): String baseName: Fun(path: String): String extension: Fun(path: String): String stem: Fun(path: String): String parts: Fun(path: String): vector.T(String) join: Fun(part1: String part2: String): String joinVector: Fun(items: vector.T(String)): String joinArray: Fun(items: Array(String)): String withExtension: Fun(path: String newExt: String): String isAbsolute: Fun(path: String): Bool isRelative: Fun(path: String): Bool hasExtension: Fun(path: String): Bool normalize: Fun(path: String): String relativeTo: Fun(path: String base: String): String resolve: Fun(path: String): String end))
+            :args (
+              (TypedString '/' :type String)
+            ))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printStr' :type Fun(s: String): Ok)
+        :args (
+          (TypedApp :type String
+            :func (TypedSelect 'baseName' :type Fun(path: String): String
+              :target (TypedVar 'path' :type Record error: Exception separator: Char separatorString: String dirName: Fun(path: String): String baseName: Fun(path: String): String extension: Fun(path: String): String stem: Fun(path: String): String parts: Fun(path: String): vector.T(String) join: Fun(part1: String part2: String): String joinVector: Fun(items: vector.T(String)): String joinArray: Fun(items: Array(String)): String withExtension: Fun(path: String newExt: String): String isAbsolute: Fun(path: String): Bool isRelative: Fun(path: String): Bool hasExtension: Fun(path: String): Bool normalize: Fun(path: String): String relativeTo: Fun(path: String base: String): String resolve: Fun(path: String): String end))
+            :args (
+              (TypedString '' :type String)
+            ))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printStr' :type Fun(s: String): Ok)
+        :args (
+          (TypedApp :type String
+            :func (TypedSelect 'extension' :type Fun(path: String): String
+              :target (TypedVar 'path' :type Record error: Exception separator: Char separatorString: String dirName: Fun(path: String): String baseName: Fun(path: String): String extension: Fun(path: String): String stem: Fun(path: String): String parts: Fun(path: String): vector.T(String) join: Fun(part1: String part2: String): String joinVector: Fun(items: vector.T(String)): String joinArray: Fun(items: Array(String)): String withExtension: Fun(path: String newExt: String): String isAbsolute: Fun(path: String): Bool isRelative: Fun(path: String): Bool hasExtension: Fun(path: String): Bool normalize: Fun(path: String): String relativeTo: Fun(path: String base: String): String resolve: Fun(path: String): String end))
+            :args (
+              (TypedString 'foo.txt' :type String)
+            ))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printStr' :type Fun(s: String): Ok)
+        :args (
+          (TypedApp :type String
+            :func (TypedSelect 'extension' :type Fun(path: String): String
+              :target (TypedVar 'path' :type Record error: Exception separator: Char separatorString: String dirName: Fun(path: String): String baseName: Fun(path: String): String extension: Fun(path: String): String stem: Fun(path: String): String parts: Fun(path: String): vector.T(String) join: Fun(part1: String part2: String): String joinVector: Fun(items: vector.T(String)): String joinArray: Fun(items: Array(String)): String withExtension: Fun(path: String newExt: String): String isAbsolute: Fun(path: String): Bool isRelative: Fun(path: String): Bool hasExtension: Fun(path: String): Bool normalize: Fun(path: String): String relativeTo: Fun(path: String base: String): String resolve: Fun(path: String): String end))
+            :args (
+              (TypedString 'archive.tar.gz' :type String)
+            ))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printStr' :type Fun(s: String): Ok)
+        :args (
+          (TypedApp :type String
+            :func (TypedSelect 'extension' :type Fun(path: String): String
+              :target (TypedVar 'path' :type Record error: Exception separator: Char separatorString: String dirName: Fun(path: String): String baseName: Fun(path: String): String extension: Fun(path: String): String stem: Fun(path: String): String parts: Fun(path: String): vector.T(String) join: Fun(part1: String part2: String): String joinVector: Fun(items: vector.T(String)): String joinArray: Fun(items: Array(String)): String withExtension: Fun(path: String newExt: String): String isAbsolute: Fun(path: String): Bool isRelative: Fun(path: String): Bool hasExtension: Fun(path: String): Bool normalize: Fun(path: String): String relativeTo: Fun(path: String base: String): String resolve: Fun(path: String): String end))
+            :args (
+              (TypedString '.gitignore' :type String)
+            ))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printStr' :type Fun(s: String): Ok)
+        :args (
+          (TypedApp :type String
+            :func (TypedSelect 'extension' :type Fun(path: String): String
+              :target (TypedVar 'path' :type Record error: Exception separator: Char separatorString: String dirName: Fun(path: String): String baseName: Fun(path: String): String extension: Fun(path: String): String stem: Fun(path: String): String parts: Fun(path: String): vector.T(String) join: Fun(part1: String part2: String): String joinVector: Fun(items: vector.T(String)): String joinArray: Fun(items: Array(String)): String withExtension: Fun(path: String newExt: String): String isAbsolute: Fun(path: String): Bool isRelative: Fun(path: String): Bool hasExtension: Fun(path: String): Bool normalize: Fun(path: String): String relativeTo: Fun(path: String base: String): String resolve: Fun(path: String): String end))
+            :args (
+              (TypedString 'foo' :type String)
+            ))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printBool' :type Fun(b: Bool): Ok)
+        :args (
+          (TypedApp :type Bool
+            :func (TypedSelect 'hasExtension' :type Fun(path: String): Bool
+              :target (TypedVar 'path' :type Record error: Exception separator: Char separatorString: String dirName: Fun(path: String): String baseName: Fun(path: String): String extension: Fun(path: String): String stem: Fun(path: String): String parts: Fun(path: String): vector.T(String) join: Fun(part1: String part2: String): String joinVector: Fun(items: vector.T(String)): String joinArray: Fun(items: Array(String)): String withExtension: Fun(path: String newExt: String): String isAbsolute: Fun(path: String): Bool isRelative: Fun(path: String): Bool hasExtension: Fun(path: String): Bool normalize: Fun(path: String): String relativeTo: Fun(path: String base: String): String resolve: Fun(path: String): String end))
+            :args (
+              (TypedString 'foo.txt' :type String)
+            ))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printBool' :type Fun(b: Bool): Ok)
+        :args (
+          (TypedApp :type Bool
+            :func (TypedSelect 'hasExtension' :type Fun(path: String): Bool
+              :target (TypedVar 'path' :type Record error: Exception separator: Char separatorString: String dirName: Fun(path: String): String baseName: Fun(path: String): String extension: Fun(path: String): String stem: Fun(path: String): String parts: Fun(path: String): vector.T(String) join: Fun(part1: String part2: String): String joinVector: Fun(items: vector.T(String)): String joinArray: Fun(items: Array(String)): String withExtension: Fun(path: String newExt: String): String isAbsolute: Fun(path: String): Bool isRelative: Fun(path: String): Bool hasExtension: Fun(path: String): Bool normalize: Fun(path: String): String relativeTo: Fun(path: String base: String): String resolve: Fun(path: String): String end))
+            :args (
+              (TypedString 'foo' :type String)
+            ))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printStr' :type Fun(s: String): Ok)
+        :args (
+          (TypedApp :type String
+            :func (TypedSelect 'stem' :type Fun(path: String): String
+              :target (TypedVar 'path' :type Record error: Exception separator: Char separatorString: String dirName: Fun(path: String): String baseName: Fun(path: String): String extension: Fun(path: String): String stem: Fun(path: String): String parts: Fun(path: String): vector.T(String) join: Fun(part1: String part2: String): String joinVector: Fun(items: vector.T(String)): String joinArray: Fun(items: Array(String)): String withExtension: Fun(path: String newExt: String): String isAbsolute: Fun(path: String): Bool isRelative: Fun(path: String): Bool hasExtension: Fun(path: String): Bool normalize: Fun(path: String): String relativeTo: Fun(path: String base: String): String resolve: Fun(path: String): String end))
+            :args (
+              (TypedString 'foo.txt' :type String)
+            ))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printStr' :type Fun(s: String): Ok)
+        :args (
+          (TypedApp :type String
+            :func (TypedSelect 'stem' :type Fun(path: String): String
+              :target (TypedVar 'path' :type Record error: Exception separator: Char separatorString: String dirName: Fun(path: String): String baseName: Fun(path: String): String extension: Fun(path: String): String stem: Fun(path: String): String parts: Fun(path: String): vector.T(String) join: Fun(part1: String part2: String): String joinVector: Fun(items: vector.T(String)): String joinArray: Fun(items: Array(String)): String withExtension: Fun(path: String newExt: String): String isAbsolute: Fun(path: String): Bool isRelative: Fun(path: String): Bool hasExtension: Fun(path: String): Bool normalize: Fun(path: String): String relativeTo: Fun(path: String base: String): String resolve: Fun(path: String): String end))
+            :args (
+              (TypedString 'archive.tar.gz' :type String)
+            ))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printStr' :type Fun(s: String): Ok)
+        :args (
+          (TypedApp :type String
+            :func (TypedSelect 'stem' :type Fun(path: String): String
+              :target (TypedVar 'path' :type Record error: Exception separator: Char separatorString: String dirName: Fun(path: String): String baseName: Fun(path: String): String extension: Fun(path: String): String stem: Fun(path: String): String parts: Fun(path: String): vector.T(String) join: Fun(part1: String part2: String): String joinVector: Fun(items: vector.T(String)): String joinArray: Fun(items: Array(String)): String withExtension: Fun(path: String newExt: String): String isAbsolute: Fun(path: String): Bool isRelative: Fun(path: String): Bool hasExtension: Fun(path: String): Bool normalize: Fun(path: String): String relativeTo: Fun(path: String base: String): String resolve: Fun(path: String): String end))
+            :args (
+              (TypedString '.gitignore' :type String)
+            ))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printStr' :type Fun(s: String): Ok)
+        :args (
+          (TypedApp :type String
+            :func (TypedSelect 'stem' :type Fun(path: String): String
+              :target (TypedVar 'path' :type Record error: Exception separator: Char separatorString: String dirName: Fun(path: String): String baseName: Fun(path: String): String extension: Fun(path: String): String stem: Fun(path: String): String parts: Fun(path: String): vector.T(String) join: Fun(part1: String part2: String): String joinVector: Fun(items: vector.T(String)): String joinArray: Fun(items: Array(String)): String withExtension: Fun(path: String newExt: String): String isAbsolute: Fun(path: String): Bool isRelative: Fun(path: String): Bool hasExtension: Fun(path: String): Bool normalize: Fun(path: String): String relativeTo: Fun(path: String base: String): String resolve: Fun(path: String): String end))
+            :args (
+              (TypedString 'foo' :type String)
+            ))
+        )))
+    (TypedLetValue 's1' :type String
+      :value (TypedInfix '<>' :type String
+        :left (TypedApp :type String
+          :func (TypedSelect 'stem' :type Fun(path: String): String
+            :target (TypedVar 'path' :type Record error: Exception separator: Char separatorString: String dirName: Fun(path: String): String baseName: Fun(path: String): String extension: Fun(path: String): String stem: Fun(path: String): String parts: Fun(path: String): vector.T(String) join: Fun(part1: String part2: String): String joinVector: Fun(items: vector.T(String)): String joinArray: Fun(items: Array(String)): String withExtension: Fun(path: String newExt: String): String isAbsolute: Fun(path: String): Bool isRelative: Fun(path: String): Bool hasExtension: Fun(path: String): Bool normalize: Fun(path: String): String relativeTo: Fun(path: String base: String): String resolve: Fun(path: String): String end))
+          :args (
+            (TypedString 'foo.txt' :type String)
+          ))
+        :right (TypedApp :type String
+          :func (TypedSelect 'extension' :type Fun(path: String): String
+            :target (TypedVar 'path' :type Record error: Exception separator: Char separatorString: String dirName: Fun(path: String): String baseName: Fun(path: String): String extension: Fun(path: String): String stem: Fun(path: String): String parts: Fun(path: String): vector.T(String) join: Fun(part1: String part2: String): String joinVector: Fun(items: vector.T(String)): String joinArray: Fun(items: Array(String)): String withExtension: Fun(path: String newExt: String): String isAbsolute: Fun(path: String): Bool isRelative: Fun(path: String): Bool hasExtension: Fun(path: String): Bool normalize: Fun(path: String): String relativeTo: Fun(path: String base: String): String resolve: Fun(path: String): String end))
+          :args (
+            (TypedString 'foo.txt' :type String)
+          ))))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printBool' :type Fun(b: Bool): Ok)
+        :args (
+          (TypedApp :type Bool
+            :func (TypedSelect 'equal' :type Fun(s1: String s2: String): Bool
+              :target (TypedVar 'stringOp' :type Record error: Exception new: Fun(size: Int init: Char): String isEmpty: Fun(string: String): Bool length: Fun(string: String): Int getChar: Fun(string: String index: Int): Char setChar: Fun(string: String index: Int char: Char): Ok getSub: Fun(source: String start: Int size: Int): String setSub: Fun(dest: String destStart: Int source: String sourceStart: Int sourceSize: Int): Ok cat: Fun(s1: String s2: String): String catSub: Fun(s1: String start1: Int size1: Int s2: String start2: Int size2: Int): String conc: Fun(a: Array(String)): String equal: Fun(s1: String s2: String): Bool equalSub: Fun(s1: String start1: Int size1: Int s2: String start2: Int size2: Int): Bool precedes: Fun(s1: String s2: String): Bool precedesSub: Fun(s1: String start1: Int size1: Int s2: String start2: Int size2: Int): Bool end))
+            :args (
+              (TypedVar 's1' :type String)
+              (TypedApp :type String
+                :func (TypedSelect 'baseName' :type Fun(path: String): String
+                  :target (TypedVar 'path' :type Record error: Exception separator: Char separatorString: String dirName: Fun(path: String): String baseName: Fun(path: String): String extension: Fun(path: String): String stem: Fun(path: String): String parts: Fun(path: String): vector.T(String) join: Fun(part1: String part2: String): String joinVector: Fun(items: vector.T(String)): String joinArray: Fun(items: Array(String)): String withExtension: Fun(path: String newExt: String): String isAbsolute: Fun(path: String): Bool isRelative: Fun(path: String): Bool hasExtension: Fun(path: String): Bool normalize: Fun(path: String): String relativeTo: Fun(path: String base: String): String resolve: Fun(path: String): String end))
+                :args (
+                  (TypedString 'foo.txt' :type String)
+                ))
+            ))
+        )))
+    (TypedLetValue 's2' :type String
+      :value (TypedInfix '<>' :type String
+        :left (TypedApp :type String
+          :func (TypedSelect 'stem' :type Fun(path: String): String
+            :target (TypedVar 'path' :type Record error: Exception separator: Char separatorString: String dirName: Fun(path: String): String baseName: Fun(path: String): String extension: Fun(path: String): String stem: Fun(path: String): String parts: Fun(path: String): vector.T(String) join: Fun(part1: String part2: String): String joinVector: Fun(items: vector.T(String)): String joinArray: Fun(items: Array(String)): String withExtension: Fun(path: String newExt: String): String isAbsolute: Fun(path: String): Bool isRelative: Fun(path: String): Bool hasExtension: Fun(path: String): Bool normalize: Fun(path: String): String relativeTo: Fun(path: String base: String): String resolve: Fun(path: String): String end))
+          :args (
+            (TypedString 'archive.tar.gz' :type String)
+          ))
+        :right (TypedApp :type String
+          :func (TypedSelect 'extension' :type Fun(path: String): String
+            :target (TypedVar 'path' :type Record error: Exception separator: Char separatorString: String dirName: Fun(path: String): String baseName: Fun(path: String): String extension: Fun(path: String): String stem: Fun(path: String): String parts: Fun(path: String): vector.T(String) join: Fun(part1: String part2: String): String joinVector: Fun(items: vector.T(String)): String joinArray: Fun(items: Array(String)): String withExtension: Fun(path: String newExt: String): String isAbsolute: Fun(path: String): Bool isRelative: Fun(path: String): Bool hasExtension: Fun(path: String): Bool normalize: Fun(path: String): String relativeTo: Fun(path: String base: String): String resolve: Fun(path: String): String end))
+          :args (
+            (TypedString 'archive.tar.gz' :type String)
+          ))))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printBool' :type Fun(b: Bool): Ok)
+        :args (
+          (TypedApp :type Bool
+            :func (TypedSelect 'equal' :type Fun(s1: String s2: String): Bool
+              :target (TypedVar 'stringOp' :type Record error: Exception new: Fun(size: Int init: Char): String isEmpty: Fun(string: String): Bool length: Fun(string: String): Int getChar: Fun(string: String index: Int): Char setChar: Fun(string: String index: Int char: Char): Ok getSub: Fun(source: String start: Int size: Int): String setSub: Fun(dest: String destStart: Int source: String sourceStart: Int sourceSize: Int): Ok cat: Fun(s1: String s2: String): String catSub: Fun(s1: String start1: Int size1: Int s2: String start2: Int size2: Int): String conc: Fun(a: Array(String)): String equal: Fun(s1: String s2: String): Bool equalSub: Fun(s1: String start1: Int size1: Int s2: String start2: Int size2: Int): Bool precedes: Fun(s1: String s2: String): Bool precedesSub: Fun(s1: String start1: Int size1: Int s2: String start2: Int size2: Int): Bool end))
+            :args (
+              (TypedVar 's2' :type String)
+              (TypedApp :type String
+                :func (TypedSelect 'baseName' :type Fun(path: String): String
+                  :target (TypedVar 'path' :type Record error: Exception separator: Char separatorString: String dirName: Fun(path: String): String baseName: Fun(path: String): String extension: Fun(path: String): String stem: Fun(path: String): String parts: Fun(path: String): vector.T(String) join: Fun(part1: String part2: String): String joinVector: Fun(items: vector.T(String)): String joinArray: Fun(items: Array(String)): String withExtension: Fun(path: String newExt: String): String isAbsolute: Fun(path: String): Bool isRelative: Fun(path: String): Bool hasExtension: Fun(path: String): Bool normalize: Fun(path: String): String relativeTo: Fun(path: String base: String): String resolve: Fun(path: String): String end))
+                :args (
+                  (TypedString 'archive.tar.gz' :type String)
+                ))
+            ))
+        )))
+    (TypedLetValue 's3' :type String
+      :value (TypedInfix '<>' :type String
+        :left (TypedApp :type String
+          :func (TypedSelect 'stem' :type Fun(path: String): String
+            :target (TypedVar 'path' :type Record error: Exception separator: Char separatorString: String dirName: Fun(path: String): String baseName: Fun(path: String): String extension: Fun(path: String): String stem: Fun(path: String): String parts: Fun(path: String): vector.T(String) join: Fun(part1: String part2: String): String joinVector: Fun(items: vector.T(String)): String joinArray: Fun(items: Array(String)): String withExtension: Fun(path: String newExt: String): String isAbsolute: Fun(path: String): Bool isRelative: Fun(path: String): Bool hasExtension: Fun(path: String): Bool normalize: Fun(path: String): String relativeTo: Fun(path: String base: String): String resolve: Fun(path: String): String end))
+          :args (
+            (TypedString '.gitignore' :type String)
+          ))
+        :right (TypedApp :type String
+          :func (TypedSelect 'extension' :type Fun(path: String): String
+            :target (TypedVar 'path' :type Record error: Exception separator: Char separatorString: String dirName: Fun(path: String): String baseName: Fun(path: String): String extension: Fun(path: String): String stem: Fun(path: String): String parts: Fun(path: String): vector.T(String) join: Fun(part1: String part2: String): String joinVector: Fun(items: vector.T(String)): String joinArray: Fun(items: Array(String)): String withExtension: Fun(path: String newExt: String): String isAbsolute: Fun(path: String): Bool isRelative: Fun(path: String): Bool hasExtension: Fun(path: String): Bool normalize: Fun(path: String): String relativeTo: Fun(path: String base: String): String resolve: Fun(path: String): String end))
+          :args (
+            (TypedString '.gitignore' :type String)
+          ))))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printBool' :type Fun(b: Bool): Ok)
+        :args (
+          (TypedApp :type Bool
+            :func (TypedSelect 'equal' :type Fun(s1: String s2: String): Bool
+              :target (TypedVar 'stringOp' :type Record error: Exception new: Fun(size: Int init: Char): String isEmpty: Fun(string: String): Bool length: Fun(string: String): Int getChar: Fun(string: String index: Int): Char setChar: Fun(string: String index: Int char: Char): Ok getSub: Fun(source: String start: Int size: Int): String setSub: Fun(dest: String destStart: Int source: String sourceStart: Int sourceSize: Int): Ok cat: Fun(s1: String s2: String): String catSub: Fun(s1: String start1: Int size1: Int s2: String start2: Int size2: Int): String conc: Fun(a: Array(String)): String equal: Fun(s1: String s2: String): Bool equalSub: Fun(s1: String start1: Int size1: Int s2: String start2: Int size2: Int): Bool precedes: Fun(s1: String s2: String): Bool precedesSub: Fun(s1: String start1: Int size1: Int s2: String start2: Int size2: Int): Bool end))
+            :args (
+              (TypedVar 's3' :type String)
+              (TypedApp :type String
+                :func (TypedSelect 'baseName' :type Fun(path: String): String
+                  :target (TypedVar 'path' :type Record error: Exception separator: Char separatorString: String dirName: Fun(path: String): String baseName: Fun(path: String): String extension: Fun(path: String): String stem: Fun(path: String): String parts: Fun(path: String): vector.T(String) join: Fun(part1: String part2: String): String joinVector: Fun(items: vector.T(String)): String joinArray: Fun(items: Array(String)): String withExtension: Fun(path: String newExt: String): String isAbsolute: Fun(path: String): Bool isRelative: Fun(path: String): Bool hasExtension: Fun(path: String): Bool normalize: Fun(path: String): String relativeTo: Fun(path: String base: String): String resolve: Fun(path: String): String end))
+                :args (
+                  (TypedString '.gitignore' :type String)
+                ))
+            ))
+        )))
+    (TypedLetValue 'pList' :type vector.T(String)
+      :value (TypedApp :type vector.T(String)
+        :func (TypedSelect 'parts' :type Fun(path: String): vector.T(String)
+          :target (TypedVar 'path' :type Record error: Exception separator: Char separatorString: String dirName: Fun(path: String): String baseName: Fun(path: String): String extension: Fun(path: String): String stem: Fun(path: String): String parts: Fun(path: String): vector.T(String) join: Fun(part1: String part2: String): String joinVector: Fun(items: vector.T(String)): String joinArray: Fun(items: Array(String)): String withExtension: Fun(path: String newExt: String): String isAbsolute: Fun(path: String): Bool isRelative: Fun(path: String): Bool hasExtension: Fun(path: String): Bool normalize: Fun(path: String): String relativeTo: Fun(path: String base: String): String resolve: Fun(path: String): String end))
+        :args (
+          (TypedString '/a/b/c' :type String)
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printInt' :type Fun(n: Int): Ok)
+        :args (
+          (TypedApp :type Int
+            :func (TypedTypeApp [String] :type Fun(v: vector.T(String)): Int
+              :func (TypedSelect 'length' :type All(A :: TYPE) Fun(v: vector.T(A)): Int
+                :target (TypedVar 'vector' :type Record error: Exception new: All(A :: TYPE) vector.T(A) newWithCapacity: All(A :: TYPE) Fun(capacity: Int): vector.T(A) length: All(A :: TYPE) Fun(v: vector.T(A)): Int empty: All(A :: TYPE) Fun(v: vector.T(A)): Bool get: All(A :: TYPE) Fun(v: vector.T(A) index: Int): A set: All(A :: TYPE) Fun(v: vector.T(A) index: Int value: A): Ok first: All(A :: TYPE) Fun(v: vector.T(A)): A last: All(A :: TYPE) Fun(v: vector.T(A)): A append: All(A :: TYPE) Fun(v: vector.T(A) value: A): Ok pop: All(A :: TYPE) Fun(v: vector.T(A)): A delete: All(A :: TYPE) Fun(v: vector.T(A) index: Int): Ok clear: All(A :: TYPE) Fun(v: vector.T(A)): Ok copy: All(A :: TYPE) Fun(v: vector.T(A)): vector.T(A) concat: All(A :: TYPE) Fun(v1: vector.T(A) v2: vector.T(A)): vector.T(A) fromArray: All(A :: TYPE) Fun(arr: Array(A)): vector.T(A) toArray: All(A :: TYPE) Fun(v: vector.T(A)): Array(A) forEach: All(A :: TYPE) Fun(v: vector.T(A) action: Fun(elem: A): Ok): Ok end)))
+            :args (
+              (TypedVar 'pList' :type vector.T(String))
+            ))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printStr' :type Fun(s: String): Ok)
+        :args (
+          (TypedApp :type String
+            :func (TypedTypeApp [String] :type Fun(v: vector.T(String) index: Int): String
+              :func (TypedSelect 'get' :type All(A :: TYPE) Fun(v: vector.T(A) index: Int): A
+                :target (TypedVar 'vector' :type Record error: Exception new: All(A :: TYPE) vector.T(A) newWithCapacity: All(A :: TYPE) Fun(capacity: Int): vector.T(A) length: All(A :: TYPE) Fun(v: vector.T(A)): Int empty: All(A :: TYPE) Fun(v: vector.T(A)): Bool get: All(A :: TYPE) Fun(v: vector.T(A) index: Int): A set: All(A :: TYPE) Fun(v: vector.T(A) index: Int value: A): Ok first: All(A :: TYPE) Fun(v: vector.T(A)): A last: All(A :: TYPE) Fun(v: vector.T(A)): A append: All(A :: TYPE) Fun(v: vector.T(A) value: A): Ok pop: All(A :: TYPE) Fun(v: vector.T(A)): A delete: All(A :: TYPE) Fun(v: vector.T(A) index: Int): Ok clear: All(A :: TYPE) Fun(v: vector.T(A)): Ok copy: All(A :: TYPE) Fun(v: vector.T(A)): vector.T(A) concat: All(A :: TYPE) Fun(v1: vector.T(A) v2: vector.T(A)): vector.T(A) fromArray: All(A :: TYPE) Fun(arr: Array(A)): vector.T(A) toArray: All(A :: TYPE) Fun(v: vector.T(A)): Array(A) forEach: All(A :: TYPE) Fun(v: vector.T(A) action: Fun(elem: A): Ok): Ok end)))
+            :args (
+              (TypedVar 'pList' :type vector.T(String))
+              (TypedInt 0 :type Int)
+            ))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printStr' :type Fun(s: String): Ok)
+        :args (
+          (TypedApp :type String
+            :func (TypedTypeApp [String] :type Fun(v: vector.T(String) index: Int): String
+              :func (TypedSelect 'get' :type All(A :: TYPE) Fun(v: vector.T(A) index: Int): A
+                :target (TypedVar 'vector' :type Record error: Exception new: All(A :: TYPE) vector.T(A) newWithCapacity: All(A :: TYPE) Fun(capacity: Int): vector.T(A) length: All(A :: TYPE) Fun(v: vector.T(A)): Int empty: All(A :: TYPE) Fun(v: vector.T(A)): Bool get: All(A :: TYPE) Fun(v: vector.T(A) index: Int): A set: All(A :: TYPE) Fun(v: vector.T(A) index: Int value: A): Ok first: All(A :: TYPE) Fun(v: vector.T(A)): A last: All(A :: TYPE) Fun(v: vector.T(A)): A append: All(A :: TYPE) Fun(v: vector.T(A) value: A): Ok pop: All(A :: TYPE) Fun(v: vector.T(A)): A delete: All(A :: TYPE) Fun(v: vector.T(A) index: Int): Ok clear: All(A :: TYPE) Fun(v: vector.T(A)): Ok copy: All(A :: TYPE) Fun(v: vector.T(A)): vector.T(A) concat: All(A :: TYPE) Fun(v1: vector.T(A) v2: vector.T(A)): vector.T(A) fromArray: All(A :: TYPE) Fun(arr: Array(A)): vector.T(A) toArray: All(A :: TYPE) Fun(v: vector.T(A)): Array(A) forEach: All(A :: TYPE) Fun(v: vector.T(A) action: Fun(elem: A): Ok): Ok end)))
+            :args (
+              (TypedVar 'pList' :type vector.T(String))
+              (TypedInt 1 :type Int)
+            ))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printStr' :type Fun(s: String): Ok)
+        :args (
+          (TypedApp :type String
+            :func (TypedTypeApp [String] :type Fun(v: vector.T(String) index: Int): String
+              :func (TypedSelect 'get' :type All(A :: TYPE) Fun(v: vector.T(A) index: Int): A
+                :target (TypedVar 'vector' :type Record error: Exception new: All(A :: TYPE) vector.T(A) newWithCapacity: All(A :: TYPE) Fun(capacity: Int): vector.T(A) length: All(A :: TYPE) Fun(v: vector.T(A)): Int empty: All(A :: TYPE) Fun(v: vector.T(A)): Bool get: All(A :: TYPE) Fun(v: vector.T(A) index: Int): A set: All(A :: TYPE) Fun(v: vector.T(A) index: Int value: A): Ok first: All(A :: TYPE) Fun(v: vector.T(A)): A last: All(A :: TYPE) Fun(v: vector.T(A)): A append: All(A :: TYPE) Fun(v: vector.T(A) value: A): Ok pop: All(A :: TYPE) Fun(v: vector.T(A)): A delete: All(A :: TYPE) Fun(v: vector.T(A) index: Int): Ok clear: All(A :: TYPE) Fun(v: vector.T(A)): Ok copy: All(A :: TYPE) Fun(v: vector.T(A)): vector.T(A) concat: All(A :: TYPE) Fun(v1: vector.T(A) v2: vector.T(A)): vector.T(A) fromArray: All(A :: TYPE) Fun(arr: Array(A)): vector.T(A) toArray: All(A :: TYPE) Fun(v: vector.T(A)): Array(A) forEach: All(A :: TYPE) Fun(v: vector.T(A) action: Fun(elem: A): Ok): Ok end)))
+            :args (
+              (TypedVar 'pList' :type vector.T(String))
+              (TypedInt 2 :type Int)
+            ))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printStr' :type Fun(s: String): Ok)
+        :args (
+          (TypedApp :type String
+            :func (TypedTypeApp [String] :type Fun(v: vector.T(String) index: Int): String
+              :func (TypedSelect 'get' :type All(A :: TYPE) Fun(v: vector.T(A) index: Int): A
+                :target (TypedVar 'vector' :type Record error: Exception new: All(A :: TYPE) vector.T(A) newWithCapacity: All(A :: TYPE) Fun(capacity: Int): vector.T(A) length: All(A :: TYPE) Fun(v: vector.T(A)): Int empty: All(A :: TYPE) Fun(v: vector.T(A)): Bool get: All(A :: TYPE) Fun(v: vector.T(A) index: Int): A set: All(A :: TYPE) Fun(v: vector.T(A) index: Int value: A): Ok first: All(A :: TYPE) Fun(v: vector.T(A)): A last: All(A :: TYPE) Fun(v: vector.T(A)): A append: All(A :: TYPE) Fun(v: vector.T(A) value: A): Ok pop: All(A :: TYPE) Fun(v: vector.T(A)): A delete: All(A :: TYPE) Fun(v: vector.T(A) index: Int): Ok clear: All(A :: TYPE) Fun(v: vector.T(A)): Ok copy: All(A :: TYPE) Fun(v: vector.T(A)): vector.T(A) concat: All(A :: TYPE) Fun(v1: vector.T(A) v2: vector.T(A)): vector.T(A) fromArray: All(A :: TYPE) Fun(arr: Array(A)): vector.T(A) toArray: All(A :: TYPE) Fun(v: vector.T(A)): Array(A) forEach: All(A :: TYPE) Fun(v: vector.T(A) action: Fun(elem: A): Ok): Ok end)))
+            :args (
+              (TypedVar 'pList' :type vector.T(String))
+              (TypedInt 3 :type Int)
+            ))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printStr' :type Fun(s: String): Ok)
+        :args (
+          (TypedApp :type String
+            :func (TypedSelect 'join' :type Fun(part1: String part2: String): String
+              :target (TypedVar 'path' :type Record error: Exception separator: Char separatorString: String dirName: Fun(path: String): String baseName: Fun(path: String): String extension: Fun(path: String): String stem: Fun(path: String): String parts: Fun(path: String): vector.T(String) join: Fun(part1: String part2: String): String joinVector: Fun(items: vector.T(String)): String joinArray: Fun(items: Array(String)): String withExtension: Fun(path: String newExt: String): String isAbsolute: Fun(path: String): Bool isRelative: Fun(path: String): Bool hasExtension: Fun(path: String): Bool normalize: Fun(path: String): String relativeTo: Fun(path: String base: String): String resolve: Fun(path: String): String end))
+            :args (
+              (TypedString 'a' :type String)
+              (TypedString 'b' :type String)
+            ))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printStr' :type Fun(s: String): Ok)
+        :args (
+          (TypedApp :type String
+            :func (TypedSelect 'join' :type Fun(part1: String part2: String): String
+              :target (TypedVar 'path' :type Record error: Exception separator: Char separatorString: String dirName: Fun(path: String): String baseName: Fun(path: String): String extension: Fun(path: String): String stem: Fun(path: String): String parts: Fun(path: String): vector.T(String) join: Fun(part1: String part2: String): String joinVector: Fun(items: vector.T(String)): String joinArray: Fun(items: Array(String)): String withExtension: Fun(path: String newExt: String): String isAbsolute: Fun(path: String): Bool isRelative: Fun(path: String): Bool hasExtension: Fun(path: String): Bool normalize: Fun(path: String): String relativeTo: Fun(path: String base: String): String resolve: Fun(path: String): String end))
+            :args (
+              (TypedString 'a/' :type String)
+              (TypedString 'b' :type String)
+            ))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printStr' :type Fun(s: String): Ok)
+        :args (
+          (TypedApp :type String
+            :func (TypedSelect 'join' :type Fun(part1: String part2: String): String
+              :target (TypedVar 'path' :type Record error: Exception separator: Char separatorString: String dirName: Fun(path: String): String baseName: Fun(path: String): String extension: Fun(path: String): String stem: Fun(path: String): String parts: Fun(path: String): vector.T(String) join: Fun(part1: String part2: String): String joinVector: Fun(items: vector.T(String)): String joinArray: Fun(items: Array(String)): String withExtension: Fun(path: String newExt: String): String isAbsolute: Fun(path: String): Bool isRelative: Fun(path: String): Bool hasExtension: Fun(path: String): Bool normalize: Fun(path: String): String relativeTo: Fun(path: String base: String): String resolve: Fun(path: String): String end))
+            :args (
+              (TypedString 'a' :type String)
+              (TypedString '/b' :type String)
+            ))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printStr' :type Fun(s: String): Ok)
+        :args (
+          (TypedApp :type String
+            :func (TypedSelect 'join' :type Fun(part1: String part2: String): String
+              :target (TypedVar 'path' :type Record error: Exception separator: Char separatorString: String dirName: Fun(path: String): String baseName: Fun(path: String): String extension: Fun(path: String): String stem: Fun(path: String): String parts: Fun(path: String): vector.T(String) join: Fun(part1: String part2: String): String joinVector: Fun(items: vector.T(String)): String joinArray: Fun(items: Array(String)): String withExtension: Fun(path: String newExt: String): String isAbsolute: Fun(path: String): Bool isRelative: Fun(path: String): Bool hasExtension: Fun(path: String): Bool normalize: Fun(path: String): String relativeTo: Fun(path: String base: String): String resolve: Fun(path: String): String end))
+            :args (
+              (TypedString '' :type String)
+              (TypedString 'b' :type String)
+            ))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printStr' :type Fun(s: String): Ok)
+        :args (
+          (TypedApp :type String
+            :func (TypedSelect 'join' :type Fun(part1: String part2: String): String
+              :target (TypedVar 'path' :type Record error: Exception separator: Char separatorString: String dirName: Fun(path: String): String baseName: Fun(path: String): String extension: Fun(path: String): String stem: Fun(path: String): String parts: Fun(path: String): vector.T(String) join: Fun(part1: String part2: String): String joinVector: Fun(items: vector.T(String)): String joinArray: Fun(items: Array(String)): String withExtension: Fun(path: String newExt: String): String isAbsolute: Fun(path: String): Bool isRelative: Fun(path: String): Bool hasExtension: Fun(path: String): Bool normalize: Fun(path: String): String relativeTo: Fun(path: String base: String): String resolve: Fun(path: String): String end))
+            :args (
+              (TypedString 'a' :type String)
+              (TypedString '' :type String)
+            ))
+        )))
+    (TypedLetValue 'vParts' :type vector.T(String)
+      :value (TypedTypeApp [String] :type vector.T(String)
+        :func (TypedSelect 'new' :type All(A :: TYPE) vector.T(A)
+          :target (TypedVar 'vector' :type Record error: Exception new: All(A :: TYPE) vector.T(A) newWithCapacity: All(A :: TYPE) Fun(capacity: Int): vector.T(A) length: All(A :: TYPE) Fun(v: vector.T(A)): Int empty: All(A :: TYPE) Fun(v: vector.T(A)): Bool get: All(A :: TYPE) Fun(v: vector.T(A) index: Int): A set: All(A :: TYPE) Fun(v: vector.T(A) index: Int value: A): Ok first: All(A :: TYPE) Fun(v: vector.T(A)): A last: All(A :: TYPE) Fun(v: vector.T(A)): A append: All(A :: TYPE) Fun(v: vector.T(A) value: A): Ok pop: All(A :: TYPE) Fun(v: vector.T(A)): A delete: All(A :: TYPE) Fun(v: vector.T(A) index: Int): Ok clear: All(A :: TYPE) Fun(v: vector.T(A)): Ok copy: All(A :: TYPE) Fun(v: vector.T(A)): vector.T(A) concat: All(A :: TYPE) Fun(v1: vector.T(A) v2: vector.T(A)): vector.T(A) fromArray: All(A :: TYPE) Fun(arr: Array(A)): vector.T(A) toArray: All(A :: TYPE) Fun(v: vector.T(A)): Array(A) forEach: All(A :: TYPE) Fun(v: vector.T(A) action: Fun(elem: A): Ok): Ok end))))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedTypeApp [String] :type Fun(v: vector.T(String) value: String): Ok
+          :func (TypedSelect 'append' :type All(A :: TYPE) Fun(v: vector.T(A) value: A): Ok
+            :target (TypedVar 'vector' :type Record error: Exception new: All(A :: TYPE) vector.T(A) newWithCapacity: All(A :: TYPE) Fun(capacity: Int): vector.T(A) length: All(A :: TYPE) Fun(v: vector.T(A)): Int empty: All(A :: TYPE) Fun(v: vector.T(A)): Bool get: All(A :: TYPE) Fun(v: vector.T(A) index: Int): A set: All(A :: TYPE) Fun(v: vector.T(A) index: Int value: A): Ok first: All(A :: TYPE) Fun(v: vector.T(A)): A last: All(A :: TYPE) Fun(v: vector.T(A)): A append: All(A :: TYPE) Fun(v: vector.T(A) value: A): Ok pop: All(A :: TYPE) Fun(v: vector.T(A)): A delete: All(A :: TYPE) Fun(v: vector.T(A) index: Int): Ok clear: All(A :: TYPE) Fun(v: vector.T(A)): Ok copy: All(A :: TYPE) Fun(v: vector.T(A)): vector.T(A) concat: All(A :: TYPE) Fun(v1: vector.T(A) v2: vector.T(A)): vector.T(A) fromArray: All(A :: TYPE) Fun(arr: Array(A)): vector.T(A) toArray: All(A :: TYPE) Fun(v: vector.T(A)): Array(A) forEach: All(A :: TYPE) Fun(v: vector.T(A) action: Fun(elem: A): Ok): Ok end)))
+        :args (
+          (TypedVar 'vParts' :type vector.T(String))
+          (TypedString 'a' :type String)
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedTypeApp [String] :type Fun(v: vector.T(String) value: String): Ok
+          :func (TypedSelect 'append' :type All(A :: TYPE) Fun(v: vector.T(A) value: A): Ok
+            :target (TypedVar 'vector' :type Record error: Exception new: All(A :: TYPE) vector.T(A) newWithCapacity: All(A :: TYPE) Fun(capacity: Int): vector.T(A) length: All(A :: TYPE) Fun(v: vector.T(A)): Int empty: All(A :: TYPE) Fun(v: vector.T(A)): Bool get: All(A :: TYPE) Fun(v: vector.T(A) index: Int): A set: All(A :: TYPE) Fun(v: vector.T(A) index: Int value: A): Ok first: All(A :: TYPE) Fun(v: vector.T(A)): A last: All(A :: TYPE) Fun(v: vector.T(A)): A append: All(A :: TYPE) Fun(v: vector.T(A) value: A): Ok pop: All(A :: TYPE) Fun(v: vector.T(A)): A delete: All(A :: TYPE) Fun(v: vector.T(A) index: Int): Ok clear: All(A :: TYPE) Fun(v: vector.T(A)): Ok copy: All(A :: TYPE) Fun(v: vector.T(A)): vector.T(A) concat: All(A :: TYPE) Fun(v1: vector.T(A) v2: vector.T(A)): vector.T(A) fromArray: All(A :: TYPE) Fun(arr: Array(A)): vector.T(A) toArray: All(A :: TYPE) Fun(v: vector.T(A)): Array(A) forEach: All(A :: TYPE) Fun(v: vector.T(A) action: Fun(elem: A): Ok): Ok end)))
+        :args (
+          (TypedVar 'vParts' :type vector.T(String))
+          (TypedString 'b' :type String)
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedTypeApp [String] :type Fun(v: vector.T(String) value: String): Ok
+          :func (TypedSelect 'append' :type All(A :: TYPE) Fun(v: vector.T(A) value: A): Ok
+            :target (TypedVar 'vector' :type Record error: Exception new: All(A :: TYPE) vector.T(A) newWithCapacity: All(A :: TYPE) Fun(capacity: Int): vector.T(A) length: All(A :: TYPE) Fun(v: vector.T(A)): Int empty: All(A :: TYPE) Fun(v: vector.T(A)): Bool get: All(A :: TYPE) Fun(v: vector.T(A) index: Int): A set: All(A :: TYPE) Fun(v: vector.T(A) index: Int value: A): Ok first: All(A :: TYPE) Fun(v: vector.T(A)): A last: All(A :: TYPE) Fun(v: vector.T(A)): A append: All(A :: TYPE) Fun(v: vector.T(A) value: A): Ok pop: All(A :: TYPE) Fun(v: vector.T(A)): A delete: All(A :: TYPE) Fun(v: vector.T(A) index: Int): Ok clear: All(A :: TYPE) Fun(v: vector.T(A)): Ok copy: All(A :: TYPE) Fun(v: vector.T(A)): vector.T(A) concat: All(A :: TYPE) Fun(v1: vector.T(A) v2: vector.T(A)): vector.T(A) fromArray: All(A :: TYPE) Fun(arr: Array(A)): vector.T(A) toArray: All(A :: TYPE) Fun(v: vector.T(A)): Array(A) forEach: All(A :: TYPE) Fun(v: vector.T(A) action: Fun(elem: A): Ok): Ok end)))
+        :args (
+          (TypedVar 'vParts' :type vector.T(String))
+          (TypedString 'c' :type String)
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printStr' :type Fun(s: String): Ok)
+        :args (
+          (TypedApp :type String
+            :func (TypedSelect 'joinVector' :type Fun(items: vector.T(String)): String
+              :target (TypedVar 'path' :type Record error: Exception separator: Char separatorString: String dirName: Fun(path: String): String baseName: Fun(path: String): String extension: Fun(path: String): String stem: Fun(path: String): String parts: Fun(path: String): vector.T(String) join: Fun(part1: String part2: String): String joinVector: Fun(items: vector.T(String)): String joinArray: Fun(items: Array(String)): String withExtension: Fun(path: String newExt: String): String isAbsolute: Fun(path: String): Bool isRelative: Fun(path: String): Bool hasExtension: Fun(path: String): Bool normalize: Fun(path: String): String relativeTo: Fun(path: String base: String): String resolve: Fun(path: String): String end))
+            :args (
+              (TypedVar 'vParts' :type vector.T(String))
+            ))
+        )))
+    (TypedLetValue 'arrParts' :type Array(String)
+      :value (TypedArray :type Array(String)
+        :elements (
+          (TypedString 'x' :type String)
+          (TypedString 'y' :type String)
+          (TypedString 'z' :type String)
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printStr' :type Fun(s: String): Ok)
+        :args (
+          (TypedApp :type String
+            :func (TypedSelect 'joinArray' :type Fun(items: Array(String)): String
+              :target (TypedVar 'path' :type Record error: Exception separator: Char separatorString: String dirName: Fun(path: String): String baseName: Fun(path: String): String extension: Fun(path: String): String stem: Fun(path: String): String parts: Fun(path: String): vector.T(String) join: Fun(part1: String part2: String): String joinVector: Fun(items: vector.T(String)): String joinArray: Fun(items: Array(String)): String withExtension: Fun(path: String newExt: String): String isAbsolute: Fun(path: String): Bool isRelative: Fun(path: String): Bool hasExtension: Fun(path: String): Bool normalize: Fun(path: String): String relativeTo: Fun(path: String base: String): String resolve: Fun(path: String): String end))
+            :args (
+              (TypedVar 'arrParts' :type Array(String))
+            ))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printStr' :type Fun(s: String): Ok)
+        :args (
+          (TypedApp :type String
+            :func (TypedSelect 'withExtension' :type Fun(path: String newExt: String): String
+              :target (TypedVar 'path' :type Record error: Exception separator: Char separatorString: String dirName: Fun(path: String): String baseName: Fun(path: String): String extension: Fun(path: String): String stem: Fun(path: String): String parts: Fun(path: String): vector.T(String) join: Fun(part1: String part2: String): String joinVector: Fun(items: vector.T(String)): String joinArray: Fun(items: Array(String)): String withExtension: Fun(path: String newExt: String): String isAbsolute: Fun(path: String): Bool isRelative: Fun(path: String): Bool hasExtension: Fun(path: String): Bool normalize: Fun(path: String): String relativeTo: Fun(path: String base: String): String resolve: Fun(path: String): String end))
+            :args (
+              (TypedString 'foo.txt' :type String)
+              (TypedString 'md' :type String)
+            ))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printStr' :type Fun(s: String): Ok)
+        :args (
+          (TypedApp :type String
+            :func (TypedSelect 'withExtension' :type Fun(path: String newExt: String): String
+              :target (TypedVar 'path' :type Record error: Exception separator: Char separatorString: String dirName: Fun(path: String): String baseName: Fun(path: String): String extension: Fun(path: String): String stem: Fun(path: String): String parts: Fun(path: String): vector.T(String) join: Fun(part1: String part2: String): String joinVector: Fun(items: vector.T(String)): String joinArray: Fun(items: Array(String)): String withExtension: Fun(path: String newExt: String): String isAbsolute: Fun(path: String): Bool isRelative: Fun(path: String): Bool hasExtension: Fun(path: String): Bool normalize: Fun(path: String): String relativeTo: Fun(path: String base: String): String resolve: Fun(path: String): String end))
+            :args (
+              (TypedString 'foo.txt' :type String)
+              (TypedString '.md' :type String)
+            ))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printStr' :type Fun(s: String): Ok)
+        :args (
+          (TypedApp :type String
+            :func (TypedSelect 'withExtension' :type Fun(path: String newExt: String): String
+              :target (TypedVar 'path' :type Record error: Exception separator: Char separatorString: String dirName: Fun(path: String): String baseName: Fun(path: String): String extension: Fun(path: String): String stem: Fun(path: String): String parts: Fun(path: String): vector.T(String) join: Fun(part1: String part2: String): String joinVector: Fun(items: vector.T(String)): String joinArray: Fun(items: Array(String)): String withExtension: Fun(path: String newExt: String): String isAbsolute: Fun(path: String): Bool isRelative: Fun(path: String): Bool hasExtension: Fun(path: String): Bool normalize: Fun(path: String): String relativeTo: Fun(path: String base: String): String resolve: Fun(path: String): String end))
+            :args (
+              (TypedString 'foo.txt' :type String)
+              (TypedString '' :type String)
+            ))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printStr' :type Fun(s: String): Ok)
+        :args (
+          (TypedApp :type String
+            :func (TypedSelect 'withExtension' :type Fun(path: String newExt: String): String
+              :target (TypedVar 'path' :type Record error: Exception separator: Char separatorString: String dirName: Fun(path: String): String baseName: Fun(path: String): String extension: Fun(path: String): String stem: Fun(path: String): String parts: Fun(path: String): vector.T(String) join: Fun(part1: String part2: String): String joinVector: Fun(items: vector.T(String)): String joinArray: Fun(items: Array(String)): String withExtension: Fun(path: String newExt: String): String isAbsolute: Fun(path: String): Bool isRelative: Fun(path: String): Bool hasExtension: Fun(path: String): Bool normalize: Fun(path: String): String relativeTo: Fun(path: String base: String): String resolve: Fun(path: String): String end))
+            :args (
+              (TypedString '/dir/foo' :type String)
+              (TypedString 'o' :type String)
+            ))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printStr' :type Fun(s: String): Ok)
+        :args (
+          (TypedApp :type String
+            :func (TypedSelect 'normalize' :type Fun(path: String): String
+              :target (TypedVar 'path' :type Record error: Exception separator: Char separatorString: String dirName: Fun(path: String): String baseName: Fun(path: String): String extension: Fun(path: String): String stem: Fun(path: String): String parts: Fun(path: String): vector.T(String) join: Fun(part1: String part2: String): String joinVector: Fun(items: vector.T(String)): String joinArray: Fun(items: Array(String)): String withExtension: Fun(path: String newExt: String): String isAbsolute: Fun(path: String): Bool isRelative: Fun(path: String): Bool hasExtension: Fun(path: String): Bool normalize: Fun(path: String): String relativeTo: Fun(path: String base: String): String resolve: Fun(path: String): String end))
+            :args (
+              (TypedString 'a//b/./c/../d' :type String)
+            ))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printStr' :type Fun(s: String): Ok)
+        :args (
+          (TypedApp :type String
+            :func (TypedSelect 'normalize' :type Fun(path: String): String
+              :target (TypedVar 'path' :type Record error: Exception separator: Char separatorString: String dirName: Fun(path: String): String baseName: Fun(path: String): String extension: Fun(path: String): String stem: Fun(path: String): String parts: Fun(path: String): vector.T(String) join: Fun(part1: String part2: String): String joinVector: Fun(items: vector.T(String)): String joinArray: Fun(items: Array(String)): String withExtension: Fun(path: String newExt: String): String isAbsolute: Fun(path: String): Bool isRelative: Fun(path: String): Bool hasExtension: Fun(path: String): Bool normalize: Fun(path: String): String relativeTo: Fun(path: String base: String): String resolve: Fun(path: String): String end))
+            :args (
+              (TypedString '/../a' :type String)
+            ))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printStr' :type Fun(s: String): Ok)
+        :args (
+          (TypedApp :type String
+            :func (TypedSelect 'normalize' :type Fun(path: String): String
+              :target (TypedVar 'path' :type Record error: Exception separator: Char separatorString: String dirName: Fun(path: String): String baseName: Fun(path: String): String extension: Fun(path: String): String stem: Fun(path: String): String parts: Fun(path: String): vector.T(String) join: Fun(part1: String part2: String): String joinVector: Fun(items: vector.T(String)): String joinArray: Fun(items: Array(String)): String withExtension: Fun(path: String newExt: String): String isAbsolute: Fun(path: String): Bool isRelative: Fun(path: String): Bool hasExtension: Fun(path: String): Bool normalize: Fun(path: String): String relativeTo: Fun(path: String base: String): String resolve: Fun(path: String): String end))
+            :args (
+              (TypedString '' :type String)
+            ))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printStr' :type Fun(s: String): Ok)
+        :args (
+          (TypedApp :type String
+            :func (TypedSelect 'normalize' :type Fun(path: String): String
+              :target (TypedVar 'path' :type Record error: Exception separator: Char separatorString: String dirName: Fun(path: String): String baseName: Fun(path: String): String extension: Fun(path: String): String stem: Fun(path: String): String parts: Fun(path: String): vector.T(String) join: Fun(part1: String part2: String): String joinVector: Fun(items: vector.T(String)): String joinArray: Fun(items: Array(String)): String withExtension: Fun(path: String newExt: String): String isAbsolute: Fun(path: String): Bool isRelative: Fun(path: String): Bool hasExtension: Fun(path: String): Bool normalize: Fun(path: String): String relativeTo: Fun(path: String base: String): String resolve: Fun(path: String): String end))
+            :args (
+              (TypedString '/a/b/../../c' :type String)
+            ))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printStr' :type Fun(s: String): Ok)
+        :args (
+          (TypedApp :type String
+            :func (TypedSelect 'normalize' :type Fun(path: String): String
+              :target (TypedVar 'path' :type Record error: Exception separator: Char separatorString: String dirName: Fun(path: String): String baseName: Fun(path: String): String extension: Fun(path: String): String stem: Fun(path: String): String parts: Fun(path: String): vector.T(String) join: Fun(part1: String part2: String): String joinVector: Fun(items: vector.T(String)): String joinArray: Fun(items: Array(String)): String withExtension: Fun(path: String newExt: String): String isAbsolute: Fun(path: String): Bool isRelative: Fun(path: String): Bool hasExtension: Fun(path: String): Bool normalize: Fun(path: String): String relativeTo: Fun(path: String base: String): String resolve: Fun(path: String): String end))
+            :args (
+              (TypedString 'a/b/../../../c' :type String)
+            ))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printStr' :type Fun(s: String): Ok)
+        :args (
+          (TypedApp :type String
+            :func (TypedSelect 'relativeTo' :type Fun(path: String base: String): String
+              :target (TypedVar 'path' :type Record error: Exception separator: Char separatorString: String dirName: Fun(path: String): String baseName: Fun(path: String): String extension: Fun(path: String): String stem: Fun(path: String): String parts: Fun(path: String): vector.T(String) join: Fun(part1: String part2: String): String joinVector: Fun(items: vector.T(String)): String joinArray: Fun(items: Array(String)): String withExtension: Fun(path: String newExt: String): String isAbsolute: Fun(path: String): Bool isRelative: Fun(path: String): Bool hasExtension: Fun(path: String): Bool normalize: Fun(path: String): String relativeTo: Fun(path: String base: String): String resolve: Fun(path: String): String end))
+            :args (
+              (TypedString '/a/b/c' :type String)
+              (TypedString '/a' :type String)
+            ))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printStr' :type Fun(s: String): Ok)
+        :args (
+          (TypedApp :type String
+            :func (TypedSelect 'relativeTo' :type Fun(path: String base: String): String
+              :target (TypedVar 'path' :type Record error: Exception separator: Char separatorString: String dirName: Fun(path: String): String baseName: Fun(path: String): String extension: Fun(path: String): String stem: Fun(path: String): String parts: Fun(path: String): vector.T(String) join: Fun(part1: String part2: String): String joinVector: Fun(items: vector.T(String)): String joinArray: Fun(items: Array(String)): String withExtension: Fun(path: String newExt: String): String isAbsolute: Fun(path: String): Bool isRelative: Fun(path: String): Bool hasExtension: Fun(path: String): Bool normalize: Fun(path: String): String relativeTo: Fun(path: String base: String): String resolve: Fun(path: String): String end))
+            :args (
+              (TypedString '/a/b' :type String)
+              (TypedString '/a/c' :type String)
+            ))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printStr' :type Fun(s: String): Ok)
+        :args (
+          (TypedApp :type String
+            :func (TypedSelect 'relativeTo' :type Fun(path: String base: String): String
+              :target (TypedVar 'path' :type Record error: Exception separator: Char separatorString: String dirName: Fun(path: String): String baseName: Fun(path: String): String extension: Fun(path: String): String stem: Fun(path: String): String parts: Fun(path: String): vector.T(String) join: Fun(part1: String part2: String): String joinVector: Fun(items: vector.T(String)): String joinArray: Fun(items: Array(String)): String withExtension: Fun(path: String newExt: String): String isAbsolute: Fun(path: String): Bool isRelative: Fun(path: String): Bool hasExtension: Fun(path: String): Bool normalize: Fun(path: String): String relativeTo: Fun(path: String base: String): String resolve: Fun(path: String): String end))
+            :args (
+              (TypedString '/a/b/c' :type String)
+              (TypedString '/a/b/c' :type String)
+            ))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printStr' :type Fun(s: String): Ok)
+        :args (
+          (TypedApp :type String
+            :func (TypedSelect 'relativeTo' :type Fun(path: String base: String): String
+              :target (TypedVar 'path' :type Record error: Exception separator: Char separatorString: String dirName: Fun(path: String): String baseName: Fun(path: String): String extension: Fun(path: String): String stem: Fun(path: String): String parts: Fun(path: String): vector.T(String) join: Fun(part1: String part2: String): String joinVector: Fun(items: vector.T(String)): String joinArray: Fun(items: Array(String)): String withExtension: Fun(path: String newExt: String): String isAbsolute: Fun(path: String): Bool isRelative: Fun(path: String): Bool hasExtension: Fun(path: String): Bool normalize: Fun(path: String): String relativeTo: Fun(path: String base: String): String resolve: Fun(path: String): String end))
+            :args (
+              (TypedString 'a/b' :type String)
+              (TypedString 'a' :type String)
+            ))
+        )))
+    (TypedExprStmt
+      :expr (TypedTry :type Ok
+        :body (TypedBlock :type Ok
+          :bindings (
+            (TypedLetValue 'dummy' :type String
+              :value (TypedApp :type String
+                :func (TypedSelect 'relativeTo' :type Fun(path: String base: String): String
+                  :target (TypedVar 'path' :type Record error: Exception separator: Char separatorString: String dirName: Fun(path: String): String baseName: Fun(path: String): String extension: Fun(path: String): String stem: Fun(path: String): String parts: Fun(path: String): vector.T(String) join: Fun(part1: String part2: String): String joinVector: Fun(items: vector.T(String)): String joinArray: Fun(items: Array(String)): String withExtension: Fun(path: String newExt: String): String isAbsolute: Fun(path: String): Bool isRelative: Fun(path: String): Bool hasExtension: Fun(path: String): Bool normalize: Fun(path: String): String relativeTo: Fun(path: String base: String): String resolve: Fun(path: String): String end))
+                :args (
+                  (TypedString '/a/b' :type String)
+                  (TypedString 'a/b' :type String)
+                )))
+          )
+          :result (TypedApp :type Ok
+            :func (TypedVar 'printStr' :type Fun(s: String): Ok)
+            :args (
+              (TypedString 'FAILED: should have raised error' :type String)
+            )))
+        :branches (
+          (TypedTryBranch
+            :exc_pattern (TypedSelect 'error' :type Exception
+              :target (TypedVar 'path' :type Record error: Exception separator: Char separatorString: String dirName: Fun(path: String): String baseName: Fun(path: String): String extension: Fun(path: String): String stem: Fun(path: String): String parts: Fun(path: String): vector.T(String) join: Fun(part1: String part2: String): String joinVector: Fun(items: vector.T(String)): String joinArray: Fun(items: Array(String)): String withExtension: Fun(path: String newExt: String): String isAbsolute: Fun(path: String): Bool isRelative: Fun(path: String): Bool hasExtension: Fun(path: String): Bool normalize: Fun(path: String): String relativeTo: Fun(path: String base: String): String resolve: Fun(path: String): String end))
+            :body (TypedApp :type Ok
+              :func (TypedVar 'printStr' :type Fun(s: String): Ok)
+              :args (
+                (TypedString 'CAUGHT: path.error' :type String)
+              )))
+        )))
+    (TypedLetValue 'resolved' :type String
+      :value (TypedApp :type String
+        :func (TypedSelect 'resolve' :type Fun(path: String): String
+          :target (TypedVar 'path' :type Record error: Exception separator: Char separatorString: String dirName: Fun(path: String): String baseName: Fun(path: String): String extension: Fun(path: String): String stem: Fun(path: String): String parts: Fun(path: String): vector.T(String) join: Fun(part1: String part2: String): String joinVector: Fun(items: vector.T(String)): String joinArray: Fun(items: Array(String)): String withExtension: Fun(path: String newExt: String): String isAbsolute: Fun(path: String): Bool isRelative: Fun(path: String): Bool hasExtension: Fun(path: String): Bool normalize: Fun(path: String): String relativeTo: Fun(path: String base: String): String resolve: Fun(path: String): String end))
+        :args (
+          (TypedString 'foo/bar' :type String)
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printBool' :type Fun(b: Bool): Ok)
+        :args (
+          (TypedApp :type Bool
+            :func (TypedSelect 'isAbsolute' :type Fun(path: String): Bool
+              :target (TypedVar 'path' :type Record error: Exception separator: Char separatorString: String dirName: Fun(path: String): String baseName: Fun(path: String): String extension: Fun(path: String): String stem: Fun(path: String): String parts: Fun(path: String): vector.T(String) join: Fun(part1: String part2: String): String joinVector: Fun(items: vector.T(String)): String joinArray: Fun(items: Array(String)): String withExtension: Fun(path: String newExt: String): String isAbsolute: Fun(path: String): Bool isRelative: Fun(path: String): Bool hasExtension: Fun(path: String): Bool normalize: Fun(path: String): String relativeTo: Fun(path: String base: String): String resolve: Fun(path: String): String end))
+            :args (
+              (TypedVar 'resolved' :type String)
+            ))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printBool' :type Fun(b: Bool): Ok)
+        :args (
+          (TypedApp :type Bool
+            :func (TypedSelect 'equal' :type Fun(s1: String s2: String): Bool
+              :target (TypedVar 'stringOp' :type Record error: Exception new: Fun(size: Int init: Char): String isEmpty: Fun(string: String): Bool length: Fun(string: String): Int getChar: Fun(string: String index: Int): Char setChar: Fun(string: String index: Int char: Char): Ok getSub: Fun(source: String start: Int size: Int): String setSub: Fun(dest: String destStart: Int source: String sourceStart: Int sourceSize: Int): Ok cat: Fun(s1: String s2: String): String catSub: Fun(s1: String start1: Int size1: Int s2: String start2: Int size2: Int): String conc: Fun(a: Array(String)): String equal: Fun(s1: String s2: String): Bool equalSub: Fun(s1: String start1: Int size1: Int s2: String start2: Int size2: Int): Bool precedes: Fun(s1: String s2: String): Bool precedesSub: Fun(s1: String start1: Int size1: Int s2: String start2: Int size2: Int): Bool end))
+            :args (
+              (TypedApp :type String
+                :func (TypedSelect 'normalize' :type Fun(path: String): String
+                  :target (TypedVar 'path' :type Record error: Exception separator: Char separatorString: String dirName: Fun(path: String): String baseName: Fun(path: String): String extension: Fun(path: String): String stem: Fun(path: String): String parts: Fun(path: String): vector.T(String) join: Fun(part1: String part2: String): String joinVector: Fun(items: vector.T(String)): String joinArray: Fun(items: Array(String)): String withExtension: Fun(path: String newExt: String): String isAbsolute: Fun(path: String): Bool isRelative: Fun(path: String): Bool hasExtension: Fun(path: String): Bool normalize: Fun(path: String): String relativeTo: Fun(path: String base: String): String resolve: Fun(path: String): String end))
+                :args (
+                  (TypedVar 'resolved' :type String)
+                ))
+              (TypedVar 'resolved' :type String)
+            ))
+        )))
+  ))
