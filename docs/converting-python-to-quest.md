@@ -208,8 +208,7 @@ When combining filtering and transformation in a single pass without intermediat
 
 ```quest
 vector.filterMap(:Int :Int xs fun(x: Int): maybe.T(Int)
-    if x > 0 then maybe.some(:Int {x * x}) else maybe.none(:Int) end
-)
+    if x > 0 then maybe.some(:Int {x * x}) else maybe.none(:Int) end)
 ```
 
 For reductions (such as `sum()`, `any()`, `all()`, or state accumulation), use `fold`:
@@ -426,10 +425,11 @@ export
         begin
             let counts = hashMap.new(:String :Int stringOp.equal strutil.hash);
             vector.forEach(:String words fun(w: String): Ok
-                let cur = maybe.unwrapOr(:Int hashMap.get(:String :Int counts w) 0);
-                hashMap.insert(:String :Int counts w {cur + 1});
-                ok
-            );
+                begin
+                    let cur = maybe.unwrapOr(:Int hashMap.get(:String :Int counts w) 0);
+                    hashMap.insert(:String :Int counts w {cur + 1});
+                    ok
+                end);
             counts
         end;
 ```

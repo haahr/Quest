@@ -54,13 +54,11 @@ export
 
     let forEach(A::TYPE)(s: T(A) action: All(elem: A) Ok): Ok =
         hashMap.forEach(:A :Ok s.map fun(elem: A dummy: Ok): Ok
-            action(elem)
-        );
+            action(elem));
 
     let fold(A::TYPE Acc::TYPE)(s: T(A) init: Acc f: All(acc: Acc elem: A) Acc): Acc =
         hashMap.fold(:A :Ok :Acc s.map init fun(acc: Acc elem: A dummy: Ok): Acc
-            f(acc elem)
-        );
+            f(acc elem));
 
     let copy(A::TYPE)(s: T(A)): T(A) =
         fold(:A :T(A) s newWithCapacity(size(s) s.equal s.hash)
@@ -68,8 +66,7 @@ export
                 begin
                     insert(acc elem);
                     acc
-                end
-        );
+                end);
 
     let filter(A::TYPE)(s: T(A) pred: All(elem: A) Bool): T(A) =
         fold(:A :T(A) s newWithCapacity(size(s) s.equal s.hash)
@@ -79,8 +76,7 @@ export
                         insert(acc elem);
                     end;
                     acc
-                end
-        );
+                end);
 
     let map(A::TYPE B::TYPE)(s: T(A) equal: All(b1: B b2: B) Bool hash: All(b: B) word.T f: All(elem: A) B): T(B) =
         fold(:A :T(B) s newWithCapacity(:B size(s) equal hash)
@@ -88,8 +84,7 @@ export
                 begin
                     insert(:B acc f(elem));
                     acc
-                end
-        );
+                end);
 
     let filterMap(A::TYPE B::TYPE)(
         s: T(A)
@@ -105,8 +100,7 @@ export
                         insert(:B acc maybe.unwrap(:B opt));
                     end;
                     acc
-                end
-        );
+                end);
 
     let union(A::TYPE)(s1: T(A) s2: T(A)): T(A) =
         begin
@@ -115,8 +109,7 @@ export
                 begin
                     insert(res elem);
                     ok
-                end
-            );
+                end);
             res
         end;
 
@@ -125,14 +118,12 @@ export
             let primary = if size(s1) <= size(s2) then s1 else s2 end;
             let secondary = if size(s1) <= size(s2) then s2 else s1 end;
             filter(primary fun(elem: A): Bool
-                contains(secondary elem)
-            )
+                contains(secondary elem))
         end;
 
     let difference(A::TYPE)(s1: T(A) s2: T(A)): T(A) =
         filter(s1 fun(elem: A): Bool
-            not(contains(s2 elem))
-        );
+            not(contains(s2 elem)));
 
     let isSubset(A::TYPE)(s1: T(A) s2: T(A)): Bool =
         begin

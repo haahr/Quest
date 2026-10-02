@@ -436,8 +436,7 @@ export
                 begin
                     insert(:K :W acc k f(k v));
                     acc
-                end
-        );
+                end);
 
     let filter(K::TYPE V::TYPE)(m: T(K V) pred: All(k: K v: V) Bool): T(K V) =
         fold(:K :V :T(K V) m newWithCapacity(:K :V m.count m.equal m.hash)
@@ -447,8 +446,7 @@ export
                         insert(:K :V acc k v);
                     end;
                     acc
-                end
-        );
+                end);
 
     let filterMap(K::TYPE V::TYPE W::TYPE)(m: T(K V) f: All(k: K v: V) maybe.T(W)): T(K W) =
         fold(:K :V :T(K W) m newWithCapacity(:K :W m.count m.equal m.hash)
@@ -459,6 +457,5 @@ export
                         insert(:K :W acc k maybe.unwrap(:W opt));
                     end;
                     acc
-                end
-        );
+                end);
 end;

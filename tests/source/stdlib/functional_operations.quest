@@ -69,8 +69,7 @@ let vFilteredMapped = vector.filterMap(:Int :String v fun(x: Int): maybe.T(Strin
         maybe.some(:String conv.int(x * 10))
     else
         maybe.none(:String)
-    end
-);
+    end);
 vector.forEach(:String vFilteredMapped fun(s: String): Ok printString(s));
 printNewline(0);
 
@@ -110,8 +109,7 @@ let mFilterMapped = hashMap.filterMap(:String :Int :String m fun(k: String v: In
         maybe.some(:String {k <> "!"})
     else
         maybe.none(:String)
-    end
-);
+    end);
 printInt(hashMap.size(:String :String mFilterMapped));
 printString(maybe.unwrapOr(:String hashMap.get(:String :String mFilterMapped "three") "none"));
 printString(maybe.unwrapOr(:String hashMap.get(:String :String mFilterMapped "four") "none"));
@@ -153,8 +151,7 @@ let sFilterMapped = hashSet.filterMap(:Int :Int s intEqual intHash fun(x: Int): 
         maybe.some(:Int {x + 5})
     else
         maybe.none(:Int)
-    end
-);
+    end);
 printInt(hashSet.size(:Int sFilterMapped));
 printBool(hashSet.contains(:Int sFilterMapped 15));
 printBool(hashSet.contains(:Int sFilterMapped 25));

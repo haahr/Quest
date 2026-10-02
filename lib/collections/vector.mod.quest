@@ -296,8 +296,7 @@ export
             begin
                 append(:B res f(elem));
                 res
-            end
-        );
+            end);
 
     (* Retain only elements satisfying the predicate *)
     let filter(A::TYPE)(v: T(A) pred: All(elem: A) Bool): T(A) =
@@ -307,8 +306,7 @@ export
                     append(:A res elem);
                 end;
                 res
-            end
-        );
+            end);
 
     (* Combined map and filter: collects non-none results into a new vector *)
     let filterMap(A::TYPE B::TYPE)(v: T(A) f: All(elem: A) maybe.T(B)): T(B) =
@@ -319,6 +317,5 @@ export
                     append(:B res maybe.unwrap(:B opt));
                 end;
                 res
-            end
-        );
+            end);
 end;
