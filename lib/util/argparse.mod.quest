@@ -6,6 +6,7 @@ import
     util/strutil : util/Strutil
     util/stringBuilder : util/StringBuilder
     collections/vector : collections/Vector
+    collections/hashMap : collections/HashMap
     stringOp = string : StringOp
     writer: Writer
     conv: Conv
@@ -40,29 +41,15 @@ export
         prog: String
         description: String
         options: vector.T(OptDef)
+        flagsMap: hashMap.T(String Int)
         positionals: vector.T(PositionalDef)
     end;
 
-    Let StrEntry = Tuple
-        name: String
-        val: String
-    end;
-
-    Let IntEntry = Tuple
-        name: String
-        val: Int
-    end;
-
-    Let MultiEntry = Tuple
-        name: String
-        vals: vector.T(String)
-    end;
-
     Let Results = Tuple
-        bools: vector.T(StrEntry)
-        strings: vector.T(StrEntry)
-        ints: vector.T(IntEntry)
-        multis: vector.T(MultiEntry)
+        bools: hashMap.T(String Bool)
+        strings: hashMap.T(String String)
+        ints: hashMap.T(String Int)
+        multis: hashMap.T(String vector.T(String))
         posArgs: vector.T(String)
         targetArgsList: vector.T(String)
     end;
@@ -79,12 +66,26 @@ export
             else false
         end;
 
+    let registerFlags(p: Parser flagsStr: String optIdx: Int): Ok =
+        begin
+            let flagList = strutil.split(flagsStr " ");
+            let fCount = vector.length(:String flagList);
+            for fi = 0 upto {fCount - 1} do
+                let f = vector.get(:String flagList fi);
+                if stringOp.length(f) > 0 then
+                    hashMap.insert(:String :Int p.flagsMap f optIdx);
+                end;
+            end;
+            ok
+        end;
+
     let new(prog: String description: String): Parser =
         begin
             let p = tuple
                 let prog = prog
                 let description = description
                 let options = vector.new(:OptDef)
+                let flagsMap = hashMap.new(:String :Int stringOp.equal strutil.hash)
                 let positionals = vector.new(:PositionalDef)
             end;
             (* Automatically register -h and --help *)
@@ -94,28 +95,33 @@ export
                 let help = "Show this help message and exit"
                 let kind = option flag of OptKind end
             end);
+            registerFlags(p "-h --help" 0);
             p
         end;
 
     let addFlag(p: Parser name: String flags: String help: String): Ok =
         begin
+            let optIdx = vector.length(:OptDef p.options);
             vector.append(:OptDef p.options tuple
                 let name = name
                 let flagsStr = flags
                 let help = help
                 let kind = option flag of OptKind end
             end);
+            registerFlags(p flags optIdx);
             ok
         end;
 
     let addString(p: Parser name: String flags: String defaultVal: String help: String): Ok =
         begin
+            let optIdx = vector.length(:OptDef p.options);
             vector.append(:OptDef p.options tuple
                 let name = name
                 let flagsStr = flags
                 let help = help
                 let kind = option str of OptKind with tuple let defaultVal = defaultVal end end
             end);
+            registerFlags(p flags optIdx);
             ok
         end;
 
@@ -128,6 +134,7 @@ export
         help: String
     ): Ok =
         begin
+            let optIdx = vector.length(:OptDef p.options);
             vector.append(:OptDef p.options tuple
                 let name = name
                 let flagsStr = flags
@@ -137,28 +144,33 @@ export
                     let defaultVal = defaultVal
                 end end
             end);
+            registerFlags(p flags optIdx);
             ok
         end;
 
     let addInt(p: Parser name: String flags: String defaultVal: Int help: String): Ok =
         begin
+            let optIdx = vector.length(:OptDef p.options);
             vector.append(:OptDef p.options tuple
                 let name = name
                 let flagsStr = flags
                 let help = help
                 let kind = option integer of OptKind with tuple let defaultVal = defaultVal end end
             end);
+            registerFlags(p flags optIdx);
             ok
         end;
 
     let addMulti(p: Parser name: String flags: String help: String): Ok =
         begin
+            let optIdx = vector.length(:OptDef p.options);
             vector.append(:OptDef p.options tuple
                 let name = name
                 let flagsStr = flags
                 let help = help
                 let kind = option multi of OptKind end
             end);
+            registerFlags(p flags optIdx);
             ok
         end;
 
@@ -266,24 +278,7 @@ export
     (* Match a flag against registered option definitions *)
     (* Returns index in p.options, or ~1 if not found *)
     let findOptByFlag(p: Parser flag: String): Int =
-        begin
-            let optCount = vector.length(:OptDef p.options);
-            let var found = ~1;
-            let var i = 0;
-            while {i < optCount} andif {found == ~1} do
-                let opt = vector.get(:OptDef p.options i);
-                let flagList = strutil.split(opt.flagsStr " ");
-                let fCount = vector.length(:String flagList);
-                for fi = 0 upto {fCount - 1} do
-                    let f = vector.get(:String flagList fi);
-                    if stringOp.equal(f flag) then
-                        found := i;
-                    end;
-                end;
-                i := i + 1;
-            end;
-            found
-        end;
+        maybe.unwrapOr(:Int hashMap.get(:String :Int p.flagsMap flag) ~1);
 
     (* Check if val is in choices array *)
     let isChoiceValid(choices: Array(String) val: String): Bool =
@@ -298,52 +293,6 @@ export
             okChoice
         end;
 
-    (* Find entry in vector by name *)
-    let findStrEntry(v: vector.T(StrEntry) name: String): maybe.T(String) =
-        begin
-            let count = vector.length(:StrEntry v);
-            let var res = maybe.none(:String);
-            let var i = 0;
-            while {i < count} andif maybe.isNone(:String res) do
-                let e = vector.get(:StrEntry v i);
-                if stringOp.equal(e.name name) then
-                    res := maybe.some(:String e.val);
-                end;
-                i := i + 1;
-            end;
-            res
-        end;
-
-    let findIntEntry(v: vector.T(IntEntry) name: String): maybe.T(Int) =
-        begin
-            let count = vector.length(:IntEntry v);
-            let var res = maybe.none(:Int);
-            let var i = 0;
-            while {i < count} andif maybe.isNone(:Int res) do
-                let e = vector.get(:IntEntry v i);
-                if stringOp.equal(e.name name) then
-                    res := maybe.some(:Int e.val);
-                end;
-                i := i + 1;
-            end;
-            res
-        end;
-
-    let findMultiEntry(v: vector.T(MultiEntry) name: String): maybe.T(vector.T(String)) =
-        begin
-            let count = vector.length(:MultiEntry v);
-            let var res = maybe.none(:vector.T(String));
-            let var i = 0;
-            while {i < count} andif maybe.isNone(:vector.T(String) res) do
-                let e = vector.get(:MultiEntry v i);
-                if stringOp.equal(e.name name) then
-                    res := maybe.some(:vector.T(String) e.vals);
-                end;
-                i := i + 1;
-            end;
-            res
-        end;
-
     (* Store parsed value according to option kind *)
     let storeOptValue(
         p: Parser
@@ -355,10 +304,7 @@ export
         case opt.kind
             when str then
                 begin
-                    vector.append(:StrEntry res.strings tuple
-                        let name = opt.name
-                        let val = valPart
-                    end);
+                    hashMap.insert(:String :String res.strings opt.name valPart);
                     ok
                 end
             when choice with cd: Tuple choices: Array(String) defaultVal: String end then
@@ -371,10 +317,7 @@ export
                         );
                         raise error end
                     end;
-                    vector.append(:StrEntry res.strings tuple
-                        let name = opt.name
-                        let val = valPart
-                    end);
+                    hashMap.insert(:String :String res.strings opt.name valPart);
                     ok
                 end
             when integer then
@@ -388,15 +331,12 @@ export
                         );
                         raise error end
                     end;
-                    vector.append(:IntEntry res.ints tuple
-                        let name = opt.name
-                        let val = maybe.unwrap(:Int parsedInt)
-                    end);
+                    hashMap.insert(:String :Int res.ints opt.name maybe.unwrap(:Int parsedInt));
                     ok
                 end
             when multi then
                 begin
-                    let mOpt = findMultiEntry(res.multis opt.name);
+                    let mOpt = hashMap.get(:String :vector.T(String) res.multis opt.name);
                     if maybe.isSome(:vector.T(String) mOpt) then
                         vector.append(:String maybe.unwrap(:vector.T(String) mOpt) valPart);
                     end;
@@ -408,10 +348,10 @@ export
     let parseVector(p: Parser args: vector.T(String)): Results =
         begin
             let res = tuple
-                let bools = vector.new(:StrEntry)
-                let strings = vector.new(:StrEntry)
-                let ints = vector.new(:IntEntry)
-                let multis = vector.new(:MultiEntry)
+                let bools = hashMap.new(:String :Bool stringOp.equal strutil.hash)
+                let strings = hashMap.new(:String :String stringOp.equal strutil.hash)
+                let ints = hashMap.new(:String :Int stringOp.equal strutil.hash)
+                let multis = hashMap.new(:String :vector.T(String) stringOp.equal strutil.hash)
                 let posArgs = vector.new(:String)
                 let targetArgsList = vector.new(:String)
             end;
@@ -421,10 +361,8 @@ export
             for i = 0 upto {optCount - 1} do
                 let opt = vector.get(:OptDef p.options i);
                 if isMulti(opt.kind) then
-                    vector.append(:MultiEntry res.multis tuple
-                        let name = opt.name
-                        let vals = vector.new(:String)
-                    end);
+                    let emptyVec = vector.new(:String);
+                    hashMap.insert(:String :vector.T(String) res.multis opt.name emptyVec);
                 end;
             end;
 
@@ -462,10 +400,7 @@ export
                             printHelp(p writer.output);
                             raise error end
                         end;
-                        vector.append(:StrEntry res.bools tuple
-                            let name = opt.name
-                            let val = "true"
-                        end);
+                        hashMap.insert(:String :Bool res.bools opt.name true);
                         idx := idx + 1;
                     else
                         (* Option expecting value *)
@@ -503,10 +438,7 @@ export
                             printHelp(p writer.output);
                             raise error end
                         end;
-                        vector.append(:StrEntry res.bools tuple
-                            let name = opt.name
-                            let val = "true"
-                        end);
+                        hashMap.insert(:String :Bool res.bools opt.name true);
                         let aLen = stringOp.length(arg);
                         if aLen > 2 then
                             (* Handle remaining bundled short flags *)
@@ -533,10 +465,7 @@ export
                                     printHelp(p writer.output);
                                     raise error end
                                 end;
-                                vector.append(:StrEntry res.bools tuple
-                                    let name = bOpt.name
-                                    let val = "true"
-                                end);
+                                hashMap.insert(:String :Bool res.bools bOpt.name true);
                             end;
                         end;
                         idx := idx + 1;
@@ -574,34 +503,24 @@ export
                 case opt.kind
                     when str with sd: Tuple defaultVal: String end then
                         begin
-                            let existing = findStrEntry(res.strings opt.name);
-                            if maybe.isNone(:String existing) andif {stringOp.length(sd.defaultVal) > 0} then
-                                vector.append(:StrEntry res.strings tuple
-                                    let name = opt.name
-                                    let val = sd.defaultVal
-                                end);
+                            if not(hashMap.contains(:String :String res.strings opt.name))
+                               andif {stringOp.length(sd.defaultVal) > 0} then
+                                hashMap.insert(:String :String res.strings opt.name sd.defaultVal);
                             end;
                             ok
                         end
                     when choice with cd: Tuple choices: Array(String) defaultVal: String end then
                         begin
-                            let existing = findStrEntry(res.strings opt.name);
-                            if maybe.isNone(:String existing) andif {stringOp.length(cd.defaultVal) > 0} then
-                                vector.append(:StrEntry res.strings tuple
-                                    let name = opt.name
-                                    let val = cd.defaultVal
-                                end);
+                            if not(hashMap.contains(:String :String res.strings opt.name))
+                               andif {stringOp.length(cd.defaultVal) > 0} then
+                                hashMap.insert(:String :String res.strings opt.name cd.defaultVal);
                             end;
                             ok
                         end
                     when integer with id: Tuple defaultVal: Int end then
                         begin
-                            let existing = findIntEntry(res.ints opt.name);
-                            if maybe.isNone(:Int existing) then
-                                vector.append(:IntEntry res.ints tuple
-                                    let name = opt.name
-                                    let val = id.defaultVal
-                                end);
+                            if not(hashMap.contains(:String :Int res.ints opt.name)) then
+                                hashMap.insert(:String :Int res.ints opt.name id.defaultVal);
                             end;
                             ok
                         end
@@ -624,40 +543,23 @@ export
 
     (* Result Queries *)
     let getBool(r: Results name: String): Bool =
-        begin
-            let e = findStrEntry(r.bools name);
-            maybe.isSome(:String e)
-        end;
+        maybe.unwrapOr(:Bool hashMap.get(:String :Bool r.bools name) false);
 
     let getString(r: Results name: String): maybe.T(String) =
-        findStrEntry(r.strings name);
+        hashMap.get(:String :String r.strings name);
 
     let getStringOr(r: Results name: String defaultVal: String): String =
-        begin
-            let res = findStrEntry(r.strings name);
-            if maybe.isSome(:String res) then
-                maybe.unwrap(:String res)
-            else
-                defaultVal
-            end
-        end;
+        maybe.unwrapOr(:String hashMap.get(:String :String r.strings name) defaultVal);
 
     let getInt(r: Results name: String): maybe.T(Int) =
-        findIntEntry(r.ints name);
+        hashMap.get(:String :Int r.ints name);
 
     let getIntOr(r: Results name: String defaultVal: Int): Int =
-        begin
-            let res = findIntEntry(r.ints name);
-            if maybe.isSome(:Int res) then
-                maybe.unwrap(:Int res)
-            else
-                defaultVal
-            end
-        end;
+        maybe.unwrapOr(:Int hashMap.get(:String :Int r.ints name) defaultVal);
 
     let getMulti(r: Results name: String): vector.T(String) =
         begin
-            let res = findMultiEntry(r.multis name);
+            let res = hashMap.get(:String :vector.T(String) r.multis name);
             if maybe.isSome(:vector.T(String) res) then
                 maybe.unwrap(:vector.T(String) res)
             else

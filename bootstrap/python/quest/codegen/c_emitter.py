@@ -193,6 +193,7 @@ class CEmitter:
         self.module_fun_adapters: dict[str, dict[str, str]] = {}
         self.pointer_params: set[str] = set()
         self.adapter_defs: list[str] = []
+        self.adapter_decls: list[str] = []
         self.adapter_cache: dict[tuple[QType, QType], str] = {}
         self.analysis: Optional[CProgramAnalysis] = None
 
@@ -539,6 +540,7 @@ class CEmitter:
                     call_args.append(arg_name)
 
             sig = ", ".join(param_decls)
+            self.adapter_decls.append(f"static Q_UNUSED {ret_c} {adapt_fn_name}({sig});")
             fn_body: list[str] = [
                 f"static Q_UNUSED {ret_c} {adapt_fn_name}({sig}) {{",
                 "    QClosure *orig = (QClosure *)_raw_env;",
@@ -1572,6 +1574,9 @@ class CEmitter:
                 lines.append("")
 
         mod_emitter = CEmitter(echo=False, module_prefix=clean_mod)
+        mod_emitter.adapter_defs = self.adapter_defs
+        mod_emitter.adapter_decls = self.adapter_decls
+        mod_emitter.adapter_cache = self.adapter_cache
         mod_emitter.top_fun_names = {fname for fname, _, _ in mod_funs}
         mod_emitter.top_funs_dict = {fname: (ffun, fsym) for fname, ffun, fsym in mod_funs}
         mod_emitter.module_native_bindings = {nb.name: nb for nb in mod_native_funs}
@@ -1584,6 +1589,7 @@ class CEmitter:
         mod_emitter.tuple_coercions = self.tuple_coercions
         mod_emitter.variant_coercions = self.variant_coercions
 
+        fun_lines: list[str] = []
         for fname, ffun, fsym in mod_funs:
             m_ident = mangle_module_ident(clean_mod, fname)
             quants, params, body, ret_type = self._collect_fun_params(ffun)
@@ -1600,7 +1606,7 @@ class CEmitter:
                     linkage,
                 ) = fun_adapters[fname]
                 int_ret_c = "void" if int_ret_t == OK_TYPE else self.c_type(int_ret_t)
-                lines.append(f"static {int_ret_c} {impl_ident}({int_sig}) {{")
+                fun_lines.append(f"static {int_ret_c} {impl_ident}({int_sig}) {{")
                 fn_lines: list[str] = []
                 for q in quants:
                     mod_emitter.in_scope_type_descriptors[q.name] = f"descriptor_{q.name}"
@@ -1621,11 +1627,11 @@ class CEmitter:
                 mod_emitter.pointer_params = set()
                 mod_emitter.current_env_vars = prev_env
                 for fl in fn_lines:
-                    lines.append(f"    {fl}" if fl.strip() else fl)
-                lines.append("}")
-                lines.append("")
+                    fun_lines.append(f"    {fl}" if fl.strip() else fl)
+                fun_lines.append("}")
+                fun_lines.append("")
 
-                lines.append(f"{linkage}{exp_ret_c} {m_ident}({exp_sig}) {{")
+                fun_lines.append(f"{linkage}{exp_ret_c} {m_ident}({exp_sig}) {{")
                 adapter_args = [f"descriptor_{q.name}" for q in quants]
                 for ep, ip in zip(exp_params, int_params):
                     ep_name = f"qv_p_{ep.name}"
@@ -1636,20 +1642,20 @@ class CEmitter:
                         adapter_args.append(ep_name)
                 args_str = ", ".join(adapter_args)
                 if int_ret_t == OK_TYPE:
-                    lines.append(f"    {impl_ident}({args_str});")
+                    fun_lines.append(f"    {impl_ident}({args_str});")
                     if exp_ret_t != OK_TYPE:
-                        lines.append("    return ((QVal){ .p = NULL });")
+                        fun_lines.append("    return ((QVal){ .p = NULL });")
                     else:
-                        lines.append("    return;")
+                        fun_lines.append("    return;")
                 else:
-                    lines.append(f"    {int_ret_c} _res = {impl_ident}({args_str});")
+                    fun_lines.append(f"    {int_ret_c} _res = {impl_ident}({args_str});")
                     if exp_ret_c != int_ret_c:
                         wrapped = _qval_wrap("_res", int_ret_t)
-                        lines.append(f"    return {wrapped};")
+                        fun_lines.append(f"    return {wrapped};")
                     else:
-                        lines.append("    return _res;")
-                lines.append("}")
-                lines.append("")
+                        fun_lines.append("    return _res;")
+                fun_lines.append("}")
+                fun_lines.append("")
             else:
                 ret_c = "void" if ret_type == OK_TYPE else self.c_type(ret_type)
                 quant_decls = [f"const QTypeDescriptor *descriptor_{q.name}" for q in quants]
@@ -1660,7 +1666,7 @@ class CEmitter:
                 sig = "void" if not param_decls else ", ".join(param_decls)
                 is_exported = standalone and (exported_funs is None or fname in exported_funs)
                 linkage = "" if is_exported else "static "
-                lines.append(f"{linkage}{ret_c} {m_ident}({sig}) {{")
+                fun_lines.append(f"{linkage}{ret_c} {m_ident}({sig}) {{")
                 fn_lines: list[str] = []
                 for q in quants:
                     mod_emitter.in_scope_type_descriptors[q.name] = f"descriptor_{q.name}"
@@ -1681,9 +1687,16 @@ class CEmitter:
                 mod_emitter.pointer_params = set()
                 mod_emitter.current_env_vars = prev_env
                 for fl in fn_lines:
-                    lines.append(f"    {fl}" if fl.strip() else fl)
-                lines.append("}")
-                lines.append("")
+                    fun_lines.append(f"    {fl}" if fl.strip() else fl)
+                fun_lines.append("}")
+                fun_lines.append("")
+
+        if self.adapter_decls:
+            lines.append("/* Static forward declarations for closure adapters */")
+            lines.extend(self.adapter_decls)
+            lines.append("")
+
+        lines.extend(fun_lines)
 
         has_precompiled = bool(
             self.analysis and any(getattr(m, "is_precompiled", False) for m in self.analysis.sorted_modules)
