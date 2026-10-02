@@ -1,0 +1,986 @@
+(Program
+  :phrases (
+    (ImportPhrase
+      :items (
+        (ImportItem ('argParse') 'ArgParse' ('util/argParse') 'util/ArgParse')
+        (ImportItem ('strutil') 'Strutil' ('util/strutil') 'util/Strutil')
+        (ImportItem ('vector') 'Vector' ('collections/vector') 'collections/Vector')
+        (ImportItem ('maybe') 'Maybe' ('util/maybe') 'util/Maybe')
+        (ImportItem ('writer') 'Writer')
+        (ImportItem ('conv') 'Conv')
+      )
+    )
+    (LetValueBinding
+      :name 'printStr'
+      :value (ExprBlock
+        :bindings (
+          (ExprStmt
+            :expr (ExprApp
+              :func (ExprSelect
+                :target (ExprId 'writer')
+                :field 'putString'
+              )
+              :args (
+                (ExprSelect
+                  :target (ExprId 'writer')
+                  :field 'output'
+                )
+                (ExprId 's')
+              )
+            )
+          )
+          (ExprStmt
+            :expr (ExprApp
+              :func (ExprSelect
+                :target (ExprId 'writer')
+                :field 'putString'
+              )
+              :args (
+                (ExprSelect
+                  :target (ExprId 'writer')
+                  :field 'output'
+                )
+                (ExprString '\n' '"\\n"')
+              )
+            )
+          )
+        )
+      )
+      :params (
+        (FormalParam
+          :name 's'
+          :type_annot (TypePath ('String'))
+          :mode VALUE
+        )
+      )
+      :type_annot (TypePath ('Ok'))
+    )
+    (LetValueBinding
+      :name 'printBool'
+      :value (ExprApp
+        :func (ExprId 'printStr')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'conv')
+              :field 'bool'
+            )
+            :args (
+              (ExprId 'b')
+            )
+          )
+        )
+      )
+      :params (
+        (FormalParam
+          :name 'b'
+          :type_annot (TypePath ('Bool'))
+          :mode VALUE
+        )
+      )
+      :type_annot (TypePath ('Ok'))
+    )
+    (LetValueBinding
+      :name 'printInt'
+      :value (ExprApp
+        :func (ExprId 'printStr')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'conv')
+              :field 'int'
+            )
+            :args (
+              (ExprId 'n')
+            )
+          )
+        )
+      )
+      :params (
+        (FormalParam
+          :name 'n'
+          :type_annot (TypePath ('Int'))
+          :mode VALUE
+        )
+      )
+      :type_annot (TypePath ('Ok'))
+    )
+    (LetValueBinding
+      :name 'p'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'argParse')
+          :field 'new'
+        )
+        :args (
+          (ExprString 'questc' '"questc"')
+          (ExprString 'Quest Compiler Driver' '"Quest Compiler Driver"')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'argParse')
+          :field 'addFlag'
+        )
+        :args (
+          (ExprId 'p')
+          (ExprString 'echo' '"echo"')
+          (ExprString '-e --echo' '"-e --echo"')
+          (ExprString 'Echo compilation steps' '"Echo compilation steps"')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'argParse')
+          :field 'addString'
+        )
+        :args (
+          (ExprId 'p')
+          (ExprString 'output' '"output"')
+          (ExprString '-o --output' '"-o --output"')
+          (ExprString 'a.out' '"a.out"')
+          (ExprString 'Output file path' '"Output file path"')
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'phases'
+      :value (ExprArray
+        :elements (
+          (ExprString 'parse' '"parse"')
+          (ExprString 'typecheck' '"typecheck"')
+          (ExprString 'codegen' '"codegen"')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'argParse')
+          :field 'addChoice'
+        )
+        :args (
+          (ExprId 'p')
+          (ExprString 'phase' '"phase"')
+          (ExprString '-p --phase' '"-p --phase"')
+          (ExprId 'phases')
+          (ExprString 'codegen' '"codegen"')
+          (ExprString 'Stop after phase' '"Stop after phase"')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'argParse')
+          :field 'addInt'
+        )
+        :args (
+          (ExprId 'p')
+          (ExprString 'optLevel' '"optLevel"')
+          (ExprString '-O' '"-O"')
+          (ExprInt 2 '2')
+          (ExprString 'Optimization level' '"Optimization level"')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'argParse')
+          :field 'addMulti'
+        )
+        :args (
+          (ExprId 'p')
+          (ExprString 'include' '"include"')
+          (ExprString '-I --include' '"-I --include"')
+          (ExprString 'Search path directory' '"Search path directory"')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'argParse')
+          :field 'addPositional'
+        )
+        :args (
+          (ExprId 'p')
+          (ExprString 'source' '"source"')
+          (ExprString 'Source file to compile' '"Source file to compile"')
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'helpText'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'argParse')
+          :field 'formatHelp'
+        )
+        :args (
+          (ExprId 'p')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printBool')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'strutil')
+              :field 'contains'
+            )
+            :args (
+              (ExprId 'helpText')
+              (ExprString 'Usage: questc [options] source' '"Usage: questc [options] source"')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printBool')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'strutil')
+              :field 'contains'
+            )
+            :args (
+              (ExprId 'helpText')
+              (ExprString 'Echo compilation steps' '"Echo compilation steps"')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printBool')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'strutil')
+              :field 'contains'
+            )
+            :args (
+              (ExprId 'helpText')
+              (ExprString 'choices: parse, typecheck, codegen' '"choices: parse, typecheck, codegen"')
+            )
+          )
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'args1'
+      :value (ExprArray
+        :elements (
+          (ExprString 'main.quest' '"main.quest"')
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'r1'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'argParse')
+          :field 'parse'
+        )
+        :args (
+          (ExprId 'p')
+          (ExprId 'args1')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printBool')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'argParse')
+              :field 'getBool'
+            )
+            :args (
+              (ExprId 'r1')
+              (ExprString 'echo' '"echo"')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printStr')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'argParse')
+              :field 'getStringOr'
+            )
+            :args (
+              (ExprId 'r1')
+              (ExprString 'output' '"output"')
+              (ExprString '' '""')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printStr')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'argParse')
+              :field 'getStringOr'
+            )
+            :args (
+              (ExprId 'r1')
+              (ExprString 'phase' '"phase"')
+              (ExprString '' '""')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printInt')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'argParse')
+              :field 'getIntOr'
+            )
+            :args (
+              (ExprId 'r1')
+              (ExprString 'optLevel' '"optLevel"')
+              (ExprInt 0 '0')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printInt')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'vector')
+              :field 'length'
+            )
+            :args (
+              (TypeArgument
+                :type_val (TypePath ('String'))
+              )
+              (ExprApp
+                :func (ExprSelect
+                  :target (ExprId 'argParse')
+                  :field 'getMulti'
+                )
+                :args (
+                  (ExprId 'r1')
+                  (ExprString 'include' '"include"')
+                )
+              )
+            )
+          )
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'pos1'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'argParse')
+          :field 'positionals'
+        )
+        :args (
+          (ExprId 'r1')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printInt')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'vector')
+              :field 'length'
+            )
+            :args (
+              (TypeArgument
+                :type_val (TypePath ('String'))
+              )
+              (ExprId 'pos1')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printStr')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'vector')
+              :field 'get'
+            )
+            :args (
+              (TypeArgument
+                :type_val (TypePath ('String'))
+              )
+              (ExprId 'pos1')
+              (ExprInt 0 '0')
+            )
+          )
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'args2'
+      :value (ExprArray
+        :elements (
+          (ExprString '-e' '"-e"')
+          (ExprString '-o' '"-o"')
+          (ExprString 'myprog' '"myprog"')
+          (ExprString '--phase=typecheck' '"--phase=typecheck"')
+          (ExprString '-O' '"-O"')
+          (ExprString '3' '"3"')
+          (ExprString '-I' '"-I"')
+          (ExprString 'lib' '"lib"')
+          (ExprString '-Iextra/lib' '"-Iextra/lib"')
+          (ExprString 'src1.quest' '"src1.quest"')
+          (ExprString 'src2.quest' '"src2.quest"')
+          (ExprString '--' '"--"')
+          (ExprString 'target_arg1' '"target_arg1"')
+          (ExprString 'target_arg2' '"target_arg2"')
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'r2'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'argParse')
+          :field 'parse'
+        )
+        :args (
+          (ExprId 'p')
+          (ExprId 'args2')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printBool')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'argParse')
+              :field 'getBool'
+            )
+            :args (
+              (ExprId 'r2')
+              (ExprString 'echo' '"echo"')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printStr')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'argParse')
+              :field 'getStringOr'
+            )
+            :args (
+              (ExprId 'r2')
+              (ExprString 'output' '"output"')
+              (ExprString '' '""')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printStr')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'argParse')
+              :field 'getStringOr'
+            )
+            :args (
+              (ExprId 'r2')
+              (ExprString 'phase' '"phase"')
+              (ExprString '' '""')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printInt')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'argParse')
+              :field 'getIntOr'
+            )
+            :args (
+              (ExprId 'r2')
+              (ExprString 'optLevel' '"optLevel"')
+              (ExprInt 0 '0')
+            )
+          )
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'inc2'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'argParse')
+          :field 'getMulti'
+        )
+        :args (
+          (ExprId 'r2')
+          (ExprString 'include' '"include"')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printInt')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'vector')
+              :field 'length'
+            )
+            :args (
+              (TypeArgument
+                :type_val (TypePath ('String'))
+              )
+              (ExprId 'inc2')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printStr')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'vector')
+              :field 'get'
+            )
+            :args (
+              (TypeArgument
+                :type_val (TypePath ('String'))
+              )
+              (ExprId 'inc2')
+              (ExprInt 0 '0')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printStr')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'vector')
+              :field 'get'
+            )
+            :args (
+              (TypeArgument
+                :type_val (TypePath ('String'))
+              )
+              (ExprId 'inc2')
+              (ExprInt 1 '1')
+            )
+          )
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'pos2'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'argParse')
+          :field 'positionals'
+        )
+        :args (
+          (ExprId 'r2')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printInt')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'vector')
+              :field 'length'
+            )
+            :args (
+              (TypeArgument
+                :type_val (TypePath ('String'))
+              )
+              (ExprId 'pos2')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printStr')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'vector')
+              :field 'get'
+            )
+            :args (
+              (TypeArgument
+                :type_val (TypePath ('String'))
+              )
+              (ExprId 'pos2')
+              (ExprInt 0 '0')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printStr')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'vector')
+              :field 'get'
+            )
+            :args (
+              (TypeArgument
+                :type_val (TypePath ('String'))
+              )
+              (ExprId 'pos2')
+              (ExprInt 1 '1')
+            )
+          )
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'target2'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'argParse')
+          :field 'targetArgs'
+        )
+        :args (
+          (ExprId 'r2')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printInt')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'vector')
+              :field 'length'
+            )
+            :args (
+              (TypeArgument
+                :type_val (TypePath ('String'))
+              )
+              (ExprId 'target2')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printStr')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'vector')
+              :field 'get'
+            )
+            :args (
+              (TypeArgument
+                :type_val (TypePath ('String'))
+              )
+              (ExprId 'target2')
+              (ExprInt 0 '0')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printStr')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'vector')
+              :field 'get'
+            )
+            :args (
+              (TypeArgument
+                :type_val (TypePath ('String'))
+              )
+              (ExprId 'target2')
+              (ExprInt 1 '1')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprTry
+        :body (ExprBlock
+          :bindings (
+            (LetValueBinding
+              :name 'bad1Args'
+              :value (ExprArray
+                :elements (
+                  (ExprString '--unknown' '"--unknown"')
+                )
+              )
+            )
+            (LetValueBinding
+              :name 'bad1'
+              :value (ExprApp
+                :func (ExprSelect
+                  :target (ExprId 'argParse')
+                  :field 'parse'
+                )
+                :args (
+                  (ExprId 'p')
+                  (ExprId 'bad1Args')
+                )
+              )
+            )
+            (ExprStmt
+              :expr (ExprApp
+                :func (ExprId 'printStr')
+                :args (
+                  (ExprString 'FAILED: should have raised on --unknown' '"FAILED: should have raised on --unknown"')
+                )
+              )
+            )
+          )
+        )
+        :branches (
+          (TryBranch
+            :exc_pattern (ExprSelect
+              :target (ExprId 'argParse')
+              :field 'error'
+            )
+            :body (ExprStmt
+              :expr (ExprApp
+                :func (ExprId 'printStr')
+                :args (
+                  (ExprString 'CAUGHT: unrecognized option error' '"CAUGHT: unrecognized option error"')
+                )
+              )
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprTry
+        :body (ExprBlock
+          :bindings (
+            (LetValueBinding
+              :name 'bad2Args'
+              :value (ExprArray
+                :elements (
+                  (ExprString '--phase' '"--phase"')
+                  (ExprString 'invalid_phase' '"invalid_phase"')
+                )
+              )
+            )
+            (LetValueBinding
+              :name 'bad2'
+              :value (ExprApp
+                :func (ExprSelect
+                  :target (ExprId 'argParse')
+                  :field 'parse'
+                )
+                :args (
+                  (ExprId 'p')
+                  (ExprId 'bad2Args')
+                )
+              )
+            )
+            (ExprStmt
+              :expr (ExprApp
+                :func (ExprId 'printStr')
+                :args (
+                  (ExprString 'FAILED: should have raised on invalid choice' '"FAILED: should have raised on invalid choice"')
+                )
+              )
+            )
+          )
+        )
+        :branches (
+          (TryBranch
+            :exc_pattern (ExprSelect
+              :target (ExprId 'argParse')
+              :field 'error'
+            )
+            :body (ExprStmt
+              :expr (ExprApp
+                :func (ExprId 'printStr')
+                :args (
+                  (ExprString 'CAUGHT: invalid choice error' '"CAUGHT: invalid choice error"')
+                )
+              )
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprTry
+        :body (ExprBlock
+          :bindings (
+            (LetValueBinding
+              :name 'bad3Args'
+              :value (ExprArray
+                :elements (
+                  (ExprString '-o' '"-o"')
+                )
+              )
+            )
+            (LetValueBinding
+              :name 'bad3'
+              :value (ExprApp
+                :func (ExprSelect
+                  :target (ExprId 'argParse')
+                  :field 'parse'
+                )
+                :args (
+                  (ExprId 'p')
+                  (ExprId 'bad3Args')
+                )
+              )
+            )
+            (ExprStmt
+              :expr (ExprApp
+                :func (ExprId 'printStr')
+                :args (
+                  (ExprString 'FAILED: should have raised on missing arg' '"FAILED: should have raised on missing arg"')
+                )
+              )
+            )
+          )
+        )
+        :branches (
+          (TryBranch
+            :exc_pattern (ExprSelect
+              :target (ExprId 'argParse')
+              :field 'error'
+            )
+            :body (ExprStmt
+              :expr (ExprApp
+                :func (ExprId 'printStr')
+                :args (
+                  (ExprString 'CAUGHT: missing argument error' '"CAUGHT: missing argument error"')
+                )
+              )
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprTry
+        :body (ExprBlock
+          :bindings (
+            (LetValueBinding
+              :name 'bad4Args'
+              :value (ExprArray
+                :elements (
+                  (ExprString '-O' '"-O"')
+                  (ExprString 'not_a_number' '"not_a_number"')
+                )
+              )
+            )
+            (LetValueBinding
+              :name 'bad4'
+              :value (ExprApp
+                :func (ExprSelect
+                  :target (ExprId 'argParse')
+                  :field 'parse'
+                )
+                :args (
+                  (ExprId 'p')
+                  (ExprId 'bad4Args')
+                )
+              )
+            )
+            (ExprStmt
+              :expr (ExprApp
+                :func (ExprId 'printStr')
+                :args (
+                  (ExprString 'FAILED: should have raised on invalid int' '"FAILED: should have raised on invalid int"')
+                )
+              )
+            )
+          )
+        )
+        :branches (
+          (TryBranch
+            :exc_pattern (ExprSelect
+              :target (ExprId 'argParse')
+              :field 'error'
+            )
+            :body (ExprStmt
+              :expr (ExprApp
+                :func (ExprId 'printStr')
+                :args (
+                  (ExprString 'CAUGHT: invalid integer error' '"CAUGHT: invalid integer error"')
+                )
+              )
+            )
+          )
+        )
+      )
+    )
+  )
+)

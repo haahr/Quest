@@ -223,6 +223,65 @@ end;
 
 ---
 
+### 1.5. `util/argParse : util/ArgParse`
+
+Command-line argument parser patterned after Python's `argparse.ArgumentParser`. Supports flags, string options,
+restricted choices, integer options, accumulating multi-value options, positional arguments, and `--` passthrough.
+Error messages are written to `writer.err` before raising `argParse.error`. Help generation (`-h`, `--help`) is
+automatically registered by default.
+
+#### Interface Summary
+
+```quest
+interface ArgParse
+import
+    util/maybe : util/Maybe
+    collections/vector : collections/Vector
+    writer: Writer
+export
+    error: Exception
+
+    Parser::TYPE
+    Results::TYPE
+
+    (* Parser Construction *)
+    new(prog: String description: String): Parser
+
+    (* Option Registration *)
+    addFlag(p: Parser name: String flags: String help: String): Ok
+    addString(p: Parser name: String flags: String defaultVal: String help: String): Ok
+    addChoice(
+        p: Parser
+        name: String
+        flags: String
+        choices: Array(String)
+        defaultVal: String
+        help: String
+    ): Ok
+    addInt(p: Parser name: String flags: String defaultVal: Int help: String): Ok
+    addMulti(p: Parser name: String flags: String help: String): Ok
+    addPositional(p: Parser name: String help: String): Ok
+
+    (* Parsing & Help *)
+    parse(p: Parser args: Array(String)): Results
+    parseVector(p: Parser args: vector.T(String)): Results
+    printHelp(p: Parser w: writer.T): Ok
+    formatHelp(p: Parser): String
+
+    (* Result Inspection *)
+    getBool(r: Results name: String): Bool
+    getString(r: Results name: String): maybe.T(String)
+    getStringOr(r: Results name: String defaultVal: String): String
+    getInt(r: Results name: String): maybe.T(Int)
+    getIntOr(r: Results name: String defaultVal: Int): Int
+    getMulti(r: Results name: String): vector.T(String)
+    positionals(r: Results): vector.T(String)
+    targetArgs(r: Results): vector.T(String)
+end;
+```
+
+---
+
 ## 2. Collections (`lib/collections/`)
 
 ### 2.1. `collections/vector : collections/Vector`

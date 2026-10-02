@@ -1,0 +1,27 @@
+true
+true
+true
+false
+a.out
+codegen
+2
+0
+1
+main.quest
+true
+myprog
+typecheck
+3
+2
+lib
+extra/lib
+2
+src1.quest
+src2.quest
+2
+target_arg1
+target_arg2
+CAUGHT: unrecognized option error
+CAUGHT: invalid choice error
+CAUGHT: missing argument error
+CAUGHT: invalid integer error

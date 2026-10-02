@@ -1,0 +1,666 @@
+(* Standard Library: Pure Quest Command-Line Argument Parser *)
+
+module argParse : ArgParse
+import
+    util/maybe : util/Maybe
+    util/strutil : util/Strutil
+    util/stringBuilder : util/StringBuilder
+    collections/vector : collections/Vector
+    stringOp = string : StringOp
+    writer: Writer
+    conv: Conv
+    ascii: Ascii
+    word: Word
+export
+    (* Exception raised on argument parsing or configuration errors *)
+    let error: Exception = exception error: Ok end;
+
+    (* Kind of Option *)
+    (* 0: Flag (bool), 1: String, 2: Choice, 3: Int, 4: Multi *)
+    Let OptKind = Int;
+
+    Let OptDef = Tuple
+        name: String
+        kind: OptKind
+        flagsStr: String
+        help: String
+        defaultStr: String
+        defaultInt: Int
+        choices: Array(String)
+    end;
+
+    Let PositionalDef = Tuple
+        name: String
+        help: String
+    end;
+
+    Let Parser = Tuple
+        prog: String
+        description: String
+        options: vector.T(OptDef)
+        positionals: vector.T(PositionalDef)
+    end;
+
+    Let StrEntry = Tuple
+        name: String
+        val: String
+    end;
+
+    Let IntEntry = Tuple
+        name: String
+        val: Int
+    end;
+
+    Let MultiEntry = Tuple
+        name: String
+        vals: vector.T(String)
+    end;
+
+    Let Results = Tuple
+        bools: vector.T(StrEntry)
+        strings: vector.T(StrEntry)
+        ints: vector.T(IntEntry)
+        multis: vector.T(MultiEntry)
+        posArgs: vector.T(String)
+        targetArgsList: vector.T(String)
+    end;
+
+    (* Helper: string equality *)
+    let strEq(s1: String s2: String): Bool =
+        stringOp.equal(s1 s2);
+
+    let new(prog: String description: String): Parser =
+        begin
+            let p = tuple
+                let prog = prog
+                let description = description
+                let options = vector.new(:OptDef)
+                let positionals = vector.new(:PositionalDef)
+            end;
+            (* Automatically register -h and --help *)
+            vector.append(:OptDef p.options tuple
+                let name = "help"
+                let kind = 0
+                let flagsStr = "-h --help"
+                let help = "Show this help message and exit"
+                let defaultStr = ""
+                let defaultInt = 0
+                let choices = array of :String end
+            end);
+            p
+        end;
+
+    let addFlag(p: Parser name: String flags: String help: String): Ok =
+        begin
+            vector.append(:OptDef p.options tuple
+                let name = name
+                let kind = 0
+                let flagsStr = flags
+                let help = help
+                let defaultStr = ""
+                let defaultInt = 0
+                let choices = array of :String end
+            end);
+            ok
+        end;
+
+    let addString(p: Parser name: String flags: String defaultVal: String help: String): Ok =
+        begin
+            vector.append(:OptDef p.options tuple
+                let name = name
+                let kind = 1
+                let flagsStr = flags
+                let help = help
+                let defaultStr = defaultVal
+                let defaultInt = 0
+                let choices = array of :String end
+            end);
+            ok
+        end;
+
+    let addChoice(
+        p: Parser
+        name: String
+        flags: String
+        choices: Array(String)
+        defaultVal: String
+        help: String
+    ): Ok =
+        begin
+            vector.append(:OptDef p.options tuple
+                let name = name
+                let kind = 2
+                let flagsStr = flags
+                let help = help
+                let defaultStr = defaultVal
+                let defaultInt = 0
+                let choices = choices
+            end);
+            ok
+        end;
+
+    let addInt(p: Parser name: String flags: String defaultVal: Int help: String): Ok =
+        begin
+            vector.append(:OptDef p.options tuple
+                let name = name
+                let kind = 3
+                let flagsStr = flags
+                let help = help
+                let defaultStr = ""
+                let defaultInt = defaultVal
+                let choices = array of :String end
+            end);
+            ok
+        end;
+
+    let addMulti(p: Parser name: String flags: String help: String): Ok =
+        begin
+            vector.append(:OptDef p.options tuple
+                let name = name
+                let kind = 4
+                let flagsStr = flags
+                let help = help
+                let defaultStr = ""
+                let defaultInt = 0
+                let choices = array of :String end
+            end);
+            ok
+        end;
+
+    let addPositional(p: Parser name: String help: String): Ok =
+        begin
+            vector.append(:PositionalDef p.positionals tuple
+                let name = name
+                let help = help
+            end);
+            ok
+        end;
+
+    (* Help Formatting *)
+    let formatHelp(p: Parser): String =
+        begin
+            let b = stringBuilder.new();
+            stringBuilder.append(b "Usage: ");
+            stringBuilder.append(b p.prog);
+            stringBuilder.append(b " [options]");
+            let posCount = vector.length(:PositionalDef p.positionals);
+            for i = 0 upto {posCount - 1} do
+                let pos = vector.get(:PositionalDef p.positionals i);
+                stringBuilder.append(b " ");
+                stringBuilder.append(b pos.name);
+            end;
+            stringBuilder.appendChar(b '\n');
+            if stringOp.length(p.description) > 0 then
+                stringBuilder.appendChar(b '\n');
+                stringBuilder.append(b p.description);
+                stringBuilder.appendChar(b '\n');
+            end;
+
+            if posCount > 0 then
+                stringBuilder.append(b "\nPositional arguments:\n");
+                for i = 0 upto {posCount - 1} do
+                    let pos = vector.get(:PositionalDef p.positionals i);
+                    stringBuilder.append(b "  ");
+                    stringBuilder.append(b pos.name);
+                    let pad = {24 - stringOp.length(pos.name)};
+                    if pad > 0 then
+                        for k = 1 upto pad do stringBuilder.appendChar(b ' '); end;
+                    else
+                        stringBuilder.append(b "  ");
+                    end;
+                    stringBuilder.append(b pos.help);
+                    stringBuilder.appendChar(b '\n');
+                end;
+            end;
+
+            let optCount = vector.length(:OptDef p.options);
+            if optCount > 0 then
+                stringBuilder.append(b "\nOptions:\n");
+                for i = 0 upto {optCount - 1} do
+                    let opt = vector.get(:OptDef p.options i);
+                    stringBuilder.append(b "  ");
+                    stringBuilder.append(b opt.flagsStr);
+                    let pad = {24 - stringOp.length(opt.flagsStr)};
+                    if pad > 0 then
+                        for k = 1 upto pad do stringBuilder.appendChar(b ' '); end;
+                    else
+                        stringBuilder.append(b "  ");
+                    end;
+                    stringBuilder.append(b opt.help);
+                    if opt.kind == 2 then
+                        stringBuilder.append(b " (choices: ");
+                        let cNum = extent opt.choices;
+                        for ci = 0 upto {cNum - 1} do
+                            if ci > 0 then stringBuilder.append(b ", "); end;
+                            stringBuilder.append(b opt.choices[ci]);
+                        end;
+                        stringBuilder.append(b ")");
+                    end;
+                    if stringOp.length(opt.defaultStr) > 0 then
+                        stringBuilder.append(b " [default: ");
+                        stringBuilder.append(b opt.defaultStr);
+                        stringBuilder.append(b "]");
+                    elsif {opt.kind == 3} andif {opt.defaultInt isnot 0} then
+                        stringBuilder.append(b " [default: ");
+                        stringBuilder.append(b conv.int(opt.defaultInt));
+                        stringBuilder.append(b "]");
+                    end;
+                    stringBuilder.appendChar(b '\n');
+                end;
+            end;
+
+            stringBuilder.toString(b)
+        end;
+
+    let printHelp(p: Parser w: writer.T): Ok =
+        begin
+            writer.putString(w formatHelp(p));
+            ok
+        end;
+
+    (* Match a flag against registered option definitions *)
+    (* Returns index in p.options, or ~1 if not found *)
+    let findOptByFlag(p: Parser flag: String): Int =
+        begin
+            let optCount = vector.length(:OptDef p.options);
+            let var found = ~1;
+            let var i = 0;
+            while {i < optCount} andif {found == ~1} do
+                let opt = vector.get(:OptDef p.options i);
+                let flagList = strutil.split(opt.flagsStr " ");
+                let fCount = vector.length(:String flagList);
+                for fi = 0 upto {fCount - 1} do
+                    let f = vector.get(:String flagList fi);
+                    if strEq(f flag) then
+                        found := i;
+                    end;
+                end;
+                i := i + 1;
+            end;
+            found
+        end;
+
+    (* Check if val is in choices array *)
+    let isChoiceValid(choices: Array(String) val: String): Bool =
+        begin
+            let n = extent choices;
+            let var okChoice = false;
+            for i = 0 upto {n - 1} do
+                if strEq(choices[i] val) then
+                    okChoice := true;
+                end;
+            end;
+            okChoice
+        end;
+
+    (* Find entry in vector by name *)
+    let findStrEntry(v: vector.T(StrEntry) name: String): maybe.T(String) =
+        begin
+            let count = vector.length(:StrEntry v);
+            let var res = maybe.none(:String);
+            let var i = 0;
+            while {i < count} andif maybe.isNone(:String res) do
+                let e = vector.get(:StrEntry v i);
+                if strEq(e.name name) then
+                    res := maybe.some(:String e.val);
+                end;
+                i := i + 1;
+            end;
+            res
+        end;
+
+    let findIntEntry(v: vector.T(IntEntry) name: String): maybe.T(Int) =
+        begin
+            let count = vector.length(:IntEntry v);
+            let var res = maybe.none(:Int);
+            let var i = 0;
+            while {i < count} andif maybe.isNone(:Int res) do
+                let e = vector.get(:IntEntry v i);
+                if strEq(e.name name) then
+                    res := maybe.some(:Int e.val);
+                end;
+                i := i + 1;
+            end;
+            res
+        end;
+
+    let findMultiEntry(v: vector.T(MultiEntry) name: String): maybe.T(vector.T(String)) =
+        begin
+            let count = vector.length(:MultiEntry v);
+            let var res = maybe.none(:vector.T(String));
+            let var i = 0;
+            while {i < count} andif maybe.isNone(:vector.T(String) res) do
+                let e = vector.get(:MultiEntry v i);
+                if strEq(e.name name) then
+                    res := maybe.some(:vector.T(String) e.vals);
+                end;
+                i := i + 1;
+            end;
+            res
+        end;
+
+    let parseVector(p: Parser args: vector.T(String)): Results =
+        begin
+            let res = tuple
+                let bools = vector.new(:StrEntry)
+                let strings = vector.new(:StrEntry)
+                let ints = vector.new(:IntEntry)
+                let multis = vector.new(:MultiEntry)
+                let posArgs = vector.new(:String)
+                let targetArgsList = vector.new(:String)
+            end;
+
+            (* Pre-populate multis with empty vectors *)
+            let optCount = vector.length(:OptDef p.options);
+            for i = 0 upto {optCount - 1} do
+                let opt = vector.get(:OptDef p.options i);
+                if opt.kind == 4 then
+                    vector.append(:MultiEntry res.multis tuple
+                        let name = opt.name
+                        let vals = vector.new(:String)
+                    end);
+                end;
+            end;
+
+            let nArgs = vector.length(:String args);
+            let var idx = 0;
+            let var inTargetArgs = false;
+
+            while idx < nArgs do
+                let arg = vector.get(:String args idx);
+                if inTargetArgs then
+                    vector.append(:String res.targetArgsList arg);
+                    idx := idx + 1;
+                elsif strEq(arg "--") then
+                    inTargetArgs := true;
+                    idx := idx + 1;
+                elsif strutil.startsWith(arg "--") then
+                    (* Long option *)
+                    let eqIdx = strutil.find(arg "=");
+                    let flagPart =
+                        if eqIdx is ~1 then
+                            arg
+                        else
+                            stringOp.getSub(arg 0 eqIdx)
+                        end;
+                    let optIdx = findOptByFlag(p flagPart);
+                    if optIdx is ~1 then
+                        writer.putString(writer.err {p.prog <> ": error: unrecognized option '" <> flagPart <> "'\n"});
+                        raise error end
+                    end;
+                    let opt = vector.get(:OptDef p.options optIdx);
+
+                    if opt.kind == 0 then
+                        (* Flag *)
+                        if strEq(opt.name "help") then
+                            printHelp(p writer.output);
+                            raise error end
+                        end;
+                        vector.append(:StrEntry res.bools tuple
+                            let name = opt.name
+                            let val = "true"
+                        end);
+                        idx := idx + 1;
+                    else
+                        (* Option expecting value *)
+                        let valPart =
+                            if eqIdx isnot ~1 then
+                                stringOp.getSub(arg {eqIdx + 1} {{stringOp.length(arg) - eqIdx} - 1})
+                            else
+                                idx := idx + 1;
+                                if idx >= nArgs then
+                                    writer.putString(
+                                        writer.err
+                                        {p.prog <> ": error: option '" <> flagPart <> "' requires an argument\n"}
+                                    );
+                                    raise error end
+                                end;
+                                vector.get(:String args idx)
+                            end;
+
+                        if opt.kind == 1 then
+                            (* String *)
+                            vector.append(:StrEntry res.strings tuple
+                                let name = opt.name
+                                let val = valPart
+                            end);
+                        elsif opt.kind == 2 then
+                            (* Choice *)
+                            if not(isChoiceValid(opt.choices valPart)) then
+                                writer.putString(
+                                    writer.err
+                                    {p.prog <> ": error: invalid choice '" <> valPart
+                                        <> "' for option '" <> flagPart <> "'\n"}
+                                );
+                                raise error end
+                            end;
+                            vector.append(:StrEntry res.strings tuple
+                                let name = opt.name
+                                let val = valPart
+                            end);
+                        elsif opt.kind == 3 then
+                            (* Int *)
+                            let parsedInt = strutil.tryToInt(valPart);
+                            if maybe.isNone(:Int parsedInt) then
+                                writer.putString(
+                                    writer.err
+                                    {p.prog <> ": error: option '" <> flagPart
+                                        <> "' requires integer argument\n"}
+                                );
+                                raise error end
+                            end;
+                            vector.append(:IntEntry res.ints tuple
+                                let name = opt.name
+                                let val = maybe.unwrap(:Int parsedInt)
+                            end);
+                        elsif opt.kind == 4 then
+                            (* Multi *)
+                            let mOpt = findMultiEntry(res.multis opt.name);
+                            if maybe.isSome(:vector.T(String) mOpt) then
+                                vector.append(:String maybe.unwrap(:vector.T(String) mOpt) valPart);
+                            end;
+                        end;
+                        idx := idx + 1;
+                    end;
+                elsif strutil.startsWith(arg "-") andif {stringOp.length(arg) > 1} then
+                    (* Short option *)
+                    let flagPart = stringOp.getSub(arg 0 2);
+                    let optIdx = findOptByFlag(p flagPart);
+                    if optIdx is ~1 then
+                        writer.putString(writer.err {p.prog <> ": error: unrecognized option '" <> arg <> "'\n"});
+                        raise error end
+                    end;
+                    let opt = vector.get(:OptDef p.options optIdx);
+
+                    if opt.kind == 0 then
+                        (* Flag: could be bundled or single *)
+                        if strEq(opt.name "help") then
+                            printHelp(p writer.output);
+                            raise error end
+                        end;
+                        vector.append(:StrEntry res.bools tuple
+                            let name = opt.name
+                            let val = "true"
+                        end);
+                        let aLen = stringOp.length(arg);
+                        if aLen > 2 then
+                            (* Handle remaining bundled short flags *)
+                            for ci = 2 upto {aLen - 1} do
+                                let bFlag = "-" <> stringOp.getSub(arg ci 1);
+                                let bOptIdx = findOptByFlag(p bFlag);
+                                if bOptIdx is ~1 then
+                                    writer.putString(
+                                        writer.err
+                                        {p.prog <> ": error: unrecognized option '" <> bFlag <> "'\n"}
+                                    );
+                                    raise error end
+                                end;
+                                let bOpt = vector.get(:OptDef p.options bOptIdx);
+                                if bOpt.kind isnot 0 then
+                                    writer.putString(
+                                        writer.err
+                                        {p.prog <> ": error: option '" <> bFlag
+                                            <> "' requires value and cannot be bundled\n"}
+                                    );
+                                    raise error end
+                                end;
+                                if strEq(bOpt.name "help") then
+                                    printHelp(p writer.output);
+                                    raise error end
+                                end;
+                                vector.append(:StrEntry res.bools tuple
+                                    let name = bOpt.name
+                                    let val = "true"
+                                end);
+                            end;
+                        end;
+                        idx := idx + 1;
+                    else
+                        (* Option expecting value *)
+                        let valPart =
+                            if stringOp.length(arg) > 2 then
+                                (* Attached value, e.g. -Ipath or -ofile *)
+                                stringOp.getSub(arg 2 {stringOp.length(arg) - 2})
+                            else
+                                idx := idx + 1;
+                                if idx >= nArgs then
+                                    writer.putString(
+                                        writer.err
+                                        {p.prog <> ": error: option '" <> flagPart <> "' requires an argument\n"}
+                                    );
+                                    raise error end
+                                end;
+                                vector.get(:String args idx)
+                            end;
+
+                        if opt.kind == 1 then
+                            vector.append(:StrEntry res.strings tuple
+                                let name = opt.name
+                                let val = valPart
+                            end);
+                        elsif opt.kind == 2 then
+                            if not(isChoiceValid(opt.choices valPart)) then
+                                writer.putString(
+                                    writer.err
+                                    {p.prog <> ": error: invalid choice '" <> valPart
+                                        <> "' for option '" <> flagPart <> "'\n"}
+                                );
+                                raise error end
+                            end;
+                            vector.append(:StrEntry res.strings tuple
+                                let name = opt.name
+                                let val = valPart
+                            end);
+                        elsif opt.kind == 3 then
+                            let parsedInt = strutil.tryToInt(valPart);
+                            if maybe.isNone(:Int parsedInt) then
+                                writer.putString(
+                                    writer.err
+                                    {p.prog <> ": error: option '" <> flagPart
+                                        <> "' requires integer argument\n"}
+                                );
+                                raise error end
+                            end;
+                            vector.append(:IntEntry res.ints tuple
+                                let name = opt.name
+                                let val = maybe.unwrap(:Int parsedInt)
+                            end);
+                        elsif opt.kind == 4 then
+                            let mOpt = findMultiEntry(res.multis opt.name);
+                            if maybe.isSome(:vector.T(String) mOpt) then
+                                vector.append(:String maybe.unwrap(:vector.T(String) mOpt) valPart);
+                            end;
+                        end;
+                        idx := idx + 1;
+                    end;
+                else
+                    (* Positional argument *)
+                    vector.append(:String res.posArgs arg);
+                    idx := idx + 1;
+                end;
+            end;
+
+            (* Apply defaults for non-specified options *)
+            for i = 0 upto {optCount - 1} do
+                let opt = vector.get(:OptDef p.options i);
+                if {opt.kind == 1} orif {opt.kind == 2} then
+                    let existing = findStrEntry(res.strings opt.name);
+                    if maybe.isNone(:String existing) andif {stringOp.length(opt.defaultStr) > 0} then
+                        vector.append(:StrEntry res.strings tuple
+                            let name = opt.name
+                            let val = opt.defaultStr
+                        end);
+                    end;
+                elsif opt.kind == 3 then
+                    let existing = findIntEntry(res.ints opt.name);
+                    if maybe.isNone(:Int existing) then
+                        vector.append(:IntEntry res.ints tuple
+                            let name = opt.name
+                            let val = opt.defaultInt
+                        end);
+                    end;
+                end;
+            end;
+
+            res
+        end;
+
+    let parse(p: Parser args: Array(String)): Results =
+        begin
+            let n = extent args;
+            let v = vector.newWithCapacity(:String n);
+            for i = 0 upto {n - 1} do
+                vector.append(:String v args[i]);
+            end;
+            parseVector(p v)
+        end;
+
+    (* Result Queries *)
+    let getBool(r: Results name: String): Bool =
+        begin
+            let e = findStrEntry(r.bools name);
+            maybe.isSome(:String e)
+        end;
+
+    let getString(r: Results name: String): maybe.T(String) =
+        findStrEntry(r.strings name);
+
+    let getStringOr(r: Results name: String defaultVal: String): String =
+        begin
+            let res = findStrEntry(r.strings name);
+            if maybe.isSome(:String res) then
+                maybe.unwrap(:String res)
+            else
+                defaultVal
+            end
+        end;
+
+    let getInt(r: Results name: String): maybe.T(Int) =
+        findIntEntry(r.ints name);
+
+    let getIntOr(r: Results name: String defaultVal: Int): Int =
+        begin
+            let res = findIntEntry(r.ints name);
+            if maybe.isSome(:Int res) then
+                maybe.unwrap(:Int res)
+            else
+                defaultVal
+            end
+        end;
+
+    let getMulti(r: Results name: String): vector.T(String) =
+        begin
+            let res = findMultiEntry(r.multis name);
+            if maybe.isSome(:vector.T(String) res) then
+                maybe.unwrap(:vector.T(String) res)
+            else
+                vector.new(:String)
+            end
+        end;
+
+    let positionals(r: Results): vector.T(String) =
+        r.posArgs;
+
+    let targetArgs(r: Results): vector.T(String) =
+        r.targetArgsList;
+end;

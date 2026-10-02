@@ -73,10 +73,12 @@ remaining OS primitive is:
 ---
 
 ## 4. Command-Line Argument Parsing
-
+ 
 - **Python Usage**: `argparse.ArgumentParser` handles positional arguments (`main.quest`, `foo.o`), options with
   values (`-o <file>`, `-I <dir>`, `--stop-after <phase>`), and boolean flags (`-c`, `--emit-c`, `--nogc`).
-- **Quest Solution**: A dedicated CLI option parsing library built on top of `system.args: Array(String)`.
+- **Quest Solution**: Implemented in pure Quest as `util/argParse : util/ArgParse`
+  (`lib/util/argparse.{int,mod}.quest`), operating over `system.args: Array(String)` or arbitrary vectors
+  of strings, documented in `docs/new-libraries.md`.
 
 ---
 
@@ -108,13 +110,12 @@ Migrating the Python object-oriented codebase to Quest requires structural adapt
 ## 6. Implementation Roadmap & Priority Matrix
 
 Completed subsystems (`collections/vector`, `collections/hashMap`, `collections/hashSet`, `util/maybe`,
-`util/stringBuilder`, `util/strutil`, and `util/path`) are documented in `docs/new-libraries.md`.
+`util/stringBuilder`, `util/strutil`, `util/path`, and `util/argParse`) are documented in `docs/new-libraries.md`.
 Remaining prerequisites:
 
 | Subsystem | Components | Priority | Strategy |
 | :--- | :--- | :--- | :--- |
 | **OS Primitives** | `system.exec` | **P1** | Extend `System` (native C backing) |
 | **Algorithms** | Binary search, Quicksort, Topological sort | **P1** | Pure Quest algorithms |
-| **CLI Parser** | Flag and option parsing over `system.args` | **P2** | Pure Quest CLI library |
 | **AST & Type Models** | Recursive `Variant` definitions | **P2** | Compiler architecture |
 

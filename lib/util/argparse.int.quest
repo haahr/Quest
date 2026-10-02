@@ -1,0 +1,108 @@
+interface ArgParse
+import
+    util/maybe : util/Maybe
+    collections/vector : collections/Vector
+    writer: Writer
+export
+    (* Exception raised on argument parsing or configuration errors *)
+    error: Exception
+
+    (* Opaque parser configuration and parsed results *)
+    Parser::TYPE
+    Results::TYPE
+
+    (* =========================================================================
+     * Parser Construction
+     * ========================================================================= *)
+
+    (* Create a new argument parser with program name and description.
+     * Automatically registers "-h" and "--help".
+     *)
+    new(prog: String description: String): Parser
+
+    (* =========================================================================
+     * Option Registration
+     * ========================================================================= *)
+
+    (* Add a boolean flag (e.g. name="echo", flags="-e --echo").
+     * Evaluates to true if present on CLI, false otherwise.
+     *)
+    addFlag(p: Parser name: String flags: String help: String): Ok
+
+    (* Add a string option expecting a value (e.g. name="output", flags="-o --output").
+     * If not provided on CLI, defaultVal is used.
+     *)
+    addString(p: Parser name: String flags: String defaultVal: String help: String): Ok
+
+    (* Add a string option with restricted valid choices.
+     * Raises error if the CLI value is not in choices.
+     *)
+    addChoice(
+        p: Parser
+        name: String
+        flags: String
+        choices: Array(String)
+        defaultVal: String
+        help: String
+    ): Ok
+
+    (* Add an integer option (e.g. name="exitCode", flags="--expected-exit").
+     * Automatically validates integer format.
+     *)
+    addInt(p: Parser name: String flags: String defaultVal: Int help: String): Ok
+
+    (* Add an accumulating multi-value option (e.g. name="include", flags="-I --include").
+     * Can appear multiple times; all values are collected in order into a vector.
+     *)
+    addMulti(p: Parser name: String flags: String help: String): Ok
+
+    (* Configure positional arguments name and help description *)
+    addPositional(p: Parser name: String help: String): Ok
+
+    (* =========================================================================
+     * Parsing
+     * ========================================================================= *)
+
+    (* Parse an array of command-line arguments.
+     * On error, writes message to writer.err and raises error.
+     * Stops option parsing at "--".
+     *)
+    parse(p: Parser args: Array(String)): Results
+
+    (* Parse a vector of argument strings *)
+    parseVector(p: Parser args: vector.T(String)): Results
+
+    (* Format and print help message to specified writer *)
+    printHelp(p: Parser w: writer.T): Ok
+
+    (* Format help text to string *)
+    formatHelp(p: Parser): String
+
+    (* =========================================================================
+     * Result Inspection
+     * ========================================================================= *)
+
+    (* Query boolean flag value *)
+    getBool(r: Results name: String): Bool
+
+    (* Query string option value *)
+    getString(r: Results name: String): maybe.T(String)
+
+    (* Query string option with fallback *)
+    getStringOr(r: Results name: String defaultVal: String): String
+
+    (* Query integer option value *)
+    getInt(r: Results name: String): maybe.T(Int)
+
+    (* Query integer option with fallback *)
+    getIntOr(r: Results name: String defaultVal: Int): Int
+
+    (* Query accumulating multi-value option as a Vector of strings *)
+    getMulti(r: Results name: String): vector.T(String)
+
+    (* Return positional arguments in order *)
+    positionals(r: Results): vector.T(String)
+
+    (* Return arguments specified after "--", if any *)
+    targetArgs(r: Results): vector.T(String)
+end;
