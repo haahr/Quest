@@ -161,8 +161,18 @@ class TestTypecheckerPhase2(unittest.TestCase):
         with self.assertRaises(QuestTypeError):
             synth_test_expr("3.0 < 5.0", self.env)
 
-        # Equality is
+        # Equality is and isnot
         self.assertEqual(synth_test_expr('"a" is "b"', self.env).type_val, BOOL_TYPE)
+        self.assertEqual(synth_test_expr('"a" isnot "b"', self.env).type_val, BOOL_TYPE)
+
+        # == and != are rejected
+        with self.assertRaises(QuestTypeError) as ctx:
+            synth_test_expr("10 == 10", self.env)
+        self.assertIn("use 'is' instead", str(ctx.exception))
+
+        with self.assertRaises(QuestTypeError) as ctx:
+            synth_test_expr("10 != 20", self.env)
+        self.assertIn("use 'isnot' instead", str(ctx.exception))
 
         # String concatenation <>
         typed_concat = synth_test_expr('"hello " <> "world"', self.env)

@@ -84,7 +84,7 @@
           ))))
     (TypedLetValue 'intEqual' :type Fun(a: Int b: Int): Bool
       :value (TypedFun :params (('a' : Int) ('b' : Int)) :type Fun(a: Int b: Int): Bool
-        :body (TypedInfix '==' :type Bool
+        :body (TypedInfix 'is' :type Bool
           :left (TypedVar 'a' :type Int)
           :right (TypedVar 'b' :type Int))))
     (TypedLetValue 'intHash' :type Fun(a: Int): Word.T

@@ -65,11 +65,11 @@ export
         end;
 
     let toString(b: T): String =
-        if b.totalLen == 0 then
+        if b.totalLen is 0 then
             ""
         else
             let numChunks = vector.length(:String b.chunks);
-            if numChunks == 1 then
+            if numChunks is 1 then
                 vector.get(:String b.chunks 0)
             else
                 stringOp.conc(vector.toArray(:String b.chunks))

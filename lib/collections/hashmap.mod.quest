@@ -84,7 +84,7 @@ export
         m.count;
 
     let empty(K::TYPE V::TYPE)(m: T(K V)): Bool =
-        m.count == 0;
+        m.count is 0;
 
     let findIndex(K::TYPE V::TYPE)(m: T(K V) key: K h: word.T): Int =
         begin
@@ -97,9 +97,9 @@ export
 
             while searching do
                 let slot = m.indices[i];
-                if slot == emptySlot then
+                if slot is emptySlot then
                     searching := false;
-                elsif slot == tombstoneSlot then
+                elsif slot is tombstoneSlot then
                     (* Skip tombstone, continue probing *)
                     pert := word.shift(pert ~5);
                     let nextI = word.andBits(
@@ -108,7 +108,7 @@ export
                     );
                     i := word.toInt(nextI);
                 else
-                    if word.toInt(word.xorBits(vector.get(m.hashes slot) h)) == 0 then
+                    if word.toInt(word.xorBits(vector.get(m.hashes slot) h)) is 0 then
                         if not(vector.get(m.deleted slot)) andif m.equal(vector.get(m.keys slot) key) then
                             result := slot;
                             searching := false;
@@ -168,7 +168,7 @@ export
                     let var pert = h;
                     let var searching = true;
                     while searching do
-                        if newIndices[i] == emptySlot then
+                        if newIndices[i] is emptySlot then
                             newIndices[i] := idx;
                             searching := false;
                         else
@@ -246,10 +246,10 @@ export
 
             while searching do
                 let slot = m.indices[i];
-                if slot == emptySlot then
+                if slot is emptySlot then
                     searching := false;
-                elsif slot == tombstoneSlot then
-                    if firstTombstone == emptySlot then
+                elsif slot is tombstoneSlot then
+                    if firstTombstone is emptySlot then
                         firstTombstone := i;
                     end;
                     pert := word.shift(pert ~5);
@@ -259,7 +259,7 @@ export
                     );
                     i := word.toInt(nextI);
                 else
-                    if word.toInt(word.xorBits(vector.get(m.hashes slot) h)) == 0 then
+                    if word.toInt(word.xorBits(vector.get(m.hashes slot) h)) is 0 then
                         if not(vector.get(m.deleted slot)) andif m.equal(vector.get(m.keys slot) key) then
                             existingIdx := slot;
                             searching := false;
@@ -309,9 +309,9 @@ export
 
             while searching do
                 let slot = m.indices[i];
-                if slot == emptySlot then
+                if slot is emptySlot then
                     searching := false;
-                elsif slot == tombstoneSlot then
+                elsif slot is tombstoneSlot then
                     pert := word.shift(pert ~5);
                     let nextI = word.andBits(
                         word.add(word.add(word.mul(word.fromInt(5) word.fromInt(i)) word.fromInt(1)) pert)
@@ -319,7 +319,7 @@ export
                     );
                     i := word.toInt(nextI);
                 else
-                    if word.toInt(word.xorBits(vector.get(m.hashes slot) h)) == 0 then
+                    if word.toInt(word.xorBits(vector.get(m.hashes slot) h)) is 0 then
                         if not(vector.get(m.deleted slot)) andif m.equal(vector.get(m.keys slot) key) then
                             foundSlot := i;
                             denseIdx := slot;

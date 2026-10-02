@@ -48,7 +48,7 @@ export
     extension(path: String): String
 
     (* Return the base filename without its final extension (stem).
-     * Guaranteed: stem(p) <> extension(p) == baseName(p)
+     * Guaranteed: stem(p) <> extension(p) is baseName(p)
      * Examples:
      *   stem("foo.txt")        => "foo"
      *   stem("archive.tar.gz") => "archive.tar"

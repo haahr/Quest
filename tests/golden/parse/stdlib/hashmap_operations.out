@@ -195,7 +195,7 @@
       :name 'intEqual'
       :value (ExprInfix
         :left (ExprId 'a')
-        :op '=='
+        :op 'is'
         :right (ExprId 'b')
       )
       :params (
@@ -1146,7 +1146,7 @@
                 :op '%'
                 :right (ExprInt 2 '2')
               )
-              :op '=='
+              :op 'is'
               :right (ExprInt 0 '0')
             )
             :then_branch (ExprStmt

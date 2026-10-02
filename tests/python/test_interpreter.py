@@ -137,7 +137,7 @@ class TestRelationalAndEquality(InterpreterTestCase):
         self.assert_eval("10 is 10;", True)
         self.assert_eval("10 isnot 20;", True)
         self.assert_eval("10 is 20;", False)
-        self.assert_eval("10 == 10;", True)
+        self.assert_eval("10 isnot 10;", False)
 
     def test_string_concatenation(self):
         self.assert_eval('"hello " <> "world";', "hello world")

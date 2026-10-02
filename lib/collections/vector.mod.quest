@@ -48,7 +48,7 @@ export
 
     (* Test whether a vector is empty *)
     let empty(A::TYPE)(v: T(A)): Bool =
-        v.length == 0;
+        v.length is 0;
 
     (* Return the element at the specified index, or raise error *)
     let get(A::TYPE)(v: T(A) index: Int): A =
@@ -68,7 +68,7 @@ export
 
     (* Return the first element of a vector, or raise error if empty *)
     let first(A::TYPE)(v: T(A)): A =
-        if v.length == 0 then
+        if v.length is 0 then
             raise error end
         else
             v.data[0]
@@ -76,7 +76,7 @@ export
 
     (* Return the last element of a vector, or raise error if empty *)
     let last(A::TYPE)(v: T(A)): A =
-        if v.length == 0 then
+        if v.length is 0 then
             raise error end
         else
             v.data[v.length - 1]
@@ -86,7 +86,7 @@ export
     let append(A::TYPE)(v: T(A) value: A): Ok =
         begin
             let cap: Int = extent v.data;
-            if v.length == cap then
+            if v.length is cap then
                 let var newCap: Int = floorSize;
                 if cap > 0 then
                     newCap := cap + {cap / 2};
@@ -108,7 +108,7 @@ export
 
     (* Helper to overwrite cleared slot and shrink backing storage when utilization is low *)
     let shrinkAfterRemoval(A::TYPE)(v: T(A)): Ok =
-        if v.length == 0 then
+        if v.length is 0 then
             v.data := array of :A end;
             ok
         else
@@ -132,7 +132,7 @@ export
 
     (* Remove and return the last element of a vector, or raise error if empty *)
     let pop(A::TYPE)(v: T(A)): A =
-        if v.length == 0 then
+        if v.length is 0 then
             raise error end
         else
             let res: A = v.data[v.length - 1];
@@ -168,7 +168,7 @@ export
     let copy(A::TYPE)(v: T(A)): T(A) =
         begin
             let n: Int = v.length;
-            if n == 0 then
+            if n is 0 then
                 new(:A)
             else
                 let var cap: Int = n;
@@ -193,7 +193,7 @@ export
             let n1: Int = v1.length;
             let n2: Int = v2.length;
             let total: Int = n1 + n2;
-            if total == 0 then
+            if total is 0 then
                 new(:A)
             else
                 let var cap: Int = total;
@@ -229,7 +229,7 @@ export
     let fromArray(A::TYPE)(arr: Array(A)): T(A) =
         begin
             let n: Int = extent arr;
-            if n == 0 then
+            if n is 0 then
                 new(:A)
             else
                 let var cap: Int = n;
@@ -252,7 +252,7 @@ export
     let toArray(A::TYPE)(v: T(A)): Array(A) =
         begin
             let n: Int = v.length;
-            if n == 0 then
+            if n is 0 then
                 array of :A end
             else
                 let res: Array(A) = array of(n v.data[0]);

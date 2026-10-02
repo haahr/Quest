@@ -23,7 +23,7 @@ let printBool(b: Bool): Ok =
 let printNewline(dummy: Int): Ok =
     writer.putString(wOut "\n");
 
-let intEqual(a: Int b: Int): Bool = a == b;
+let intEqual(a: Int b: Int): Bool = a is b;
 let intHash(a: Int): word.T =
     word.mul(word.fromInt(a) word.fromInt(2654435761));
 

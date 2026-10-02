@@ -2442,8 +2442,8 @@ class TypeElaborator:
                 offset=expr.offset,
             )
 
-        # 4. Identity and Equality Operators (==, is, isnot)
-        if expr.op in ("==", "is", "isnot"):
+        # 4. Identity and Equality Operators (is, isnot)
+        if expr.op in ("is", "isnot"):
             left_typed = self.synth_expr(expr.left, env, loop_depth)
             right_typed = self.synth_expr(expr.right, env, loop_depth)
             if (
@@ -2461,6 +2461,13 @@ class TypeElaborator:
             raise TypeError(
                 f"Equality operator '{expr.op}' requires operands of compatible types, got "
                 f"'{left_typed.type_val}' and '{right_typed.type_val}'",
+                offset=expr.offset,
+            )
+
+        if expr.op in ("==", "!="):
+            suggest = "is" if expr.op == "==" else "isnot"
+            raise TypeError(
+                f"Operator '{expr.op}' is not supported; use '{suggest}' instead",
                 offset=expr.offset,
             )
 

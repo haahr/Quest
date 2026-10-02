@@ -50,7 +50,7 @@ printStr(path.stem("archive.tar.gz"));
 printStr(path.stem(".gitignore"));
 printStr(path.stem("foo"));
 
-(* Invariant: stem <> extension == baseName *)
+(* Invariant: stem <> extension is baseName *)
 let s1 = path.stem("foo.txt") <> path.extension("foo.txt");
 printBool(stringOp.equal(s1 path.baseName("foo.txt")));
 let s2 = path.stem("archive.tar.gz") <> path.extension("archive.tar.gz");

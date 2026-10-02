@@ -184,7 +184,7 @@ class Phase3FunctionsTest(unittest.TestCase):
         """let rec factorial(n: Int): Int = ... typechecks and binds properly."""
         typed_block = synth_test_expr(
             "begin let rec factorial(n: Int): Int = "
-            "if n == 0 then 1 else n * factorial(n - 1) end; "
+            "if n is 0 then 1 else n * factorial(n - 1) end; "
             "factorial(5) end"
         )
         self.assertEqual(typed_block.type_val, INT_TYPE)

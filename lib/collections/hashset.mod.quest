@@ -152,7 +152,7 @@ export
         end;
 
     let equal(A::TYPE)(s1: T(A) s2: T(A)): Bool =
-        if size(s1) == size(s2) then
+        if size(s1) is size(s2) then
             isSubset(s1 s2)
         else
             false

@@ -687,7 +687,7 @@ def eval_expr(expr: TypedExpr, env: RuntimeEnvironment) -> QValue:
                 )
 
             # Equality & Identity
-            if op in ("is", "=="):
+            if op == "is":
                 res = qvalue_is(left_val, right_val)
                 return TRUE_VALUE if res else FALSE_VALUE
             if op == "isnot":

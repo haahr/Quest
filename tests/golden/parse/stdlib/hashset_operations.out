@@ -151,7 +151,7 @@
       :name 'intEqual'
       :value (ExprInfix
         :left (ExprId 'a')
-        :op '=='
+        :op 'is'
         :right (ExprId 'b')
       )
       :params (
