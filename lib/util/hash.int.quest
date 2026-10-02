@@ -1,0 +1,23 @@
+interface Hash
+import
+    word: Word
+export
+    (* Universal identity equality matching Quest's 'is' semantics *)
+    identityEqual: All(A::TYPE) All(x1: A x2: A) Bool
+
+    (* Universal identity hash derived from pointer/machine address *)
+    identityHash: All(A::TYPE) All(x: A) word.T
+
+    (* 64-bit SplitMix64 bit avalanche mixer *)
+    mix(w: word.T): word.T
+
+    (* 64-bit hash combiner for composite keys *)
+    combine(h1: word.T h2: word.T): word.T
+
+    (* Primitives to word.T hashes *)
+    int(n: Int): word.T
+    bool(b: Bool): word.T
+    char(c: Char): word.T
+    word(w: word.T): word.T
+    string(s: String): word.T
+end;

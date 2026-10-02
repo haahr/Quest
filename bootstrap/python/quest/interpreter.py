@@ -611,6 +611,14 @@ def eval_expr(expr: TypedExpr, env: RuntimeEnvironment) -> QValue:
                     call_env = closure_env.push_scope()
                     for param_name, arg_val in zip(callee_params, arg_vals):
                         call_env.define(param_name, arg_val)
+                    if isinstance(body, TypedExternal):
+                        from quest.builtins import BuiltinModuleRegistry
+                        ext_val = BuiltinModuleRegistry.resolve_external_symbol(body.symbol)
+                        if isinstance(ext_val, QBuiltinFun):
+                            return ext_val.fn(*arg_vals)
+                        if callable(ext_val):
+                            return ext_val(*arg_vals)
+                        return ext_val
                     return eval_expr(body, call_env)
                 case _:
                     raise QuestRuntimeError(

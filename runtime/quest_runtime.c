@@ -1711,6 +1711,18 @@ uint64_t quest_word_from_real_val(double r) {
     return ((QVal){ .r = r }).u;
 }
 
+uint64_t quest_hash_mix(uint64_t w) {
+    return quest_hash_mix64(w);
+}
+
+uint64_t quest_hash_combine(uint64_t h1, uint64_t h2) {
+    return h1 ^ (h2 + 0x9e3779b97f4a7c15ULL + (h1 << 6) + (h1 >> 2));
+}
+
+uint64_t quest_identity_hash(QVal x) {
+    return quest_hash_mix64(x.u);
+}
+
 /* Builtins initialization */
 void quest_builtins_init(int argc, char **argv) {
     quest_writer_init_std();

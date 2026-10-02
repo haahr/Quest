@@ -569,6 +569,88 @@ class CEmitter:
 
         return self._emit_closure_alloc(adapt_fn_name, c_closure, lines, prefix="_adapt_clo")
 
+    def _emit_type_app_closure(
+        self,
+        c_func: str,
+        orig_t: QType,
+        target_t: QType,
+        descriptor_args: list[str],
+        lines: list[str],
+    ) -> str:
+        """Emits a specialized closure binding type descriptors for partially applied polymorphic function."""
+        if not descriptor_args:
+            return c_func
+
+        num_descs = len(descriptor_args)
+        cache_key = ("type_app", orig_t, target_t, num_descs)
+        if cache_key in self.adapter_cache:
+            adapt_fn_name, env_struct_name = self.adapter_cache[cache_key]
+        else:
+            adapt_fn_name = self.fresh_tmp("qv_typeapp")
+            env_struct_name = f"QTypeAppEnv_{adapt_fn_name}"
+            self.adapter_cache[cache_key] = (adapt_fn_name, env_struct_name)
+
+            orig_fn_ptr = _closure_fn_ptr_type(orig_t, self.record_ctx)
+
+            tgt_quants, inner_tgt = self._collect_fun_quantifiers(target_t)
+            tgt_params = inner_tgt.params if isinstance(inner_tgt, QFunType) else ()
+            ret_t = inner_tgt.result_type if isinstance(inner_tgt, QFunType) else OK_TYPE
+            ret_c = "void" if ret_t == OK_TYPE else self.c_type(ret_t)
+
+            self.adapter_decls.append(
+                f"typedef struct {{ QClosure *orig; const QTypeDescriptor *desc[{num_descs}]; }} {env_struct_name};"
+            )
+
+            param_decls = ["void *_raw_env"]
+            for q in tgt_quants:
+                param_decls.append(f"const QTypeDescriptor *descriptor_{q.name}")
+            for idx, p in enumerate(tgt_params):
+                p_c = "QVal" if p.type_val == OK_TYPE else self.c_type(p.type_val)
+                param_decls.append(f"{p_c} qv_arg_{idx}")
+
+            sig = ", ".join(param_decls)
+            self.adapter_decls.append(f"static Q_UNUSED {ret_c} {adapt_fn_name}({sig});")
+
+            fn_body = [
+                f"static Q_UNUSED {ret_c} {adapt_fn_name}({sig}) {{",
+                f"    {env_struct_name} *_env = ({env_struct_name} *)_raw_env;",
+            ]
+            for q in tgt_quants:
+                fn_body.append(f"    (void)descriptor_{q.name};")
+
+            call_args = ["_env->orig->env"]
+            for i in range(num_descs):
+                call_args.append(f"_env->desc[{i}]")
+            for q in tgt_quants:
+                call_args.append(f"descriptor_{q.name}")
+            for idx, _ in enumerate(tgt_params):
+                call_args.append(f"qv_arg_{idx}")
+
+            call_expr = f"(({orig_fn_ptr})(_env->orig->fn))({', '.join(call_args)})"
+            if ret_t == OK_TYPE:
+                fn_body.append(f"    {call_expr};")
+                fn_body.append("    return;")
+            else:
+                fn_body.append(f"    return {call_expr};")
+            fn_body.append("}")
+            fn_body.append("")
+            self.adapter_defs.extend(fn_body)
+
+        env_tmp = self.fresh_tmp("_typeapp_env")
+        lines.append(
+            f"{env_struct_name} *{env_tmp} = "
+            f"({env_struct_name} *)quest_alloc(sizeof({env_struct_name}));"
+        )
+        lines.append(f"{env_tmp}->orig = {c_func};")
+        for i, d_arg in enumerate(descriptor_args):
+            lines.append(f"{env_tmp}->desc[{i}] = {d_arg};")
+
+        clos_tmp = self.fresh_tmp("_typeapp_clos")
+        lines.append(f"QClosure *{clos_tmp} = (QClosure *)quest_alloc(sizeof(QClosure));")
+        lines.append(f"{clos_tmp}->fn = (void *)({adapt_fn_name});")
+        lines.append(f"{clos_tmp}->env = (void *)({env_tmp});")
+        return clos_tmp
+
     def _emit_closure_alloc(
         self,
         fn_ptr_expr: str,
@@ -692,17 +774,24 @@ class CEmitter:
                 lines.append(f"{res_tmp}->_{i} = {src_field_access};")
         return res_tmp
 
-    def _emit_fun_return(self, body: TypedExpr, ret_type: QType, fn_lines: list[str]) -> None:
+    def _emit_fun_return(
+        self,
+        body: TypedExpr,
+        ret_type: QType,
+        fn_lines: list[str],
+        param_c_names: Optional[list[str]] = None,
+    ) -> None:
         """Emits function return handling with appropriate subtyping coercions."""
+        call_args = ", ".join(param_c_names) if param_c_names else ""
         if ret_type == OK_TYPE:
             if isinstance(body, TypedExternal):
-                fn_lines.append(f"{body.symbol}();")
+                fn_lines.append(f"{body.symbol}({call_args});")
             else:
                 self.emit_to(body, None, fn_lines)
             fn_lines.append("return;")
         else:
             if isinstance(body, TypedExternal):
-                ret_val = f"{body.symbol}()"
+                ret_val = f"{body.symbol}({call_args})"
             else:
                 ret_val = self.emit_val(body, fn_lines)
             coerced = self._coerce_val(ret_val, body, ret_type, fn_lines)
@@ -1109,7 +1198,8 @@ class CEmitter:
                 self.in_scope_type_descriptors[q.name] = f"descriptor_{q.name}"
                 fn_lines.append(f"(void)descriptor_{q.name};")
 
-            self._emit_fun_return(l.fun.body, ret_type, fn_lines)
+            param_c_names = [mangle_ident(p.name) for p in l.fun.params]
+            self._emit_fun_return(l.fun.body, ret_type, fn_lines, param_c_names)
 
             self.in_scope_type_descriptors = saved_descriptors
             self.pointer_params = saved_ptr_params
@@ -1254,7 +1344,8 @@ class CEmitter:
                 # Silence unused descriptor warnings
                 for q in quants:
                     fn_lines.append(f"(void)descriptor_{q.name};")
-                self._emit_fun_return(body, ret_type, fn_lines)
+                param_c_names = [self.mangle_ident(p.name) for p in params]
+                self._emit_fun_return(body, ret_type, fn_lines, param_c_names)
                 self.in_scope_type_descriptors = saved_descriptors
                 self.pointer_params = saved_ptr_params
                 self.current_env_vars = saved_env
@@ -1595,6 +1686,20 @@ class CEmitter:
                 )
                 lines.append("")
 
+                fn_name = mangle_module_ident(clean_mod, nb.name)
+                if standalone and (exported_funs is None or nb.name in exported_funs):
+                    fn_sig = "void" if not param_decls else ", ".join(param_decls)
+                    lines.append(f"{ret_c} {fn_name}({fn_sig}) {{")
+                    for uv in unused_vars:
+                        lines.append(f"    (void){uv};")
+                    if ret_type == OK_TYPE:
+                        lines.append(f"    {call_expr};")
+                        lines.append("    return;")
+                    else:
+                        lines.append(f"    return {call_expr};")
+                    lines.append("}")
+                    lines.append("")
+
         mod_emitter = CEmitter(echo=False, module_prefix=clean_mod)
         mod_emitter.adapter_defs = self.adapter_defs
         mod_emitter.adapter_decls = self.adapter_decls
@@ -1647,7 +1752,8 @@ class CEmitter:
                 mod_emitter.pointer_params = {
                     p.name for p in params if getattr(p, "is_out", False) or getattr(p, "is_var", False)
                 }
-                mod_emitter._emit_fun_return(body, int_ret_t, fn_lines)
+                param_c_names = [mangle_module_ident(clean_mod, p.name) for p in params]
+                mod_emitter._emit_fun_return(body, int_ret_t, fn_lines, param_c_names)
                 mod_emitter.pointer_params = set()
                 mod_emitter.current_env_vars = prev_env
                 for fl in fn_lines:
@@ -1703,7 +1809,8 @@ class CEmitter:
                 mod_emitter.pointer_params = {
                     p.name for p in params if getattr(p, "is_out", False) or getattr(p, "is_var", False)
                 }
-                mod_emitter._emit_fun_return(body, ret_type, fn_lines)
+                param_c_names = [mangle_module_ident(clean_mod, p.name) for p in params]
+                mod_emitter._emit_fun_return(body, ret_type, fn_lines, param_c_names)
                 mod_emitter.pointer_params = set()
                 mod_emitter.current_env_vars = prev_env
                 for fl in fn_lines:
@@ -2199,7 +2306,7 @@ class CEmitter:
             case TypedInfix(left=left, op=op, right=right):
                 c_left = self.emit_val(left, lines)
                 c_right = self.emit_val(right, lines)
-                return self._emit_infix(c_left, op, c_right)
+                return self._emit_infix(c_left, op, c_right, left.type_val)
 
             case TypedApp(func=f, args=args):
                 # Check for unwrapped type applications and collect type arguments
@@ -2232,7 +2339,7 @@ class CEmitter:
                 ):
                     c_l = self.emit_val(args[0], lines)
                     c_r = self.emit_val(args[1], lines)
-                    return self._emit_infix(c_l, effective_func.name, c_r)
+                    return self._emit_infix(c_l, effective_func.name, c_r, args[0].type_val)
 
                 # Direct lowering for built-in arrayOp calls
                 if isinstance(effective_func, TypedSelect) and isinstance(effective_func.target, TypedVar):
@@ -2422,9 +2529,12 @@ class CEmitter:
 
             case TypedTypeApp(func=func, type_args=type_args):
                 _, inner_t = self._collect_fun_quantifiers(expr.type_val)
-                if isinstance(inner_t, QFunType):
-                    return self.emit_val(func, lines)
                 descriptor_args = [self.c_type_descriptor(targ) for targ in type_args]
+                if isinstance(inner_t, QFunType):
+                    c_func = self.emit_val(func, lines)
+                    return self._emit_type_app_closure(
+                        c_func, func.type_val, expr.type_val, descriptor_args, lines
+                    )
                 if isinstance(func, TypedVar) and (
                     func.name in self.top_fun_names or func.name in self.current_env_vars
                 ):
@@ -2909,7 +3019,13 @@ class CEmitter:
                 elif val != "((void)0)":
                     lines.append(f"{val};")
 
-    def _emit_infix(self, c_left: str, op: str, c_right: str) -> str:
+    def _emit_infix(
+        self,
+        c_left: str,
+        op: str,
+        c_right: str,
+        arg_type: Optional[QType] = None,
+    ) -> str:
         # 1. Integer division and modulo via C99 inline runtime functions
         if op == "/":
             return f"quest_int_div({c_left}, {c_right})"
@@ -2924,14 +3040,20 @@ class CEmitter:
         if op == "<>":
             return f"quest_string_concat({c_left}, {c_right})"
 
-        # 4. Standard arithmetic & relations mapping directly
+        # 4. Identity comparisons
+        if op in ("is", "isnot"):
+            c_op = "==" if op == "is" else "!="
+            if arg_type is not None and self.c_type(arg_type) == "QVal":
+                return f"(({c_left}).u {c_op} ({c_right}).u)"
+            return f"(({c_left}) {c_op} ({c_right}))"
+
+        # 5. Standard arithmetic & relations mapping directly
         op_map = {
             "+": "+", "-": "-", "*": "*",
             "++": "+", "--": "-", "**": "*", "//": "/",
             "<": "<", "<=": "<=", ">": ">", ">=": ">=",
             "<<": "<", "<<=": "<=", ">>": ">", ">>=": ">=",
             "/\\": "&&", "\\/": "||",
-            "is": "==", "isnot": "!=",
         }
         if op in op_map:
             c_op = op_map[op]

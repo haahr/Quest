@@ -8,6 +8,7 @@ module hashSet : HashSet
 import
     collections/hashMap : collections/HashMap
     collections/vector : collections/Vector
+    util/hash : util/Hash
     util/maybe : util/Maybe
     word: Word
 export
@@ -30,6 +31,12 @@ export
             let equal = equal
             let hash = hash
         end;
+
+    let newIdentitySet(A::TYPE): T(A) =
+        new(:A hash.identityEqual(:A) hash.identityHash(:A));
+
+    let newIdentitySetWithCapacity(A::TYPE)(capacity: Int): T(A) =
+        newWithCapacity(:A capacity hash.identityEqual(:A) hash.identityHash(:A));
 
     let size(A::TYPE)(s: T(A)): Int =
         hashMap.size(s.map);

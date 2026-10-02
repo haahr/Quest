@@ -15,12 +15,18 @@ export
             hash: All(a: A) word.T)
         T(A)
 
+    (* Create a new empty hash set using object identity equality and hashing *)
+    newIdentitySet: All(A::TYPE) T(A)
+
     (* Create a new hash set with preallocated initial capacity *)
     newWithCapacity: All(A::TYPE)
         All(capacity: Int
             equal: All(a1: A a2: A) Bool
             hash: All(a: A) word.T)
         T(A)
+
+    (* Create a new hash set using object identity with preallocated initial capacity *)
+    newIdentitySetWithCapacity: All(A::TYPE) All(capacity: Int) T(A)
 
     (* Return the number of elements in the set *)
     size: All(A::TYPE) All(s: T(A)) Int

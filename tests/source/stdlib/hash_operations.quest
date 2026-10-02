@@ -1,0 +1,136 @@
+(* Standard library: Identity hashing and hash utility operations *)
+
+import collections/hashMap : collections/HashMap;
+import collections/hashSet : collections/HashSet;
+import util/hash : util/Hash;
+import util/maybe : util/Maybe;
+import word: Word;
+import writer: Writer;
+import conv: Conv;
+
+let wOut = writer.output;
+
+let printInt(n: Int): Ok =
+    begin
+        writer.putString(wOut conv.int(n));
+        writer.putString(wOut " ");
+    end;
+
+let printBool(b: Bool): Ok =
+    begin
+        writer.putString(wOut conv.bool(b));
+        writer.putString(wOut " ");
+    end;
+
+let printString(s: String): Ok =
+    begin
+        writer.putString(wOut s);
+        writer.putString(wOut " ");
+    end;
+
+let printNewline(dummy: Int): Ok =
+    writer.putString(wOut "\n");
+
+(* 1. Identity equality (hash.identityEqual) *)
+let r1 = tuple var x = 10 end;
+let r2 = tuple var x = 10 end;
+printBool(hash.identityEqual(r1 r1));
+printBool(hash.identityEqual(r1 r2));
+printBool(r1 is r1);
+printBool(r1 is r2);
+printNewline(0);
+
+(* 2. Identity hashing determinism and mutation invariance *)
+let h1Before = hash.identityHash(r1);
+let h1Again = hash.identityHash(r1);
+printBool(h1Before is h1Again);
+r1.x := 999;
+let h1After = hash.identityHash(r1);
+printBool(h1Before is h1After);
+printNewline(0);
+
+(* 3. Primitive hash functions *)
+let hi1 = hash.int(42);
+let hi2 = hash.int(42);
+let hi3 = hash.int(43);
+printBool(hi1 is hi2);
+printBool(hi1 isnot hi3);
+
+let hb1 = hash.bool(true);
+let hb2 = hash.bool(false);
+printBool(hb1 isnot hb2);
+
+let hc1 = hash.char('a');
+let hc2 = hash.char('a');
+let hc3 = hash.char('b');
+printBool(hc1 is hc2);
+printBool(hc1 isnot hc3);
+
+let hw1 = hash.word(word.fromInt(12345));
+let hw2 = hash.word(word.fromInt(12345));
+printBool(hw1 is hw2);
+
+let hs1 = hash.string("quest");
+let hs2 = hash.string("quest");
+let hs3 = hash.string("lang");
+printBool(hs1 is hs2);
+printBool(hs1 isnot hs3);
+printNewline(0);
+
+(* 4. Mix and Combine *)
+let mixedOne = hash.mix(word.fromInt(1));
+printBool(mixedOne isnot word.fromInt(1));
+
+let comb1 = hash.combine(hi1 hs1);
+let comb2 = hash.combine(hi1 hs1);
+let comb3 = hash.combine(hs1 hi1);
+printBool(comb1 is comb2);
+printBool(comb1 isnot comb3);
+printNewline(0);
+
+(* 5. Identity HashMap *)
+Let Key = Tuple
+    var v: Int
+end;
+
+let idMap = hashMap.newIdentityMap(:Key :String);
+let k1: Key = tuple var v = 1 end;
+let k2: Key = tuple var v = 1 end;
+let k3: Key = tuple var v = 2 end;
+
+printBool(hashMap.insert(idMap k1 "first"));
+printBool(hashMap.insert(idMap k2 "second"));
+printBool(hashMap.insert(idMap k3 "third"));
+printInt(hashMap.size(idMap));
+
+printString(hashMap.find(idMap k1));
+printString(hashMap.find(idMap k2));
+printString(hashMap.find(idMap k3));
+printNewline(0);
+
+(* Mutate key content; identity remains valid in map *)
+k1.v := 999;
+printBool(hashMap.contains(idMap k1));
+printString(hashMap.find(idMap k1));
+
+let delK1 = hashMap.delete(idMap k1);
+printBool(maybe.isSome(delK1));
+printInt(hashMap.size(idMap));
+printBool(hashMap.contains(idMap k1));
+printBool(hashMap.contains(idMap k2));
+printNewline(0);
+
+(* 6. Identity HashSet *)
+let idSet = hashSet.newIdentitySet(:Key);
+printBool(hashSet.insert(idSet k1));
+printBool(hashSet.insert(idSet k2));
+printBool(hashSet.insert(idSet k1)); (* Duplicate identity insertion *)
+printInt(hashSet.size(idSet));
+
+printBool(hashSet.contains(idSet k1));
+printBool(hashSet.contains(idSet k2));
+printBool(hashSet.delete(idSet k1));
+printBool(not(hashSet.contains(idSet k1)));
+printBool(hashSet.contains(idSet k2));
+printInt(hashSet.size(idSet));
+printNewline(0);

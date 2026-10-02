@@ -1663,6 +1663,35 @@ class BuiltinModuleRegistry:
         )
         word_b.finish()
 
+        def _splitmix64(z: int) -> int:
+            z = (z ^ (z >> 30)) * 0xBF58476D1CE4E5B9 & 0xFFFF_FFFF_FFFF_FFFF
+            z = (z ^ (z >> 27)) * 0x94D049BB133111EB & 0xFFFF_FFFF_FFFF_FFFF
+            return (z ^ (z >> 31)) & 0xFFFF_FFFF_FFFF_FFFF
+
+        def _quest_hash_mix(w: QWord) -> QWord:
+            return QWord(_splitmix64(w.value & 0xFFFF_FFFF_FFFF_FFFF))
+
+        def _quest_hash_combine(h1: QWord, h2: QWord) -> QWord:
+            combined = (
+                h1.value ^ (h2.value + 0x9E3779B97F4A7C15 + (h1.value << 6) + (h1.value >> 2))
+            ) & 0xFFFF_FFFF_FFFF_FFFF
+            return QWord(combined)
+
+        def _quest_identity_hash(v: QValue) -> QWord:
+            if isinstance(v, (QInt, QWord)):
+                raw = v.value & 0xFFFF_FFFF_FFFF_FFFF
+            elif isinstance(v, QBool):
+                raw = 1 if v.value else 0
+            elif isinstance(v, QChar):
+                raw = ord(v.value)
+            elif isinstance(v, QReal):
+                raw = struct.unpack(">Q", struct.pack(">d", v.value))[0]
+            elif isinstance(v, QOk):
+                raw = 0
+            else:
+                raw = id(v) & 0xFFFF_FFFF_FFFF_FFFF
+            return QWord(_splitmix64(raw))
+
         cls._symbol_bridge.update({
             "QUEST_INT_MAX": QInt(9223372036854775807),
             "QUEST_INT_MIN": QInt(-9223372036854775808),
@@ -1706,6 +1735,9 @@ class BuiltinModuleRegistry:
             "quest_word_from_int": _word_from_int,
             "quest_word_to_real_val": _word_to_real,
             "quest_word_from_real_val": _word_from_real,
+            "quest_hash_mix": _quest_hash_mix,
+            "quest_hash_combine": _quest_hash_combine,
+            "quest_identity_hash": _quest_identity_hash,
         })
 
     @classmethod

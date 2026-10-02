@@ -1,0 +1,23 @@
+module hash : Hash
+import
+    ascii: Ascii
+    wordLib = word : Word
+    util/strutil : util/Strutil
+export
+    let identityEqual(A::TYPE)(x1: A x2: A): Bool = x1 is x2;
+
+    let identityHash(A::TYPE)(x: A): wordLib.T = external "quest_identity_hash";
+    let mix(w: wordLib.T): wordLib.T = external "quest_hash_mix";
+    let combine(h1: wordLib.T h2: wordLib.T): wordLib.T = external "quest_hash_combine";
+
+    let int(n: Int): wordLib.T = mix(wordLib.fromInt(n));
+
+    let bool(b: Bool): wordLib.T =
+        if b then wordLib.fromInt(1) else wordLib.fromInt(0) end;
+
+    let char(c: Char): wordLib.T = mix(wordLib.fromInt(ascii.val(c)));
+
+    let word(w: wordLib.T): wordLib.T = mix(w);
+
+    let string(s: String): wordLib.T = strutil.hash(s);
+end;

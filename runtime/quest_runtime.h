@@ -590,6 +590,17 @@ static inline uint64_t quest_word_mod(uint64_t a, uint64_t b) {
     return a % b;
 }
 
+/* Hash utilities & SplitMix64 */
+static inline uint64_t quest_hash_mix64(uint64_t z) {
+    z = (z ^ (z >> 30)) * 0xbf58476d1ce4e5b9ULL;
+    z = (z ^ (z >> 27)) * 0x94d049bb133111ebULL;
+    return z ^ (z >> 31);
+}
+
+uint64_t quest_hash_mix(uint64_t w);
+uint64_t quest_hash_combine(uint64_t h1, uint64_t h2);
+uint64_t quest_identity_hash(QVal x);
+
 /* Built-in operator closures (Cardelli §4.2) */
 extern QClosure qv_sym_plus_closure;
 extern QClosure qv_sym_minus_closure;

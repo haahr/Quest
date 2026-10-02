@@ -285,6 +285,41 @@ end;
 
 ---
 
+### 1.6. `util/hash : util/Hash`
+
+Universal identity equality, address-based identity hashing, 64-bit SplitMix64 mixing, hash combining, and primitive
+hashing functions.
+
+#### Interface Summary
+
+```quest
+interface Hash
+import
+    word: Word
+export
+    (* Universal identity equality matching Quest's 'is' semantics *)
+    identityEqual: All(A::TYPE) All(x1: A x2: A) Bool
+
+    (* Universal identity hash derived from pointer/machine address *)
+    identityHash: All(A::TYPE) All(x: A) word.T
+
+    (* 64-bit SplitMix64 bit avalanche mixer *)
+    mix(w: word.T): word.T
+
+    (* 64-bit hash combiner for composite keys *)
+    combine(h1: word.T h2: word.T): word.T
+
+    (* Primitives to word.T hashes *)
+    int(n: Int): word.T
+    bool(b: Bool): word.T
+    char(c: Char): word.T
+    word(w: word.T): word.T
+    string(s: String): word.T
+end;
+```
+
+---
+
 ## 2. Collections (`lib/collections/`)
 
 ### 2.1. `collections/vector : collections/Vector`
@@ -396,12 +431,18 @@ export
             hash: All(k: K) word.T)
         T(K V)
 
+    (* Create a new empty hash map using object identity equality and hashing *)
+    newIdentityMap: All(K::TYPE V::TYPE) T(K V)
+
     (* Create a new hash map with preallocated initial capacity *)
     newWithCapacity: All(K::TYPE V::TYPE)
         All(capacity: Int
             equal: All(k1: K k2: K) Bool
             hash: All(k: K) word.T)
         T(K V)
+
+    (* Create a new hash map using object identity with preallocated initial capacity *)
+    newIdentityMapWithCapacity: All(K::TYPE V::TYPE) All(capacity: Int) T(K V)
 
     (* Return the number of active key-value pairs stored in the map *)
     size: All(K::TYPE V::TYPE) All(m: T(K V)) Int
@@ -440,6 +481,26 @@ export
     forEach: All(K::TYPE V::TYPE)
         All(m: T(K V) action: All(k: K v: V) Ok)
         Ok
+
+    (* Transform values in place while preserving keys, equality, and hash table layout *)
+    map: All(K::TYPE V::TYPE W::TYPE)
+        All(m: T(K V) f: All(k: K v: V) W)
+        T(K W)
+
+    (* Retain entries where predicate holds *)
+    filter: All(K::TYPE V::TYPE)
+        All(m: T(K V) pred: All(k: K v: V) Bool)
+        T(K V)
+
+    (* Fold over key-value pairs in insertion order *)
+    fold: All(K::TYPE V::TYPE Acc::TYPE)
+        All(m: T(K V) init: Acc f: All(acc: Acc k: K v: V) Acc)
+        Acc
+
+    (* Combined map and filter on values: retains keys where f returns maybe.some(w) *)
+    filterMap: All(K::TYPE V::TYPE W::TYPE)
+        All(m: T(K V) f: All(k: K v: V) maybe.T(W))
+        T(K W)
 end;
 ```
 
@@ -467,12 +528,18 @@ export
             hash: All(a: A) word.T)
         T(A)
 
+    (* Create a new empty hash set using object identity equality and hashing *)
+    newIdentitySet: All(A::TYPE) T(A)
+
     (* Create a new hash set with preallocated initial capacity *)
     newWithCapacity: All(A::TYPE)
         All(capacity: Int
             equal: All(a1: A a2: A) Bool
             hash: All(a: A) word.T)
         T(A)
+
+    (* Create a new hash set using object identity with preallocated initial capacity *)
+    newIdentitySetWithCapacity: All(A::TYPE) All(capacity: Int) T(A)
 
     (* Return the number of elements in the set *)
     size: All(A::TYPE) All(s: T(A)) Int
@@ -517,5 +584,31 @@ export
 
     (* Check if s1 and s2 are equal (same size and every element of s1 is in s2) *)
     equal: All(A::TYPE) All(s1: T(A) s2: T(A)) Bool
+
+    (* Retain only elements satisfying the predicate *)
+    filter: All(A::TYPE)
+        All(s: T(A) pred: All(elem: A) Bool)
+        T(A)
+
+    (* Fold over elements in insertion order *)
+    fold: All(A::TYPE Acc::TYPE)
+        All(s: T(A) init: Acc f: All(acc: Acc elem: A) Acc)
+        Acc
+
+    (* Transform elements into a new set with equality and hash functions for B *)
+    map: All(A::TYPE B::TYPE)
+        All(s: T(A)
+            equal: All(b1: B b2: B) Bool
+            hash: All(b: B) word.T
+            f: All(elem: A) B)
+        T(B)
+
+    (* Combined map and filter into a new set with equality and hash functions for B *)
+    filterMap: All(A::TYPE B::TYPE)
+        All(s: T(A)
+            equal: All(b1: B b2: B) Bool
+            hash: All(b: B) word.T
+            f: All(elem: A) maybe.T(B))
+        T(B)
 end;
 ```

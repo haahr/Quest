@@ -21,12 +21,18 @@ export
             hash: All(k: K) word.T)
         T(K V)
 
+    (* Create a new empty hash map using object identity equality and hashing *)
+    newIdentityMap: All(K::TYPE V::TYPE) T(K V)
+
     (* Create a new hash map with preallocated initial capacity *)
     newWithCapacity: All(K::TYPE V::TYPE)
         All(capacity: Int
             equal: All(k1: K k2: K) Bool
             hash: All(k: K) word.T)
         T(K V)
+
+    (* Create a new hash map using object identity with preallocated initial capacity *)
+    newIdentityMapWithCapacity: All(K::TYPE V::TYPE) All(capacity: Int) T(K V)
 
     (* Return the number of active key-value pairs stored in the map *)
     size: All(K::TYPE V::TYPE) All(m: T(K V)) Int

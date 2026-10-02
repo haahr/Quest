@@ -20,6 +20,7 @@
 
 module hashMap : HashMap
 import
+    util/hash : util/Hash
     util/maybe : util/Maybe
     collections/vector : collections/Vector
     word: Word
@@ -78,7 +79,13 @@ export
         end;
 
     let new(K::TYPE V::TYPE)(equal: All(k1: K k2: K) Bool hash: All(k: K) word.T): T(K V) =
-        newWithCapacity(minCapacity equal hash);
+        newWithCapacity(:K :V minCapacity equal hash);
+
+    let newIdentityMap(K::TYPE V::TYPE): T(K V) =
+        new(:K :V hash.identityEqual(:K) hash.identityHash(:K));
+
+    let newIdentityMapWithCapacity(K::TYPE V::TYPE)(capacity: Int): T(K V) =
+        newWithCapacity(:K :V capacity hash.identityEqual(:K) hash.identityHash(:K));
 
     let size(K::TYPE V::TYPE)(m: T(K V)): Int =
         m.count;

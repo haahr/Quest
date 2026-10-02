@@ -20,6 +20,20 @@ The primary collection libraries required for self-hosting have been implemented
 Queues and stacks (used for scope stacks in `env.py`, block nesting and token lookahead buffers, and
 topological sort queues) are straightforwardly implemented on top of `collections/vector`.
 
+### 1.1. Identity Hashing and Equality (`util/hash`, `identityEqual`, `identityHash`)
+
+- **Usage:** Packrat memoization table keying (`SyntaxTarget` non-terminal instances in
+  `questlang/syntax/parser/engine`), AST node identity mapping, and graph cycle detection.
+- **Rationale:** In Quest, the `is` and `isnot` operators compare object identity ("same memory location") for compound
+  types like tuples, records, arrays, and options. Standard collections (`HashMap`, `HashSet`) require an equality
+  predicate and an explicit hash function returning `word.T`. To use heap-allocated instances as collection keys
+  without manual structural traversal or boilerplate `isSame` functions, `util/hash : util/Hash` exports:
+  ```quest
+  identityEqual(A::TYPE)(x1: A x2: A): Bool   (* x1 is x2 *)
+  identityHash(A::TYPE)(x: A): word.T         (* derived from pointer / memory address *)
+  ```
+  allowing direct instantiation: `hashMap.new(:Node :Result hash.identityEqual hash.identityHash)`.
+
 ---
 
 ## 2. Operating System, Process Execution, and Filesystem Primitives
@@ -116,8 +130,9 @@ Remaining prerequisites:
 | Subsystem | Components | Priority | Strategy |
 | :--- | :--- | :--- | :--- |
 | **OS Primitives** | `system.exec` | **P1** | Extend `System` (native C backing) |
+| **Identity Hashing** | `util/hash` (`identityHash`) | **P1** | Pointer hash for memoization & symbols |
 | **Algorithms** | Binary search, Quicksort, Topological sort | **P1** | Pure Quest algorithms |
-| **AST & Type Models** | Recursive `Variant` definitions | **P2** | Compiler architecture |
+| **AST & Type Models** | Parameterized `Node(Form)` definitions | **P2** | Compiler architecture |
 | **String Building** | In-Quest `StringBuilder` | **P2** | Replace chunked array `stringOp.conc` |
 
 ### 6.1. Note on String Building
