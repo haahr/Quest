@@ -174,6 +174,9 @@ export
     tryToReal(s: String): maybe.T(Real)
     toBool(s: String): Bool
     tryToBool(s: String): maybe.T(Bool)
+
+    (* Hashing *)
+    hash(s: String): word.T
 end;
 ```
 

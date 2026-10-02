@@ -15,18 +15,20 @@ export
     (* Exception raised on argument parsing or configuration errors *)
     let error: Exception = exception error: Ok end;
 
-    (* Kind of Option *)
-    (* 0: Flag (bool), 1: String, 2: Choice, 3: Int, 4: Multi *)
-    Let OptKind = Int;
+    (* Kind-specific option definition using Option *)
+    Let OptKind = Option
+        flag
+        str with defaultVal: String end
+        choice with choices: Array(String) defaultVal: String end
+        integer with defaultVal: Int end
+        multi
+    end;
 
     Let OptDef = Tuple
         name: String
-        kind: OptKind
         flagsStr: String
         help: String
-        defaultStr: String
-        defaultInt: Int
-        choices: Array(String)
+        kind: OptKind
     end;
 
     Let PositionalDef = Tuple
@@ -65,9 +67,17 @@ export
         targetArgsList: vector.T(String)
     end;
 
-    (* Helper: string equality *)
-    let strEq(s1: String s2: String): Bool =
-        stringOp.equal(s1 s2);
+    let isFlag(k: OptKind): Bool =
+        case k
+            when flag then true
+            else false
+        end;
+
+    let isMulti(k: OptKind): Bool =
+        case k
+            when multi then true
+            else false
+        end;
 
     let new(prog: String description: String): Parser =
         begin
@@ -80,12 +90,9 @@ export
             (* Automatically register -h and --help *)
             vector.append(:OptDef p.options tuple
                 let name = "help"
-                let kind = 0
                 let flagsStr = "-h --help"
                 let help = "Show this help message and exit"
-                let defaultStr = ""
-                let defaultInt = 0
-                let choices = array of :String end
+                let kind = option flag of OptKind end
             end);
             p
         end;
@@ -94,12 +101,9 @@ export
         begin
             vector.append(:OptDef p.options tuple
                 let name = name
-                let kind = 0
                 let flagsStr = flags
                 let help = help
-                let defaultStr = ""
-                let defaultInt = 0
-                let choices = array of :String end
+                let kind = option flag of OptKind end
             end);
             ok
         end;
@@ -108,12 +112,9 @@ export
         begin
             vector.append(:OptDef p.options tuple
                 let name = name
-                let kind = 1
                 let flagsStr = flags
                 let help = help
-                let defaultStr = defaultVal
-                let defaultInt = 0
-                let choices = array of :String end
+                let kind = option str of OptKind with tuple let defaultVal = defaultVal end end
             end);
             ok
         end;
@@ -129,12 +130,12 @@ export
         begin
             vector.append(:OptDef p.options tuple
                 let name = name
-                let kind = 2
                 let flagsStr = flags
                 let help = help
-                let defaultStr = defaultVal
-                let defaultInt = 0
-                let choices = choices
+                let kind = option choice of OptKind with tuple
+                    let choices = choices
+                    let defaultVal = defaultVal
+                end end
             end);
             ok
         end;
@@ -143,12 +144,9 @@ export
         begin
             vector.append(:OptDef p.options tuple
                 let name = name
-                let kind = 3
                 let flagsStr = flags
                 let help = help
-                let defaultStr = ""
-                let defaultInt = defaultVal
-                let choices = array of :String end
+                let kind = option integer of OptKind with tuple let defaultVal = defaultVal end end
             end);
             ok
         end;
@@ -157,12 +155,9 @@ export
         begin
             vector.append(:OptDef p.options tuple
                 let name = name
-                let kind = 4
                 let flagsStr = flags
                 let help = help
-                let defaultStr = ""
-                let defaultInt = 0
-                let choices = array of :String end
+                let kind = option multi of OptKind end
             end);
             ok
         end;
@@ -227,23 +222,33 @@ export
                         stringBuilder.append(b "  ");
                     end;
                     stringBuilder.append(b opt.help);
-                    if opt.kind == 2 then
-                        stringBuilder.append(b " (choices: ");
-                        let cNum = extent opt.choices;
-                        for ci = 0 upto {cNum - 1} do
-                            if ci > 0 then stringBuilder.append(b ", "); end;
-                            stringBuilder.append(b opt.choices[ci]);
-                        end;
-                        stringBuilder.append(b ")");
-                    end;
-                    if stringOp.length(opt.defaultStr) > 0 then
-                        stringBuilder.append(b " [default: ");
-                        stringBuilder.append(b opt.defaultStr);
-                        stringBuilder.append(b "]");
-                    elsif {opt.kind == 3} andif {opt.defaultInt isnot 0} then
-                        stringBuilder.append(b " [default: ");
-                        stringBuilder.append(b conv.int(opt.defaultInt));
-                        stringBuilder.append(b "]");
+                    case opt.kind
+                        when choice with cd: Tuple choices: Array(String) defaultVal: String end then
+                            stringBuilder.append(b " (choices: ");
+                            let cNum = extent cd.choices;
+                            for ci = 0 upto {cNum - 1} do
+                                if ci > 0 then stringBuilder.append(b ", "); end;
+                                stringBuilder.append(b cd.choices[ci]);
+                            end;
+                            stringBuilder.append(b ")");
+                            if stringOp.length(cd.defaultVal) > 0 then
+                                stringBuilder.append(b " [default: ");
+                                stringBuilder.append(b cd.defaultVal);
+                                stringBuilder.append(b "]");
+                            end;
+                        when str with sd: Tuple defaultVal: String end then
+                            if stringOp.length(sd.defaultVal) > 0 then
+                                stringBuilder.append(b " [default: ");
+                                stringBuilder.append(b sd.defaultVal);
+                                stringBuilder.append(b "]");
+                            end;
+                        when integer with id: Tuple defaultVal: Int end then
+                            if id.defaultVal isnot 0 then
+                                stringBuilder.append(b " [default: ");
+                                stringBuilder.append(b conv.int(id.defaultVal));
+                                stringBuilder.append(b "]");
+                            end;
+                        else ok
                     end;
                     stringBuilder.appendChar(b '\n');
                 end;
@@ -271,7 +276,7 @@ export
                 let fCount = vector.length(:String flagList);
                 for fi = 0 upto {fCount - 1} do
                     let f = vector.get(:String flagList fi);
-                    if strEq(f flag) then
+                    if stringOp.equal(f flag) then
                         found := i;
                     end;
                 end;
@@ -286,7 +291,7 @@ export
             let n = extent choices;
             let var okChoice = false;
             for i = 0 upto {n - 1} do
-                if strEq(choices[i] val) then
+                if stringOp.equal(choices[i] val) then
                     okChoice := true;
                 end;
             end;
@@ -301,7 +306,7 @@ export
             let var i = 0;
             while {i < count} andif maybe.isNone(:String res) do
                 let e = vector.get(:StrEntry v i);
-                if strEq(e.name name) then
+                if stringOp.equal(e.name name) then
                     res := maybe.some(:String e.val);
                 end;
                 i := i + 1;
@@ -316,7 +321,7 @@ export
             let var i = 0;
             while {i < count} andif maybe.isNone(:Int res) do
                 let e = vector.get(:IntEntry v i);
-                if strEq(e.name name) then
+                if stringOp.equal(e.name name) then
                     res := maybe.some(:Int e.val);
                 end;
                 i := i + 1;
@@ -331,12 +336,73 @@ export
             let var i = 0;
             while {i < count} andif maybe.isNone(:vector.T(String) res) do
                 let e = vector.get(:MultiEntry v i);
-                if strEq(e.name name) then
+                if stringOp.equal(e.name name) then
                     res := maybe.some(:vector.T(String) e.vals);
                 end;
                 i := i + 1;
             end;
             res
+        end;
+
+    (* Store parsed value according to option kind *)
+    let storeOptValue(
+        p: Parser
+        opt: OptDef
+        flagPart: String
+        valPart: String
+        res: Results
+    ): Ok =
+        case opt.kind
+            when str then
+                begin
+                    vector.append(:StrEntry res.strings tuple
+                        let name = opt.name
+                        let val = valPart
+                    end);
+                    ok
+                end
+            when choice with cd: Tuple choices: Array(String) defaultVal: String end then
+                begin
+                    if not(isChoiceValid(cd.choices valPart)) then
+                        writer.putString(
+                            writer.err
+                            {p.prog <> ": error: invalid choice '" <> valPart
+                                <> "' for option '" <> flagPart <> "'\n"}
+                        );
+                        raise error end
+                    end;
+                    vector.append(:StrEntry res.strings tuple
+                        let name = opt.name
+                        let val = valPart
+                    end);
+                    ok
+                end
+            when integer then
+                begin
+                    let parsedInt = strutil.tryToInt(valPart);
+                    if maybe.isNone(:Int parsedInt) then
+                        writer.putString(
+                            writer.err
+                            {p.prog <> ": error: option '" <> flagPart
+                                <> "' requires integer argument\n"}
+                        );
+                        raise error end
+                    end;
+                    vector.append(:IntEntry res.ints tuple
+                        let name = opt.name
+                        let val = maybe.unwrap(:Int parsedInt)
+                    end);
+                    ok
+                end
+            when multi then
+                begin
+                    let mOpt = findMultiEntry(res.multis opt.name);
+                    if maybe.isSome(:vector.T(String) mOpt) then
+                        vector.append(:String maybe.unwrap(:vector.T(String) mOpt) valPart);
+                    end;
+                    ok
+                end
+            else ok
         end;
 
     let parseVector(p: Parser args: vector.T(String)): Results =
@@ -354,7 +420,7 @@ export
             let optCount = vector.length(:OptDef p.options);
             for i = 0 upto {optCount - 1} do
                 let opt = vector.get(:OptDef p.options i);
-                if opt.kind == 4 then
+                if isMulti(opt.kind) then
                     vector.append(:MultiEntry res.multis tuple
                         let name = opt.name
                         let vals = vector.new(:String)
@@ -371,7 +437,7 @@ export
                 if inTargetArgs then
                     vector.append(:String res.targetArgsList arg);
                     idx := idx + 1;
-                elsif strEq(arg "--") then
+                elsif stringOp.equal(arg "--") then
                     inTargetArgs := true;
                     idx := idx + 1;
                 elsif strutil.startsWith(arg "--") then
@@ -390,9 +456,9 @@ export
                     end;
                     let opt = vector.get(:OptDef p.options optIdx);
 
-                    if opt.kind == 0 then
+                    if isFlag(opt.kind) then
                         (* Flag *)
-                        if strEq(opt.name "help") then
+                        if stringOp.equal(opt.name "help") then
                             printHelp(p writer.output);
                             raise error end
                         end;
@@ -418,48 +484,7 @@ export
                                 vector.get(:String args idx)
                             end;
 
-                        if opt.kind == 1 then
-                            (* String *)
-                            vector.append(:StrEntry res.strings tuple
-                                let name = opt.name
-                                let val = valPart
-                            end);
-                        elsif opt.kind == 2 then
-                            (* Choice *)
-                            if not(isChoiceValid(opt.choices valPart)) then
-                                writer.putString(
-                                    writer.err
-                                    {p.prog <> ": error: invalid choice '" <> valPart
-                                        <> "' for option '" <> flagPart <> "'\n"}
-                                );
-                                raise error end
-                            end;
-                            vector.append(:StrEntry res.strings tuple
-                                let name = opt.name
-                                let val = valPart
-                            end);
-                        elsif opt.kind == 3 then
-                            (* Int *)
-                            let parsedInt = strutil.tryToInt(valPart);
-                            if maybe.isNone(:Int parsedInt) then
-                                writer.putString(
-                                    writer.err
-                                    {p.prog <> ": error: option '" <> flagPart
-                                        <> "' requires integer argument\n"}
-                                );
-                                raise error end
-                            end;
-                            vector.append(:IntEntry res.ints tuple
-                                let name = opt.name
-                                let val = maybe.unwrap(:Int parsedInt)
-                            end);
-                        elsif opt.kind == 4 then
-                            (* Multi *)
-                            let mOpt = findMultiEntry(res.multis opt.name);
-                            if maybe.isSome(:vector.T(String) mOpt) then
-                                vector.append(:String maybe.unwrap(:vector.T(String) mOpt) valPart);
-                            end;
-                        end;
+                        storeOptValue(p opt flagPart valPart res);
                         idx := idx + 1;
                     end;
                 elsif strutil.startsWith(arg "-") andif {stringOp.length(arg) > 1} then
@@ -472,9 +497,9 @@ export
                     end;
                     let opt = vector.get(:OptDef p.options optIdx);
 
-                    if opt.kind == 0 then
+                    if isFlag(opt.kind) then
                         (* Flag: could be bundled or single *)
-                        if strEq(opt.name "help") then
+                        if stringOp.equal(opt.name "help") then
                             printHelp(p writer.output);
                             raise error end
                         end;
@@ -496,7 +521,7 @@ export
                                     raise error end
                                 end;
                                 let bOpt = vector.get(:OptDef p.options bOptIdx);
-                                if bOpt.kind isnot 0 then
+                                if not(isFlag(bOpt.kind)) then
                                     writer.putString(
                                         writer.err
                                         {p.prog <> ": error: option '" <> bFlag
@@ -504,7 +529,7 @@ export
                                     );
                                     raise error end
                                 end;
-                                if strEq(bOpt.name "help") then
+                                if stringOp.equal(bOpt.name "help") then
                                     printHelp(p writer.output);
                                     raise error end
                                 end;
@@ -533,44 +558,7 @@ export
                                 vector.get(:String args idx)
                             end;
 
-                        if opt.kind == 1 then
-                            vector.append(:StrEntry res.strings tuple
-                                let name = opt.name
-                                let val = valPart
-                            end);
-                        elsif opt.kind == 2 then
-                            if not(isChoiceValid(opt.choices valPart)) then
-                                writer.putString(
-                                    writer.err
-                                    {p.prog <> ": error: invalid choice '" <> valPart
-                                        <> "' for option '" <> flagPart <> "'\n"}
-                                );
-                                raise error end
-                            end;
-                            vector.append(:StrEntry res.strings tuple
-                                let name = opt.name
-                                let val = valPart
-                            end);
-                        elsif opt.kind == 3 then
-                            let parsedInt = strutil.tryToInt(valPart);
-                            if maybe.isNone(:Int parsedInt) then
-                                writer.putString(
-                                    writer.err
-                                    {p.prog <> ": error: option '" <> flagPart
-                                        <> "' requires integer argument\n"}
-                                );
-                                raise error end
-                            end;
-                            vector.append(:IntEntry res.ints tuple
-                                let name = opt.name
-                                let val = maybe.unwrap(:Int parsedInt)
-                            end);
-                        elsif opt.kind == 4 then
-                            let mOpt = findMultiEntry(res.multis opt.name);
-                            if maybe.isSome(:vector.T(String) mOpt) then
-                                vector.append(:String maybe.unwrap(:vector.T(String) mOpt) valPart);
-                            end;
-                        end;
+                        storeOptValue(p opt flagPart valPart res);
                         idx := idx + 1;
                     end;
                 else
@@ -583,22 +571,41 @@ export
             (* Apply defaults for non-specified options *)
             for i = 0 upto {optCount - 1} do
                 let opt = vector.get(:OptDef p.options i);
-                if {opt.kind == 1} orif {opt.kind == 2} then
-                    let existing = findStrEntry(res.strings opt.name);
-                    if maybe.isNone(:String existing) andif {stringOp.length(opt.defaultStr) > 0} then
-                        vector.append(:StrEntry res.strings tuple
-                            let name = opt.name
-                            let val = opt.defaultStr
-                        end);
-                    end;
-                elsif opt.kind == 3 then
-                    let existing = findIntEntry(res.ints opt.name);
-                    if maybe.isNone(:Int existing) then
-                        vector.append(:IntEntry res.ints tuple
-                            let name = opt.name
-                            let val = opt.defaultInt
-                        end);
-                    end;
+                case opt.kind
+                    when str with sd: Tuple defaultVal: String end then
+                        begin
+                            let existing = findStrEntry(res.strings opt.name);
+                            if maybe.isNone(:String existing) andif {stringOp.length(sd.defaultVal) > 0} then
+                                vector.append(:StrEntry res.strings tuple
+                                    let name = opt.name
+                                    let val = sd.defaultVal
+                                end);
+                            end;
+                            ok
+                        end
+                    when choice with cd: Tuple choices: Array(String) defaultVal: String end then
+                        begin
+                            let existing = findStrEntry(res.strings opt.name);
+                            if maybe.isNone(:String existing) andif {stringOp.length(cd.defaultVal) > 0} then
+                                vector.append(:StrEntry res.strings tuple
+                                    let name = opt.name
+                                    let val = cd.defaultVal
+                                end);
+                            end;
+                            ok
+                        end
+                    when integer with id: Tuple defaultVal: Int end then
+                        begin
+                            let existing = findIntEntry(res.ints opt.name);
+                            if maybe.isNone(:Int existing) then
+                                vector.append(:IntEntry res.ints tuple
+                                    let name = opt.name
+                                    let val = id.defaultVal
+                                end);
+                            end;
+                            ok
+                        end
+                    else ok
                 end;
             end;
 

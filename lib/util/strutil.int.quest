@@ -149,4 +149,12 @@ export
 
     (* Non-throwing variant of toBool *)
     tryToBool(s: String): maybe.T(Bool)
+
+    (* =========================================================================
+     * Hashing
+     * ========================================================================= *)
+
+    (* Compute a 64-bit FNV-1a non-cryptographic hash of string s *)
+    hash(s: String): word.T
 end;
+

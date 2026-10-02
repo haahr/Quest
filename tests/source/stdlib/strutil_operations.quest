@@ -206,3 +206,13 @@ when strutil.error then
     printString("caught_bool_error")
 end;
 printNewline(0);
+
+(* 10. String hashing (64-bit FNV-1a) *)
+let h1 = strutil.hash("hello");
+let h2 = strutil.hash("hello");
+let h3 = strutil.hash("world");
+printBool(h1 is h2);
+printBool(h1 isnot h3);
+printString(strutil.formatWord(h1 16));
+printNewline(0);
+

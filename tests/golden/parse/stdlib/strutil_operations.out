@@ -2029,5 +2029,90 @@
         )
       )
     )
+    (LetValueBinding
+      :name 'h1'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'strutil')
+          :field 'hash'
+        )
+        :args (
+          (ExprString 'hello' '"hello"')
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'h2'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'strutil')
+          :field 'hash'
+        )
+        :args (
+          (ExprString 'hello' '"hello"')
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'h3'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'strutil')
+          :field 'hash'
+        )
+        :args (
+          (ExprString 'world' '"world"')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printBool')
+        :args (
+          (ExprInfix
+            :left (ExprId 'h1')
+            :op 'is'
+            :right (ExprId 'h2')
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printBool')
+        :args (
+          (ExprInfix
+            :left (ExprId 'h1')
+            :op 'isnot'
+            :right (ExprId 'h3')
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printString')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'strutil')
+              :field 'formatWord'
+            )
+            :args (
+              (ExprId 'h1')
+              (ExprInt 16 '16')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printNewline')
+        :args (
+          (ExprInt 0 '0')
+        )
+      )
+    )
   )
 )
