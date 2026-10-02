@@ -25,7 +25,8 @@ import collections/hashMap : collections/HashMap     (* Python dict *)
 import collections/hashSet : collections/HashSet     (* Python set *)
 import util/maybe : util/Maybe                       (* Optional[T] *)
 import util/stringBuilder : util/StringBuilder       (* Fast string accumulator *)
-import util/strutil : util/Strutil                   (* String utilities and hashing *)
+import util/strutil : util/Strutil                   (* String utilities *)
+import util/hash : util/Hash                         (* Universal & primitive hashing *)
 ```
 
 Each library's main type is called `T`, following Quest convention, so you write `vector.T(Int)`, `hashMap.T(String
@@ -73,15 +74,15 @@ stringBuilder.T new()  newWithCapacity(cap)  append(b s)  appendChar(b c)
 
 `hashMap.new` and `hashSet.new` take an equality function `All(a,b:K) Bool` and a hash function `All(k:K) word.T`. Quest
 has no overloading, and its `is` on strings and structured values compares memory locations, so a hash table cannot
-discover key equality by itself. For strings, pass `stringOp.equal` and `strutil.hash`.
+discover key equality by itself. For strings, pass `stringOp.equal` and `hash.string`.
 
 ### Still missing
 
 - **Iterators.** No generator or iterator protocol exists. The rules assume a type you define yourself:
   `Let Iter(A::TYPE)::TYPE = Tuple next():maybe.T(A) end`
 - **Output and formatting helpers.** `Writer` is available for output (`writer.write(writer.output str)`), while
-  conversions live in `Conv` (`conv.int`, `conv.real`, `conv.bool`) and `util/strutil` (`strutil.hash`, `strutil.split`,
-  `strutil.join`, `strutil.strip`, etc.).
+  conversions live in `Conv` (`conv.int`, `conv.real`, `conv.bool`), `util/strutil` (`strutil.split`, `strutil.join`,
+  `strutil.strip`, etc.), and `util/hash` (`hash.string`, `hash.int`, `hash.identityHash`).
 
 ## Lexical and expression-level rules
 
@@ -112,7 +113,7 @@ code should strictly use `is` and `isnot`.
 **3. Only use `is` for scalar equality.** `is`/`isnot` mean value equality for `Ok`, `Bool`, `Char`, `Int`, and `Real`.
 For strings and every other reference type they mean "same memory location." Python `s == "yes"` becomes
 `stringOp.equal(s "yes")`. For the same reason, hash tables are built with explicit equality and hash functions:
-`hashMap.new(:String :Int stringOp.equal strutil.hash)`. For your own types, export `equal` and `hash` from the
+`hashMap.new(:String :Int stringOp.equal hash.string)`. For your own types, export `equal` and `hash` from the
 interface, the Quest equivalent of `__eq__`/`__hash__`.
 
 **4. Use the short-circuiting connectives.** Python `and`/`or` short-circuit. Quest's `/\` and `\/` evaluate both sides,
@@ -443,12 +444,12 @@ import
     collections/vector : collections/Vector
     collections/hashMap : collections/HashMap
     util/maybe : util/Maybe
-    util/strutil : util/Strutil
+    util/hash : util/Hash
     stringOp = string : StringOp
 export
     let wordCounts(words: vector.T(String)): hashMap.T(String Int) =
         begin
-            let counts = hashMap.new(:String :Int stringOp.equal strutil.hash);
+            let counts = hashMap.new(:String :Int stringOp.equal hash.string);
             vector.forEach(:String words fun(w: String): Ok
                 begin
                     let cur = maybe.unwrapOr(:Int hashMap.get(:String :Int counts w) 0);

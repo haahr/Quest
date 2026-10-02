@@ -1,8 +1,8 @@
 module hash : Hash
 import
     ascii: Ascii
+    stringOp = string : StringOp
     wordLib = word : Word
-    util/strutil : util/Strutil
 export
     let identityEqual(A::TYPE)(x1: A x2: A): Bool = x1 is x2;
 
@@ -19,5 +19,22 @@ export
 
     let word(w: wordLib.T): wordLib.T = mix(w);
 
-    let string(s: String): wordLib.T = strutil.hash(s);
+    (* 64-bit FNV-1a string hashing:
+     * offset basis: 14695981039346656037 (0xcbf29ce484222325)
+     * prime:        1099511628211        (0x100000001b3)
+     *)
+    let fnvOffsetBasis: wordLib.T = wordLib.fromInt(~3750763034362895579);
+    let fnvPrime: wordLib.T = wordLib.fromInt(1099511628211);
+
+    let string(s: String): wordLib.T =
+        begin
+            let sLen = stringOp.length(s);
+            let var h = fnvOffsetBasis;
+            for i = 0 upto {sLen - 1} do
+                let chCode = ascii.val(stringOp.getChar(s i));
+                h := wordLib.xorBits(h wordLib.fromInt(chCode));
+                h := wordLib.mul(h fnvPrime);
+            end;
+            h
+        end;
 end;

@@ -3,6 +3,7 @@
 module argParse : ArgParse
 import
     util/maybe : util/Maybe
+    util/hash : util/Hash
     util/strutil : util/Strutil
     util/stringBuilder : util/StringBuilder
     collections/vector : collections/Vector
@@ -85,7 +86,7 @@ export
                 let prog = prog
                 let description = description
                 let options = vector.new(:OptDef)
-                let flagsMap = hashMap.new(:String :Int stringOp.equal strutil.hash)
+                let flagsMap = hashMap.new(:String :Int stringOp.equal hash.string)
                 let positionals = vector.new(:PositionalDef)
             end;
             (* Automatically register -h and --help *)
@@ -348,10 +349,10 @@ export
     let parseVector(p: Parser args: vector.T(String)): Results =
         begin
             let res = tuple
-                let bools = hashMap.new(:String :Bool stringOp.equal strutil.hash)
-                let strings = hashMap.new(:String :String stringOp.equal strutil.hash)
-                let ints = hashMap.new(:String :Int stringOp.equal strutil.hash)
-                let multis = hashMap.new(:String :vector.T(String) stringOp.equal strutil.hash)
+                let bools = hashMap.new(:String :Bool stringOp.equal hash.string)
+                let strings = hashMap.new(:String :String stringOp.equal hash.string)
+                let ints = hashMap.new(:String :Int stringOp.equal hash.string)
+                let multis = hashMap.new(:String :vector.T(String) stringOp.equal hash.string)
                 let posArgs = vector.new(:String)
                 let targetArgsList = vector.new(:String)
             end;

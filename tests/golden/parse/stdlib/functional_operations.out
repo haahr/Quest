@@ -22,6 +22,11 @@
     )
     (ImportPhrase
       :items (
+        (ImportItem ('hash') 'Hash' ('util/hash') 'util/Hash')
+      )
+    )
+    (ImportPhrase
+      :items (
         (ImportItem ('strutil') 'Strutil' ('util/strutil') 'util/Strutil')
       )
     )
@@ -691,8 +696,8 @@
             :field 'equal'
           )
           (ExprSelect
-            :target (ExprId 'strutil')
-            :field 'hash'
+            :target (ExprId 'hash')
+            :field 'string'
           )
         )
       )
@@ -1565,8 +1570,8 @@
             :field 'equal'
           )
           (ExprSelect
-            :target (ExprId 'strutil')
-            :field 'hash'
+            :target (ExprId 'hash')
+            :field 'string'
           )
           (ExprFun
             :params (

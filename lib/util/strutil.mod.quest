@@ -644,23 +644,4 @@ export
                 raise error end
             end
         end;
-
-    (* 64-bit FNV-1a string hashing:
-     * offset basis: 14695981039346656037 (0xcbf29ce484222325)
-     * prime:        1099511628211        (0x100000001b3)
-     *)
-    let fnvOffsetBasis: word.T = word.fromInt(~3750763034362895579);
-    let fnvPrime: word.T = word.fromInt(1099511628211);
-
-    let hash(s: String): word.T =
-        begin
-            let sLen = stringOp.length(s);
-            let var h = fnvOffsetBasis;
-            for i = 0 upto {sLen - 1} do
-                let chCode = ascii.val(stringOp.getChar(s i));
-                h := word.xorBits(h word.fromInt(chCode));
-                h := word.mul(h fnvPrime);
-            end;
-            h
-        end;
 end;

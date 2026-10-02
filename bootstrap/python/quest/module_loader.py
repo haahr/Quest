@@ -70,30 +70,28 @@ def resolve_interface_file(
     include_paths: list[Path],
 ) -> Optional[Path]:
     """Finds <name.lower()>.qi or <name.lower()>.int.quest in current_dir, include_paths, or DEFAULT_LIB_DIR."""
-    for ext in (".qi", ".int.quest"):
-        filename = f"{name.lower()}{ext}"
-        if current_dir is not None:
-            candidate = current_dir / filename
-            if candidate.is_file():
-                return candidate.resolve()
+    source_file = resolve_interface_source_file(name, current_dir, include_paths)
+    source_mtime = source_file.stat().st_mtime if source_file and source_file.is_file() else None
 
-        for inc in include_paths:
-            candidate = Path(inc) / filename
-            if candidate.is_file():
-                return candidate.resolve()
+    stem = name.lower()
+    dirs_to_check: list[Path] = []
+    if current_dir is not None:
+        dirs_to_check.append(current_dir)
+    for inc in include_paths:
+        dirs_to_check.append(Path(inc))
+    env_lib = os.environ.get("QUEST_LIB")
+    if env_lib:
+        dirs_to_check.append(Path(env_lib))
+    if DEFAULT_LIB_DIR.is_dir():
+        dirs_to_check.append(DEFAULT_LIB_DIR)
 
-        env_lib = os.environ.get("QUEST_LIB")
-        if env_lib:
-            candidate = Path(env_lib) / filename
-            if candidate.is_file():
-                return candidate.resolve()
+    for d in dirs_to_check:
+        qi_candidate = d / f"{stem}.qi"
+        if qi_candidate.is_file():
+            if source_mtime is None or qi_candidate.stat().st_mtime >= source_mtime:
+                return qi_candidate.resolve()
 
-        if DEFAULT_LIB_DIR.is_dir():
-            candidate = DEFAULT_LIB_DIR / filename
-            if candidate.is_file():
-                return candidate.resolve()
-
-    return None
+    return source_file
 
 
 def resolve_interface_source_file(
@@ -257,7 +255,10 @@ def load_interface(name: str, env: Environment) -> Scope:
 
         qi_file = out_root / f"{name.lower()}.qi"
         sources: list[Path] = []
-        if file_path and file_path.is_file():
+        int_src = resolve_interface_source_file(name, env.current_dir, env.include_paths)
+        if int_src and int_src.is_file():
+            sources.append(int_src)
+        elif file_path and file_path.is_file():
             sources.append(file_path)
         mod_src = resolve_module_file(name, env.current_dir, env.include_paths)
         if mod_src and mod_src.is_file():
@@ -540,6 +541,23 @@ def load_module(name: str, expected_interface: str, env: Environment) -> TypedMo
         intf_src = resolve_interface_file(expected_interface, env.current_dir, env.include_paths)
         if intf_src and intf_src.is_file():
             sources.append(intf_src)
+
+        if obj_file.is_file():
+            dep_candidates = [
+                obj_file.parent / ".deps" / f"{obj_file.stem}.d",
+                obj_file.with_suffix(".d"),
+            ]
+            for dep_file in dep_candidates:
+                if dep_file.is_file():
+                    try:
+                        for prereq in parse_dep_file(dep_file):
+                            cand = out_root / prereq
+                            if cand.is_file():
+                                sources.append(cand)
+                            elif (DEFAULT_LIB_DIR / prereq).is_file():
+                                sources.append(DEFAULT_LIB_DIR / prereq)
+                    except Exception:
+                        pass
 
         if _is_artifact_stale(obj_file, sources) and file_path is not None:
             from quest.module_compiler import compile_hierarchical_module

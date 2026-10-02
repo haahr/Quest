@@ -18,6 +18,10 @@
       ))
     (TypedImport
       :items (
+        (TypedImportItem ('hash') : 'Hash')
+      ))
+    (TypedImport
+      :items (
         (TypedImportItem ('strutil') : 'Strutil')
       ))
     (TypedImport
@@ -342,8 +346,8 @@
         :args (
           (TypedSelect 'equal' :type Fun(s1: String s2: String): Bool
             :target (TypedVar 'stringOp' :type Record error: Exception new: Fun(size: Int init: Char): String isEmpty: Fun(string: String): Bool length: Fun(string: String): Int getChar: Fun(string: String index: Int): Char setChar: Fun(string: String index: Int char: Char): Ok getSub: Fun(source: String start: Int size: Int): String setSub: Fun(dest: String destStart: Int source: String sourceStart: Int sourceSize: Int): Ok cat: Fun(s1: String s2: String): String catSub: Fun(s1: String start1: Int size1: Int s2: String start2: Int size2: Int): String conc: Fun(a: Array(String)): String equal: Fun(s1: String s2: String): Bool equalSub: Fun(s1: String start1: Int size1: Int s2: String start2: Int size2: Int): Bool precedes: Fun(s1: String s2: String): Bool precedesSub: Fun(s1: String start1: Int size1: Int s2: String start2: Int size2: Int): Bool end))
-          (TypedSelect 'hash' :type Fun(s: String): Word.T
-            :target (TypedVar 'strutil' :type Record error: Exception split: Fun(s: String delim: String): vector.T(String) splitlines: Fun(s: String): vector.T(String) join: Fun(delim: String items: vector.T(String)): String joinArray: Fun(delim: String items: Array(String)): String startsWith: Fun(s: String prefix: String): Bool endsWith: Fun(s: String suffix: String): Bool find: Fun(s: String sub: String): Int findFrom: Fun(s: String sub: String start: Int): Int rfind: Fun(s: String sub: String): Int contains: Fun(s: String sub: String): Bool strip: Fun(s: String): String stripLeading: Fun(s: String): String stripTrailing: Fun(s: String): String replace: Fun(s: String oldSub: String newSub: String): String escapeC: Fun(s: String): String unescapeC: Fun(s: String): String isDigit: Fun(c: Char): Bool isAlpha: Fun(c: Char): Bool isAlnum: Fun(c: Char): Bool isSpace: Fun(c: Char): Bool toInt: Fun(s: String): Int tryToInt: Fun(s: String): maybe.T(Int) toIntBase: Fun(s: String base: Int): Int tryToIntBase: Fun(s: String base: Int): maybe.T(Int) toWord: Fun(s: String): Word.T tryToWord: Fun(s: String): maybe.T(Word.T) toWordBase: Fun(s: String base: Int): Word.T tryToWordBase: Fun(s: String base: Int): maybe.T(Word.T) formatWord: Fun(w: Word.T base: Int): String wordToString: Fun(w: Word.T): String toReal: Fun(s: String): Real tryToReal: Fun(s: String): maybe.T(Real) toBool: Fun(s: String): Bool tryToBool: Fun(s: String): maybe.T(Bool) hash: Fun(s: String): Word.T end))
+          (TypedSelect 'string' :type Fun(s: String): Word.T
+            :target (TypedVar 'hash' :type Record identityEqual: All(A :: TYPE) Fun(x1: A x2: A): Bool identityHash: All(A :: TYPE) Fun(x: A): Word.T mix: Fun(w: Word.T): Word.T combine: Fun(h1: Word.T h2: Word.T): Word.T int: Fun(n: Int): Word.T bool: Fun(b: Bool): Word.T char: Fun(c: Char): Word.T word: Fun(w: Word.T): Word.T string: Fun(s: String): Word.T end))
         )))
     (TypedExprStmt
       :expr (TypedApp :type Bool
@@ -782,8 +786,8 @@
           (TypedVar 's' :type T(Int))
           (TypedSelect 'equal' :type Fun(s1: String s2: String): Bool
             :target (TypedVar 'stringOp' :type Record error: Exception new: Fun(size: Int init: Char): String isEmpty: Fun(string: String): Bool length: Fun(string: String): Int getChar: Fun(string: String index: Int): Char setChar: Fun(string: String index: Int char: Char): Ok getSub: Fun(source: String start: Int size: Int): String setSub: Fun(dest: String destStart: Int source: String sourceStart: Int sourceSize: Int): Ok cat: Fun(s1: String s2: String): String catSub: Fun(s1: String start1: Int size1: Int s2: String start2: Int size2: Int): String conc: Fun(a: Array(String)): String equal: Fun(s1: String s2: String): Bool equalSub: Fun(s1: String start1: Int size1: Int s2: String start2: Int size2: Int): Bool precedes: Fun(s1: String s2: String): Bool precedesSub: Fun(s1: String start1: Int size1: Int s2: String start2: Int size2: Int): Bool end))
-          (TypedSelect 'hash' :type Fun(s: String): Word.T
-            :target (TypedVar 'strutil' :type Record error: Exception split: Fun(s: String delim: String): vector.T(String) splitlines: Fun(s: String): vector.T(String) join: Fun(delim: String items: vector.T(String)): String joinArray: Fun(delim: String items: Array(String)): String startsWith: Fun(s: String prefix: String): Bool endsWith: Fun(s: String suffix: String): Bool find: Fun(s: String sub: String): Int findFrom: Fun(s: String sub: String start: Int): Int rfind: Fun(s: String sub: String): Int contains: Fun(s: String sub: String): Bool strip: Fun(s: String): String stripLeading: Fun(s: String): String stripTrailing: Fun(s: String): String replace: Fun(s: String oldSub: String newSub: String): String escapeC: Fun(s: String): String unescapeC: Fun(s: String): String isDigit: Fun(c: Char): Bool isAlpha: Fun(c: Char): Bool isAlnum: Fun(c: Char): Bool isSpace: Fun(c: Char): Bool toInt: Fun(s: String): Int tryToInt: Fun(s: String): maybe.T(Int) toIntBase: Fun(s: String base: Int): Int tryToIntBase: Fun(s: String base: Int): maybe.T(Int) toWord: Fun(s: String): Word.T tryToWord: Fun(s: String): maybe.T(Word.T) toWordBase: Fun(s: String base: Int): Word.T tryToWordBase: Fun(s: String base: Int): maybe.T(Word.T) formatWord: Fun(w: Word.T base: Int): String wordToString: Fun(w: Word.T): String toReal: Fun(s: String): Real tryToReal: Fun(s: String): maybe.T(Real) toBool: Fun(s: String): Bool tryToBool: Fun(s: String): maybe.T(Bool) hash: Fun(s: String): Word.T end))
+          (TypedSelect 'string' :type Fun(s: String): Word.T
+            :target (TypedVar 'hash' :type Record identityEqual: All(A :: TYPE) Fun(x1: A x2: A): Bool identityHash: All(A :: TYPE) Fun(x: A): Word.T mix: Fun(w: Word.T): Word.T combine: Fun(h1: Word.T h2: Word.T): Word.T int: Fun(n: Int): Word.T bool: Fun(b: Bool): Word.T char: Fun(c: Char): Word.T word: Fun(w: Word.T): Word.T string: Fun(s: String): Word.T end))
           (TypedFun :params (('x' : Int)) :type Fun(x: Int): String
             :body (TypedApp :type String
               :func (TypedSelect 'int' :type Fun(n: Int): String

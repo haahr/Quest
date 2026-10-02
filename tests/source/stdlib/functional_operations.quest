@@ -4,6 +4,7 @@ import collections/vector : collections/Vector;
 import collections/hashMap : collections/HashMap;
 import collections/hashSet : collections/HashSet;
 import util/maybe : util/Maybe;
+import util/hash : util/Hash;
 import util/strutil : util/Strutil;
 import writer: Writer;
 import conv: Conv;
@@ -77,7 +78,7 @@ printNewline(0);
  * 2. HashMap functional operations
  * ========================================================================= *)
 
-let m = hashMap.new(:String :Int stringOp.equal strutil.hash);
+let m = hashMap.new(:String :Int stringOp.equal hash.string);
 hashMap.insert(:String :Int m "one" 1);
 hashMap.insert(:String :Int m "two" 2);
 hashMap.insert(:String :Int m "three" 3);
@@ -139,7 +140,7 @@ printInt(sSum);
 printNewline(0);
 
 (* hashSet.map *)
-let sMapped = hashSet.map(:Int :String s stringOp.equal strutil.hash fun(x: Int): String conv.int(x));
+let sMapped = hashSet.map(:Int :String s stringOp.equal hash.string fun(x: Int): String conv.int(x));
 printInt(hashSet.size(:String sMapped));
 printBool(hashSet.contains(:String sMapped "10"));
 printBool(hashSet.contains(:String sMapped "30"));
