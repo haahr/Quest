@@ -1,0 +1,67 @@
+(* Standard Library: Polymorphic Hash Set interface *)
+
+interface HashSet
+import
+    collections/vector : collections/Vector
+    word: Word
+export
+    (* The polymorphic hash set type constructor *)
+    T::ALL(A::TYPE) TYPE
+
+    (* Create a new empty hash set with custom equality and hash functions *)
+    new: All(A::TYPE)
+        All(equal: All(a1: A a2: A) Bool
+            hash: All(a: A) word.T)
+        T(A)
+
+    (* Create a new hash set with preallocated initial capacity *)
+    newWithCapacity: All(A::TYPE)
+        All(capacity: Int
+            equal: All(a1: A a2: A) Bool
+            hash: All(a: A) word.T)
+        T(A)
+
+    (* Return the number of elements in the set *)
+    size: All(A::TYPE) All(s: T(A)) Int
+
+    (* Check if the set is empty *)
+    empty: All(A::TYPE) All(s: T(A)) Bool
+
+    (* Check if an element exists in the set *)
+    contains: All(A::TYPE) All(s: T(A) elem: A) Bool
+
+    (* Insert an element into the set. Returns true if newly added, false if already present *)
+    insert: All(A::TYPE) All(s: T(A) elem: A) Bool
+
+    (* Remove an element from the set. Returns true if element was found and removed *)
+    delete: All(A::TYPE) All(s: T(A) elem: A) Bool
+
+    (* Clear all elements from the set *)
+    clear: All(A::TYPE) All(s: T(A)) Ok
+
+    (* Return all elements as a vector in insertion order *)
+    elements: All(A::TYPE) All(s: T(A)) vector.T(A)
+
+    (* Iterate over all elements in insertion order *)
+    forEach: All(A::TYPE)
+        All(s: T(A) action: All(elem: A) Ok)
+        Ok
+
+    (* Create a shallow copy of the set *)
+    copy: All(A::TYPE) All(s: T(A)) T(A)
+
+    (* Return the union of s1 and s2 (elements in s1 or s2) *)
+    union: All(A::TYPE) All(s1: T(A) s2: T(A)) T(A)
+
+    (* Return the intersection of s1 and s2 (elements in both s1 and s2) *)
+    intersection: All(A::TYPE) All(s1: T(A) s2: T(A)) T(A)
+
+    (* Return the set difference s1 \ s2 (elements in s1 that are not in s2) *)
+    difference: All(A::TYPE) All(s1: T(A) s2: T(A)) T(A)
+
+    (* Check if s1 is a subset of s2 (every element in s1 is in s2) *)
+    isSubset: All(A::TYPE) All(s1: T(A) s2: T(A)) Bool
+
+    (* Check if s1 and s2 are equal (same size and every element of s1 is in s2) *)
+    equal: All(A::TYPE) All(s1: T(A) s2: T(A)) Bool
+end;

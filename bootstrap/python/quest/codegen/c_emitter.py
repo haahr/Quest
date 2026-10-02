@@ -1571,6 +1571,12 @@ class CEmitter:
         mod_emitter.module_native_bindings = {nb.name: nb for nb in mod_native_funs}
         mod_emitter.record_ctx = self.record_ctx
         mod_emitter.all_modules = self.all_modules
+        mod_emitter.lambda_info_by_id = self.lambda_info_by_id
+        mod_emitter.lifted_lambdas = self.lifted_lambdas
+        mod_emitter.analysis = self.analysis
+        mod_emitter.needed_dicts = self.needed_dicts
+        mod_emitter.tuple_coercions = self.tuple_coercions
+        mod_emitter.variant_coercions = self.variant_coercions
 
         for fname, ffun, fsym in mod_funs:
             m_ident = mangle_module_ident(clean_mod, fname)
@@ -1595,13 +1601,13 @@ class CEmitter:
                     fn_lines.append(f"(void)descriptor_{q.name};")
                 prev_env = mod_emitter.current_env_vars
                 mod_emitter.current_env_vars = dict(mod_imported_env)
+                for fn_k, (fn_impl, *_) in fun_adapters.items():
+                    mod_emitter.current_env_vars[fn_k] = fn_impl
+                for vname, _, _ in mod_vars:
+                    mod_emitter.current_env_vars[vname] = mangle_module_ident(clean_mod, vname)
                 mod_emitter.current_env_vars.update(
                     {p.name: mangle_module_ident(clean_mod, p.name) for p in params}
                 )
-                for vname, _, _ in mod_vars:
-                    mod_emitter.current_env_vars[vname] = mangle_module_ident(clean_mod, vname)
-                for fn_k, (fn_impl, *_) in fun_adapters.items():
-                    mod_emitter.current_env_vars[fn_k] = fn_impl
                 mod_emitter.pointer_params = {
                     p.name for p in params if getattr(p, "is_out", False) or getattr(p, "is_var", False)
                 }
@@ -1655,13 +1661,13 @@ class CEmitter:
                     fn_lines.append(f"(void)descriptor_{q.name};")
                 prev_env = mod_emitter.current_env_vars
                 mod_emitter.current_env_vars = dict(mod_imported_env)
+                for fn_k, (fn_impl, *_) in fun_adapters.items():
+                    mod_emitter.current_env_vars[fn_k] = fn_impl
+                for vname, _, _ in mod_vars:
+                    mod_emitter.current_env_vars[vname] = mangle_module_ident(clean_mod, vname)
                 mod_emitter.current_env_vars.update(
                     {p.name: mangle_module_ident(clean_mod, p.name) for p in params}
                 )
-                for vname, _, _ in mod_vars:
-                    mod_emitter.current_env_vars[vname] = mangle_module_ident(clean_mod, vname)
-                for fn_k, (fn_impl, *_) in fun_adapters.items():
-                    mod_emitter.current_env_vars[fn_k] = fn_impl
                 mod_emitter.pointer_params = {
                     p.name for p in params if getattr(p, "is_out", False) or getattr(p, "is_var", False)
                 }
@@ -1964,12 +1970,12 @@ class CEmitter:
             case TypedVar(name=name):
                 if name == "DivideByZero":
                     return "(&quest_exc_DivideByZero)"
-                if name in INFIX_OPERATORS and name not in self.current_env_vars:
+                if name in self.current_env_vars:
+                    return self.current_env_vars[name]
+                if name in INFIX_OPERATORS:
                     return f"(&{mangle_ident(name)}_closure)"
                 if name in self.top_fun_names:
                     return f"(&{self.mangle_ident(name)}_closure)"
-                if name in self.current_env_vars:
-                    return self.current_env_vars[name]
                 return mangle_ident(name)
 
             case TypedFun():

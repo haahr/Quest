@@ -11,11 +11,14 @@ into modular subsystems that can be developed incrementally.
 
 ## 1. Core Data Structures & Collections
 
-The Python bootstrap relies on built-in collections (`list`, `dict`, `set`, `deque`) that must be implemented as
-standard libraries in Quest. Growable dynamic arrays (`Vector(T)`) have been completed and are provided by
-`collections/vector : collections/Vector` (documented in `docs/new-libraries.md`).
+The Python bootstrap relies on built-in collections (`list`, `dict`, `set`, `deque`) that must be available in Quest.
+The primary collection libraries have been completed and are documented in `docs/new-libraries.md`:
+- `collections/vector : collections/Vector` (growable dynamic arrays `Vector(T)`)
+- `collections/hashMap : collections/HashMap` (compact ordered hash tables `HashMap(K, V)`)
+- `collections/hashSet : collections/HashSet` (hash sets `HashSet(T)` built on `HashMap`)
 
-### 1.1. Associative Maps / Hash Tables (`Map(K, V)`)
+### 1.1. Associative Maps / Hash Tables (`collections/hashMap : collections/HashMap`)
+- **Status**: Completed (`lib/collections/hashmap.{int,mod}.quest`).
 - **Python Usage**: `dict[K, V]` throughout all compiler phases.
 - **Key Use Cases**:
   - Symbol tables in `Scope`: `dict[str, ValueSymbol]`, `dict[str, TypeSymbol]`, `dict[int, TypeSymbol]`.
@@ -23,11 +26,13 @@ standard libraries in Quest. Growable dynamic arrays (`Vector(T)`) have been com
   - Parser packrat memoization cache: mapping `(SyntaxTarget, pos)` pairs to parse results.
   - Module registry and AST cache: mapping canonical path strings to module records and typed ASTs.
   - Struct and type name caches in the C code generator.
-- **Required Functionality**:
-  - Generic key-value store with string hashing (`djb2` or `fnv1a`) and integer identity hashing.
-  - Support for composite keys (e.g. hashing pairs of integers or target/offset pairs).
+- **Provided Functionality**:
+  - Polymorphic hash map preserving insertion order.
+  - Custom equality and hash functions (`word.T`).
+  - Supports compound and composite key hashing via custom hash closures.
 
-### 1.2. Sets (`Set(T)`)
+### 1.2. Sets (`collections/hashSet : collections/HashSet`)
+- **Status**: Completed (`lib/collections/hashset.{int,mod}.quest`).
 - **Python Usage**: `set[T]` for deduplication and membership testing.
 - **Key Use Cases**:
   - **Coinductive Subtyping Trail**: `trail: set[tuple[int, int]]` in `types.py` tracking visited pairs of symbol IDs
@@ -36,8 +41,9 @@ standard libraries in Quest. Growable dynamic arrays (`Vector(T)`) have been com
   - **Module Import Cycle Detection**: `active_imports: set[str]` in `module_loader.py`.
   - **Parser Error Expectations**: `expected_at_farthest: set[str]` in `parser.py`.
   - **Topological Sort**: Visited set in Kahn's algorithm and dependency DAG traversal.
-- **Required Functionality**:
-  - Operations: `new()`, `add(item)`, `contains(item)`, `remove(item)`, `size()`, `union(other)`, `diff(other)`.
+- **Provided Functionality**:
+  - Full set operations (`contains`, `insert`, `delete`, `elements`, `forEach`, `copy`).
+  - Set algebra (`union`, `intersection`, `difference`, `isSubset`, `equal`).
 
 ### 1.3. Queues & Stacks
 - **Key Use Cases**: Scope stacks in `env.py`, block nesting and token lookahead buffers, topological sort queues.
@@ -161,14 +167,15 @@ Migrating the Python object-oriented codebase to Quest requires structural adapt
 
 ## 6. Implementation Roadmap & Priority Matrix
 
-Completed subsystems (`collections/vector` and `util/strutil`) are documented in `docs/new-libraries.md`.
+Completed subsystems (`collections/vector`, `collections/hashMap`, `collections/hashSet`, `util/maybe`,
+`util/stringBuilder`, and `util/strutil`) are documented in `docs/new-libraries.md`.
 Remaining prerequisites:
 
 | Subsystem | Components | Priority | Strategy |
 | :--- | :--- | :--- | :--- |
-| **Collections** | `Map(K, V)`, `Set(T)` | **P0** | Pure Quest modules (`lib/`) |
 | **OS Primitives** | `system.exec`, `mkdir`, `removeFile`, `isDir` | **P1** | Extend `System` (native C backing) |
 | **Path Library** | `join`, `dirName`, `baseName`, `normalize` | **P1** | Pure Quest path module |
 | **Algorithms** | Binary search, Quicksort, Topological sort | **P1** | Pure Quest algorithms |
 | **CLI Parser** | Flag and option parsing over `system.args` | **P2** | Pure Quest CLI library |
 | **AST & Type Models** | Recursive `Variant` definitions | **P2** | Compiler architecture |
+

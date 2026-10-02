@@ -1,0 +1,117 @@
+(* Standard library: Polymorphic HashSet operations *)
+
+import collections/hashSet : collections/HashSet;
+import collections/vector : collections/Vector;
+import word: Word;
+import writer: Writer;
+import conv: Conv;
+
+let wOut = writer.output;
+
+let printInt(n: Int): Ok =
+    begin
+        writer.putString(wOut conv.int(n));
+        writer.putString(wOut " ");
+    end;
+
+let printBool(b: Bool): Ok =
+    begin
+        writer.putString(wOut conv.bool(b));
+        writer.putString(wOut " ");
+    end;
+
+let printNewline(dummy: Int): Ok =
+    writer.putString(wOut "\n");
+
+let intEqual(a: Int b: Int): Bool = a == b;
+let intHash(a: Int): word.T =
+    word.mul(word.fromInt(a) word.fromInt(2654435761));
+
+(* 1. Creation, empty, size *)
+let s = hashSet.new(:Int intEqual intHash);
+printBool(hashSet.empty(s));
+printInt(hashSet.size(s));
+printNewline(0);
+
+(* 2. Insertion & duplicate insertion *)
+printBool(hashSet.insert(s 10));
+printBool(hashSet.insert(s 20));
+printBool(hashSet.insert(s 30));
+printBool(hashSet.insert(s 10)); (* duplicate *)
+printInt(hashSet.size(s));
+printBool(hashSet.empty(s));
+printNewline(0);
+
+(* 3. Membership test (contains) *)
+printBool(hashSet.contains(s 10));
+printBool(hashSet.contains(s 20));
+printBool(hashSet.contains(s 25));
+printBool(hashSet.contains(s 30));
+printNewline(0);
+
+(* 4. Elements vector and forEach in insertion order *)
+let elems = hashSet.elements(s);
+printInt(vector.length(elems));
+vector.forEach(elems fun(elem: Int): Ok printInt(elem));
+printNewline(0);
+
+hashSet.forEach(s fun(elem: Int): Ok printInt(elem));
+printNewline(0);
+
+(* 5. Deletion *)
+printBool(hashSet.delete(s 20)); (* found and deleted *)
+printBool(hashSet.delete(s 20)); (* not found *)
+printInt(hashSet.size(s));
+printBool(hashSet.contains(s 20));
+printNewline(0);
+
+(* Elements after deletion *)
+hashSet.forEach(s fun(elem: Int): Ok printInt(elem));
+printNewline(0);
+
+(* 6. Copy *)
+let sCopy = hashSet.copy(s);
+printInt(hashSet.size(sCopy));
+printBool(hashSet.equal(s sCopy));
+printNewline(0);
+
+(* 7. Set algebra: union, intersection, difference, isSubset, equal *)
+let setA = hashSet.new(:Int intEqual intHash);
+hashSet.insert(setA 1);
+hashSet.insert(setA 2);
+hashSet.insert(setA 3);
+
+let setB = hashSet.new(:Int intEqual intHash);
+hashSet.insert(setB 2);
+hashSet.insert(setB 3);
+hashSet.insert(setB 4);
+
+(* Union: 1, 2, 3, 4 *)
+let sUnion = hashSet.union(setA setB);
+printInt(hashSet.size(sUnion));
+hashSet.forEach(sUnion fun(elem: Int): Ok printInt(elem));
+printNewline(0);
+
+(* Intersection: 2, 3 *)
+let sInter = hashSet.intersection(setA setB);
+printInt(hashSet.size(sInter));
+hashSet.forEach(sInter fun(elem: Int): Ok printInt(elem));
+printNewline(0);
+
+(* Difference A \ B: 1 *)
+let sDiff = hashSet.difference(setA setB);
+printInt(hashSet.size(sDiff));
+hashSet.forEach(sDiff fun(elem: Int): Ok printInt(elem));
+printNewline(0);
+
+(* Subset tests *)
+printBool(hashSet.isSubset(sInter setA)); (* {2, 3} subset of {1, 2, 3} *)
+printBool(hashSet.isSubset(setA setB));  (* false *)
+printBool(hashSet.isSubset(setA setA));  (* true *)
+printNewline(0);
+
+(* 8. Clear *)
+hashSet.clear(s);
+printInt(hashSet.size(s));
+printBool(hashSet.empty(s));
+printNewline(0);

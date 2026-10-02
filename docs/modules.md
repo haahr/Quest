@@ -448,10 +448,37 @@ To maintain high performance, modular boundaries, and clean test separation:
 
 ---
 
+## 10. Module Dependency Tracking (`.deps/` and `--emit-deps`)
+
+Quest supports recording and resolving module dependencies using make-compatible `.d` dependency files:
+
+### 10.1. Emitting Dependency Files
+
+When compiling modules with `--emit-deps`:
+```bash
+quest --emit-deps -c lib/util/strutil.mod.quest
+```
+The compiler creates a `.deps/` subdirectory in the module's target output directory and writes `<stem>.d`:
+```make
+util/strutil.o: util/maybe.o util/stringbuilder.o collections/vector.o word.o
+```
+Each entry lists the target `.o` file and its immediate prerequisite module `.o` files.
+
+### 10.2. Transitive Linker Resolution
+
+When the compiler driver links a binary:
+1. It discovers the directly imported modules from the compilation unit.
+2. For each `.o` file, it looks for `.deps/<stem>.d` (or `<stem>.d` alongside the object).
+3. It recursively parses prerequisite `.o` files to form the transitive closure of all required objects.
+4. All prerequisite object files are supplied to clang during final binary linking.
+
+---
+
 ## See Also
 - [pipeline.md](pipeline.md): Compiler pipeline framework and CLI driver options.
 - [c-representation.md](c-representation.md): C runtime ABI, record representation, and function calling conventions.
 - [type-system.md](type-system.md): Type system, subtyping, and signature elaboration.
 - [interpreter.md](interpreter.md): Tree-walking interpreter and runtime environment.
 - [syntax.md](syntax.md): Concrete syntax and grammar rules.
+
 
