@@ -8,12 +8,36 @@ module system : System export
     (* Terminate program execution with exit code *)
     let sysexit(code: Int): Ok = external "quest_system_exit";
 
-    (* Alias for sysexit *)
-    let sysExit(code: Int): Ok = external "quest_system_exit";
-
     (* Retrieve environment variable value by name *)
     let getEnv(name: String): String = external "quest_system_getenv";
 
     (* Check if file exists at filesystem path *)
     let fileExists(path: String): Bool = external "quest_system_file_exists";
+
+    (* Test if path exists and refers to a regular file *)
+    let isFile(path: String): Bool = external "quest_system_is_file";
+
+    (* Test if path exists and refers to a directory *)
+    let isDirectory(path: String): Bool = external "quest_system_is_directory";
+
+    (* Create directory at path, creating parent directories as needed *)
+    let makeDirectory(path: String): Ok = external "quest_system_make_directory";
+
+    (* Remove file at path; raises error if file does not exist *)
+    let removeFile(path: String): Ok = external "quest_system_remove_file";
+
+    (* Remove empty directory at path; raises error if not empty *)
+    let removeDirectory(path: String): Ok = external "quest_system_remove_directory";
+
+    (* Rename or move a file or directory from oldPath to newPath *)
+    let renameFile(oldPath: String newPath: String): Ok = external "quest_system_rename_file";
+
+    (* Return the current working directory path *)
+    let currentDirectory(): String = external "quest_system_current_directory";
+
+    (* Change the current working directory path *)
+    let changeDirectory(path: String): Ok = external "quest_system_change_directory";
+
+    (* Return the names of entries within a directory (excluding . and ..) *)
+    let listDirectory(path: String): Array(String) = external "quest_system_list_directory";
 end;

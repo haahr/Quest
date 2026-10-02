@@ -1,0 +1,519 @@
+(TypedProgram
+  :phrases (
+    (TypedImport
+      :items (
+        (TypedImportItem ('system') : 'System')
+      ))
+    (TypedImport
+      :items (
+        (TypedImportItem ('writer') : 'Writer')
+      ))
+    (TypedImport
+      :items (
+        (TypedImportItem ('conv') : 'Conv')
+      ))
+    (TypedLetValue 'printBool' :type Fun(b: Bool): Ok
+      :value (TypedFun :params (('b' : Bool)) :type Fun(b: Bool): Ok
+        :body (TypedBlock :type Ok
+          :bindings (
+            (TypedExprStmt
+              :expr (TypedApp :type Ok
+                :func (TypedSelect 'putString' :type Fun(writer: Writer.T string: String): Ok
+                  :target (TypedVar 'writer' :type Record error: Exception output: Writer.T err: Writer.T file: Fun(name: String): Writer.T putString: Fun(writer: Writer.T string: String): Ok putChar: Fun(writer: Writer.T char: Char): Ok putSubString: Fun(writer: Writer.T string: String start: Int size: Int): Ok flush: Fun(writer: Writer.T): Ok close: Fun(writer: Writer.T): Ok end))
+                :args (
+                  (TypedSelect 'output' :type Writer.T
+                    :target (TypedVar 'writer' :type Record error: Exception output: Writer.T err: Writer.T file: Fun(name: String): Writer.T putString: Fun(writer: Writer.T string: String): Ok putChar: Fun(writer: Writer.T char: Char): Ok putSubString: Fun(writer: Writer.T string: String start: Int size: Int): Ok flush: Fun(writer: Writer.T): Ok close: Fun(writer: Writer.T): Ok end))
+                  (TypedApp :type String
+                    :func (TypedSelect 'bool' :type Fun(b: Bool): String
+                      :target (TypedVar 'conv' :type Record okay: Fun(): String bool: Fun(b: Bool): String int: Fun(n: Int): String real: Fun(r: Real): String char: Fun(c: Char): String string: Fun(s: String): String end))
+                    :args (
+                      (TypedVar 'b' :type Bool)
+                    ))
+                )))
+          )
+          :result (TypedApp :type Ok
+            :func (TypedSelect 'putString' :type Fun(writer: Writer.T string: String): Ok
+              :target (TypedVar 'writer' :type Record error: Exception output: Writer.T err: Writer.T file: Fun(name: String): Writer.T putString: Fun(writer: Writer.T string: String): Ok putChar: Fun(writer: Writer.T char: Char): Ok putSubString: Fun(writer: Writer.T string: String start: Int size: Int): Ok flush: Fun(writer: Writer.T): Ok close: Fun(writer: Writer.T): Ok end))
+            :args (
+              (TypedSelect 'output' :type Writer.T
+                :target (TypedVar 'writer' :type Record error: Exception output: Writer.T err: Writer.T file: Fun(name: String): Writer.T putString: Fun(writer: Writer.T string: String): Ok putChar: Fun(writer: Writer.T char: Char): Ok putSubString: Fun(writer: Writer.T string: String start: Int size: Int): Ok flush: Fun(writer: Writer.T): Ok close: Fun(writer: Writer.T): Ok end))
+              (TypedString '\n' :type String)
+            )))))
+    (TypedLetValue 'printInt' :type Fun(n: Int): Ok
+      :value (TypedFun :params (('n' : Int)) :type Fun(n: Int): Ok
+        :body (TypedBlock :type Ok
+          :bindings (
+            (TypedExprStmt
+              :expr (TypedApp :type Ok
+                :func (TypedSelect 'putString' :type Fun(writer: Writer.T string: String): Ok
+                  :target (TypedVar 'writer' :type Record error: Exception output: Writer.T err: Writer.T file: Fun(name: String): Writer.T putString: Fun(writer: Writer.T string: String): Ok putChar: Fun(writer: Writer.T char: Char): Ok putSubString: Fun(writer: Writer.T string: String start: Int size: Int): Ok flush: Fun(writer: Writer.T): Ok close: Fun(writer: Writer.T): Ok end))
+                :args (
+                  (TypedSelect 'output' :type Writer.T
+                    :target (TypedVar 'writer' :type Record error: Exception output: Writer.T err: Writer.T file: Fun(name: String): Writer.T putString: Fun(writer: Writer.T string: String): Ok putChar: Fun(writer: Writer.T char: Char): Ok putSubString: Fun(writer: Writer.T string: String start: Int size: Int): Ok flush: Fun(writer: Writer.T): Ok close: Fun(writer: Writer.T): Ok end))
+                  (TypedApp :type String
+                    :func (TypedSelect 'int' :type Fun(n: Int): String
+                      :target (TypedVar 'conv' :type Record okay: Fun(): String bool: Fun(b: Bool): String int: Fun(n: Int): String real: Fun(r: Real): String char: Fun(c: Char): String string: Fun(s: String): String end))
+                    :args (
+                      (TypedVar 'n' :type Int)
+                    ))
+                )))
+          )
+          :result (TypedApp :type Ok
+            :func (TypedSelect 'putString' :type Fun(writer: Writer.T string: String): Ok
+              :target (TypedVar 'writer' :type Record error: Exception output: Writer.T err: Writer.T file: Fun(name: String): Writer.T putString: Fun(writer: Writer.T string: String): Ok putChar: Fun(writer: Writer.T char: Char): Ok putSubString: Fun(writer: Writer.T string: String start: Int size: Int): Ok flush: Fun(writer: Writer.T): Ok close: Fun(writer: Writer.T): Ok end))
+            :args (
+              (TypedSelect 'output' :type Writer.T
+                :target (TypedVar 'writer' :type Record error: Exception output: Writer.T err: Writer.T file: Fun(name: String): Writer.T putString: Fun(writer: Writer.T string: String): Ok putChar: Fun(writer: Writer.T char: Char): Ok putSubString: Fun(writer: Writer.T string: String start: Int size: Int): Ok flush: Fun(writer: Writer.T): Ok close: Fun(writer: Writer.T): Ok end))
+              (TypedString '\n' :type String)
+            )))))
+    (TypedLetValue 'printString' :type Fun(s: String): Ok
+      :value (TypedFun :params (('s' : String)) :type Fun(s: String): Ok
+        :body (TypedBlock :type Ok
+          :bindings (
+            (TypedExprStmt
+              :expr (TypedApp :type Ok
+                :func (TypedSelect 'putString' :type Fun(writer: Writer.T string: String): Ok
+                  :target (TypedVar 'writer' :type Record error: Exception output: Writer.T err: Writer.T file: Fun(name: String): Writer.T putString: Fun(writer: Writer.T string: String): Ok putChar: Fun(writer: Writer.T char: Char): Ok putSubString: Fun(writer: Writer.T string: String start: Int size: Int): Ok flush: Fun(writer: Writer.T): Ok close: Fun(writer: Writer.T): Ok end))
+                :args (
+                  (TypedSelect 'output' :type Writer.T
+                    :target (TypedVar 'writer' :type Record error: Exception output: Writer.T err: Writer.T file: Fun(name: String): Writer.T putString: Fun(writer: Writer.T string: String): Ok putChar: Fun(writer: Writer.T char: Char): Ok putSubString: Fun(writer: Writer.T string: String start: Int size: Int): Ok flush: Fun(writer: Writer.T): Ok close: Fun(writer: Writer.T): Ok end))
+                  (TypedVar 's' :type String)
+                )))
+          )
+          :result (TypedApp :type Ok
+            :func (TypedSelect 'putString' :type Fun(writer: Writer.T string: String): Ok
+              :target (TypedVar 'writer' :type Record error: Exception output: Writer.T err: Writer.T file: Fun(name: String): Writer.T putString: Fun(writer: Writer.T string: String): Ok putChar: Fun(writer: Writer.T char: Char): Ok putSubString: Fun(writer: Writer.T string: String start: Int size: Int): Ok flush: Fun(writer: Writer.T): Ok close: Fun(writer: Writer.T): Ok end))
+            :args (
+              (TypedSelect 'output' :type Writer.T
+                :target (TypedVar 'writer' :type Record error: Exception output: Writer.T err: Writer.T file: Fun(name: String): Writer.T putString: Fun(writer: Writer.T string: String): Ok putChar: Fun(writer: Writer.T char: Char): Ok putSubString: Fun(writer: Writer.T string: String start: Int size: Int): Ok flush: Fun(writer: Writer.T): Ok close: Fun(writer: Writer.T): Ok end))
+              (TypedString '\n' :type String)
+            )))))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printBool' :type Fun(b: Bool): Ok)
+        :args (
+          (TypedApp :type Bool
+            :func (TypedSelect 'isFile' :type Fun(path: String): Bool
+              :target (TypedVar 'system' :type Record error: Exception args: Array(String) sysexit: Fun(code: Int): Ok getEnv: Fun(name: String): String fileExists: Fun(path: String): Bool isFile: Fun(path: String): Bool isDirectory: Fun(path: String): Bool makeDirectory: Fun(path: String): Ok removeFile: Fun(path: String): Ok removeDirectory: Fun(path: String): Ok renameFile: Fun(oldPath: String newPath: String): Ok currentDirectory: Fun(): String changeDirectory: Fun(path: String): Ok listDirectory: Fun(path: String): Array(String) end))
+            :args (
+              (TypedString 'runtime/quest_runtime.h' :type String)
+            ))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printBool' :type Fun(b: Bool): Ok)
+        :args (
+          (TypedApp :type Bool
+            :func (TypedSelect 'isDirectory' :type Fun(path: String): Bool
+              :target (TypedVar 'system' :type Record error: Exception args: Array(String) sysexit: Fun(code: Int): Ok getEnv: Fun(name: String): String fileExists: Fun(path: String): Bool isFile: Fun(path: String): Bool isDirectory: Fun(path: String): Bool makeDirectory: Fun(path: String): Ok removeFile: Fun(path: String): Ok removeDirectory: Fun(path: String): Ok renameFile: Fun(oldPath: String newPath: String): Ok currentDirectory: Fun(): String changeDirectory: Fun(path: String): Ok listDirectory: Fun(path: String): Array(String) end))
+            :args (
+              (TypedString 'runtime/quest_runtime.h' :type String)
+            ))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printBool' :type Fun(b: Bool): Ok)
+        :args (
+          (TypedApp :type Bool
+            :func (TypedSelect 'isFile' :type Fun(path: String): Bool
+              :target (TypedVar 'system' :type Record error: Exception args: Array(String) sysexit: Fun(code: Int): Ok getEnv: Fun(name: String): String fileExists: Fun(path: String): Bool isFile: Fun(path: String): Bool isDirectory: Fun(path: String): Bool makeDirectory: Fun(path: String): Ok removeFile: Fun(path: String): Ok removeDirectory: Fun(path: String): Ok renameFile: Fun(oldPath: String newPath: String): Ok currentDirectory: Fun(): String changeDirectory: Fun(path: String): Ok listDirectory: Fun(path: String): Array(String) end))
+            :args (
+              (TypedString 'runtime' :type String)
+            ))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printBool' :type Fun(b: Bool): Ok)
+        :args (
+          (TypedApp :type Bool
+            :func (TypedSelect 'isDirectory' :type Fun(path: String): Bool
+              :target (TypedVar 'system' :type Record error: Exception args: Array(String) sysexit: Fun(code: Int): Ok getEnv: Fun(name: String): String fileExists: Fun(path: String): Bool isFile: Fun(path: String): Bool isDirectory: Fun(path: String): Bool makeDirectory: Fun(path: String): Ok removeFile: Fun(path: String): Ok removeDirectory: Fun(path: String): Ok renameFile: Fun(oldPath: String newPath: String): Ok currentDirectory: Fun(): String changeDirectory: Fun(path: String): Ok listDirectory: Fun(path: String): Array(String) end))
+            :args (
+              (TypedString 'runtime' :type String)
+            ))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printBool' :type Fun(b: Bool): Ok)
+        :args (
+          (TypedApp :type Bool
+            :func (TypedSelect 'isFile' :type Fun(path: String): Bool
+              :target (TypedVar 'system' :type Record error: Exception args: Array(String) sysexit: Fun(code: Int): Ok getEnv: Fun(name: String): String fileExists: Fun(path: String): Bool isFile: Fun(path: String): Bool isDirectory: Fun(path: String): Bool makeDirectory: Fun(path: String): Ok removeFile: Fun(path: String): Ok removeDirectory: Fun(path: String): Ok renameFile: Fun(oldPath: String newPath: String): Ok currentDirectory: Fun(): String changeDirectory: Fun(path: String): Ok listDirectory: Fun(path: String): Array(String) end))
+            :args (
+              (TypedString 'does_not_exist_abc_123.txt' :type String)
+            ))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printBool' :type Fun(b: Bool): Ok)
+        :args (
+          (TypedApp :type Bool
+            :func (TypedSelect 'isDirectory' :type Fun(path: String): Bool
+              :target (TypedVar 'system' :type Record error: Exception args: Array(String) sysexit: Fun(code: Int): Ok getEnv: Fun(name: String): String fileExists: Fun(path: String): Bool isFile: Fun(path: String): Bool isDirectory: Fun(path: String): Bool makeDirectory: Fun(path: String): Ok removeFile: Fun(path: String): Ok removeDirectory: Fun(path: String): Ok renameFile: Fun(oldPath: String newPath: String): Ok currentDirectory: Fun(): String changeDirectory: Fun(path: String): Ok listDirectory: Fun(path: String): Array(String) end))
+            :args (
+              (TypedString 'does_not_exist_abc_123.txt' :type String)
+            ))
+        )))
+    (TypedLetValue 'testDir' :type String
+      :value (TypedString 'tmp_system_fs_test' :type String))
+    (TypedExprStmt
+      :expr (TypedIf :type Ok
+        :cond (TypedApp :type Bool
+          :func (TypedSelect 'fileExists' :type Fun(path: String): Bool
+            :target (TypedVar 'system' :type Record error: Exception args: Array(String) sysexit: Fun(code: Int): Ok getEnv: Fun(name: String): String fileExists: Fun(path: String): Bool isFile: Fun(path: String): Bool isDirectory: Fun(path: String): Bool makeDirectory: Fun(path: String): Ok removeFile: Fun(path: String): Ok removeDirectory: Fun(path: String): Ok renameFile: Fun(oldPath: String newPath: String): Ok currentDirectory: Fun(): String changeDirectory: Fun(path: String): Ok listDirectory: Fun(path: String): Array(String) end))
+          :args (
+            (TypedVar 'testDir' :type String)
+          ))
+        :then (TypedBlock :type Ok
+          :bindings (
+            (TypedExprStmt
+              :expr (TypedApp :type Ok
+                :func (TypedSelect 'removeDirectory' :type Fun(path: String): Ok
+                  :target (TypedVar 'system' :type Record error: Exception args: Array(String) sysexit: Fun(code: Int): Ok getEnv: Fun(name: String): String fileExists: Fun(path: String): Bool isFile: Fun(path: String): Bool isDirectory: Fun(path: String): Bool makeDirectory: Fun(path: String): Ok removeFile: Fun(path: String): Ok removeDirectory: Fun(path: String): Ok renameFile: Fun(oldPath: String newPath: String): Ok currentDirectory: Fun(): String changeDirectory: Fun(path: String): Ok listDirectory: Fun(path: String): Array(String) end))
+                :args (
+                  (TypedVar 'testDir' :type String)
+                )))
+          )
+          :result (TypedOk))
+        :else (TypedOk)))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedSelect 'makeDirectory' :type Fun(path: String): Ok
+          :target (TypedVar 'system' :type Record error: Exception args: Array(String) sysexit: Fun(code: Int): Ok getEnv: Fun(name: String): String fileExists: Fun(path: String): Bool isFile: Fun(path: String): Bool isDirectory: Fun(path: String): Bool makeDirectory: Fun(path: String): Ok removeFile: Fun(path: String): Ok removeDirectory: Fun(path: String): Ok renameFile: Fun(oldPath: String newPath: String): Ok currentDirectory: Fun(): String changeDirectory: Fun(path: String): Ok listDirectory: Fun(path: String): Array(String) end))
+        :args (
+          (TypedVar 'testDir' :type String)
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printBool' :type Fun(b: Bool): Ok)
+        :args (
+          (TypedApp :type Bool
+            :func (TypedSelect 'isDirectory' :type Fun(path: String): Bool
+              :target (TypedVar 'system' :type Record error: Exception args: Array(String) sysexit: Fun(code: Int): Ok getEnv: Fun(name: String): String fileExists: Fun(path: String): Bool isFile: Fun(path: String): Bool isDirectory: Fun(path: String): Bool makeDirectory: Fun(path: String): Ok removeFile: Fun(path: String): Ok removeDirectory: Fun(path: String): Ok renameFile: Fun(oldPath: String newPath: String): Ok currentDirectory: Fun(): String changeDirectory: Fun(path: String): Ok listDirectory: Fun(path: String): Array(String) end))
+            :args (
+              (TypedVar 'testDir' :type String)
+            ))
+        )))
+    (TypedLetValue 'subDir' :type String
+      :value (TypedString 'tmp_system_fs_test/nested/deep' :type String))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedSelect 'makeDirectory' :type Fun(path: String): Ok
+          :target (TypedVar 'system' :type Record error: Exception args: Array(String) sysexit: Fun(code: Int): Ok getEnv: Fun(name: String): String fileExists: Fun(path: String): Bool isFile: Fun(path: String): Bool isDirectory: Fun(path: String): Bool makeDirectory: Fun(path: String): Ok removeFile: Fun(path: String): Ok removeDirectory: Fun(path: String): Ok renameFile: Fun(oldPath: String newPath: String): Ok currentDirectory: Fun(): String changeDirectory: Fun(path: String): Ok listDirectory: Fun(path: String): Array(String) end))
+        :args (
+          (TypedVar 'subDir' :type String)
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printBool' :type Fun(b: Bool): Ok)
+        :args (
+          (TypedApp :type Bool
+            :func (TypedSelect 'isDirectory' :type Fun(path: String): Bool
+              :target (TypedVar 'system' :type Record error: Exception args: Array(String) sysexit: Fun(code: Int): Ok getEnv: Fun(name: String): String fileExists: Fun(path: String): Bool isFile: Fun(path: String): Bool isDirectory: Fun(path: String): Bool makeDirectory: Fun(path: String): Ok removeFile: Fun(path: String): Ok removeDirectory: Fun(path: String): Ok renameFile: Fun(oldPath: String newPath: String): Ok currentDirectory: Fun(): String changeDirectory: Fun(path: String): Ok listDirectory: Fun(path: String): Array(String) end))
+            :args (
+              (TypedVar 'subDir' :type String)
+            ))
+        )))
+    (TypedLetValue 'fileA' :type String
+      :value (TypedString 'tmp_system_fs_test/nested/fileA.txt' :type String))
+    (TypedLetValue 'w' :type Writer.T
+      :value (TypedApp :type Writer.T
+        :func (TypedSelect 'file' :type Fun(name: String): Writer.T
+          :target (TypedVar 'writer' :type Record error: Exception output: Writer.T err: Writer.T file: Fun(name: String): Writer.T putString: Fun(writer: Writer.T string: String): Ok putChar: Fun(writer: Writer.T char: Char): Ok putSubString: Fun(writer: Writer.T string: String start: Int size: Int): Ok flush: Fun(writer: Writer.T): Ok close: Fun(writer: Writer.T): Ok end))
+        :args (
+          (TypedVar 'fileA' :type String)
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedSelect 'putString' :type Fun(writer: Writer.T string: String): Ok
+          :target (TypedVar 'writer' :type Record error: Exception output: Writer.T err: Writer.T file: Fun(name: String): Writer.T putString: Fun(writer: Writer.T string: String): Ok putChar: Fun(writer: Writer.T char: Char): Ok putSubString: Fun(writer: Writer.T string: String start: Int size: Int): Ok flush: Fun(writer: Writer.T): Ok close: Fun(writer: Writer.T): Ok end))
+        :args (
+          (TypedVar 'w' :type Writer.T)
+          (TypedString 'hello world\n' :type String)
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedSelect 'close' :type Fun(writer: Writer.T): Ok
+          :target (TypedVar 'writer' :type Record error: Exception output: Writer.T err: Writer.T file: Fun(name: String): Writer.T putString: Fun(writer: Writer.T string: String): Ok putChar: Fun(writer: Writer.T char: Char): Ok putSubString: Fun(writer: Writer.T string: String start: Int size: Int): Ok flush: Fun(writer: Writer.T): Ok close: Fun(writer: Writer.T): Ok end))
+        :args (
+          (TypedVar 'w' :type Writer.T)
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printBool' :type Fun(b: Bool): Ok)
+        :args (
+          (TypedApp :type Bool
+            :func (TypedSelect 'isFile' :type Fun(path: String): Bool
+              :target (TypedVar 'system' :type Record error: Exception args: Array(String) sysexit: Fun(code: Int): Ok getEnv: Fun(name: String): String fileExists: Fun(path: String): Bool isFile: Fun(path: String): Bool isDirectory: Fun(path: String): Bool makeDirectory: Fun(path: String): Ok removeFile: Fun(path: String): Ok removeDirectory: Fun(path: String): Ok renameFile: Fun(oldPath: String newPath: String): Ok currentDirectory: Fun(): String changeDirectory: Fun(path: String): Ok listDirectory: Fun(path: String): Array(String) end))
+            :args (
+              (TypedVar 'fileA' :type String)
+            ))
+        )))
+    (TypedLetValue 'fileB' :type String
+      :value (TypedString 'tmp_system_fs_test/nested/fileB.txt' :type String))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedSelect 'renameFile' :type Fun(oldPath: String newPath: String): Ok
+          :target (TypedVar 'system' :type Record error: Exception args: Array(String) sysexit: Fun(code: Int): Ok getEnv: Fun(name: String): String fileExists: Fun(path: String): Bool isFile: Fun(path: String): Bool isDirectory: Fun(path: String): Bool makeDirectory: Fun(path: String): Ok removeFile: Fun(path: String): Ok removeDirectory: Fun(path: String): Ok renameFile: Fun(oldPath: String newPath: String): Ok currentDirectory: Fun(): String changeDirectory: Fun(path: String): Ok listDirectory: Fun(path: String): Array(String) end))
+        :args (
+          (TypedVar 'fileA' :type String)
+          (TypedVar 'fileB' :type String)
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printBool' :type Fun(b: Bool): Ok)
+        :args (
+          (TypedApp :type Bool
+            :func (TypedSelect 'fileExists' :type Fun(path: String): Bool
+              :target (TypedVar 'system' :type Record error: Exception args: Array(String) sysexit: Fun(code: Int): Ok getEnv: Fun(name: String): String fileExists: Fun(path: String): Bool isFile: Fun(path: String): Bool isDirectory: Fun(path: String): Bool makeDirectory: Fun(path: String): Ok removeFile: Fun(path: String): Ok removeDirectory: Fun(path: String): Ok renameFile: Fun(oldPath: String newPath: String): Ok currentDirectory: Fun(): String changeDirectory: Fun(path: String): Ok listDirectory: Fun(path: String): Array(String) end))
+            :args (
+              (TypedVar 'fileA' :type String)
+            ))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printBool' :type Fun(b: Bool): Ok)
+        :args (
+          (TypedApp :type Bool
+            :func (TypedSelect 'isFile' :type Fun(path: String): Bool
+              :target (TypedVar 'system' :type Record error: Exception args: Array(String) sysexit: Fun(code: Int): Ok getEnv: Fun(name: String): String fileExists: Fun(path: String): Bool isFile: Fun(path: String): Bool isDirectory: Fun(path: String): Bool makeDirectory: Fun(path: String): Ok removeFile: Fun(path: String): Ok removeDirectory: Fun(path: String): Ok renameFile: Fun(oldPath: String newPath: String): Ok currentDirectory: Fun(): String changeDirectory: Fun(path: String): Ok listDirectory: Fun(path: String): Array(String) end))
+            :args (
+              (TypedVar 'fileB' :type String)
+            ))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedSelect 'removeFile' :type Fun(path: String): Ok
+          :target (TypedVar 'system' :type Record error: Exception args: Array(String) sysexit: Fun(code: Int): Ok getEnv: Fun(name: String): String fileExists: Fun(path: String): Bool isFile: Fun(path: String): Bool isDirectory: Fun(path: String): Bool makeDirectory: Fun(path: String): Ok removeFile: Fun(path: String): Ok removeDirectory: Fun(path: String): Ok renameFile: Fun(oldPath: String newPath: String): Ok currentDirectory: Fun(): String changeDirectory: Fun(path: String): Ok listDirectory: Fun(path: String): Array(String) end))
+        :args (
+          (TypedVar 'fileB' :type String)
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printBool' :type Fun(b: Bool): Ok)
+        :args (
+          (TypedApp :type Bool
+            :func (TypedSelect 'fileExists' :type Fun(path: String): Bool
+              :target (TypedVar 'system' :type Record error: Exception args: Array(String) sysexit: Fun(code: Int): Ok getEnv: Fun(name: String): String fileExists: Fun(path: String): Bool isFile: Fun(path: String): Bool isDirectory: Fun(path: String): Bool makeDirectory: Fun(path: String): Ok removeFile: Fun(path: String): Ok removeDirectory: Fun(path: String): Ok renameFile: Fun(oldPath: String newPath: String): Ok currentDirectory: Fun(): String changeDirectory: Fun(path: String): Ok listDirectory: Fun(path: String): Array(String) end))
+            :args (
+              (TypedVar 'fileB' :type String)
+            ))
+        )))
+    (TypedLetValue 'subFile1' :type String
+      :value (TypedString 'tmp_system_fs_test/nested/deep/file1.txt' :type String))
+    (TypedLetValue 'w1' :type Writer.T
+      :value (TypedApp :type Writer.T
+        :func (TypedSelect 'file' :type Fun(name: String): Writer.T
+          :target (TypedVar 'writer' :type Record error: Exception output: Writer.T err: Writer.T file: Fun(name: String): Writer.T putString: Fun(writer: Writer.T string: String): Ok putChar: Fun(writer: Writer.T char: Char): Ok putSubString: Fun(writer: Writer.T string: String start: Int size: Int): Ok flush: Fun(writer: Writer.T): Ok close: Fun(writer: Writer.T): Ok end))
+        :args (
+          (TypedVar 'subFile1' :type String)
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedSelect 'putString' :type Fun(writer: Writer.T string: String): Ok
+          :target (TypedVar 'writer' :type Record error: Exception output: Writer.T err: Writer.T file: Fun(name: String): Writer.T putString: Fun(writer: Writer.T string: String): Ok putChar: Fun(writer: Writer.T char: Char): Ok putSubString: Fun(writer: Writer.T string: String start: Int size: Int): Ok flush: Fun(writer: Writer.T): Ok close: Fun(writer: Writer.T): Ok end))
+        :args (
+          (TypedVar 'w1' :type Writer.T)
+          (TypedString '1' :type String)
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedSelect 'close' :type Fun(writer: Writer.T): Ok
+          :target (TypedVar 'writer' :type Record error: Exception output: Writer.T err: Writer.T file: Fun(name: String): Writer.T putString: Fun(writer: Writer.T string: String): Ok putChar: Fun(writer: Writer.T char: Char): Ok putSubString: Fun(writer: Writer.T string: String start: Int size: Int): Ok flush: Fun(writer: Writer.T): Ok close: Fun(writer: Writer.T): Ok end))
+        :args (
+          (TypedVar 'w1' :type Writer.T)
+        )))
+    (TypedLetValue 'subFile2' :type String
+      :value (TypedString 'tmp_system_fs_test/nested/deep/file2.txt' :type String))
+    (TypedLetValue 'w2' :type Writer.T
+      :value (TypedApp :type Writer.T
+        :func (TypedSelect 'file' :type Fun(name: String): Writer.T
+          :target (TypedVar 'writer' :type Record error: Exception output: Writer.T err: Writer.T file: Fun(name: String): Writer.T putString: Fun(writer: Writer.T string: String): Ok putChar: Fun(writer: Writer.T char: Char): Ok putSubString: Fun(writer: Writer.T string: String start: Int size: Int): Ok flush: Fun(writer: Writer.T): Ok close: Fun(writer: Writer.T): Ok end))
+        :args (
+          (TypedVar 'subFile2' :type String)
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedSelect 'putString' :type Fun(writer: Writer.T string: String): Ok
+          :target (TypedVar 'writer' :type Record error: Exception output: Writer.T err: Writer.T file: Fun(name: String): Writer.T putString: Fun(writer: Writer.T string: String): Ok putChar: Fun(writer: Writer.T char: Char): Ok putSubString: Fun(writer: Writer.T string: String start: Int size: Int): Ok flush: Fun(writer: Writer.T): Ok close: Fun(writer: Writer.T): Ok end))
+        :args (
+          (TypedVar 'w2' :type Writer.T)
+          (TypedString '2' :type String)
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedSelect 'close' :type Fun(writer: Writer.T): Ok
+          :target (TypedVar 'writer' :type Record error: Exception output: Writer.T err: Writer.T file: Fun(name: String): Writer.T putString: Fun(writer: Writer.T string: String): Ok putChar: Fun(writer: Writer.T char: Char): Ok putSubString: Fun(writer: Writer.T string: String start: Int size: Int): Ok flush: Fun(writer: Writer.T): Ok close: Fun(writer: Writer.T): Ok end))
+        :args (
+          (TypedVar 'w2' :type Writer.T)
+        )))
+    (TypedLetValue 'entries' :type Array(String)
+      :value (TypedApp :type Array(String)
+        :func (TypedSelect 'listDirectory' :type Fun(path: String): Array(String)
+          :target (TypedVar 'system' :type Record error: Exception args: Array(String) sysexit: Fun(code: Int): Ok getEnv: Fun(name: String): String fileExists: Fun(path: String): Bool isFile: Fun(path: String): Bool isDirectory: Fun(path: String): Bool makeDirectory: Fun(path: String): Ok removeFile: Fun(path: String): Ok removeDirectory: Fun(path: String): Ok renameFile: Fun(oldPath: String newPath: String): Ok currentDirectory: Fun(): String changeDirectory: Fun(path: String): Ok listDirectory: Fun(path: String): Array(String) end))
+        :args (
+          (TypedVar 'subDir' :type String)
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printInt' :type Fun(n: Int): Ok)
+        :args (
+          (TypedApp :type Int
+            :func (TypedTypeApp [String] :type Fun(array: Array(String)): Int
+              :func (TypedSelect 'size' :type All(A :: TYPE) Fun(array: Array(A)): Int
+                :target (TypedVar 'arrayOp' :type Record error: Exception new: All(A :: TYPE) Fun(size: Int init: A): Array(A) size: All(A :: TYPE) Fun(array: Array(A)): Int get: All(A :: TYPE) Fun(array: Array(A) index: Int): A set: All(A :: TYPE) Fun(array: Array(A) index: Int item: A): Ok end)))
+            :args (
+              (TypedVar 'entries' :type Array(String))
+            ))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printString' :type Fun(s: String): Ok)
+        :args (
+          (TypedApp :type String
+            :func (TypedTypeApp [String] :type Fun(array: Array(String) index: Int): String
+              :func (TypedSelect 'get' :type All(A :: TYPE) Fun(array: Array(A) index: Int): A
+                :target (TypedVar 'arrayOp' :type Record error: Exception new: All(A :: TYPE) Fun(size: Int init: A): Array(A) size: All(A :: TYPE) Fun(array: Array(A)): Int get: All(A :: TYPE) Fun(array: Array(A) index: Int): A set: All(A :: TYPE) Fun(array: Array(A) index: Int item: A): Ok end)))
+            :args (
+              (TypedVar 'entries' :type Array(String))
+              (TypedInt 0 :type Int)
+            ))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printString' :type Fun(s: String): Ok)
+        :args (
+          (TypedApp :type String
+            :func (TypedTypeApp [String] :type Fun(array: Array(String) index: Int): String
+              :func (TypedSelect 'get' :type All(A :: TYPE) Fun(array: Array(A) index: Int): A
+                :target (TypedVar 'arrayOp' :type Record error: Exception new: All(A :: TYPE) Fun(size: Int init: A): Array(A) size: All(A :: TYPE) Fun(array: Array(A)): Int get: All(A :: TYPE) Fun(array: Array(A) index: Int): A set: All(A :: TYPE) Fun(array: Array(A) index: Int item: A): Ok end)))
+            :args (
+              (TypedVar 'entries' :type Array(String))
+              (TypedInt 1 :type Int)
+            ))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedSelect 'removeFile' :type Fun(path: String): Ok
+          :target (TypedVar 'system' :type Record error: Exception args: Array(String) sysexit: Fun(code: Int): Ok getEnv: Fun(name: String): String fileExists: Fun(path: String): Bool isFile: Fun(path: String): Bool isDirectory: Fun(path: String): Bool makeDirectory: Fun(path: String): Ok removeFile: Fun(path: String): Ok removeDirectory: Fun(path: String): Ok renameFile: Fun(oldPath: String newPath: String): Ok currentDirectory: Fun(): String changeDirectory: Fun(path: String): Ok listDirectory: Fun(path: String): Array(String) end))
+        :args (
+          (TypedVar 'subFile1' :type String)
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedSelect 'removeFile' :type Fun(path: String): Ok
+          :target (TypedVar 'system' :type Record error: Exception args: Array(String) sysexit: Fun(code: Int): Ok getEnv: Fun(name: String): String fileExists: Fun(path: String): Bool isFile: Fun(path: String): Bool isDirectory: Fun(path: String): Bool makeDirectory: Fun(path: String): Ok removeFile: Fun(path: String): Ok removeDirectory: Fun(path: String): Ok renameFile: Fun(oldPath: String newPath: String): Ok currentDirectory: Fun(): String changeDirectory: Fun(path: String): Ok listDirectory: Fun(path: String): Array(String) end))
+        :args (
+          (TypedVar 'subFile2' :type String)
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedSelect 'removeDirectory' :type Fun(path: String): Ok
+          :target (TypedVar 'system' :type Record error: Exception args: Array(String) sysexit: Fun(code: Int): Ok getEnv: Fun(name: String): String fileExists: Fun(path: String): Bool isFile: Fun(path: String): Bool isDirectory: Fun(path: String): Bool makeDirectory: Fun(path: String): Ok removeFile: Fun(path: String): Ok removeDirectory: Fun(path: String): Ok renameFile: Fun(oldPath: String newPath: String): Ok currentDirectory: Fun(): String changeDirectory: Fun(path: String): Ok listDirectory: Fun(path: String): Array(String) end))
+        :args (
+          (TypedVar 'subDir' :type String)
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedSelect 'removeDirectory' :type Fun(path: String): Ok
+          :target (TypedVar 'system' :type Record error: Exception args: Array(String) sysexit: Fun(code: Int): Ok getEnv: Fun(name: String): String fileExists: Fun(path: String): Bool isFile: Fun(path: String): Bool isDirectory: Fun(path: String): Bool makeDirectory: Fun(path: String): Ok removeFile: Fun(path: String): Ok removeDirectory: Fun(path: String): Ok renameFile: Fun(oldPath: String newPath: String): Ok currentDirectory: Fun(): String changeDirectory: Fun(path: String): Ok listDirectory: Fun(path: String): Array(String) end))
+        :args (
+          (TypedString 'tmp_system_fs_test/nested' :type String)
+        )))
+    (TypedLetValue 'origCwd' :type String
+      :value (TypedApp :type String
+        :func (TypedSelect 'currentDirectory' :type Fun(): String
+          :target (TypedVar 'system' :type Record error: Exception args: Array(String) sysexit: Fun(code: Int): Ok getEnv: Fun(name: String): String fileExists: Fun(path: String): Bool isFile: Fun(path: String): Bool isDirectory: Fun(path: String): Bool makeDirectory: Fun(path: String): Ok removeFile: Fun(path: String): Ok removeDirectory: Fun(path: String): Ok renameFile: Fun(oldPath: String newPath: String): Ok currentDirectory: Fun(): String changeDirectory: Fun(path: String): Ok listDirectory: Fun(path: String): Array(String) end))
+        :args ()))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedSelect 'changeDirectory' :type Fun(path: String): Ok
+          :target (TypedVar 'system' :type Record error: Exception args: Array(String) sysexit: Fun(code: Int): Ok getEnv: Fun(name: String): String fileExists: Fun(path: String): Bool isFile: Fun(path: String): Bool isDirectory: Fun(path: String): Bool makeDirectory: Fun(path: String): Ok removeFile: Fun(path: String): Ok removeDirectory: Fun(path: String): Ok renameFile: Fun(oldPath: String newPath: String): Ok currentDirectory: Fun(): String changeDirectory: Fun(path: String): Ok listDirectory: Fun(path: String): Array(String) end))
+        :args (
+          (TypedVar 'testDir' :type String)
+        )))
+    (TypedLetValue 'newCwd' :type String
+      :value (TypedApp :type String
+        :func (TypedSelect 'currentDirectory' :type Fun(): String
+          :target (TypedVar 'system' :type Record error: Exception args: Array(String) sysexit: Fun(code: Int): Ok getEnv: Fun(name: String): String fileExists: Fun(path: String): Bool isFile: Fun(path: String): Bool isDirectory: Fun(path: String): Bool makeDirectory: Fun(path: String): Ok removeFile: Fun(path: String): Ok removeDirectory: Fun(path: String): Ok renameFile: Fun(oldPath: String newPath: String): Ok currentDirectory: Fun(): String changeDirectory: Fun(path: String): Ok listDirectory: Fun(path: String): Array(String) end))
+        :args ()))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printBool' :type Fun(b: Bool): Ok)
+        :args (
+          (TypedApp :type Bool
+            :func (TypedSelect 'equal' :type Fun(s1: String s2: String): Bool
+              :target (TypedVar 'string' :type Record error: Exception new: Fun(size: Int init: Char): String isEmpty: Fun(string: String): Bool length: Fun(string: String): Int getChar: Fun(string: String index: Int): Char setChar: Fun(string: String index: Int char: Char): Ok getSub: Fun(source: String start: Int size: Int): String setSub: Fun(dest: String destStart: Int source: String sourceStart: Int sourceSize: Int): Ok cat: Fun(s1: String s2: String): String catSub: Fun(s1: String start1: Int size1: Int s2: String start2: Int size2: Int): String conc: Fun(a: Array(String)): String equal: Fun(s1: String s2: String): Bool equalSub: Fun(s1: String start1: Int size1: Int s2: String start2: Int size2: Int): Bool precedes: Fun(s1: String s2: String): Bool precedesSub: Fun(s1: String start1: Int size1: Int s2: String start2: Int size2: Int): Bool end))
+            :args (
+              (TypedVar 'origCwd' :type String)
+              (TypedVar 'newCwd' :type String)
+            ))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedSelect 'changeDirectory' :type Fun(path: String): Ok
+          :target (TypedVar 'system' :type Record error: Exception args: Array(String) sysexit: Fun(code: Int): Ok getEnv: Fun(name: String): String fileExists: Fun(path: String): Bool isFile: Fun(path: String): Bool isDirectory: Fun(path: String): Bool makeDirectory: Fun(path: String): Ok removeFile: Fun(path: String): Ok removeDirectory: Fun(path: String): Ok renameFile: Fun(oldPath: String newPath: String): Ok currentDirectory: Fun(): String changeDirectory: Fun(path: String): Ok listDirectory: Fun(path: String): Array(String) end))
+        :args (
+          (TypedVar 'origCwd' :type String)
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printBool' :type Fun(b: Bool): Ok)
+        :args (
+          (TypedApp :type Bool
+            :func (TypedSelect 'equal' :type Fun(s1: String s2: String): Bool
+              :target (TypedVar 'string' :type Record error: Exception new: Fun(size: Int init: Char): String isEmpty: Fun(string: String): Bool length: Fun(string: String): Int getChar: Fun(string: String index: Int): Char setChar: Fun(string: String index: Int char: Char): Ok getSub: Fun(source: String start: Int size: Int): String setSub: Fun(dest: String destStart: Int source: String sourceStart: Int sourceSize: Int): Ok cat: Fun(s1: String s2: String): String catSub: Fun(s1: String start1: Int size1: Int s2: String start2: Int size2: Int): String conc: Fun(a: Array(String)): String equal: Fun(s1: String s2: String): Bool equalSub: Fun(s1: String start1: Int size1: Int s2: String start2: Int size2: Int): Bool precedes: Fun(s1: String s2: String): Bool precedesSub: Fun(s1: String start1: Int size1: Int s2: String start2: Int size2: Int): Bool end))
+            :args (
+              (TypedVar 'origCwd' :type String)
+              (TypedApp :type String
+                :func (TypedSelect 'currentDirectory' :type Fun(): String
+                  :target (TypedVar 'system' :type Record error: Exception args: Array(String) sysexit: Fun(code: Int): Ok getEnv: Fun(name: String): String fileExists: Fun(path: String): Bool isFile: Fun(path: String): Bool isDirectory: Fun(path: String): Bool makeDirectory: Fun(path: String): Ok removeFile: Fun(path: String): Ok removeDirectory: Fun(path: String): Ok renameFile: Fun(oldPath: String newPath: String): Ok currentDirectory: Fun(): String changeDirectory: Fun(path: String): Ok listDirectory: Fun(path: String): Array(String) end))
+                :args ())
+            ))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedSelect 'removeDirectory' :type Fun(path: String): Ok
+          :target (TypedVar 'system' :type Record error: Exception args: Array(String) sysexit: Fun(code: Int): Ok getEnv: Fun(name: String): String fileExists: Fun(path: String): Bool isFile: Fun(path: String): Bool isDirectory: Fun(path: String): Bool makeDirectory: Fun(path: String): Ok removeFile: Fun(path: String): Ok removeDirectory: Fun(path: String): Ok renameFile: Fun(oldPath: String newPath: String): Ok currentDirectory: Fun(): String changeDirectory: Fun(path: String): Ok listDirectory: Fun(path: String): Array(String) end))
+        :args (
+          (TypedVar 'testDir' :type String)
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printBool' :type Fun(b: Bool): Ok)
+        :args (
+          (TypedApp :type Bool
+            :func (TypedSelect 'fileExists' :type Fun(path: String): Bool
+              :target (TypedVar 'system' :type Record error: Exception args: Array(String) sysexit: Fun(code: Int): Ok getEnv: Fun(name: String): String fileExists: Fun(path: String): Bool isFile: Fun(path: String): Bool isDirectory: Fun(path: String): Bool makeDirectory: Fun(path: String): Ok removeFile: Fun(path: String): Ok removeDirectory: Fun(path: String): Ok renameFile: Fun(oldPath: String newPath: String): Ok currentDirectory: Fun(): String changeDirectory: Fun(path: String): Ok listDirectory: Fun(path: String): Array(String) end))
+            :args (
+              (TypedVar 'testDir' :type String)
+            ))
+        )))
+    (TypedExprStmt
+      :expr (TypedTry :type Ok
+        :body (TypedBlock :type Ok
+          :bindings (
+            (TypedExprStmt
+              :expr (TypedApp :type Ok
+                :func (TypedSelect 'removeFile' :type Fun(path: String): Ok
+                  :target (TypedVar 'system' :type Record error: Exception args: Array(String) sysexit: Fun(code: Int): Ok getEnv: Fun(name: String): String fileExists: Fun(path: String): Bool isFile: Fun(path: String): Bool isDirectory: Fun(path: String): Bool makeDirectory: Fun(path: String): Ok removeFile: Fun(path: String): Ok removeDirectory: Fun(path: String): Ok renameFile: Fun(oldPath: String newPath: String): Ok currentDirectory: Fun(): String changeDirectory: Fun(path: String): Ok listDirectory: Fun(path: String): Array(String) end))
+                :args (
+                  (TypedString 'does_not_exist_xyz_999.txt' :type String)
+                )))
+          )
+          :result (TypedApp :type Ok
+            :func (TypedVar 'printString' :type Fun(s: String): Ok)
+            :args (
+              (TypedString 'FAIL: should have raised' :type String)
+            )))
+        :branches (
+          (TypedTryBranch
+            :exc_pattern (TypedSelect 'error' :type Exception
+              :target (TypedVar 'system' :type Record error: Exception args: Array(String) sysexit: Fun(code: Int): Ok getEnv: Fun(name: String): String fileExists: Fun(path: String): Bool isFile: Fun(path: String): Bool isDirectory: Fun(path: String): Bool makeDirectory: Fun(path: String): Ok removeFile: Fun(path: String): Ok removeDirectory: Fun(path: String): Ok renameFile: Fun(oldPath: String newPath: String): Ok currentDirectory: Fun(): String changeDirectory: Fun(path: String): Ok listDirectory: Fun(path: String): Array(String) end))
+            :body (TypedApp :type Ok
+              :func (TypedVar 'printString' :type Fun(s: String): Ok)
+              :args (
+                (TypedString 'CAUGHT: system.error' :type String)
+              )))
+        )))
+  ))

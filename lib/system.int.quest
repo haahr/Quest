@@ -5,10 +5,26 @@ interface System export
     args: Array(String)
     (* Terminate program execution with exit code *)
     sysexit(code: Int): Ok
-    (* Alias for sysexit *)
-    sysExit(code: Int): Ok
     (* Retrieve environment variable value by name *)
     getEnv(name: String): String
     (* Check if file exists at filesystem path *)
     fileExists(path: String): Bool
+    (* Test if path exists and refers to a regular file *)
+    isFile(path: String): Bool
+    (* Test if path exists and refers to a directory *)
+    isDirectory(path: String): Bool
+    (* Create directory at path, creating parent directories as needed *)
+    makeDirectory(path: String): Ok
+    (* Remove file at path; raises error if file does not exist *)
+    removeFile(path: String): Ok
+    (* Remove empty directory at path; raises error if not empty *)
+    removeDirectory(path: String): Ok
+    (* Rename or move a file or directory from oldPath to newPath *)
+    renameFile(oldPath: String newPath: String): Ok
+    (* Return the current working directory path *)
+    currentDirectory(): String
+    (* Change the current working directory path *)
+    changeDirectory(path: String): Ok
+    (* Return the names of entries within a directory (excluding . and ..) *)
+    listDirectory(path: String): Array(String)
 end;

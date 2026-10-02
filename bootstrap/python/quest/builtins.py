@@ -1300,11 +1300,70 @@ class BuiltinModuleRegistry:
         def _system_file_exists(path_val: QString) -> QBool:
             return TRUE_VALUE if os.path.exists(path_val.value) else FALSE_VALUE
 
+        @qchecked(cls._SYSTEM_ERROR_EXC, QString)
+        def _system_is_file(path_val: QString) -> QBool:
+            return TRUE_VALUE if os.path.isfile(path_val.value) else FALSE_VALUE
+
+        @qchecked(cls._SYSTEM_ERROR_EXC, QString)
+        def _system_is_directory(path_val: QString) -> QBool:
+            return TRUE_VALUE if os.path.isdir(path_val.value) else FALSE_VALUE
+
+        @qchecked(cls._SYSTEM_ERROR_EXC, QString)
+        def _system_make_directory(path_val: QString) -> QOk:
+            try:
+                os.makedirs(path_val.value, exist_ok=True)
+                return OK_VALUE
+            except OSError:
+                raise QuestException(cls._SYSTEM_ERROR_EXC)
+
+        @qchecked(cls._SYSTEM_ERROR_EXC, QString)
+        def _system_remove_file(path_val: QString) -> QOk:
+            try:
+                os.remove(path_val.value)
+                return OK_VALUE
+            except OSError:
+                raise QuestException(cls._SYSTEM_ERROR_EXC)
+
+        @qchecked(cls._SYSTEM_ERROR_EXC, QString)
+        def _system_remove_directory(path_val: QString) -> QOk:
+            try:
+                os.rmdir(path_val.value)
+                return OK_VALUE
+            except OSError:
+                raise QuestException(cls._SYSTEM_ERROR_EXC)
+
+        @qchecked(cls._SYSTEM_ERROR_EXC, QString, QString)
+        def _system_rename_file(old_path_val: QString, new_path_val: QString) -> QOk:
+            try:
+                os.rename(old_path_val.value, new_path_val.value)
+                return OK_VALUE
+            except OSError:
+                raise QuestException(cls._SYSTEM_ERROR_EXC)
+
+        def _system_current_directory() -> QString:
+            try:
+                return QString(os.getcwd())
+            except OSError:
+                raise QuestException(cls._SYSTEM_ERROR_EXC)
+
+        @qchecked(cls._SYSTEM_ERROR_EXC, QString)
+        def _system_change_directory(path_val: QString) -> QOk:
+            try:
+                os.chdir(path_val.value)
+                return OK_VALUE
+            except OSError:
+                raise QuestException(cls._SYSTEM_ERROR_EXC)
+
+        @qchecked(cls._SYSTEM_ERROR_EXC, QString)
+        def _system_list_directory(path_val: QString) -> QArray:
+            try:
+                names = sorted(os.listdir(path_val.value))
+                return QArray(tuple(QString(n) for n in names))
+            except OSError:
+                raise QuestException(cls._SYSTEM_ERROR_EXC)
+
         sys_b.def_fn(
             "sysexit", [("code", INT_TYPE)], OK_TYPE, _system_exit, c_symbol="quest_system_exit"
-        )
-        sys_b.def_fn(
-            "sysExit", [("code", INT_TYPE)], OK_TYPE, _system_exit, c_symbol="quest_system_exit"
         )
         sys_b.def_fn(
             "getEnv", [("name", STRING_TYPE)], STRING_TYPE, _system_getenv, c_symbol="quest_system_getenv"
@@ -1312,6 +1371,42 @@ class BuiltinModuleRegistry:
         sys_b.def_fn(
             "fileExists", [("path", STRING_TYPE)], BOOL_TYPE, _system_file_exists,
             c_symbol="quest_system_file_exists",
+        )
+        sys_b.def_fn(
+            "isFile", [("path", STRING_TYPE)], BOOL_TYPE, _system_is_file,
+            c_symbol="quest_system_is_file",
+        )
+        sys_b.def_fn(
+            "isDirectory", [("path", STRING_TYPE)], BOOL_TYPE, _system_is_directory,
+            c_symbol="quest_system_is_directory",
+        )
+        sys_b.def_fn(
+            "makeDirectory", [("path", STRING_TYPE)], OK_TYPE, _system_make_directory,
+            c_symbol="quest_system_make_directory",
+        )
+        sys_b.def_fn(
+            "removeFile", [("path", STRING_TYPE)], OK_TYPE, _system_remove_file,
+            c_symbol="quest_system_remove_file",
+        )
+        sys_b.def_fn(
+            "removeDirectory", [("path", STRING_TYPE)], OK_TYPE, _system_remove_directory,
+            c_symbol="quest_system_remove_directory",
+        )
+        sys_b.def_fn(
+            "renameFile", [("oldPath", STRING_TYPE), ("newPath", STRING_TYPE)], OK_TYPE, _system_rename_file,
+            c_symbol="quest_system_rename_file",
+        )
+        sys_b.def_fn(
+            "currentDirectory", [], STRING_TYPE, _system_current_directory,
+            c_symbol="quest_system_current_directory",
+        )
+        sys_b.def_fn(
+            "changeDirectory", [("path", STRING_TYPE)], OK_TYPE, _system_change_directory,
+            c_symbol="quest_system_change_directory",
+        )
+        sys_b.def_fn(
+            "listDirectory", [("path", STRING_TYPE)], QArrayType(STRING_TYPE), _system_list_directory,
+            c_symbol="quest_system_list_directory",
         )
         sys_b.finish()
 

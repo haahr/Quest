@@ -15,7 +15,7 @@
     (TypedLetValue 'val' :type String
       :value (TypedApp :type String
         :func (TypedSelect 'getEnv' :type Fun(name: String): String
-          :target (TypedVar 'system' :type Record error: Exception args: Array(String) sysexit: Fun(code: Int): Ok sysExit: Fun(code: Int): Ok getEnv: Fun(name: String): String fileExists: Fun(path: String): Bool end))
+          :target (TypedVar 'system' :type Record error: Exception args: Array(String) sysexit: Fun(code: Int): Ok getEnv: Fun(name: String): String fileExists: Fun(path: String): Bool isFile: Fun(path: String): Bool isDirectory: Fun(path: String): Bool makeDirectory: Fun(path: String): Ok removeFile: Fun(path: String): Ok removeDirectory: Fun(path: String): Ok renameFile: Fun(oldPath: String newPath: String): Ok currentDirectory: Fun(): String changeDirectory: Fun(path: String): Ok listDirectory: Fun(path: String): Array(String) end))
         :args (
           (TypedString 'QUEST_TEST_ENV_VAR' :type String)
         )))
@@ -40,7 +40,7 @@
     (TypedLetValue 'missing' :type String
       :value (TypedApp :type String
         :func (TypedSelect 'getEnv' :type Fun(name: String): String
-          :target (TypedVar 'system' :type Record error: Exception args: Array(String) sysexit: Fun(code: Int): Ok sysExit: Fun(code: Int): Ok getEnv: Fun(name: String): String fileExists: Fun(path: String): Bool end))
+          :target (TypedVar 'system' :type Record error: Exception args: Array(String) sysexit: Fun(code: Int): Ok getEnv: Fun(name: String): String fileExists: Fun(path: String): Bool isFile: Fun(path: String): Bool isDirectory: Fun(path: String): Bool makeDirectory: Fun(path: String): Ok removeFile: Fun(path: String): Ok removeDirectory: Fun(path: String): Ok renameFile: Fun(oldPath: String newPath: String): Ok currentDirectory: Fun(): String changeDirectory: Fun(path: String): Ok listDirectory: Fun(path: String): Array(String) end))
         :args (
           (TypedString 'NON_EXISTENT_VAR_ABCXYZ' :type String)
         )))
@@ -77,7 +77,7 @@
     (TypedLetValue 'hasRuntime' :type Bool
       :value (TypedApp :type Bool
         :func (TypedSelect 'fileExists' :type Fun(path: String): Bool
-          :target (TypedVar 'system' :type Record error: Exception args: Array(String) sysexit: Fun(code: Int): Ok sysExit: Fun(code: Int): Ok getEnv: Fun(name: String): String fileExists: Fun(path: String): Bool end))
+          :target (TypedVar 'system' :type Record error: Exception args: Array(String) sysexit: Fun(code: Int): Ok getEnv: Fun(name: String): String fileExists: Fun(path: String): Bool isFile: Fun(path: String): Bool isDirectory: Fun(path: String): Bool makeDirectory: Fun(path: String): Ok removeFile: Fun(path: String): Ok removeDirectory: Fun(path: String): Ok renameFile: Fun(oldPath: String newPath: String): Ok currentDirectory: Fun(): String changeDirectory: Fun(path: String): Ok listDirectory: Fun(path: String): Array(String) end))
         :args (
           (TypedString 'runtime/quest_runtime.h' :type String)
         )))
@@ -107,7 +107,7 @@
     (TypedLetValue 'noFile' :type Bool
       :value (TypedApp :type Bool
         :func (TypedSelect 'fileExists' :type Fun(path: String): Bool
-          :target (TypedVar 'system' :type Record error: Exception args: Array(String) sysexit: Fun(code: Int): Ok sysExit: Fun(code: Int): Ok getEnv: Fun(name: String): String fileExists: Fun(path: String): Bool end))
+          :target (TypedVar 'system' :type Record error: Exception args: Array(String) sysexit: Fun(code: Int): Ok getEnv: Fun(name: String): String fileExists: Fun(path: String): Bool isFile: Fun(path: String): Bool isDirectory: Fun(path: String): Bool makeDirectory: Fun(path: String): Ok removeFile: Fun(path: String): Ok removeDirectory: Fun(path: String): Ok renameFile: Fun(oldPath: String newPath: String): Ok currentDirectory: Fun(): String changeDirectory: Fun(path: String): Ok listDirectory: Fun(path: String): Array(String) end))
         :args (
           (TypedString 'does_not_exist_file_987654.txt' :type String)
         )))

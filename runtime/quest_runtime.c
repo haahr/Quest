@@ -1102,6 +1102,9 @@ const QTypeDescriptor *quest_lookup_type_descriptor_by_name(const char *name) {
 /* ------------------------------------------------------------------------- */
 
 #include <unistd.h>
+#include <sys/stat.h>
+#include <dirent.h>
+#include <errno.h>
 
 /* System module primitives */
 QArray *quest_system_args = NULL;
@@ -1131,6 +1134,155 @@ QString *quest_system_getenv(const QString *var) {
 bool quest_system_file_exists(const QString *path) {
     if (path == NULL || path->data == NULL) return false;
     return access(path->data, F_OK) == 0;
+}
+
+bool quest_system_is_file(const QString *path) {
+    if (path == NULL || path->data == NULL) return false;
+    struct stat st;
+    if (stat(path->data, &st) != 0) return false;
+    return S_ISREG(st.st_mode);
+}
+
+bool quest_system_is_directory(const QString *path) {
+    if (path == NULL || path->data == NULL) return false;
+    struct stat st;
+    if (stat(path->data, &st) != 0) return false;
+    return S_ISDIR(st.st_mode);
+}
+
+static int quest_mkdir_recursive(char *path) {
+    char *p = path;
+    if (*p == '/') p++;
+    while (*p) {
+        if (*p == '/') {
+            *p = '\0';
+            if (mkdir(path, 0777) != 0 && errno != EEXIST) {
+                *p = '/';
+                return -1;
+            }
+            *p = '/';
+        }
+        p++;
+    }
+    if (mkdir(path, 0777) != 0 && errno != EEXIST) {
+        return -1;
+    }
+    return 0;
+}
+
+void quest_system_make_directory(const QString *path) {
+    if (path == NULL || path->data == NULL || path->length == 0) {
+        quest_raise_system_error();
+    }
+    char *buf = (char *)malloc((size_t)path->length + 1);
+    if (buf == NULL) {
+        quest_raise_system_error();
+    }
+    memcpy(buf, path->data, (size_t)path->length + 1);
+    int res = quest_mkdir_recursive(buf);
+    free(buf);
+    if (res != 0) {
+        quest_raise_system_error();
+    }
+}
+
+void quest_system_remove_file(const QString *path) {
+    if (path == NULL || path->data == NULL) {
+        quest_raise_system_error();
+    }
+    if (unlink(path->data) != 0) {
+        quest_raise_system_error();
+    }
+}
+
+void quest_system_remove_directory(const QString *path) {
+    if (path == NULL || path->data == NULL) {
+        quest_raise_system_error();
+    }
+    if (rmdir(path->data) != 0) {
+        quest_raise_system_error();
+    }
+}
+
+void quest_system_rename_file(const QString *old_path, const QString *new_path) {
+    if (old_path == NULL || old_path->data == NULL ||
+        new_path == NULL || new_path->data == NULL) {
+        quest_raise_system_error();
+    }
+    if (rename(old_path->data, new_path->data) != 0) {
+        quest_raise_system_error();
+    }
+}
+
+QString *quest_system_current_directory(void) {
+    char buf[4096];
+    if (getcwd(buf, sizeof(buf)) == NULL) {
+        quest_raise_system_error();
+    }
+    return quest_string_new(buf, (int64_t)strlen(buf));
+}
+
+void quest_system_change_directory(const QString *path) {
+    if (path == NULL || path->data == NULL) {
+        quest_raise_system_error();
+    }
+    if (chdir(path->data) != 0) {
+        quest_raise_system_error();
+    }
+}
+
+static int quest_strcmp_qsort(const void *a, const void *b) {
+    const QString *s1 = *(const QString * const *)a;
+    const QString *s2 = *(const QString * const *)b;
+    return strcmp(s1->data, s2->data);
+}
+
+QArray *quest_system_list_directory(const QString *path) {
+    if (path == NULL || path->data == NULL) {
+        quest_raise_system_error();
+    }
+    DIR *dir = opendir(path->data);
+    if (dir == NULL) {
+        quest_raise_system_error();
+    }
+
+    size_t count = 0;
+    size_t cap = 16;
+    QString **entries = (QString **)malloc(cap * sizeof(QString *));
+    if (entries == NULL) {
+        closedir(dir);
+        quest_raise_system_error();
+    }
+
+    struct dirent *entry;
+    while ((entry = readdir(dir)) != NULL) {
+        if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) {
+            continue;
+        }
+        if (count >= cap) {
+            cap *= 2;
+            QString **new_entries = (QString **)realloc(entries, cap * sizeof(QString *));
+            if (new_entries == NULL) {
+                free(entries);
+                closedir(dir);
+                quest_raise_system_error();
+            }
+            entries = new_entries;
+        }
+        entries[count++] = quest_string_new(entry->d_name, (int64_t)strlen(entry->d_name));
+    }
+    closedir(dir);
+
+    if (count > 1) {
+        qsort(entries, count, sizeof(QString *), quest_strcmp_qsort);
+    }
+
+    QArray *res = quest_array_new((int64_t)count, (QVal){ .p = NULL });
+    for (size_t i = 0; i < count; i++) {
+        res->data[i].p = entries[i];
+    }
+    free(entries);
+    return res;
 }
 
 /* Writer module primitives */

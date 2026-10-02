@@ -356,6 +356,15 @@ void     quest_system_init(int argc, char **argv);
 void     quest_system_exit(int64_t code);
 QString *quest_system_getenv(const QString *var);
 bool     quest_system_file_exists(const QString *path);
+bool     quest_system_is_file(const QString *path);
+bool     quest_system_is_directory(const QString *path);
+void     quest_system_make_directory(const QString *path);
+void     quest_system_remove_file(const QString *path);
+void     quest_system_remove_directory(const QString *path);
+void     quest_system_rename_file(const QString *old_path, const QString *new_path);
+QString *quest_system_current_directory(void);
+void     quest_system_change_directory(const QString *path);
+QArray  *quest_system_list_directory(const QString *path);
 
 /* Writer module primitives */
 extern QWriter quest_writer_output_val;

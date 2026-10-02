@@ -11,87 +11,36 @@ into modular subsystems that can be developed incrementally.
 
 ## 1. Core Data Structures & Collections
 
-The Python bootstrap relies on built-in collections (`list`, `dict`, `set`, `deque`) that must be available in Quest.
-The primary collection libraries have been completed and are documented in `docs/new-libraries.md`:
+The primary collection libraries required for self-hosting have been implemented and are documented in
+`docs/new-libraries.md`:
 - `collections/vector : collections/Vector` (growable dynamic arrays `Vector(T)`)
 - `collections/hashMap : collections/HashMap` (compact ordered hash tables `HashMap(K, V)`)
 - `collections/hashSet : collections/HashSet` (hash sets `HashSet(T)` built on `HashMap`)
 
-### 1.1. Associative Maps / Hash Tables (`collections/hashMap : collections/HashMap`)
-- **Status**: Completed (`lib/collections/hashmap.{int,mod}.quest`).
-- **Python Usage**: `dict[K, V]` throughout all compiler phases.
-- **Key Use Cases**:
-  - Symbol tables in `Scope`: `dict[str, ValueSymbol]`, `dict[str, TypeSymbol]`, `dict[int, TypeSymbol]`.
-  - Subtyping substitution mappings: `dict[int, QType]` (mapping symbol IDs to types).
-  - Parser packrat memoization cache: mapping `(SyntaxTarget, pos)` pairs to parse results.
-  - Module registry and AST cache: mapping canonical path strings to module records and typed ASTs.
-  - Struct and type name caches in the C code generator.
-- **Provided Functionality**:
-  - Polymorphic hash map preserving insertion order.
-  - Custom equality and hash functions (`word.T`).
-  - Supports compound and composite key hashing via custom hash closures.
-
-### 1.2. Sets (`collections/hashSet : collections/HashSet`)
-- **Status**: Completed (`lib/collections/hashset.{int,mod}.quest`).
-- **Python Usage**: `set[T]` for deduplication and membership testing.
-- **Key Use Cases**:
-  - **Coinductive Subtyping Trail**: `trail: set[tuple[int, int]]` in `types.py` tracking visited pairs of symbol IDs
-    to detect cycles during equi-recursive subtyping.
-  - **Closure Free-Variable Analysis**: `seen: set[str]`, `bound: set[str]` in `analysis/closure.py`.
-  - **Module Import Cycle Detection**: `active_imports: set[str]` in `module_loader.py`.
-  - **Parser Error Expectations**: `expected_at_farthest: set[str]` in `parser.py`.
-  - **Topological Sort**: Visited set in Kahn's algorithm and dependency DAG traversal.
-- **Provided Functionality**:
-  - Full set operations (`contains`, `insert`, `delete`, `elements`, `forEach`, `copy`).
-  - Set algebra (`union`, `intersection`, `difference`, `isSubset`, `equal`).
-
-### 1.3. Queues & Stacks
-- **Key Use Cases**: Scope stacks in `env.py`, block nesting and token lookahead buffers, topological sort queues.
-- **Implementation**: Easily implemented on top of `collections/vector`.
+Queues and stacks (used for scope stacks in `env.py`, block nesting and token lookahead buffers, and
+topological sort queues) are straightforwardly implemented on top of `collections/vector`.
 
 ---
 
 ## 2. Operating System, Process Execution, and Filesystem Primitives
 
-Currently, Quest's `System` interface provides:
-`args: Array(String)`, `sysexit(code: Int): Ok`, `getEnv(name: String): String`, `fileExists(path: String): Bool`,
-and `error: Exception(Ok)`.
+Quest's `System` interface provides operating system and filesystem primitives:
+`args`, `sysexit`, `getEnv`, `fileExists`, `isFile`, `isDirectory`, `makeDirectory`, `removeFile`,
+`removeDirectory`, `renameFile`, `currentDirectory`, `changeDirectory`, and `listDirectory`.
 
-To support compiling programs end-to-end to native binaries, the following OS primitives are needed:
+To support compiling programs end-to-end to native binaries without relying on external drivers, the
+remaining OS primitive is:
 
 ### 2.1. Process Execution (`subprocess.run`)
 - **Python Usage**: `compiler_runner.py` invokes the host C compiler (`clang` or `gcc`) to assemble and link generated
   C source into relocatable object files (`.o`) and executables.
-- **Current Status**: Quest has no child process execution primitive.
+- **Current Status**: Quest has no child process execution primitive; compilation currently delegates to Python driver.
 - **Required Primitive**:
   ```quest
   system.exec(command: String): Int
   ```
   Returns the process exit code (0 for success, non-zero for failure). Can be implemented using standard C POSIX
   `system()` or `fork`/`execvp`.
-
-### 2.2. Directory Creation (`mkdir` / `os.makedirs`)
-- **Python Usage**: When compiling hierarchical modules (e.g. `quest compile -c util/calc.mod.quest`), the compiler
-  ensures subdirectories (such as `util/`) exist before writing `.c`, `.o`, and `.int.h` artifacts.
-- **Required Primitive**:
-  ```quest
-  system.mkdir(path: String): Ok
-  ```
-  Creates directories recursively (`mkdir -p` semantics).
-
-### 2.3. File Removal (`removeFile` / `os.unlink`)
-- **Python Usage**: Deleting temporary generated `.c` files after host compilation completes.
-- **Required Primitive**:
-  ```quest
-  system.removeFile(path: String): Ok
-  ```
-
-### 2.4. File Status Metadata (`isDir` / `os.stat`)
-- **Python Usage**: Distinguishing directories from files when scanning `-I` include search paths.
-- **Required Primitive**:
-  ```quest
-  system.isDir(path: String): Bool
-  ```
 
 ### 2.5. Path Utility Library (`Path`)
 - **Python Usage**: `pathlib.Path` for dirname, basename, extension, path concatenation, and normalization.
@@ -173,7 +122,7 @@ Remaining prerequisites:
 
 | Subsystem | Components | Priority | Strategy |
 | :--- | :--- | :--- | :--- |
-| **OS Primitives** | `system.exec`, `mkdir`, `removeFile`, `isDir` | **P1** | Extend `System` (native C backing) |
+| **OS Primitives** | `system.exec` | **P1** | Extend `System` (native C backing) |
 | **Path Library** | `join`, `dirName`, `baseName`, `normalize` | **P1** | Pure Quest path module |
 | **Algorithms** | Binary search, Quicksort, Topological sort | **P1** | Pure Quest algorithms |
 | **CLI Parser** | Flag and option parsing over `system.args` | **P2** | Pure Quest CLI library |

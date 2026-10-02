@@ -19,7 +19,7 @@
             :target (TypedVar 'arrayOp' :type Record error: Exception new: All(A :: TYPE) Fun(size: Int init: A): Array(A) size: All(A :: TYPE) Fun(array: Array(A)): Int get: All(A :: TYPE) Fun(array: Array(A) index: Int): A set: All(A :: TYPE) Fun(array: Array(A) index: Int item: A): Ok end)))
         :args (
           (TypedSelect 'args' :type Array(String)
-            :target (TypedVar 'system' :type Record error: Exception args: Array(String) sysexit: Fun(code: Int): Ok sysExit: Fun(code: Int): Ok getEnv: Fun(name: String): String fileExists: Fun(path: String): Bool end))
+            :target (TypedVar 'system' :type Record error: Exception args: Array(String) sysexit: Fun(code: Int): Ok getEnv: Fun(name: String): String fileExists: Fun(path: String): Bool isFile: Fun(path: String): Bool isDirectory: Fun(path: String): Bool makeDirectory: Fun(path: String): Ok removeFile: Fun(path: String): Ok removeDirectory: Fun(path: String): Ok renameFile: Fun(oldPath: String newPath: String): Ok currentDirectory: Fun(): String changeDirectory: Fun(path: String): Ok listDirectory: Fun(path: String): Array(String) end))
         )))
     (TypedExprStmt
       :expr (TypedApp :type Ok
@@ -51,7 +51,7 @@
             :target (TypedVar 'arrayOp' :type Record error: Exception new: All(A :: TYPE) Fun(size: Int init: A): Array(A) size: All(A :: TYPE) Fun(array: Array(A)): Int get: All(A :: TYPE) Fun(array: Array(A) index: Int): A set: All(A :: TYPE) Fun(array: Array(A) index: Int item: A): Ok end)))
         :args (
           (TypedSelect 'args' :type Array(String)
-            :target (TypedVar 'system' :type Record error: Exception args: Array(String) sysexit: Fun(code: Int): Ok sysExit: Fun(code: Int): Ok getEnv: Fun(name: String): String fileExists: Fun(path: String): Bool end))
+            :target (TypedVar 'system' :type Record error: Exception args: Array(String) sysexit: Fun(code: Int): Ok getEnv: Fun(name: String): String fileExists: Fun(path: String): Bool isFile: Fun(path: String): Bool isDirectory: Fun(path: String): Bool makeDirectory: Fun(path: String): Ok removeFile: Fun(path: String): Ok removeDirectory: Fun(path: String): Ok renameFile: Fun(oldPath: String newPath: String): Ok currentDirectory: Fun(): String changeDirectory: Fun(path: String): Ok listDirectory: Fun(path: String): Array(String) end))
           (TypedInt 1 :type Int)
         )))
     (TypedExprStmt
@@ -75,7 +75,7 @@
     (TypedExprStmt
       :expr (TypedApp :type Ok
         :func (TypedSelect 'sysexit' :type Fun(code: Int): Ok
-          :target (TypedVar 'system' :type Record error: Exception args: Array(String) sysexit: Fun(code: Int): Ok sysExit: Fun(code: Int): Ok getEnv: Fun(name: String): String fileExists: Fun(path: String): Bool end))
+          :target (TypedVar 'system' :type Record error: Exception args: Array(String) sysexit: Fun(code: Int): Ok getEnv: Fun(name: String): String fileExists: Fun(path: String): Bool isFile: Fun(path: String): Bool isDirectory: Fun(path: String): Bool makeDirectory: Fun(path: String): Ok removeFile: Fun(path: String): Ok removeDirectory: Fun(path: String): Ok renameFile: Fun(oldPath: String newPath: String): Ok currentDirectory: Fun(): String changeDirectory: Fun(path: String): Ok listDirectory: Fun(path: String): Array(String) end))
         :args (
           (TypedInt 42 :type Int)
         )))

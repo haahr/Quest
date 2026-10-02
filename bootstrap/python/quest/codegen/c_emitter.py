@@ -692,10 +692,16 @@ class CEmitter:
     def _emit_fun_return(self, body: TypedExpr, ret_type: QType, fn_lines: list[str]) -> None:
         """Emits function return handling with appropriate subtyping coercions."""
         if ret_type == OK_TYPE:
-            self.emit_to(body, None, fn_lines)
+            if isinstance(body, TypedExternal):
+                fn_lines.append(f"{body.symbol}();")
+            else:
+                self.emit_to(body, None, fn_lines)
             fn_lines.append("return;")
         else:
-            ret_val = self.emit_val(body, fn_lines)
+            if isinstance(body, TypedExternal):
+                ret_val = f"{body.symbol}()"
+            else:
+                ret_val = self.emit_val(body, fn_lines)
             coerced = self._coerce_val(ret_val, body, ret_type, fn_lines)
             fn_lines.append(f"return {coerced};")
 
@@ -2386,6 +2392,8 @@ class CEmitter:
                     return call_str
 
             case TypedExternal(symbol=symbol):
+                if isinstance(expr.type_val, QFunType) and not expr.type_val.params:
+                    return f"{symbol}()"
                 return symbol
 
             case _:

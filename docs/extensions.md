@@ -50,6 +50,36 @@ export
 
     fileExists(path: String): Bool
     (* Returns true if a file or directory exists at `path` and is accessible, false otherwise. *)
+
+    isFile(path: String): Bool
+    (* Returns true if `path` exists and refers to a regular file, false otherwise. *)
+
+    isDirectory(path: String): Bool
+    (* Returns true if `path` exists and refers to a directory, false otherwise. *)
+
+    makeDirectory(path: String): Ok
+    (* Creates directory at `path`, creating intermediate parent directories as needed.
+       Raises system.error if directory creation fails. *)
+
+    removeFile(path: String): Ok
+    (* Deletes file at `path`. Raises system.error if file does not exist or removal fails. *)
+
+    removeDirectory(path: String): Ok
+    (* Deletes empty directory at `path`. Raises system.error if directory is not empty or cannot be removed. *)
+
+    renameFile(oldPath: String newPath: String): Ok
+    (* Renames or moves a file or directory from `oldPath` to `newPath`.
+       Raises system.error on failure. *)
+
+    currentDirectory(): String
+    (* Returns the absolute path of the current working directory. Raises system.error on failure. *)
+
+    changeDirectory(path: String): Ok
+    (* Changes the current working directory to `path`. Raises system.error on failure. *)
+
+    listDirectory(path: String): Array(String)
+    (* Returns an array of entry names in the directory at `path` (excluding "." and "..") in sorted order.
+       Raises system.error on failure. *)
 end;
 ```
 
