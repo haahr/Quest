@@ -140,9 +140,26 @@ and interfaces are Capitalized. Kinds are ALL CAPS. `let` binds values, `Let` bi
 
 ## Functions and types
 
-**8. Annotate parameters, and drop the commas.** Parameters are a space-separated signature. Commas appear only in
-identifier lists. `def plus(a: int, b: int) -> int` becomes `let plus(a:Int b:Int):Int = a+b`, and `def gcd(n, m)`
-becomes `let gcd(n,m:Int):Int = ...`. Calls also use no commas: `plus(3 4)`. Local `let` bindings may omit types.
+**8. Annotate parameters, drop commas, and keep value arguments uncurried.** Parameters form a space-separated
+signature. Commas appear only in identifier lists (e.g. `n,m:Int`). `def plus(a: int, b: int) -> int` becomes
+`let plus(a:Int b:Int):Int = a+b`, and `def gcd(n, m)` becomes `let gcd(n,m:Int):Int = ...`. Calls also use no
+commas: `plus(3 4)`. Local `let` bindings may omit types.
+
+*Default to uncurried value arguments:* Multi-argument functions take all value parameters in a single parameter group
+(`let f(a:Int b:String c:Bool): Ok`), called as `f(1 "foo" true)`. While Quest supports curried definitions
+(`let f(a:Int)(b:String)(c:Bool): Ok`), uncurried value arguments are the project standard for several reasons:
+- **Cardelli's specification:** In *Typeful Programming* (§4.3, §11), Cardelli uses uncurried value arguments for all
+  standard library interfaces (`ArrayOp`, `StringOp`, `Reader`, `IntOp`) and ordinary operations (`plus(3 4)`).
+- **Less syntactic noise:** Because Quest requires parentheses for each application level, curried calls
+  (`f(1)("foo")(true)`) add significant visual noise compared to `f(1 "foo" true)`.
+- **Keyword bindings:** Uncurried signatures allow calling with named `let` bindings
+  (`f(let a=1 let b="foo" let c=true)`, Rule 10), which currying fragments.
+- **C ABI and performance:** The Quest compiler emits direct C function calls with arguments passed in registers.
+  Currying forces intermediate heap-allocated closures for each partially applied argument.
+- **Direct Python mapping:** Python functions are uncurried; uncurried Quest preserves the 1-to-1 structure of
+  signatures and call sites.
+
+Reserve currying for type parameters (Rule 13) and higher-order combinators (like `twice(f)(x)`).
 
 **9. Mark recursion explicitly.** A Python function that calls itself needs `let rec`. Mutually recursive functions use
 `let rec f(...) = ... and g(...) = ...`.
@@ -157,9 +174,17 @@ total(xs:Array(Int)):Int = ...`, and you call it with listfix syntax: `total of 
 **12. Translate lambdas directly.** `lambda x: x + 1` becomes `fun(x:Int):Int x+1`. Closures over non-mutable locals
 work as in Python.
 
-**13. Make generics explicit.** A duck-typed function that works on "anything" takes a type parameter, usually curried
-first: `def first(xs): return xs[0]` becomes `let first(A::TYPE)(xs:Array(A)):A = xs[0]`, and the call is
-`first(:Int)(a)`. The leading colon in `:Int` marks a type argument.
+**13. Make generics explicit.** A duck-typed function that works on "anything" takes a type parameter, curried in the
+first group: `def first(xs): return xs[0]` becomes `let first(A::TYPE)(xs:Array(A)):A = xs[0]`. Subsequent value
+arguments remain uncurried. The leading colon in `:Int` marks a type argument. Currying type parameters first allows
+instantiating the function for a specific type (`let intFirst = first(:Int)`) without evaluating or requiring value
+arguments upfront.
+
+*Type argument inference at calls:* At call time, type arguments can be omitted if they can be inferred from the other
+arguments. For example, `first(a)` can be called directly without `:Int`, as can `vector.append(v x)` or
+`hashMap.get(m k)`. The preferred style across the codebase is to omit type arguments at call sites unless they are
+strictly necessary (e.g. for empty constructors like `vector.new(:Int)` where no arguments supply the type, or when
+resolving ambiguous subtyping).
 
 **14. Turn duck typing on attributes into structural records.** If a function only needs `.name`, declare `Let Named =
 Record name:String end` and accept a `Named`. Any record with at least that field is automatically a subtype, with no
