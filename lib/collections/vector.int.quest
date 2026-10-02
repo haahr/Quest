@@ -1,4 +1,7 @@
-interface Vector export
+interface Vector
+import
+    util/maybe : util/Maybe
+export
     (* The polymorphic growable vector type constructor *)
     T::ALL(A::TYPE) TYPE
 
@@ -55,4 +58,16 @@ interface Vector export
 
     (* Iterate over all elements of a vector *)
     forEach: All(A::TYPE) All(v: T(A) action: All(elem: A) Ok) Ok
+
+    (* Transform each element into a new vector of type B *)
+    map: All(A::TYPE B::TYPE) All(v: T(A) f: All(elem: A) B) T(B)
+
+    (* Retain only elements satisfying the predicate *)
+    filter: All(A::TYPE) All(v: T(A) pred: All(elem: A) Bool) T(A)
+
+    (* Left fold / reduction over elements *)
+    fold: All(A::TYPE Acc::TYPE) All(v: T(A) init: Acc f: All(acc: Acc elem: A) Acc) Acc
+
+    (* Combined map and filter: collects non-none results in a single pass *)
+    filterMap: All(A::TYPE B::TYPE) All(v: T(A) f: All(elem: A) maybe.T(B)) T(B)
 end;

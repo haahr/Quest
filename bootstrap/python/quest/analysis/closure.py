@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Optional
 
 from quest.typed_ast import (
     TypedBlock,
@@ -11,10 +11,14 @@ from quest.typed_ast import (
     TypedFor,
     TypedFun,
     TypedLetValue,
+    TypedModule,
     TypedTry,
     TypedVar,
 )
-from quest.types import QType
+from quest.types import INFIX_OPERATORS, QType
+
+
+BUILTIN_NAMES: set[str] = {"not", "extent", "ordinal", "DivideByZero", "ok"} | set(INFIX_OPERATORS.keys())
 
 
 @dataclass(frozen=True)
@@ -30,6 +34,7 @@ class LambdaAnalysis:
     id: str
     fun: TypedFun
     free_vars: list[CapturedVar]
+    module_name: Optional[str] = None
 
 
 def find_free_vars(fun: TypedFun, global_names: set[str]) -> list[CapturedVar]:
@@ -42,7 +47,12 @@ def find_free_vars(fun: TypedFun, global_names: set[str]) -> list[CapturedVar]:
             return
         match node:
             case TypedVar(name=name, type_val=t):
-                if name not in bound and name not in global_names and name not in seen:
+                if (
+                    name not in bound
+                    and name not in global_names
+                    and name not in BUILTIN_NAMES
+                    and name not in seen
+                ):
                     seen.add(name)
                     free_vars.append(CapturedVar(name=name, type_val=t))
             case TypedLetValue(name=name, value=v):
@@ -96,10 +106,18 @@ def analyze_closures(
     """Scans AST to find all lambdas needing lifting and collects their free variables."""
     lambdas: list[LambdaAnalysis] = []
     lambda_counter = 0
+    current_module: Optional[str] = None
 
     def scan(node: Any) -> None:
-        nonlocal lambda_counter
+        nonlocal lambda_counter, current_module
         if node is None:
+            return
+        if isinstance(node, TypedModule):
+            old_mod = current_module
+            current_module = node.name
+            for b in node.bindings:
+                scan(b)
+            current_module = old_mod
             return
         if isinstance(node, TypedFun):
             if id(node) not in top_fun_objs:
@@ -111,6 +129,7 @@ def analyze_closures(
                         id=lid,
                         fun=node,
                         free_vars=fvars,
+                        module_name=current_module,
                     )
                 )
             # Continue scanning body for nested lambdas

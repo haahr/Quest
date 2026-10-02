@@ -12,6 +12,8 @@
  *)
 
 module vector : Vector
+import
+    util/maybe : util/Maybe
 export
     (* Capacity floor for non-empty backing storage *)
     let floorSize: Int = 6;
@@ -274,4 +276,49 @@ export
             end;
             ok
         end;
+
+    (* Left fold / reduction over elements *)
+    let fold(A::TYPE Acc::TYPE)(v: T(A) init: Acc f: All(acc: Acc elem: A) Acc): Acc =
+        begin
+            let n: Int = v.length;
+            let var acc: Acc = init;
+            if n > 0 then
+                for i = 0 upto {n - 1} do
+                    acc := f(acc v.data[i]);
+                end;
+            end;
+            acc
+        end;
+
+    (* Transform each element into a new vector of type B *)
+    let map(A::TYPE B::TYPE)(v: T(A) f: All(elem: A) B): T(B) =
+        fold(:A :T(B) v newWithCapacity(:B v.length) fun(res: T(B) elem: A): T(B)
+            begin
+                append(:B res f(elem));
+                res
+            end
+        );
+
+    (* Retain only elements satisfying the predicate *)
+    let filter(A::TYPE)(v: T(A) pred: All(elem: A) Bool): T(A) =
+        fold(:A :T(A) v new(:A) fun(res: T(A) elem: A): T(A)
+            begin
+                if pred(elem) then
+                    append(:A res elem);
+                end;
+                res
+            end
+        );
+
+    (* Combined map and filter: collects non-none results into a new vector *)
+    let filterMap(A::TYPE B::TYPE)(v: T(A) f: All(elem: A) maybe.T(B)): T(B) =
+        fold(:A :T(B) v new(:B) fun(res: T(B) elem: A): T(B)
+            begin
+                let opt = f(elem);
+                if maybe.isSome(:B opt) then
+                    append(:B res maybe.unwrap(:B opt));
+                end;
+                res
+            end
+        );
 end;

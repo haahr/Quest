@@ -1,0 +1,162 @@
+(* Tests for functional collection operations: forEach, map, filter, fold, filterMap *)
+
+import collections/vector : collections/Vector;
+import collections/hashMap : collections/HashMap;
+import collections/hashSet : collections/HashSet;
+import util/maybe : util/Maybe;
+import util/strutil : util/Strutil;
+import writer: Writer;
+import conv: Conv;
+import word: Word;
+import stringOp = string: StringOp;
+
+let wOut = writer.output;
+
+let printInt(n: Int): Ok =
+    begin
+        writer.putString(wOut conv.int(n));
+        writer.putString(wOut " ");
+    end;
+
+let printBool(b: Bool): Ok =
+    begin
+        writer.putString(wOut conv.bool(b));
+        writer.putString(wOut " ");
+    end;
+
+let printString(s: String): Ok =
+    begin
+        writer.putString(wOut s);
+        writer.putString(wOut " ");
+    end;
+
+let printNewline(dummy: Int): Ok =
+    writer.putString(wOut "\n");
+
+let intEqual(a: Int b: Int): Bool = a is b;
+let intHash(a: Int): word.T =
+    word.mul(word.fromInt(a) word.fromInt(2654435761));
+
+(* =========================================================================
+ * 1. Vector functional operations
+ * ========================================================================= *)
+
+let v = vector.new(:Int);
+vector.append(:Int v 1);
+vector.append(:Int v 2);
+vector.append(:Int v 3);
+vector.append(:Int v 4);
+vector.append(:Int v 5);
+
+(* vector.map *)
+let vDoubled = vector.map(:Int :Int v fun(x: Int): Int x * 2);
+vector.forEach(:Int vDoubled fun(x: Int): Ok printInt(x));
+printNewline(0);
+
+(* vector.filter *)
+let vEvens = vector.filter(:Int v fun(x: Int): Bool {x % 2} is 0);
+vector.forEach(:Int vEvens fun(x: Int): Ok printInt(x));
+printNewline(0);
+
+(* vector.fold *)
+let vSum = vector.fold(:Int :Int v 0 fun(acc: Int x: Int): Int acc + x);
+printInt(vSum);
+printNewline(0);
+
+(* vector.filterMap *)
+let vFilteredMapped = vector.filterMap(:Int :String v fun(x: Int): maybe.T(String)
+    if {x % 2} is 1 then
+        maybe.some(:String conv.int(x * 10))
+    else
+        maybe.none(:String)
+    end
+);
+vector.forEach(:String vFilteredMapped fun(s: String): Ok printString(s));
+printNewline(0);
+
+(* =========================================================================
+ * 2. HashMap functional operations
+ * ========================================================================= *)
+
+let m = hashMap.new(:String :Int stringOp.equal strutil.hash);
+hashMap.insert(:String :Int m "one" 1);
+hashMap.insert(:String :Int m "two" 2);
+hashMap.insert(:String :Int m "three" 3);
+hashMap.insert(:String :Int m "four" 4);
+
+(* hashMap.map: value transformation *)
+let mMapped = hashMap.map(:String :Int :Int m fun(k: String v: Int): Int v * 10);
+printInt(hashMap.size(:String :Int mMapped));
+printInt(maybe.unwrapOr(:Int hashMap.get(:String :Int mMapped "one") 0));
+printInt(maybe.unwrapOr(:Int hashMap.get(:String :Int mMapped "three") 0));
+printNewline(0);
+
+(* hashMap.filter *)
+let mFiltered = hashMap.filter(:String :Int m fun(k: String v: Int): Bool {v % 2} is 0);
+printInt(hashMap.size(:String :Int mFiltered));
+printBool(hashMap.contains(:String :Int mFiltered "two"));
+printBool(hashMap.contains(:String :Int mFiltered "four"));
+printBool(hashMap.contains(:String :Int mFiltered "one"));
+printNewline(0);
+
+(* hashMap.fold *)
+let mSum = hashMap.fold(:String :Int :Int m 0 fun(acc: Int k: String v: Int): Int acc + v);
+printInt(mSum);
+printNewline(0);
+
+(* hashMap.filterMap *)
+let mFilterMapped = hashMap.filterMap(:String :Int :String m fun(k: String v: Int): maybe.T(String)
+    if v > 2 then
+        maybe.some(:String {k <> "!"})
+    else
+        maybe.none(:String)
+    end
+);
+printInt(hashMap.size(:String :String mFilterMapped));
+printString(maybe.unwrapOr(:String hashMap.get(:String :String mFilterMapped "three") "none"));
+printString(maybe.unwrapOr(:String hashMap.get(:String :String mFilterMapped "four") "none"));
+printNewline(0);
+
+(* =========================================================================
+ * 3. HashSet functional operations
+ * ========================================================================= *)
+
+let s = hashSet.new(:Int intEqual intHash);
+hashSet.insert(:Int s 10);
+hashSet.insert(:Int s 20);
+hashSet.insert(:Int s 30);
+hashSet.insert(:Int s 40);
+
+(* hashSet.filter *)
+let sFiltered = hashSet.filter(:Int s fun(x: Int): Bool x > 20);
+printInt(hashSet.size(:Int sFiltered));
+printBool(hashSet.contains(:Int sFiltered 30));
+printBool(hashSet.contains(:Int sFiltered 40));
+printBool(hashSet.contains(:Int sFiltered 10));
+printNewline(0);
+
+(* hashSet.fold *)
+let sSum = hashSet.fold(:Int :Int s 0 fun(acc: Int x: Int): Int acc + x);
+printInt(sSum);
+printNewline(0);
+
+(* hashSet.map *)
+let sMapped = hashSet.map(:Int :String s stringOp.equal strutil.hash fun(x: Int): String conv.int(x));
+printInt(hashSet.size(:String sMapped));
+printBool(hashSet.contains(:String sMapped "10"));
+printBool(hashSet.contains(:String sMapped "30"));
+printNewline(0);
+
+(* hashSet.filterMap *)
+let sFilterMapped = hashSet.filterMap(:Int :Int s intEqual intHash fun(x: Int): maybe.T(Int)
+    if x <= 20 then
+        maybe.some(:Int {x + 5})
+    else
+        maybe.none(:Int)
+    end
+);
+printInt(hashSet.size(:Int sFilterMapped));
+printBool(hashSet.contains(:Int sFilterMapped 15));
+printBool(hashSet.contains(:Int sFilterMapped 25));
+printBool(hashSet.contains(:Int sFilterMapped 35));
+printNewline(0);

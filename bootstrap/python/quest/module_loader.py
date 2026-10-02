@@ -263,7 +263,10 @@ def load_interface(name: str, env: Environment) -> Scope:
         if mod_src and mod_src.is_file():
             sources.append(mod_src)
 
-        if _is_artifact_stale(qi_file, sources) and file_path is not None and mod_src is not None:
+        obj_file = out_root / f"{name.lower()}.o"
+        is_c_mode = is_c_compilation_mode(env)
+        stale = _is_artifact_stale(qi_file, sources) or (is_c_mode and _is_artifact_stale(obj_file, sources))
+        if stale and file_path is not None and mod_src is not None:
             from quest.module_compiler import compile_hierarchical_module
             compile_hierarchical_module(
                 name.lower(),

@@ -417,4 +417,48 @@ export
             end;
             ok
         end;
+
+    let fold(K::TYPE V::TYPE Acc::TYPE)(m: T(K V) init: Acc f: All(acc: Acc k: K v: V) Acc): Acc =
+        begin
+            let total = vector.length(m.hashes);
+            let var acc: Acc = init;
+            for i = 0 upto {total - 1} do
+                if not(vector.get(m.deleted i)) then
+                    acc := f(acc vector.get(m.keys i) vector.get(m.values i));
+                end;
+            end;
+            acc
+        end;
+
+    let map(K::TYPE V::TYPE W::TYPE)(m: T(K V) f: All(k: K v: V) W): T(K W) =
+        fold(:K :V :T(K W) m newWithCapacity(:K :W m.count m.equal m.hash)
+            fun(acc: T(K W) k: K v: V): T(K W)
+                begin
+                    insert(:K :W acc k f(k v));
+                    acc
+                end
+        );
+
+    let filter(K::TYPE V::TYPE)(m: T(K V) pred: All(k: K v: V) Bool): T(K V) =
+        fold(:K :V :T(K V) m newWithCapacity(:K :V m.count m.equal m.hash)
+            fun(acc: T(K V) k: K v: V): T(K V)
+                begin
+                    if pred(k v) then
+                        insert(:K :V acc k v);
+                    end;
+                    acc
+                end
+        );
+
+    let filterMap(K::TYPE V::TYPE W::TYPE)(m: T(K V) f: All(k: K v: V) maybe.T(W)): T(K W) =
+        fold(:K :V :T(K W) m newWithCapacity(:K :W m.count m.equal m.hash)
+            fun(acc: T(K W) k: K v: V): T(K W)
+                begin
+                    let opt: maybe.T(W) = f(k v);
+                    if maybe.isSome(:W opt) then
+                        insert(:K :W acc k maybe.unwrap(:W opt));
+                    end;
+                    acc
+                end
+        );
 end;

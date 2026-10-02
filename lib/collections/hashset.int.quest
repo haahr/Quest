@@ -3,6 +3,7 @@
 interface HashSet
 import
     collections/vector : collections/Vector
+    util/maybe : util/Maybe
     word: Word
 export
     (* The polymorphic hash set type constructor *)
@@ -64,4 +65,30 @@ export
 
     (* Check if s1 and s2 are equal (same size and every element of s1 is in s2) *)
     equal: All(A::TYPE) All(s1: T(A) s2: T(A)) Bool
+
+    (* Retain only elements satisfying the predicate *)
+    filter: All(A::TYPE)
+        All(s: T(A) pred: All(elem: A) Bool)
+        T(A)
+
+    (* Fold over elements in insertion order *)
+    fold: All(A::TYPE Acc::TYPE)
+        All(s: T(A) init: Acc f: All(acc: Acc elem: A) Acc)
+        Acc
+
+    (* Transform elements into a new set with equality and hash functions for B *)
+    map: All(A::TYPE B::TYPE)
+        All(s: T(A)
+            equal: All(b1: B b2: B) Bool
+            hash: All(b: B) word.T
+            f: All(elem: A) B)
+        T(B)
+
+    (* Combined map and filter into a new set with equality and hash functions for B *)
+    filterMap: All(A::TYPE B::TYPE)
+        All(s: T(A)
+            equal: All(b1: B b2: B) Bool
+            hash: All(b: B) word.T
+            f: All(elem: A) maybe.T(B))
+        T(B)
 end;

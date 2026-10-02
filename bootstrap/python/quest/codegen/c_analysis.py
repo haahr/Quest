@@ -68,6 +68,7 @@ class CLambdaInfo:
     env_struct_name: Optional[str]
     c_fn_name: str
     closure_var_name: Optional[str] = None
+    module_name: Optional[str] = None
 
 
 @dataclass
@@ -556,8 +557,19 @@ def analyze_program_for_c(
 
     for phrase in prog.phrases:
         match phrase:
-            case TypedModule():
-                pass
+            case TypedModule() as mod:
+                for b in mod.bindings:
+                    match b:
+                        case TypedLetValue(name=name, value=val, symbol=symbol):
+                            if isinstance(val, TypedFun):
+                                top_funs.append((name, val, symbol))
+                            else:
+                                top_vars.append((name, val, symbol))
+                        case TypedException(name=name, type_val=t) as exc_node:
+                            if name:
+                                top_vars.append((name, exc_node, type("Symbol", (), {"type_val": t})()))
+                        case _:
+                            pass
             case TypedLetValue(name=name, value=val, symbol=symbol):
                 if isinstance(val, TypedFun):
                     top_funs.append((name, val, symbol))
@@ -704,6 +716,7 @@ def analyze_program_for_c(
                 env_struct_name=env_struct,
                 c_fn_name=c_fn_name,
                 closure_var_name=closure_var,
+                module_name=l.module_name,
             )
         )
 

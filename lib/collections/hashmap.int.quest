@@ -65,4 +65,24 @@ export
     forEach: All(K::TYPE V::TYPE)
         All(m: T(K V) action: All(k: K v: V) Ok)
         Ok
+
+    (* Transform values in place while preserving keys, equality, and hash table layout *)
+    map: All(K::TYPE V::TYPE W::TYPE)
+        All(m: T(K V) f: All(k: K v: V) W)
+        T(K W)
+
+    (* Retain entries where predicate holds *)
+    filter: All(K::TYPE V::TYPE)
+        All(m: T(K V) pred: All(k: K v: V) Bool)
+        T(K V)
+
+    (* Fold over key-value pairs in insertion order *)
+    fold: All(K::TYPE V::TYPE Acc::TYPE)
+        All(m: T(K V) init: Acc f: All(acc: Acc k: K v: V) Acc)
+        Acc
+
+    (* Combined map and filter on values: retains keys where f returns maybe.some(w) *)
+    filterMap: All(K::TYPE V::TYPE W::TYPE)
+        All(m: T(K V) f: All(k: K v: V) maybe.T(W))
+        T(K W)
 end;

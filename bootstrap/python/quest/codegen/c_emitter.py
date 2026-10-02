@@ -294,7 +294,8 @@ class CEmitter:
 
     def _param_c_decl(self, p: TypedParam, ident: str) -> str:
         ptr = " *" if getattr(p, "is_out", False) or getattr(p, "is_var", False) else " "
-        return f"{self.c_type(p.type_val)}{ptr}{ident}"
+        c_t = "QVal" if p.type_val == OK_TYPE else self.c_type(p.type_val)
+        return f"{c_t}{ptr}{ident}"
 
     def _param_signatures(
         self,
@@ -527,7 +528,7 @@ class CEmitter:
             for idx, tp in enumerate(tgt_params):
                 op = orig_params[idx] if idx < len(orig_params) else tp
                 arg_name = f"qv_arg_{idx}"
-                tp_c = self.c_type(tp.type_val)
+                tp_c = "QVal" if tp.type_val == OK_TYPE else self.c_type(tp.type_val)
                 param_decls.append(f"{tp_c} {arg_name}")
 
                 tp_tag = qtype_to_c_type(tp.type_val, self.record_ctx)
@@ -1060,6 +1061,64 @@ class CEmitter:
         lines.extend(decl_emitter.emit_environment_structs(self.lifted_lambdas))
         return lines
 
+    def _emit_lifted_lambdas(
+        self,
+        lambdas: list[CLambdaInfo],
+        base_env: dict[str, str],
+        lines: list[str],
+    ) -> None:
+        if not lambdas:
+            return
+        lines.append("/* Lifted lambda definitions */")
+        for l in lambdas:
+            quants, inner_t = self._collect_fun_quantifiers(l.fun.type_val)
+            ret_type = inner_t.result_type if isinstance(inner_t, QFunType) else inner_t
+            ret_c = "void" if ret_type == OK_TYPE else self.c_type(ret_type)
+            decls: list[str] = []
+            for q in quants:
+                decls.append(f"const QTypeDescriptor *descriptor_{q.name}")
+            for p in l.fun.params:
+                p_c = mangle_ident(p.name)
+                decls.append(self._param_c_decl(p, p_c))
+            param_sigs = ["void *_raw_env"] + decls
+            sig = ", ".join(param_sigs)
+            lines.append(f"static Q_UNUSED {ret_c} {l.c_fn_name}({sig}) {{")
+            fn_lines: list[str] = []
+            prev_env = self.current_env_vars
+            lambda_env = dict(base_env)
+            if l.free_vars:
+                fn_lines.append(f"{l.env_struct_name} *_env = ({l.env_struct_name} *)_raw_env;")
+                lambda_env.update({
+                    vname: f"_env->{mangle_ident(vname)}" for vname, _ in l.free_vars
+                })
+            else:
+                fn_lines.append("(void)_raw_env;")
+            lambda_env.update({
+                p.name: mangle_ident(p.name) for p in l.fun.params
+            })
+            self.current_env_vars = lambda_env
+
+            saved_descriptors = self.in_scope_type_descriptors
+            self.in_scope_type_descriptors = {}
+            saved_ptr_params = self.pointer_params
+            self.pointer_params = set()
+            for p in l.fun.params:
+                if getattr(p, "is_out", False) or getattr(p, "is_var", False):
+                    self.pointer_params.add(p.name)
+            for q in quants:
+                self.in_scope_type_descriptors[q.name] = f"descriptor_{q.name}"
+                fn_lines.append(f"(void)descriptor_{q.name};")
+
+            self._emit_fun_return(l.fun.body, ret_type, fn_lines)
+
+            self.in_scope_type_descriptors = saved_descriptors
+            self.pointer_params = saved_ptr_params
+            self.current_env_vars = prev_env
+            for f_line in fn_lines:
+                lines.append(f"    {f_line}" if f_line.strip() else f_line)
+            lines.append("}")
+            lines.append("")
+
     def emit_program(
         self,
         prog: TypedProgram,
@@ -1204,47 +1263,10 @@ class CEmitter:
                 lines.append("}")
                 lines.append("")
 
-        # 8b. Function definitions for lifted lambdas
-        if self.lifted_lambdas:
-            lines.append("/* Lifted lambda definitions */")
-            for l in self.lifted_lambdas:
-                quants, inner_t = self._collect_fun_quantifiers(l.fun.type_val)
-                ret_type = inner_t.result_type if isinstance(inner_t, QFunType) else inner_t
-                ret_c = "void" if ret_type == OK_TYPE else self.c_type(ret_type)
-                decls, _ = self._param_signatures(l.fun.params, quants)
-                param_sigs = ["void *_raw_env"] + decls
-                sig = ", ".join(param_sigs)
-                lines.append(f"static Q_UNUSED {ret_c} {l.c_fn_name}({sig}) {{")
-                fn_lines = []
-                if l.free_vars:
-                    fn_lines.append(f"{l.env_struct_name} *_env = ({l.env_struct_name} *)_raw_env;")
-                    prev_env = self.current_env_vars
-                    self.current_env_vars = {
-                        vname: f"_env->{mangle_ident(vname)}" for vname, _ in l.free_vars
-                    }
-                else:
-                    fn_lines.append("(void)_raw_env;")
-                    prev_env = self.current_env_vars
-                    self.current_env_vars = {}
-
-                saved_descriptors = dict(self.in_scope_type_descriptors)
-                saved_ptr_params = set(self.pointer_params)
-                for p in l.fun.params:
-                    if getattr(p, "is_out", False) or getattr(p, "is_var", False):
-                        self.pointer_params.add(p.name)
-                for q in quants:
-                    self.in_scope_type_descriptors[q.name] = f"descriptor_{q.name}"
-                    fn_lines.append(f"(void)descriptor_{q.name};")
-
-                self._emit_fun_return(l.fun.body, ret_type, fn_lines)
-
-                self.in_scope_type_descriptors = saved_descriptors
-                self.pointer_params = saved_ptr_params
-                self.current_env_vars = prev_env
-                for f_line in fn_lines:
-                    lines.append(f"    {f_line}" if f_line.strip() else f_line)
-                lines.append("}")
-                lines.append("")
+        # 8b. Function definitions for lifted lambdas (top-level only)
+        top_lambdas = [l for l in self.lifted_lambdas if not l.module_name]
+        if top_lambdas:
+            self._emit_lifted_lambdas(top_lambdas, {}, lines)
 
         # 9. Main entrypoint
         main_lines: list[str] = [
@@ -1589,6 +1611,12 @@ class CEmitter:
         mod_emitter.tuple_coercions = self.tuple_coercions
         mod_emitter.variant_coercions = self.variant_coercions
 
+        mod_base_env = dict(mod_imported_env)
+        for fn_k, (fn_impl, *_) in fun_adapters.items():
+            mod_base_env[fn_k] = fn_impl
+        for vname, _, _ in mod_vars:
+            mod_base_env[vname] = mangle_module_ident(clean_mod, vname)
+
         fun_lines: list[str] = []
         for fname, ffun, fsym in mod_funs:
             m_ident = mangle_module_ident(clean_mod, fname)
@@ -1612,11 +1640,7 @@ class CEmitter:
                     mod_emitter.in_scope_type_descriptors[q.name] = f"descriptor_{q.name}"
                     fn_lines.append(f"(void)descriptor_{q.name};")
                 prev_env = mod_emitter.current_env_vars
-                mod_emitter.current_env_vars = dict(mod_imported_env)
-                for fn_k, (fn_impl, *_) in fun_adapters.items():
-                    mod_emitter.current_env_vars[fn_k] = fn_impl
-                for vname, _, _ in mod_vars:
-                    mod_emitter.current_env_vars[vname] = mangle_module_ident(clean_mod, vname)
+                mod_emitter.current_env_vars = dict(mod_base_env)
                 mod_emitter.current_env_vars.update(
                     {p.name: mangle_module_ident(clean_mod, p.name) for p in params}
                 )
@@ -1672,11 +1696,7 @@ class CEmitter:
                     mod_emitter.in_scope_type_descriptors[q.name] = f"descriptor_{q.name}"
                     fn_lines.append(f"(void)descriptor_{q.name};")
                 prev_env = mod_emitter.current_env_vars
-                mod_emitter.current_env_vars = dict(mod_imported_env)
-                for fn_k, (fn_impl, *_) in fun_adapters.items():
-                    mod_emitter.current_env_vars[fn_k] = fn_impl
-                for vname, _, _ in mod_vars:
-                    mod_emitter.current_env_vars[vname] = mangle_module_ident(clean_mod, vname)
+                mod_emitter.current_env_vars = dict(mod_base_env)
                 mod_emitter.current_env_vars.update(
                     {p.name: mangle_module_ident(clean_mod, p.name) for p in params}
                 )
@@ -1690,6 +1710,20 @@ class CEmitter:
                     fun_lines.append(f"    {fl}" if fl.strip() else fl)
                 fun_lines.append("}")
                 fun_lines.append("")
+
+        mod_lambdas = [
+            l for l in self.lifted_lambdas
+            if l.module_name == mod.name or (standalone and l.module_name is None)
+        ]
+        if mod_lambdas:
+            mod_emitter._emit_lifted_lambdas(mod_lambdas, mod_base_env, fun_lines)
+
+        if standalone and mod_lambdas and decl_emitter:
+            lines.extend(
+                decl_emitter.emit_forward_declarations_and_trampolines(
+                    [], mod_lambdas, set(), {}
+                )
+            )
 
         if self.adapter_decls:
             lines.append("/* Static forward declarations for closure adapters */")

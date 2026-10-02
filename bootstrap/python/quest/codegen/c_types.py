@@ -462,6 +462,8 @@ def closure_fn_ptr_type(fun_type: QType, ctx: Optional[RecordNamingContext] = No
         for p in cur_type.params:
             if getattr(p, "is_out", False) or getattr(p, "is_var", False):
                 param_types.append(f"{qtype_to_c_type(p.type_val, ctx)} *")
+            elif p.type_val == OK_TYPE:
+                param_types.append("QVal")
             else:
                 param_types.append(qtype_to_c_type(p.type_val, ctx))
         sig = ", ".join(param_types)

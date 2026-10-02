@@ -53,47 +53,70 @@ export
         hashMap.keys(s.map);
 
     let forEach(A::TYPE)(s: T(A) action: All(elem: A) Ok): Ok =
-        begin
-            let elems = hashMap.keys(s.map);
-            let n = vector.length(elems);
-            if n > 0 then
-                for i = 0 upto {n - 1} do
-                    action(vector.get(elems i));
-                end;
-            end;
-            ok
-        end;
+        hashMap.forEach(:A :Ok s.map fun(elem: A dummy: Ok): Ok
+            action(elem)
+        );
+
+    let fold(A::TYPE Acc::TYPE)(s: T(A) init: Acc f: All(acc: Acc elem: A) Acc): Acc =
+        hashMap.fold(:A :Ok :Acc s.map init fun(acc: Acc elem: A dummy: Ok): Acc
+            f(acc elem)
+        );
 
     let copy(A::TYPE)(s: T(A)): T(A) =
-        begin
-            let res = newWithCapacity(size(s) s.equal s.hash);
-            let elems = elements(s);
-            let n = vector.length(elems);
-            if n > 0 then
-                for i = 0 upto {n - 1} do
-                    insert(res vector.get(elems i));
-                end;
-            end;
-            res
-        end;
+        fold(:A :T(A) s newWithCapacity(size(s) s.equal s.hash)
+            fun(acc: T(A) elem: A): T(A)
+                begin
+                    insert(acc elem);
+                    acc
+                end
+        );
+
+    let filter(A::TYPE)(s: T(A) pred: All(elem: A) Bool): T(A) =
+        fold(:A :T(A) s newWithCapacity(size(s) s.equal s.hash)
+            fun(acc: T(A) elem: A): T(A)
+                begin
+                    if pred(elem) then
+                        insert(acc elem);
+                    end;
+                    acc
+                end
+        );
+
+    let map(A::TYPE B::TYPE)(s: T(A) equal: All(b1: B b2: B) Bool hash: All(b: B) word.T f: All(elem: A) B): T(B) =
+        fold(:A :T(B) s newWithCapacity(:B size(s) equal hash)
+            fun(acc: T(B) elem: A): T(B)
+                begin
+                    insert(:B acc f(elem));
+                    acc
+                end
+        );
+
+    let filterMap(A::TYPE B::TYPE)(
+        s: T(A)
+        equal: All(b1: B b2: B) Bool
+        hash: All(b: B) word.T
+        f: All(elem: A) maybe.T(B)
+    ): T(B) =
+        fold(:A :T(B) s newWithCapacity(:B size(s) equal hash)
+            fun(acc: T(B) elem: A): T(B)
+                begin
+                    let opt: maybe.T(B) = f(elem);
+                    if maybe.isSome(:B opt) then
+                        insert(:B acc maybe.unwrap(:B opt));
+                    end;
+                    acc
+                end
+        );
 
     let union(A::TYPE)(s1: T(A) s2: T(A)): T(A) =
         begin
-            let res = newWithCapacity({size(s1) + size(s2)} s1.equal s1.hash);
-            let e1 = elements(s1);
-            let n1 = vector.length(e1);
-            if n1 > 0 then
-                for i = 0 upto {n1 - 1} do
-                    insert(res vector.get(e1 i));
-                end;
-            end;
-            let e2 = elements(s2);
-            let n2 = vector.length(e2);
-            if n2 > 0 then
-                for i = 0 upto {n2 - 1} do
-                    insert(res vector.get(e2 i));
-                end;
-            end;
+            let res = copy(s1);
+            forEach(s2 fun(elem: A): Ok
+                begin
+                    insert(res elem);
+                    ok
+                end
+            );
             res
         end;
 
@@ -101,35 +124,15 @@ export
         begin
             let primary = if size(s1) <= size(s2) then s1 else s2 end;
             let secondary = if size(s1) <= size(s2) then s2 else s1 end;
-            let res = newWithCapacity(size(primary) s1.equal s1.hash);
-            let elems = elements(primary);
-            let n = vector.length(elems);
-            if n > 0 then
-                for i = 0 upto {n - 1} do
-                    let item = vector.get(elems i);
-                    if contains(secondary item) then
-                        insert(res item);
-                    end;
-                end;
-            end;
-            res
+            filter(primary fun(elem: A): Bool
+                contains(secondary elem)
+            )
         end;
 
     let difference(A::TYPE)(s1: T(A) s2: T(A)): T(A) =
-        begin
-            let res = newWithCapacity(size(s1) s1.equal s1.hash);
-            let elems = elements(s1);
-            let n = vector.length(elems);
-            if n > 0 then
-                for i = 0 upto {n - 1} do
-                    let item = vector.get(elems i);
-                    if not(contains(s2 item)) then
-                        insert(res item);
-                    end;
-                end;
-            end;
-            res
-        end;
+        filter(s1 fun(elem: A): Bool
+            not(contains(s2 elem))
+        );
 
     let isSubset(A::TYPE)(s1: T(A) s2: T(A)): Bool =
         begin
