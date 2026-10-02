@@ -118,4 +118,11 @@ Remaining prerequisites:
 | **OS Primitives** | `system.exec` | **P1** | Extend `System` (native C backing) |
 | **Algorithms** | Binary search, Quicksort, Topological sort | **P1** | Pure Quest algorithms |
 | **AST & Type Models** | Recursive `Variant` definitions | **P2** | Compiler architecture |
+| **String Building** | In-Quest `StringBuilder` | **P2** | Replace chunked array `stringOp.conc` |
+
+### 6.1. Note on String Building
+The current `util/stringBuilder` collects chunks in a `vector.T(String)` and delegates to
+`stringOp.conc(vector.toArray(b.chunks))` upon `toString()`. For heavy compiler workloads (emitting C code,
+formatting large AST dumps, and generating diagnostics), a better, fully in-Quest solution that manages character
+or byte buffers directly (or a rope structure) may be desirable to avoid intermediate string array allocations.
 
