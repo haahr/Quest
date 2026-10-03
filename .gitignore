@@ -35,8 +35,8 @@ lib/**/*.h
 !runtime/quest_serialization.h
 !tests/golden/**/*.out
 !tests/golden/**/*.error
-build/
-.build/
-bin/
-dist/
+/build/
+/.build/
+/bin/
+/dist/
 *.code-workspace

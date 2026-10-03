@@ -385,6 +385,7 @@ def compile_interface_file(
     file_path: Path,
     output_dir: Optional[Path] = None,
     include_paths: Optional[list[Path]] = None,
+    build_dir: Optional[Path] = None,
 ) -> tuple[Path, Path]:
     """Compiles a .int.quest file to .h and .qi files."""
     try:
@@ -408,15 +409,26 @@ def compile_interface_file(
         )
 
     env = Environment()
-    if include_paths:
-        env.include_paths = list(include_paths)
+    env.include_paths = list(include_paths) if include_paths else []
+    if build_dir is not None:
+        b_dir = Path(build_dir).resolve()
+        if b_dir not in env.include_paths:
+            env.include_paths.insert(0, b_dir)
     env.current_dir = file_path.parent
     typed_iface = elaborate_interface(decl, env)
 
     qi_content = compile_interface_to_qi(decl, typed_iface.scope)
     h_content = compile_interface_to_header(decl, typed_iface.scope)
 
-    target_dir = output_dir if output_dir is not None else file_path.parent
+    if build_dir is not None and output_dir is None:
+        from quest.module_loader import canonicalize_module_path
+        canon_name = canonicalize_module_path(file_path, env.include_paths)
+        if "/" in canon_name:
+            target_dir = Path(build_dir).resolve() / Path(canon_name).parent
+        else:
+            target_dir = Path(build_dir).resolve()
+    else:
+        target_dir = output_dir if output_dir is not None else file_path.parent
     base_name = file_path.name
     if base_name.endswith(".int.quest"):
         stem = base_name[:-10]

@@ -17,17 +17,38 @@ import quest.ast as ast
 from quest.codegen.c_emitter import CEmitter
 from quest.codegen.compiler_runner import compile_c_to_object
 from quest.diagnostics import QuestTypeError
+from quest.build.manifest import (
+    ImportedInterfaceRef,
+    ImportedModuleRef,
+    ModuleManifest,
+    write_qm,
+)
 from quest.env import Environment
 from quest.grammar import parse_quest_program
 from quest.module_loader import (
     DEFAULT_LIB_DIR,
     load_interface,
     resolve_interface_file,
+    resolve_interface_source_file,
     resolve_module_file,
 )
 from quest.modules import elaborate_module
 from quest.tokenizer import Tokenizer
 from quest.tokens import SourceMap
+
+
+class ModuleCompileResult(tuple):
+    """Tuple of (c_file, o_file) with additional metadata attributes."""
+    c_file: Path
+    o_file: Path
+    qm_file: Path
+
+    def __new__(cls, c_file: Path, o_file: Path, qm_file: Path):
+        obj = super().__new__(cls, (c_file, o_file))
+        obj.c_file = c_file
+        obj.o_file = o_file
+        obj.qm_file = qm_file
+        return obj
 
 
 def compile_module(
@@ -42,23 +63,53 @@ def compile_module(
     stem_name: Optional[str] = None,
     canonical_name: Optional[str] = None,
     emit_deps: bool = False,
-) -> tuple[Path, Path]:
-    """Compiles an AST ModuleDecl into .c and .o files."""
+    source_file: Optional[Path] = None,
+    build_dir: Optional[Path] = None,
+) -> ModuleCompileResult:
+    """Compiles an AST ModuleDecl into .c, .o, and .qm files."""
     if output_dir is None:
         output_dir = Path.cwd()
     output_dir.mkdir(parents=True, exist_ok=True)
+
+    imported_modules: list[ImportedModuleRef] = []
+    imported_interfaces: list[ImportedInterfaceRef] = []
 
     # 1. Load target interface (from .qi or .int.quest)
     target_interface_scope = env.lookup_interface(module_decl.interface_name)
     if target_interface_scope is None:
         target_interface_scope = load_interface(module_decl.interface_name, env)
 
+    tgt_src = resolve_interface_source_file(
+        module_decl.interface_name, env.current_dir, env.include_paths
+    )
+    tgt_mtime = tgt_src.stat().st_mtime if tgt_src and tgt_src.is_file() else 0.0
+    imported_interfaces.append(
+        ImportedInterfaceRef(
+            name=module_decl.interface_name,
+            source=str(tgt_src.resolve()) if tgt_src else "",
+            mtime=tgt_mtime,
+        )
+    )
+
     # 2. Load any imported interfaces or modules
     for imp in module_decl.imports:
         iface_path = imp.effective_interface_path
         if env.lookup_interface(iface_path) is None and env.lookup_interface(imp.interface_name) is None:
             load_interface(iface_path, env)
+
+        imp_src = resolve_interface_source_file(iface_path, env.current_dir, env.include_paths)
+        imp_mtime = imp_src.stat().st_mtime if imp_src and imp_src.is_file() else 0.0
+        imported_interfaces.append(
+            ImportedInterfaceRef(
+                name=iface_path,
+                source=str(imp_src.resolve()) if imp_src else "",
+                mtime=imp_mtime,
+            )
+        )
+
         for iname, mpath in zip(imp.names, imp.effective_module_paths):
+            mod_ref = mpath if mpath else iname
+            imported_modules.append(ImportedModuleRef(name=mod_ref, interface=iface_path))
             if mpath not in env.loaded_modules_ast and iname not in env.loaded_modules_ast:
                 from quest.module_loader import load_module
                 load_module(mpath, iface_path, env)
@@ -161,7 +212,19 @@ def compile_module(
         prereqs_str = " ".join(dep_objects)
         dep_file.write_text(f"{target_rel}: {prereqs_str}\n", encoding="utf-8")
 
-    return c_file, o_file
+    # 8. Emit .qm metadata file
+    qm_file = output_dir / f"{base}.qm"
+    manifest = ModuleManifest(
+        name=mod_name,
+        interface=module_decl.interface_name,
+        source=str(source_file.resolve()) if source_file else "",
+        object=str(o_file.resolve()),
+        imported_modules=imported_modules,
+        imported_interfaces=imported_interfaces,
+    )
+    write_qm(manifest, qm_file)
+
+    return ModuleCompileResult(c_file, o_file, qm_file)
 
 
 def compile_module_file(
@@ -172,16 +235,12 @@ def compile_module_file(
     nogc: bool = False,
     extra_c_flags: Optional[list[str]] = None,
     emit_deps: bool = False,
-) -> tuple[Path, Path]:
-    """Compiles a Quest module file (.mod.quest) into .c and .o files."""
+    build_dir: Optional[Path] = None,
+) -> ModuleCompileResult:
+    """Compiles a Quest module file (.mod.quest) into .c, .o, and .qm files."""
     mod_path = Path(mod_path).resolve()
     if not mod_path.is_file():
         raise FileNotFoundError(f"Module file not found: '{mod_path}'")
-
-    if output_dir is None:
-        output_dir = mod_path.parent
-    else:
-        output_dir = Path(output_dir).resolve()
 
     source_text = mod_path.read_text(encoding="utf-8")
     source_map = SourceMap(source_text, str(mod_path))
@@ -211,15 +270,29 @@ def compile_module_file(
     env = Environment()
     env.current_dir = mod_path.parent
     env.include_paths = list(include_paths) if include_paths else []
+    if build_dir is not None:
+        b_dir = Path(build_dir).resolve()
+        if b_dir not in env.include_paths:
+            env.include_paths.insert(0, b_dir)
 
     from quest.module_loader import canonicalize_module_path
     canon_name = canonicalize_module_path(mod_path, env.include_paths)
+
+    if build_dir is not None and output_dir is None:
+        target_sub = Path(build_dir).resolve()
+        if "/" in canon_name:
+            target_sub = target_sub / Path(canon_name).parent
+        output_dir = target_sub
+    elif output_dir is None:
+        output_dir = mod_path.parent
+    else:
+        output_dir = Path(output_dir).resolve()
 
     return compile_module(
         decl,
         env,
         output_dir=output_dir,
-        include_paths=include_paths,
+        include_paths=env.include_paths,
         compiler_path=compiler_path,
         nogc=nogc,
         extra_c_flags=extra_c_flags,
@@ -227,6 +300,8 @@ def compile_module_file(
         stem_name=stem,
         canonical_name=canon_name,
         emit_deps=emit_deps,
+        source_file=mod_path,
+        build_dir=build_dir,
     )
 
 

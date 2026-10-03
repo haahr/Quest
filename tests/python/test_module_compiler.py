@@ -63,8 +63,17 @@ class TestModuleCompiler(unittest.TestCase):
             include_paths=[self.dir_path],
         )
 
-        self.assertTrue(c_file.is_file())
-        self.assertTrue(o_file.is_file())
+        qm_file = self.dir_path / "counter.qm"
+        self.assertTrue(qm_file.is_file())
+        from quest.build.manifest import read_qm
+        manifest = read_qm(qm_file)
+        self.assertIsNotNone(manifest)
+        self.assertEqual(manifest.name, "counter")
+        self.assertEqual(manifest.interface, "Counter")
+        self.assertEqual(manifest.source, str(mod_file.resolve()))
+        self.assertEqual(manifest.object, str(o_file.resolve()))
+        self.assertEqual(len(manifest.imported_interfaces), 1)
+        self.assertEqual(manifest.imported_interfaces[0].name, "Counter")
 
         c_source = c_file.read_text(encoding="utf-8")
         # Interface header included
@@ -325,6 +334,73 @@ class TestModuleCompiler(unittest.TestCase):
         ])
         self.assertEqual(res, 0)
 
+    def test_module_manifest_with_imports(self) -> None:
+        """Tests that .qm metadata captures imported modules and interfaces."""
+        from quest.build.manifest import read_qm
+
+        intf_c = self.dir_path / "depc.int.quest"
+        intf_c.write_text("interface DepC export val: Int end;\n", encoding="utf-8")
+        compile_interface_file(intf_c, output_dir=self.dir_path, include_paths=[self.dir_path])
+
+        mod_c = self.dir_path / "depc.mod.quest"
+        mod_c.write_text("module depc: DepC export let val: Int = 10; end;\n", encoding="utf-8")
+        compile_module_file(mod_c, output_dir=self.dir_path, include_paths=[self.dir_path])
+
+        intf_b = self.dir_path / "depb.int.quest"
+        intf_b.write_text(
+            "interface DepB import c = depc : DepC export val: Int end;\n",
+            encoding="utf-8",
+        )
+        compile_interface_file(intf_b, output_dir=self.dir_path, include_paths=[self.dir_path])
+
+        mod_b = self.dir_path / "depb.mod.quest"
+        mod_b.write_text(
+            "module depb: DepB import c = depc : DepC export let val: Int = c.val + 20; end;\n",
+            encoding="utf-8",
+        )
+        res_b = compile_module_file(mod_b, output_dir=self.dir_path, include_paths=[self.dir_path])
+        self.assertTrue(res_b.qm_file.is_file())
+
+        manifest = read_qm(res_b.qm_file)
+        self.assertIsNotNone(manifest)
+        self.assertEqual(manifest.name, "depb")
+        self.assertEqual(manifest.interface, "DepB")
+        # Imported modules
+        self.assertEqual(len(manifest.imported_modules), 1)
+        self.assertEqual(manifest.imported_modules[0].name, "depc")
+        self.assertEqual(manifest.imported_modules[0].interface, "DepC")
+        # Imported interfaces (DepB and DepC)
+        iface_names = {i.name for i in manifest.imported_interfaces}
+        self.assertIn("DepB", iface_names)
+        self.assertIn("DepC", iface_names)
+
+    def test_build_dir_support(self) -> None:
+        """Tests compiling into a dedicated build_dir."""
+        from quest.build.manifest import read_qm
+
+        build_dir = self.dir_path / ".build"
+        intf = self.dir_path / "calc.int.quest"
+        intf.write_text("interface Calc export add(a: Int b: Int): Int end;\n", encoding="utf-8")
+        compile_interface_file(intf, build_dir=build_dir, include_paths=[self.dir_path])
+
+        self.assertTrue((build_dir / "calc.qi").is_file())
+        self.assertTrue((build_dir / "calc.h").is_file())
+
+        mod = self.dir_path / "calc.mod.quest"
+        mod.write_text(
+            "module calc: Calc export let add(a: Int b: Int): Int = a + b; end;\n",
+            encoding="utf-8",
+        )
+        res = compile_module_file(mod, build_dir=build_dir, include_paths=[self.dir_path])
+        self.assertTrue((build_dir / "calc.qm").is_file())
+        self.assertTrue((build_dir / "calc.c").is_file())
+        self.assertTrue((build_dir / "calc.o").is_file())
+
+        manifest = read_qm(build_dir / "calc.qm")
+        self.assertIsNotNone(manifest)
+        self.assertEqual(manifest.name, "calc")
+
 
 if __name__ == "__main__":
     unittest.main()
+
