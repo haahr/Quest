@@ -298,6 +298,16 @@ on runtime helper operations provided by standard library modules (e.g. `string`
 - The build engine then queues and links them transitively into the final executable just like explicitly imported
   modules.
 
+### 6.3. Inter-Module Interface Conformance Verification
+Because separate compilation decouples the compilation of an importing unit from the imported module's implementation:
+- An importing compilation unit compiles and typechecks strictly against the imported interface (`Iface.qi`).
+- The imported module compiles and typechecks strictly against its own declared interface (`ActualIface.qi`).
+- To prevent type mismatches and binary desynchronization across separate compilation boundaries, the build engine
+  explicitly enforces that the module's declared interface (`mod.qm.interface`) conforms to the interface expected by
+  each importer (`imported_modules[...].interface`).
+- If an importer expects interface `Iface` but `mod` implements `ActualIface`, the build engine halts compilation with a
+  fatal type mismatch error before generating binary code or invoking the linker.
+
 ---
 
 ## 7. The Queue-Driven Full Build Process
@@ -344,6 +354,7 @@ and rebuild the transitive closure of required modules.
 1. **Initialization:**
    - Let `work_queue` be a FIFO queue of compilation items (`main.quest` or module names).
    - Let `discovered_modules` be a set of canonical module names to prevent duplicate enqueueing.
+   - Let `expected_interfaces` be a map from module name to expected interface constraints `(importer, interface)`.
    - Let `linked_objects` be an ordered set of object file paths (`.o`) to pass to the linker.
    - Enqueue the Quest main routine `main.quest`.
 
@@ -374,19 +385,26 @@ and rebuild the transitive closure of required modules.
      - For each imported interface: verify and regenerate `I.qi` / `q_I.h` per §5.
      - Emit `.qm` and `.c` into `.build/`.
      - Compile `.c` to `.o` via the host C compiler (`clang -c ... -o .build/...`).
-     - For each module `Dep` in `imported_modules`: if `Dep` is not in `discovered_modules`, add `Dep` to
-       `discovered_modules` and enqueue `Dep`.
+     - Read the generated `.qm` manifest.
+     - **Verify Interface Conformance:** Verify that `manifest.interface` satisfies all expected interfaces recorded
+       in `expected_interfaces[item]` from importing units. If there is a mismatch, raise a `BuildError`.
+     - For each module `Dep` in `imported_modules`:
+       - Record `(item, Dep.interface)` in `expected_interfaces[Dep.name]`.
+       - If `Dep` is not in `discovered_modules`, add `Dep` to `discovered_modules` and enqueue `Dep`.
      - Add `.o` to `linked_objects`.
 
    - **Action if Up to Date:**
      - Read the existing `.qm` file from `.build/`.
-     - For each module `Dep` in `.qm.imported_modules`: if `Dep` is not in `discovered_modules`, add `Dep` to
-       `discovered_modules` and enqueue `Dep`.
+     - **Verify Interface Conformance:** Verify that `manifest.interface` satisfies all expected interfaces recorded
+       in `expected_interfaces[item]` from importing units. If there is a mismatch, raise a `BuildError`.
+     - For each module `Dep` in `.qm.imported_modules`:
+       - Record `(item, Dep.interface)` in `expected_interfaces[Dep.name]`.
+       - If `Dep` is not in `discovered_modules`, add `Dep` to `discovered_modules` and enqueue `Dep`.
      - Add `.o` to `linked_objects`.
 
 3. **Termination:**
    When the queue is empty, all units in the transitive closure are guaranteed to have current `.qm`, `.c`, and
-   `.o` files in `.build/`.
+   `.o` files in `.build/`, and all module interface contracts have been verified.
 
 4. **Module Implementation Import Cycle Check:**
    Separate compilation of module implementations strictly requires an acyclic dependency graph (DAG). Circular

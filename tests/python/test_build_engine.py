@@ -284,6 +284,61 @@ class TestBuildEngine(unittest.TestCase):
         self.assertIn("HOST LINK:", content)
         self.assertIn("BUILD COMPLETE:", content)
 
+    def test_module_interface_conformance_mismatch(self) -> None:
+        """Tests that importing a module with an incompatible interface raises BuildError."""
+        intf_expected = self.root / "expected.int.quest"
+        intf_expected.write_text("interface Expected export get(): Int end;\n", encoding="utf-8")
+        intf_actual = self.root / "actual.int.quest"
+        intf_actual.write_text("interface Actual export get(): Int end;\n", encoding="utf-8")
+        compile_interface_file(intf_expected, build_dir=self.build_dir, include_paths=[self.root])
+        compile_interface_file(intf_actual, build_dir=self.build_dir, include_paths=[self.root])
+
+        mod_prov = self.root / "prov.mod.quest"
+        mod_prov.write_text("module prov : Actual export let get(): Int = 42; end;\n", encoding="utf-8")
+
+        main_file = self.root / "bad_import.quest"
+        main_file.write_text("import p = prov : Expected;\n", encoding="utf-8")
+
+        engine = self._create_engine()
+        with self.assertRaises(BuildError) as ctx:
+            engine.build_main(main_file)
+        self.assertIn("Type error:", str(ctx.exception))
+        self.assertIn("Expected", str(ctx.exception))
+        self.assertIn("Actual", str(ctx.exception))
+
+    def test_transitive_interface_mismatch_detected(self) -> None:
+        """Tests that a transitive module importing another with a mismatched interface is caught."""
+        intf_a = self.root / "ifacea.int.quest"
+        intf_a.write_text("interface IfaceA export valA(): Int end;\n", encoding="utf-8")
+        intf_b = self.root / "ifaceb.int.quest"
+        intf_b.write_text("interface IfaceB export valB(): Int end;\n", encoding="utf-8")
+        intf_c = self.root / "ifacec.int.quest"
+        intf_c.write_text("interface IfaceC export valC(): Int end;\n", encoding="utf-8")
+        compile_interface_file(intf_a, build_dir=self.build_dir, include_paths=[self.root])
+        compile_interface_file(intf_b, build_dir=self.build_dir, include_paths=[self.root])
+        compile_interface_file(intf_c, build_dir=self.build_dir, include_paths=[self.root])
+
+        # prov implements IfaceC
+        mod_prov = self.root / "prov2.mod.quest"
+        mod_prov.write_text("module prov2 : IfaceC export let valC(): Int = 99; end;\n", encoding="utf-8")
+
+        # mid implements IfaceB, but imports prov2 as IfaceA (mismatch!)
+        mod_mid = self.root / "mid.mod.quest"
+        mod_mid.write_text(
+            "module mid : IfaceB import p = prov2 : IfaceA export let valB(): Int = p.valA(); end;\n",
+            encoding="utf-8",
+        )
+
+        main_file = self.root / "main_trans.quest"
+        main_file.write_text("import m = mid : IfaceB;\n", encoding="utf-8")
+
+        engine = self._create_engine()
+        with self.assertRaises(BuildError) as ctx:
+            engine.build_main(main_file)
+        self.assertIn("Type error:", str(ctx.exception))
+        self.assertIn("IfaceA", str(ctx.exception))
+        self.assertIn("IfaceC", str(ctx.exception))
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -51,6 +51,15 @@ class BuildResult:
     exit_code: int = 0
 
 
+def interfaces_conform(actual: Optional[str], expected: Optional[str]) -> bool:
+    """Checks whether an actual module interface matches an expected interface name."""
+    if not actual or not expected:
+        return True
+    if actual == expected or actual.lower() == expected.lower():
+        return True
+    return actual.split("/")[-1].lower() == expected.split("/")[-1].lower()
+
+
 def detect_module_cycle(graph: dict[str, list[str]]) -> Optional[list[str]]:
     """Detects cycles in a directed graph of module dependencies using DFS."""
     visited: set[str] = set()
@@ -261,6 +270,59 @@ class BuildEngine:
             discovered_modules.add(obj.stem.lower())
         compiled_units: list[str] = []
         module_graph: dict[str, list[str]] = {}
+        expected_interfaces: dict[str, list[tuple[str, str]]] = {}
+        module_manifests: dict[str, ModuleManifest] = {}
+
+        def _record_expected_interface(
+            importer: str,
+            mod_name: str,
+            expected_iface: str,
+        ) -> None:
+            if not expected_iface:
+                return
+            norm_name = mod_name.lower()
+            stem_name = Path(mod_name).name.lower()
+            expected_interfaces.setdefault(norm_name, []).append((importer, expected_iface))
+            if stem_name != norm_name:
+                expected_interfaces.setdefault(stem_name, []).append((importer, expected_iface))
+
+            if norm_name in RUNTIME_BUILTINS:
+                if not interfaces_conform(norm_name, expected_iface):
+                    raise BuildError(
+                        f"Type error: '{importer}' imports module '{mod_name}' as interface "
+                        f"'{expected_iface}', but builtin module '{mod_name}' implements interface '{mod_name}'"
+                    )
+                return
+
+            existing = module_manifests.get(norm_name) or module_manifests.get(stem_name)
+            if existing and existing.interface:
+                if not interfaces_conform(existing.interface, expected_iface):
+                    raise BuildError(
+                        f"Type error: '{importer}' imports module '{mod_name}' as interface "
+                        f"'{expected_iface}', but module '{mod_name}' implements interface '{existing.interface}'"
+                    )
+                self.logger.log(
+                    "VERIFY INTERFACE",
+                    f"'{mod_name}' implements '{existing.interface}', "
+                    f"satisfies '{expected_iface}' (from {importer})",
+                )
+
+        def _verify_module_interface(
+            mod_key: str,
+            manifest_iface: Optional[str],
+        ) -> None:
+            if not manifest_iface:
+                return
+            for importer, exp_iface in expected_interfaces.get(mod_key, []):
+                if not interfaces_conform(manifest_iface, exp_iface):
+                    raise BuildError(
+                        f"Type error: '{importer}' imports module '{mod_key}' as interface "
+                        f"'{exp_iface}', but module '{mod_key}' implements interface '{manifest_iface}'"
+                    )
+                self.logger.log(
+                    "VERIFY INTERFACE",
+                    f"'{mod_key}' implements '{manifest_iface}', satisfies '{exp_iface}' (from {importer})",
+                )
 
         while work_queue:
             kind, item_name, source_path = work_queue.popleft()
@@ -309,6 +371,7 @@ class BuildEngine:
                     linked_objects.append(o_path)
 
                 for dep in imported_mods:
+                    _record_expected_interface(item_name, dep.name, dep.interface)
                     norm_dep = dep.name.lower()
                     if norm_dep in RUNTIME_BUILTINS:
                         continue
@@ -406,6 +469,13 @@ class BuildEngine:
                     self.logger.log("EVAL STALENESS", f"'{item_name}' -> UP TO DATE")
                     manifest = read_qm(qm_path) if qm_path.is_file() else None
 
+                if manifest is not None:
+                    module_manifests[item_name.lower()] = manifest
+                    module_manifests[stem] = manifest
+                    _verify_module_interface(item_name.lower(), manifest.interface)
+                    if stem != item_name.lower():
+                        _verify_module_interface(stem, manifest.interface)
+
                 imported_mods: list[ImportedModuleRef] = manifest.imported_modules if manifest else []
 
                 if o_path not in linked_objects:
@@ -414,6 +484,7 @@ class BuildEngine:
                 module_graph[item_name] = [dep.name for dep in imported_mods]
 
                 for dep in imported_mods:
+                    _record_expected_interface(item_name, dep.name, dep.interface)
                     norm_dep = dep.name.lower()
                     if norm_dep in RUNTIME_BUILTINS:
                         continue
@@ -424,6 +495,25 @@ class BuildEngine:
                         work_queue.append(("module", dep.name, None))
 
         self.logger.log("QUEUE EMPTY", f"transitive closure verified ({len(linked_objects)} units)")
+
+        # Verify all expected interface constraints across the transitive closure
+        for mod_name, reqs in expected_interfaces.items():
+            if mod_name in RUNTIME_BUILTINS:
+                for importer, exp_iface in reqs:
+                    if not interfaces_conform(mod_name, exp_iface):
+                        raise BuildError(
+                            f"Type error: '{importer}' imports module '{mod_name}' as interface "
+                            f"'{exp_iface}', but builtin module '{mod_name}' implements interface '{mod_name}'"
+                        )
+                continue
+            manifest = module_manifests.get(mod_name)
+            if manifest and manifest.interface:
+                for importer, exp_iface in reqs:
+                    if not interfaces_conform(manifest.interface, exp_iface):
+                        raise BuildError(
+                            f"Type error: '{importer}' imports module '{mod_name}' as interface "
+                            f"'{exp_iface}', but module '{mod_name}' implements interface '{manifest.interface}'"
+                        )
 
         # Cycle detection
         cycle = detect_module_cycle(module_graph)
