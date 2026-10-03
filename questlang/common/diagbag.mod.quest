@@ -1,0 +1,83 @@
+(* Self-Hosted Quest Compiler: Diagnostic Bag and Reporter *)
+
+module diagbag : DiagBag
+import
+    questlang/common/location : questlang/common/Location
+    questlang/common/diagnostics : questlang/common/Diagnostics
+    collections/vector : collections/Vector
+    writer : Writer
+export
+    let fatalError: Exception(diagnostics.Diagnostic) =
+        exception fatalError: diagnostics.Diagnostic end;
+
+    Let T = Tuple
+        items: vector.T(diagnostics.Diagnostic)
+        var errors: Int
+        var warnings: Int
+    end;
+
+    let new(): T =
+        tuple
+            let items = vector.new(:diagnostics.Diagnostic)
+            let var errors = 0
+            let var warnings = 0
+        end;
+
+    let add(bag: T d: diagnostics.Diagnostic): Ok =
+        begin
+            vector.append(:diagnostics.Diagnostic bag.items d);
+            case diagnostics.severity(d)
+                when fatal then
+                    bag.errors := bag.errors + 1;
+                when error then
+                    bag.errors := bag.errors + 1;
+                when warning then
+                    bag.warnings := bag.warnings + 1;
+                else
+                    ok;
+            end;
+            ok
+        end;
+
+    let addError(bag: T sp: location.Span msg: String): Ok =
+        add(bag diagnostics.error(msg sp));
+
+    let addWarning(bag: T sp: location.Span msg: String): Ok =
+        add(bag diagnostics.warning(msg sp));
+
+    let addFatal(bag: T sp: location.Span msg: String): Ok =
+        begin
+            let d = diagnostics.fatal(msg sp);
+            add(bag d);
+            raise fatalError with d end
+        end;
+
+    let hasErrors(bag: T): Bool =
+        bag.errors > 0;
+
+    let errorCount(bag: T): Int =
+        bag.errors;
+
+    let warningCount(bag: T): Int =
+        bag.warnings;
+
+    let count(bag: T): Int =
+        vector.length(:diagnostics.Diagnostic bag.items);
+
+    let get(bag: T idx: Int): diagnostics.Diagnostic =
+        vector.get(:diagnostics.Diagnostic bag.items idx);
+
+    let getAll(bag: T): vector.T(diagnostics.Diagnostic) =
+        bag.items;
+
+    let renderAll(bag: T sm: location.SourceMap w: writer.T): Ok =
+        begin
+            let n = count(bag);
+            if n > 0 then
+                for i = 0 upto {n - 1} do
+                    diagnostics.render(get(bag i) sm w);
+                end;
+            end;
+            ok
+        end;
+end;

@@ -101,7 +101,10 @@ class CDeclarationEmitter:
             for tag_name, _ in agg_types:
                 if tag_name not in seen:
                     seen.add(tag_name)
+                    lines.append(f"#ifndef QUEST_TYPE_{tag_name}_TYPEDEF")
+                    lines.append(f"#define QUEST_TYPE_{tag_name}_TYPEDEF")
                     lines.append(f"typedef struct {tag_name} {tag_name};")
+                    lines.append("#endif")
             lines.append("")
         return lines
 
@@ -182,6 +185,8 @@ class CDeclarationEmitter:
             if tag_name in seen:
                 continue
             seen.add(tag_name)
+            lines.append(f"#ifndef QUEST_TYPE_{tag_name}_DEFINED")
+            lines.append(f"#define QUEST_TYPE_{tag_name}_DEFINED")
             lines.append(f"struct {tag_name} {{")
             if isinstance(t, QTupleType):
                 if not t.value_fields:
@@ -223,6 +228,7 @@ class CDeclarationEmitter:
                             lines.append(f"        struct {{ {c_pt} val; }} {o.name};")
                     lines.append("    } u;")
             lines.append("};")
+            lines.append("#endif")
             lines.append("")
         return lines
 

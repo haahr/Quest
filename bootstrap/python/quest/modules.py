@@ -285,8 +285,6 @@ def elaborate_module(
                     if obj_file is not None and obj_file.is_file():
                         if obj_file not in env.linked_objects:
                             env.linked_objects.append(obj_file)
-                        from quest.module_loader import _load_precompiled_transitive_deps
-                        _load_precompiled_transitive_deps(obj_file, None, env, None)
                 else:
                     on_disk = (
                         resolve_module_file(mod_path, env.current_dir, env.include_paths) is not None

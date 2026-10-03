@@ -30,6 +30,7 @@ if TYPE_CHECKING:
     from quest.typed_ast import TypedModule
 
 DEFAULT_LIB_DIR = (Path(__file__).parent.parent.parent.parent / "lib").resolve()
+DEFAULT_PROJECT_DIR = (Path(__file__).parent.parent.parent.parent).resolve()
 
 
 def is_c_compilation_mode(env: Environment) -> bool:
@@ -84,6 +85,8 @@ def resolve_interface_file(
         dirs_to_check.append(Path(env_lib))
     if DEFAULT_LIB_DIR.is_dir():
         dirs_to_check.append(DEFAULT_LIB_DIR)
+    if DEFAULT_PROJECT_DIR.is_dir():
+        dirs_to_check.append(DEFAULT_PROJECT_DIR)
 
     for d in dirs_to_check:
         qi_candidate = d / f"{stem}.qi"
@@ -122,6 +125,11 @@ def resolve_interface_source_file(
         if candidate.is_file():
             return candidate.resolve()
 
+    if DEFAULT_PROJECT_DIR.is_dir():
+        candidate = DEFAULT_PROJECT_DIR / filename
+        if candidate.is_file():
+            return candidate.resolve()
+
     return None
 
 
@@ -150,6 +158,11 @@ def resolve_module_file(
 
     if DEFAULT_LIB_DIR.is_dir():
         candidate = DEFAULT_LIB_DIR / filename
+        if candidate.is_file():
+            return candidate.resolve()
+
+    if DEFAULT_PROJECT_DIR.is_dir():
+        candidate = DEFAULT_PROJECT_DIR / filename
         if candidate.is_file():
             return candidate.resolve()
 
@@ -184,6 +197,11 @@ def resolve_object_file(
         if candidate.is_file():
             return candidate.resolve()
 
+    if DEFAULT_PROJECT_DIR.is_dir():
+        candidate = DEFAULT_PROJECT_DIR / filename
+        if candidate.is_file():
+            return candidate.resolve()
+
     return None
 
 
@@ -200,6 +218,8 @@ def canonicalize_module_path(
         all_roots.append(Path(inc).resolve())
     if DEFAULT_LIB_DIR.is_dir():
         all_roots.append(DEFAULT_LIB_DIR.resolve())
+    if DEFAULT_PROJECT_DIR.is_dir():
+        all_roots.append(DEFAULT_PROJECT_DIR.resolve())
 
     all_roots.sort(key=lambda p: len(p.parts), reverse=True)
     resolved = file_path.resolve()
@@ -356,6 +376,8 @@ def load_interface(name: str, env: Environment) -> Scope:
         searched.extend(str(p) for p in env.include_paths)
         if DEFAULT_LIB_DIR.is_dir():
             searched.append(str(DEFAULT_LIB_DIR))
+        if DEFAULT_PROJECT_DIR.is_dir():
+            searched.append(str(DEFAULT_PROJECT_DIR))
         raise QuestTypeError(
             f"Undefined interface '{name}': cannot find interface file for '{name}' "
             f"(looked for '{norm_name}.qi' or '{norm_name}.int.quest' in {searched})"
@@ -445,6 +467,9 @@ def parse_dep_file(dep_file: Path) -> list[str]:
     return prereqs
 
 
+_COMPILING_MODULES: set[str] = set()
+
+
 def _load_precompiled_transitive_deps(
     obj_file: Optional[Path],
     file_path: Optional[Path],
@@ -485,6 +510,34 @@ def _load_precompiled_transitive_deps(
                         if cand.is_file():
                             dep_obj = cand.resolve()
                             break
+                if dep_obj is None and DEFAULT_LIB_DIR.is_dir():
+                    cand = DEFAULT_LIB_DIR / f"{mod_name.lower()}.o"
+                    if cand.is_file():
+                        dep_obj = cand.resolve()
+                if dep_obj is None and DEFAULT_PROJECT_DIR.is_dir():
+                    cand = DEFAULT_PROJECT_DIR / f"{mod_name.lower()}.o"
+                    if cand.is_file():
+                        dep_obj = cand.resolve()
+                if dep_obj is None:
+                    canon_key = mod_name.lower()
+                    if canon_key not in _COMPILING_MODULES:
+                        mod_file = resolve_module_file(mod_name, env.current_dir, env.include_paths)
+                        if mod_file and mod_file.is_file():
+                            _COMPILING_MODULES.add(canon_key)
+                            try:
+                                from quest.module_compiler import compile_hierarchical_module
+                                root = out_root if out_root is not None else DEFAULT_LIB_DIR
+                                _, compiled_o = compile_hierarchical_module(
+                                    mod_name,
+                                    output_dir=root,
+                                    current_dir=env.current_dir,
+                                    include_paths=env.include_paths,
+                                    emit_deps=True,
+                                )
+                                if compiled_o and compiled_o.is_file():
+                                    dep_obj = compiled_o.resolve()
+                            finally:
+                                _COMPILING_MODULES.discard(canon_key)
                 if dep_obj is not None and dep_obj.is_file():
                     if dep_obj not in env.linked_objects:
                         env.linked_objects.append(dep_obj)
@@ -520,26 +573,32 @@ def _load_precompiled_transitive_deps(
                                     break
                         if dep_obj is None:
                             mod_name = prereq[:-2] if prereq.endswith(".o") else prereq
-                            mod_file = resolve_module_file(mod_name, env.current_dir, env.include_paths)
-                            if mod_file and mod_file.is_file():
-                                from quest.module_compiler import compile_hierarchical_module
-                                root = out_root if out_root is not None else DEFAULT_LIB_DIR
-                                _, compiled_o = compile_hierarchical_module(
-                                    mod_name,
-                                    output_dir=root,
-                                    current_dir=env.current_dir,
-                                    include_paths=env.include_paths,
-                                    emit_deps=True,
-                                )
-                                if compiled_o and compiled_o.is_file():
-                                    dep_obj = compiled_o.resolve()
+                            canon_key = mod_name.lower()
+                            if canon_key not in _COMPILING_MODULES:
+                                mod_file = resolve_module_file(mod_name, env.current_dir, env.include_paths)
+                                if mod_file and mod_file.is_file():
+                                    _COMPILING_MODULES.add(canon_key)
+                                    try:
+                                        from quest.module_compiler import compile_hierarchical_module
+                                        root = out_root if out_root is not None else DEFAULT_LIB_DIR
+                                        _, compiled_o = compile_hierarchical_module(
+                                            mod_name,
+                                            output_dir=root,
+                                            current_dir=env.current_dir,
+                                            include_paths=env.include_paths,
+                                            emit_deps=True,
+                                        )
+                                        if compiled_o and compiled_o.is_file():
+                                            dep_obj = compiled_o.resolve()
+                                    finally:
+                                        _COMPILING_MODULES.discard(canon_key)
 
                         if dep_obj is not None and dep_obj.is_file():
                             if dep_obj not in env.linked_objects:
                                 env.linked_objects.append(dep_obj)
                             mod_name = prereq[:-2] if prereq.endswith(".o") else prereq
                             env.precompiled_modules.add(mod_name)
-                            _load_precompiled_transitive_deps(dep_obj, None, env, out_root)
+                            _load_precompiled_transitive_deps(dep_obj, None, env, out_root, visited=visited)
                     return
                 except Exception:
                     pass
@@ -696,6 +755,8 @@ def load_module(name: str, expected_interface: str, env: Environment) -> TypedMo
         searched.extend(str(p) for p in env.include_paths)
         if DEFAULT_LIB_DIR.is_dir():
             searched.append(str(DEFAULT_LIB_DIR))
+        if DEFAULT_PROJECT_DIR.is_dir():
+            searched.append(str(DEFAULT_PROJECT_DIR))
         raise QuestTypeError(
             f"Undefined module '{name}': cannot find module file for '{name}' "
             f"(looked for '{norm_name}.mod.quest' or '{norm_name}.o' in {searched})"

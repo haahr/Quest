@@ -1,0 +1,64 @@
+(* Self-Hosted Quest Compiler: Source Location and Coordinates *)
+
+interface Location
+import
+    collections/vector : collections/Vector
+export
+    (* Source coordinate position (1-indexed line and column, 0-indexed offset) *)
+    Def Pos = Tuple
+        offset: Int
+        line: Int
+        col: Int
+    end
+
+    (* Source span: file name, 0-indexed start offset (inclusive), end offset (exclusive) *)
+    Def Span = Tuple
+        file: String
+        startOffset: Int
+        endOffset: Int
+    end
+
+    (* Abstract source map type for line/column lookup *)
+    SourceMap::TYPE
+
+    (* =========================================================================
+     * Constructors & Factories
+     * ========================================================================= *)
+
+    (* Construct a source map indexing line starts of the given text *)
+    newSourceMap(file: String text: String): SourceMap
+
+    (* Construct a span covering [startOffset, endOffset) *)
+    span(file: String startOffset: Int endOffset: Int): Span
+
+    (* Construct a zero-width point span at offset *)
+    pointSpan(file: String offset: Int): Span
+
+    (* =========================================================================
+     * Accessors
+     * ========================================================================= *)
+
+    file(sm: SourceMap): String
+    text(sm: SourceMap): String
+    lineCount(sm: SourceMap): Int
+
+    (* =========================================================================
+     * Coordinate Resolution
+     * ========================================================================= *)
+
+    (* Resolve 0-indexed character offset into 1-indexed Pos (line, col) *)
+    locate(sm: SourceMap offset: Int): Pos
+
+    (* Resolve span into start and end Pos coordinates *)
+    locateSpan(sm: SourceMap sp: Span): Tuple start: Pos endPos: Pos end
+
+    (* =========================================================================
+     * Text & Line Extraction
+     * ========================================================================= *)
+
+    (* Retrieve 1-indexed line content, excluding trailing newline characters *)
+    getLine(sm: SourceMap lineNum: Int): String
+
+    (* Extract snippet text referenced by span *)
+    extractSnippet(sm: SourceMap sp: Span): String
+end;

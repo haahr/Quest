@@ -1,0 +1,55 @@
+test.quest
+4
+1
+1
+1
+5
+2
+1
+3
+1
+let x = 10;
+let y = 20;
+let sum = x + y;
+
+x
+let y
+2
+1
+2
+6
+warning
+test.quest:2:5: warning: unused variable 'y'
+    let y = 20;
+        ^
+  = note: variable defined here but never read
+  = help: prefix with underscore if intentionally unused
+
+test.quest:3:11: error: type mismatch
+    let sum = x + y;
+              ^^^^^
+
+false
+0
+false
+1
+0
+1
+true
+1
+1
+2
+unrecoverable syntax failure
+true
+2
+3
+--- Render All Diagnostics ---
+test.quest:1:1: warning: consider explicit type
+    let x = 10;
+    ^^^
+test.quest:1:9: error: invalid literal
+    let x = 10;
+            ^^
+test.quest:3:1: fatal error: unrecoverable syntax failure
+    let sum = x + y;
+    ^^^^^^^^^^^^^^^

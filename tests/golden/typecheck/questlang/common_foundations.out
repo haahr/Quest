@@ -1,0 +1,628 @@
+(TypedProgram
+  :phrases (
+    (TypedImport
+      :items (
+        (TypedImportItem ('location') : 'Location')
+        (TypedImportItem ('diagnostics') : 'Diagnostics')
+        (TypedImportItem ('diagbag') : 'DiagBag')
+        (TypedImportItem ('vector') : 'Vector')
+        (TypedImportItem ('maybe') : 'Maybe')
+        (TypedImportItem ('writer') : 'Writer')
+        (TypedImportItem ('conv') : 'Conv')
+      ))
+    (TypedLetValue 'wOut' :type Writer.T
+      :value (TypedSelect 'output' :type Writer.T
+        :target (TypedVar 'writer' :type Record error: Exception output: Writer.T err: Writer.T file: Fun(name: String): Writer.T putString: Fun(writer: Writer.T string: String): Ok putChar: Fun(writer: Writer.T char: Char): Ok putSubString: Fun(writer: Writer.T string: String start: Int size: Int): Ok flush: Fun(writer: Writer.T): Ok close: Fun(writer: Writer.T): Ok end)))
+    (TypedLetValue 'printStr' :type Fun(s: String): Ok
+      :value (TypedFun :params (('s' : String)) :type Fun(s: String): Ok
+        :body (TypedBlock :type Ok
+          :bindings (
+            (TypedExprStmt
+              :expr (TypedApp :type Ok
+                :func (TypedSelect 'putString' :type Fun(writer: Writer.T string: String): Ok
+                  :target (TypedVar 'writer' :type Record error: Exception output: Writer.T err: Writer.T file: Fun(name: String): Writer.T putString: Fun(writer: Writer.T string: String): Ok putChar: Fun(writer: Writer.T char: Char): Ok putSubString: Fun(writer: Writer.T string: String start: Int size: Int): Ok flush: Fun(writer: Writer.T): Ok close: Fun(writer: Writer.T): Ok end))
+                :args (
+                  (TypedVar 'wOut' :type Writer.T)
+                  (TypedVar 's' :type String)
+                )))
+          )
+          :result (TypedApp :type Ok
+            :func (TypedSelect 'putString' :type Fun(writer: Writer.T string: String): Ok
+              :target (TypedVar 'writer' :type Record error: Exception output: Writer.T err: Writer.T file: Fun(name: String): Writer.T putString: Fun(writer: Writer.T string: String): Ok putChar: Fun(writer: Writer.T char: Char): Ok putSubString: Fun(writer: Writer.T string: String start: Int size: Int): Ok flush: Fun(writer: Writer.T): Ok close: Fun(writer: Writer.T): Ok end))
+            :args (
+              (TypedVar 'wOut' :type Writer.T)
+              (TypedString '\n' :type String)
+            )))))
+    (TypedLetValue 'printInt' :type Fun(n: Int): Ok
+      :value (TypedFun :params (('n' : Int)) :type Fun(n: Int): Ok
+        :body (TypedApp :type Ok
+          :func (TypedVar 'printStr' :type Fun(s: String): Ok)
+          :args (
+            (TypedApp :type String
+              :func (TypedSelect 'int' :type Fun(n: Int): String
+                :target (TypedVar 'conv' :type Record okay: Fun(): String bool: Fun(b: Bool): String int: Fun(n: Int): String real: Fun(r: Real): String char: Fun(c: Char): String string: Fun(s: String): String end))
+              :args (
+                (TypedVar 'n' :type Int)
+              ))
+          ))))
+    (TypedLetValue 'printBool' :type Fun(b: Bool): Ok
+      :value (TypedFun :params (('b' : Bool)) :type Fun(b: Bool): Ok
+        :body (TypedApp :type Ok
+          :func (TypedVar 'printStr' :type Fun(s: String): Ok)
+          :args (
+            (TypedApp :type String
+              :func (TypedSelect 'bool' :type Fun(b: Bool): String
+                :target (TypedVar 'conv' :type Record okay: Fun(): String bool: Fun(b: Bool): String int: Fun(n: Int): String real: Fun(r: Real): String char: Fun(c: Char): String string: Fun(s: String): String end))
+              :args (
+                (TypedVar 'b' :type Bool)
+              ))
+          ))))
+    (TypedLetValue 'sampleCode' :type String
+      :value (TypedString 'let x = 10;\nlet y = 20;\nlet sum = x + y;\n' :type String))
+    (TypedLetValue 'sm' :type location.SourceMap
+      :value (TypedApp :type location.SourceMap
+        :func (TypedSelect 'newSourceMap' :type Fun(file: String text: String): location.SourceMap
+          :target (TypedVar 'location' :type Record newSourceMap: Fun(file: String text: String): SourceMap span: Fun(file: String startOffset: Int endOffset: Int): Tuple file: String startOffset: Int endOffset: Int end pointSpan: Fun(file: String offset: Int): Tuple file: String startOffset: Int endOffset: Int end file: Fun(sm: SourceMap): String text: Fun(sm: SourceMap): String lineCount: Fun(sm: SourceMap): Int locate: Fun(sm: SourceMap offset: Int): Tuple offset: Int line: Int col: Int end locateSpan: Fun(sm: SourceMap sp: Tuple file: String startOffset: Int endOffset: Int end): Tuple start: Tuple offset: Int line: Int col: Int end endPos: Tuple offset: Int line: Int col: Int end end getLine: Fun(sm: SourceMap lineNum: Int): String extractSnippet: Fun(sm: SourceMap sp: Tuple file: String startOffset: Int endOffset: Int end): String end))
+        :args (
+          (TypedString 'test.quest' :type String)
+          (TypedVar 'sampleCode' :type String)
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printStr' :type Fun(s: String): Ok)
+        :args (
+          (TypedApp :type String
+            :func (TypedSelect 'file' :type Fun(sm: location.SourceMap): String
+              :target (TypedVar 'location' :type Record newSourceMap: Fun(file: String text: String): SourceMap span: Fun(file: String startOffset: Int endOffset: Int): Tuple file: String startOffset: Int endOffset: Int end pointSpan: Fun(file: String offset: Int): Tuple file: String startOffset: Int endOffset: Int end file: Fun(sm: SourceMap): String text: Fun(sm: SourceMap): String lineCount: Fun(sm: SourceMap): Int locate: Fun(sm: SourceMap offset: Int): Tuple offset: Int line: Int col: Int end locateSpan: Fun(sm: SourceMap sp: Tuple file: String startOffset: Int endOffset: Int end): Tuple start: Tuple offset: Int line: Int col: Int end endPos: Tuple offset: Int line: Int col: Int end end getLine: Fun(sm: SourceMap lineNum: Int): String extractSnippet: Fun(sm: SourceMap sp: Tuple file: String startOffset: Int endOffset: Int end): String end))
+            :args (
+              (TypedVar 'sm' :type location.SourceMap)
+            ))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printInt' :type Fun(n: Int): Ok)
+        :args (
+          (TypedApp :type Int
+            :func (TypedSelect 'lineCount' :type Fun(sm: location.SourceMap): Int
+              :target (TypedVar 'location' :type Record newSourceMap: Fun(file: String text: String): SourceMap span: Fun(file: String startOffset: Int endOffset: Int): Tuple file: String startOffset: Int endOffset: Int end pointSpan: Fun(file: String offset: Int): Tuple file: String startOffset: Int endOffset: Int end file: Fun(sm: SourceMap): String text: Fun(sm: SourceMap): String lineCount: Fun(sm: SourceMap): Int locate: Fun(sm: SourceMap offset: Int): Tuple offset: Int line: Int col: Int end locateSpan: Fun(sm: SourceMap sp: Tuple file: String startOffset: Int endOffset: Int end): Tuple start: Tuple offset: Int line: Int col: Int end endPos: Tuple offset: Int line: Int col: Int end end getLine: Fun(sm: SourceMap lineNum: Int): String extractSnippet: Fun(sm: SourceMap sp: Tuple file: String startOffset: Int endOffset: Int end): String end))
+            :args (
+              (TypedVar 'sm' :type location.SourceMap)
+            ))
+        )))
+    (TypedLetValue 'p1' :type Tuple offset: Int line: Int col: Int end
+      :value (TypedApp :type Tuple offset: Int line: Int col: Int end
+        :func (TypedSelect 'locate' :type Fun(sm: location.SourceMap offset: Int): Tuple offset: Int line: Int col: Int end
+          :target (TypedVar 'location' :type Record newSourceMap: Fun(file: String text: String): SourceMap span: Fun(file: String startOffset: Int endOffset: Int): Tuple file: String startOffset: Int endOffset: Int end pointSpan: Fun(file: String offset: Int): Tuple file: String startOffset: Int endOffset: Int end file: Fun(sm: SourceMap): String text: Fun(sm: SourceMap): String lineCount: Fun(sm: SourceMap): Int locate: Fun(sm: SourceMap offset: Int): Tuple offset: Int line: Int col: Int end locateSpan: Fun(sm: SourceMap sp: Tuple file: String startOffset: Int endOffset: Int end): Tuple start: Tuple offset: Int line: Int col: Int end endPos: Tuple offset: Int line: Int col: Int end end getLine: Fun(sm: SourceMap lineNum: Int): String extractSnippet: Fun(sm: SourceMap sp: Tuple file: String startOffset: Int endOffset: Int end): String end))
+        :args (
+          (TypedVar 'sm' :type location.SourceMap)
+          (TypedInt 0 :type Int)
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printInt' :type Fun(n: Int): Ok)
+        :args (
+          (TypedSelect 'line' :type Int
+            :target (TypedVar 'p1' :type Tuple offset: Int line: Int col: Int end))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printInt' :type Fun(n: Int): Ok)
+        :args (
+          (TypedSelect 'col' :type Int
+            :target (TypedVar 'p1' :type Tuple offset: Int line: Int col: Int end))
+        )))
+    (TypedLetValue 'p2' :type Tuple offset: Int line: Int col: Int end
+      :value (TypedApp :type Tuple offset: Int line: Int col: Int end
+        :func (TypedSelect 'locate' :type Fun(sm: location.SourceMap offset: Int): Tuple offset: Int line: Int col: Int end
+          :target (TypedVar 'location' :type Record newSourceMap: Fun(file: String text: String): SourceMap span: Fun(file: String startOffset: Int endOffset: Int): Tuple file: String startOffset: Int endOffset: Int end pointSpan: Fun(file: String offset: Int): Tuple file: String startOffset: Int endOffset: Int end file: Fun(sm: SourceMap): String text: Fun(sm: SourceMap): String lineCount: Fun(sm: SourceMap): Int locate: Fun(sm: SourceMap offset: Int): Tuple offset: Int line: Int col: Int end locateSpan: Fun(sm: SourceMap sp: Tuple file: String startOffset: Int endOffset: Int end): Tuple start: Tuple offset: Int line: Int col: Int end endPos: Tuple offset: Int line: Int col: Int end end getLine: Fun(sm: SourceMap lineNum: Int): String extractSnippet: Fun(sm: SourceMap sp: Tuple file: String startOffset: Int endOffset: Int end): String end))
+        :args (
+          (TypedVar 'sm' :type location.SourceMap)
+          (TypedInt 4 :type Int)
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printInt' :type Fun(n: Int): Ok)
+        :args (
+          (TypedSelect 'line' :type Int
+            :target (TypedVar 'p2' :type Tuple offset: Int line: Int col: Int end))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printInt' :type Fun(n: Int): Ok)
+        :args (
+          (TypedSelect 'col' :type Int
+            :target (TypedVar 'p2' :type Tuple offset: Int line: Int col: Int end))
+        )))
+    (TypedLetValue 'p3' :type Tuple offset: Int line: Int col: Int end
+      :value (TypedApp :type Tuple offset: Int line: Int col: Int end
+        :func (TypedSelect 'locate' :type Fun(sm: location.SourceMap offset: Int): Tuple offset: Int line: Int col: Int end
+          :target (TypedVar 'location' :type Record newSourceMap: Fun(file: String text: String): SourceMap span: Fun(file: String startOffset: Int endOffset: Int): Tuple file: String startOffset: Int endOffset: Int end pointSpan: Fun(file: String offset: Int): Tuple file: String startOffset: Int endOffset: Int end file: Fun(sm: SourceMap): String text: Fun(sm: SourceMap): String lineCount: Fun(sm: SourceMap): Int locate: Fun(sm: SourceMap offset: Int): Tuple offset: Int line: Int col: Int end locateSpan: Fun(sm: SourceMap sp: Tuple file: String startOffset: Int endOffset: Int end): Tuple start: Tuple offset: Int line: Int col: Int end endPos: Tuple offset: Int line: Int col: Int end end getLine: Fun(sm: SourceMap lineNum: Int): String extractSnippet: Fun(sm: SourceMap sp: Tuple file: String startOffset: Int endOffset: Int end): String end))
+        :args (
+          (TypedVar 'sm' :type location.SourceMap)
+          (TypedInt 12 :type Int)
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printInt' :type Fun(n: Int): Ok)
+        :args (
+          (TypedSelect 'line' :type Int
+            :target (TypedVar 'p3' :type Tuple offset: Int line: Int col: Int end))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printInt' :type Fun(n: Int): Ok)
+        :args (
+          (TypedSelect 'col' :type Int
+            :target (TypedVar 'p3' :type Tuple offset: Int line: Int col: Int end))
+        )))
+    (TypedLetValue 'p4' :type Tuple offset: Int line: Int col: Int end
+      :value (TypedApp :type Tuple offset: Int line: Int col: Int end
+        :func (TypedSelect 'locate' :type Fun(sm: location.SourceMap offset: Int): Tuple offset: Int line: Int col: Int end
+          :target (TypedVar 'location' :type Record newSourceMap: Fun(file: String text: String): SourceMap span: Fun(file: String startOffset: Int endOffset: Int): Tuple file: String startOffset: Int endOffset: Int end pointSpan: Fun(file: String offset: Int): Tuple file: String startOffset: Int endOffset: Int end file: Fun(sm: SourceMap): String text: Fun(sm: SourceMap): String lineCount: Fun(sm: SourceMap): Int locate: Fun(sm: SourceMap offset: Int): Tuple offset: Int line: Int col: Int end locateSpan: Fun(sm: SourceMap sp: Tuple file: String startOffset: Int endOffset: Int end): Tuple start: Tuple offset: Int line: Int col: Int end endPos: Tuple offset: Int line: Int col: Int end end getLine: Fun(sm: SourceMap lineNum: Int): String extractSnippet: Fun(sm: SourceMap sp: Tuple file: String startOffset: Int endOffset: Int end): String end))
+        :args (
+          (TypedVar 'sm' :type location.SourceMap)
+          (TypedInt 24 :type Int)
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printInt' :type Fun(n: Int): Ok)
+        :args (
+          (TypedSelect 'line' :type Int
+            :target (TypedVar 'p4' :type Tuple offset: Int line: Int col: Int end))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printInt' :type Fun(n: Int): Ok)
+        :args (
+          (TypedSelect 'col' :type Int
+            :target (TypedVar 'p4' :type Tuple offset: Int line: Int col: Int end))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printStr' :type Fun(s: String): Ok)
+        :args (
+          (TypedApp :type String
+            :func (TypedSelect 'getLine' :type Fun(sm: location.SourceMap lineNum: Int): String
+              :target (TypedVar 'location' :type Record newSourceMap: Fun(file: String text: String): SourceMap span: Fun(file: String startOffset: Int endOffset: Int): Tuple file: String startOffset: Int endOffset: Int end pointSpan: Fun(file: String offset: Int): Tuple file: String startOffset: Int endOffset: Int end file: Fun(sm: SourceMap): String text: Fun(sm: SourceMap): String lineCount: Fun(sm: SourceMap): Int locate: Fun(sm: SourceMap offset: Int): Tuple offset: Int line: Int col: Int end locateSpan: Fun(sm: SourceMap sp: Tuple file: String startOffset: Int endOffset: Int end): Tuple start: Tuple offset: Int line: Int col: Int end endPos: Tuple offset: Int line: Int col: Int end end getLine: Fun(sm: SourceMap lineNum: Int): String extractSnippet: Fun(sm: SourceMap sp: Tuple file: String startOffset: Int endOffset: Int end): String end))
+            :args (
+              (TypedVar 'sm' :type location.SourceMap)
+              (TypedInt 1 :type Int)
+            ))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printStr' :type Fun(s: String): Ok)
+        :args (
+          (TypedApp :type String
+            :func (TypedSelect 'getLine' :type Fun(sm: location.SourceMap lineNum: Int): String
+              :target (TypedVar 'location' :type Record newSourceMap: Fun(file: String text: String): SourceMap span: Fun(file: String startOffset: Int endOffset: Int): Tuple file: String startOffset: Int endOffset: Int end pointSpan: Fun(file: String offset: Int): Tuple file: String startOffset: Int endOffset: Int end file: Fun(sm: SourceMap): String text: Fun(sm: SourceMap): String lineCount: Fun(sm: SourceMap): Int locate: Fun(sm: SourceMap offset: Int): Tuple offset: Int line: Int col: Int end locateSpan: Fun(sm: SourceMap sp: Tuple file: String startOffset: Int endOffset: Int end): Tuple start: Tuple offset: Int line: Int col: Int end endPos: Tuple offset: Int line: Int col: Int end end getLine: Fun(sm: SourceMap lineNum: Int): String extractSnippet: Fun(sm: SourceMap sp: Tuple file: String startOffset: Int endOffset: Int end): String end))
+            :args (
+              (TypedVar 'sm' :type location.SourceMap)
+              (TypedInt 2 :type Int)
+            ))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printStr' :type Fun(s: String): Ok)
+        :args (
+          (TypedApp :type String
+            :func (TypedSelect 'getLine' :type Fun(sm: location.SourceMap lineNum: Int): String
+              :target (TypedVar 'location' :type Record newSourceMap: Fun(file: String text: String): SourceMap span: Fun(file: String startOffset: Int endOffset: Int): Tuple file: String startOffset: Int endOffset: Int end pointSpan: Fun(file: String offset: Int): Tuple file: String startOffset: Int endOffset: Int end file: Fun(sm: SourceMap): String text: Fun(sm: SourceMap): String lineCount: Fun(sm: SourceMap): Int locate: Fun(sm: SourceMap offset: Int): Tuple offset: Int line: Int col: Int end locateSpan: Fun(sm: SourceMap sp: Tuple file: String startOffset: Int endOffset: Int end): Tuple start: Tuple offset: Int line: Int col: Int end endPos: Tuple offset: Int line: Int col: Int end end getLine: Fun(sm: SourceMap lineNum: Int): String extractSnippet: Fun(sm: SourceMap sp: Tuple file: String startOffset: Int endOffset: Int end): String end))
+            :args (
+              (TypedVar 'sm' :type location.SourceMap)
+              (TypedInt 3 :type Int)
+            ))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printStr' :type Fun(s: String): Ok)
+        :args (
+          (TypedApp :type String
+            :func (TypedSelect 'getLine' :type Fun(sm: location.SourceMap lineNum: Int): String
+              :target (TypedVar 'location' :type Record newSourceMap: Fun(file: String text: String): SourceMap span: Fun(file: String startOffset: Int endOffset: Int): Tuple file: String startOffset: Int endOffset: Int end pointSpan: Fun(file: String offset: Int): Tuple file: String startOffset: Int endOffset: Int end file: Fun(sm: SourceMap): String text: Fun(sm: SourceMap): String lineCount: Fun(sm: SourceMap): Int locate: Fun(sm: SourceMap offset: Int): Tuple offset: Int line: Int col: Int end locateSpan: Fun(sm: SourceMap sp: Tuple file: String startOffset: Int endOffset: Int end): Tuple start: Tuple offset: Int line: Int col: Int end endPos: Tuple offset: Int line: Int col: Int end end getLine: Fun(sm: SourceMap lineNum: Int): String extractSnippet: Fun(sm: SourceMap sp: Tuple file: String startOffset: Int endOffset: Int end): String end))
+            :args (
+              (TypedVar 'sm' :type location.SourceMap)
+              (TypedInt 99 :type Int)
+            ))
+        )))
+    (TypedLetValue 'sp1' :type Tuple file: String startOffset: Int endOffset: Int end
+      :value (TypedApp :type Tuple file: String startOffset: Int endOffset: Int end
+        :func (TypedSelect 'span' :type Fun(file: String startOffset: Int endOffset: Int): Tuple file: String startOffset: Int endOffset: Int end
+          :target (TypedVar 'location' :type Record newSourceMap: Fun(file: String text: String): SourceMap span: Fun(file: String startOffset: Int endOffset: Int): Tuple file: String startOffset: Int endOffset: Int end pointSpan: Fun(file: String offset: Int): Tuple file: String startOffset: Int endOffset: Int end file: Fun(sm: SourceMap): String text: Fun(sm: SourceMap): String lineCount: Fun(sm: SourceMap): Int locate: Fun(sm: SourceMap offset: Int): Tuple offset: Int line: Int col: Int end locateSpan: Fun(sm: SourceMap sp: Tuple file: String startOffset: Int endOffset: Int end): Tuple start: Tuple offset: Int line: Int col: Int end endPos: Tuple offset: Int line: Int col: Int end end getLine: Fun(sm: SourceMap lineNum: Int): String extractSnippet: Fun(sm: SourceMap sp: Tuple file: String startOffset: Int endOffset: Int end): String end))
+        :args (
+          (TypedString 'test.quest' :type String)
+          (TypedInt 4 :type Int)
+          (TypedInt 5 :type Int)
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printStr' :type Fun(s: String): Ok)
+        :args (
+          (TypedApp :type String
+            :func (TypedSelect 'extractSnippet' :type Fun(sm: location.SourceMap sp: Tuple file: String startOffset: Int endOffset: Int end): String
+              :target (TypedVar 'location' :type Record newSourceMap: Fun(file: String text: String): SourceMap span: Fun(file: String startOffset: Int endOffset: Int): Tuple file: String startOffset: Int endOffset: Int end pointSpan: Fun(file: String offset: Int): Tuple file: String startOffset: Int endOffset: Int end file: Fun(sm: SourceMap): String text: Fun(sm: SourceMap): String lineCount: Fun(sm: SourceMap): Int locate: Fun(sm: SourceMap offset: Int): Tuple offset: Int line: Int col: Int end locateSpan: Fun(sm: SourceMap sp: Tuple file: String startOffset: Int endOffset: Int end): Tuple start: Tuple offset: Int line: Int col: Int end endPos: Tuple offset: Int line: Int col: Int end end getLine: Fun(sm: SourceMap lineNum: Int): String extractSnippet: Fun(sm: SourceMap sp: Tuple file: String startOffset: Int endOffset: Int end): String end))
+            :args (
+              (TypedVar 'sm' :type location.SourceMap)
+              (TypedVar 'sp1' :type Tuple file: String startOffset: Int endOffset: Int end)
+            ))
+        )))
+    (TypedLetValue 'sp2' :type Tuple file: String startOffset: Int endOffset: Int end
+      :value (TypedApp :type Tuple file: String startOffset: Int endOffset: Int end
+        :func (TypedSelect 'span' :type Fun(file: String startOffset: Int endOffset: Int): Tuple file: String startOffset: Int endOffset: Int end
+          :target (TypedVar 'location' :type Record newSourceMap: Fun(file: String text: String): SourceMap span: Fun(file: String startOffset: Int endOffset: Int): Tuple file: String startOffset: Int endOffset: Int end pointSpan: Fun(file: String offset: Int): Tuple file: String startOffset: Int endOffset: Int end file: Fun(sm: SourceMap): String text: Fun(sm: SourceMap): String lineCount: Fun(sm: SourceMap): Int locate: Fun(sm: SourceMap offset: Int): Tuple offset: Int line: Int col: Int end locateSpan: Fun(sm: SourceMap sp: Tuple file: String startOffset: Int endOffset: Int end): Tuple start: Tuple offset: Int line: Int col: Int end endPos: Tuple offset: Int line: Int col: Int end end getLine: Fun(sm: SourceMap lineNum: Int): String extractSnippet: Fun(sm: SourceMap sp: Tuple file: String startOffset: Int endOffset: Int end): String end))
+        :args (
+          (TypedString 'test.quest' :type String)
+          (TypedInt 12 :type Int)
+          (TypedInt 17 :type Int)
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printStr' :type Fun(s: String): Ok)
+        :args (
+          (TypedApp :type String
+            :func (TypedSelect 'extractSnippet' :type Fun(sm: location.SourceMap sp: Tuple file: String startOffset: Int endOffset: Int end): String
+              :target (TypedVar 'location' :type Record newSourceMap: Fun(file: String text: String): SourceMap span: Fun(file: String startOffset: Int endOffset: Int): Tuple file: String startOffset: Int endOffset: Int end pointSpan: Fun(file: String offset: Int): Tuple file: String startOffset: Int endOffset: Int end file: Fun(sm: SourceMap): String text: Fun(sm: SourceMap): String lineCount: Fun(sm: SourceMap): Int locate: Fun(sm: SourceMap offset: Int): Tuple offset: Int line: Int col: Int end locateSpan: Fun(sm: SourceMap sp: Tuple file: String startOffset: Int endOffset: Int end): Tuple start: Tuple offset: Int line: Int col: Int end endPos: Tuple offset: Int line: Int col: Int end end getLine: Fun(sm: SourceMap lineNum: Int): String extractSnippet: Fun(sm: SourceMap sp: Tuple file: String startOffset: Int endOffset: Int end): String end))
+            :args (
+              (TypedVar 'sm' :type location.SourceMap)
+              (TypedVar 'sp2' :type Tuple file: String startOffset: Int endOffset: Int end)
+            ))
+        )))
+    (TypedLetValue 'spSpan' :type Tuple start: Tuple offset: Int line: Int col: Int end endPos: Tuple offset: Int line: Int col: Int end end
+      :value (TypedApp :type Tuple start: Tuple offset: Int line: Int col: Int end endPos: Tuple offset: Int line: Int col: Int end end
+        :func (TypedSelect 'locateSpan' :type Fun(sm: location.SourceMap sp: Tuple file: String startOffset: Int endOffset: Int end): Tuple start: Tuple offset: Int line: Int col: Int end endPos: Tuple offset: Int line: Int col: Int end end
+          :target (TypedVar 'location' :type Record newSourceMap: Fun(file: String text: String): SourceMap span: Fun(file: String startOffset: Int endOffset: Int): Tuple file: String startOffset: Int endOffset: Int end pointSpan: Fun(file: String offset: Int): Tuple file: String startOffset: Int endOffset: Int end file: Fun(sm: SourceMap): String text: Fun(sm: SourceMap): String lineCount: Fun(sm: SourceMap): Int locate: Fun(sm: SourceMap offset: Int): Tuple offset: Int line: Int col: Int end locateSpan: Fun(sm: SourceMap sp: Tuple file: String startOffset: Int endOffset: Int end): Tuple start: Tuple offset: Int line: Int col: Int end endPos: Tuple offset: Int line: Int col: Int end end getLine: Fun(sm: SourceMap lineNum: Int): String extractSnippet: Fun(sm: SourceMap sp: Tuple file: String startOffset: Int endOffset: Int end): String end))
+        :args (
+          (TypedVar 'sm' :type location.SourceMap)
+          (TypedVar 'sp2' :type Tuple file: String startOffset: Int endOffset: Int end)
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printInt' :type Fun(n: Int): Ok)
+        :args (
+          (TypedSelect 'line' :type Int
+            :target (TypedSelect 'start' :type Tuple offset: Int line: Int col: Int end
+              :target (TypedVar 'spSpan' :type Tuple start: Tuple offset: Int line: Int col: Int end endPos: Tuple offset: Int line: Int col: Int end end)))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printInt' :type Fun(n: Int): Ok)
+        :args (
+          (TypedSelect 'col' :type Int
+            :target (TypedSelect 'start' :type Tuple offset: Int line: Int col: Int end
+              :target (TypedVar 'spSpan' :type Tuple start: Tuple offset: Int line: Int col: Int end endPos: Tuple offset: Int line: Int col: Int end end)))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printInt' :type Fun(n: Int): Ok)
+        :args (
+          (TypedSelect 'line' :type Int
+            :target (TypedSelect 'endPos' :type Tuple offset: Int line: Int col: Int end
+              :target (TypedVar 'spSpan' :type Tuple start: Tuple offset: Int line: Int col: Int end endPos: Tuple offset: Int line: Int col: Int end end)))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printInt' :type Fun(n: Int): Ok)
+        :args (
+          (TypedSelect 'col' :type Int
+            :target (TypedSelect 'endPos' :type Tuple offset: Int line: Int col: Int end
+              :target (TypedVar 'spSpan' :type Tuple start: Tuple offset: Int line: Int col: Int end endPos: Tuple offset: Int line: Int col: Int end end)))
+        )))
+    (TypedLetValue 'dWarn' :type diagnostics.Diagnostic
+      :value (TypedApp :type diagnostics.Diagnostic
+        :func (TypedSelect 'warning' :type Fun(msg: String sp: Tuple file: String startOffset: Int endOffset: Int end): diagnostics.Diagnostic
+          :target (TypedVar 'diagnostics' :type Record make: Fun(sev: Option fatal error warning info end msg: String sp: Tuple file: String startOffset: Int endOffset: Int end): Diagnostic fatal: Fun(msg: String sp: Tuple file: String startOffset: Int endOffset: Int end): Diagnostic error: Fun(msg: String sp: Tuple file: String startOffset: Int endOffset: Int end): Diagnostic warning: Fun(msg: String sp: Tuple file: String startOffset: Int endOffset: Int end): Diagnostic info: Fun(msg: String sp: Tuple file: String startOffset: Int endOffset: Int end): Diagnostic severity: Fun(d: Diagnostic): Option fatal error warning info end message: Fun(d: Diagnostic): String span: Fun(d: Diagnostic): Tuple file: String startOffset: Int endOffset: Int end labels: Fun(d: Diagnostic): vector.T(Tuple sp: Tuple file: String startOffset: Int endOffset: Int end message: String isPrimary: Bool end) notes: Fun(d: Diagnostic): vector.T(String) help: Fun(d: Diagnostic): maybe.T(String) code: Fun(d: Diagnostic): maybe.T(String) addLabel: Fun(d: Diagnostic sp: Tuple file: String startOffset: Int endOffset: Int end msg: String isPrimary: Bool): Ok addNote: Fun(d: Diagnostic note: String): Ok setHelp: Fun(d: Diagnostic h: String): Ok setCode: Fun(d: Diagnostic c: String): Ok severityString: Fun(sev: Option fatal error warning info end): String format: Fun(d: Diagnostic sm: location.SourceMap): String render: Fun(d: Diagnostic sm: location.SourceMap w: Writer.T): Ok end))
+        :args (
+          (TypedString "unused variable 'y'" :type String)
+          (TypedApp :type Tuple file: String startOffset: Int endOffset: Int end
+            :func (TypedSelect 'span' :type Fun(file: String startOffset: Int endOffset: Int): Tuple file: String startOffset: Int endOffset: Int end
+              :target (TypedVar 'location' :type Record newSourceMap: Fun(file: String text: String): SourceMap span: Fun(file: String startOffset: Int endOffset: Int): Tuple file: String startOffset: Int endOffset: Int end pointSpan: Fun(file: String offset: Int): Tuple file: String startOffset: Int endOffset: Int end file: Fun(sm: SourceMap): String text: Fun(sm: SourceMap): String lineCount: Fun(sm: SourceMap): Int locate: Fun(sm: SourceMap offset: Int): Tuple offset: Int line: Int col: Int end locateSpan: Fun(sm: SourceMap sp: Tuple file: String startOffset: Int endOffset: Int end): Tuple start: Tuple offset: Int line: Int col: Int end endPos: Tuple offset: Int line: Int col: Int end end getLine: Fun(sm: SourceMap lineNum: Int): String extractSnippet: Fun(sm: SourceMap sp: Tuple file: String startOffset: Int endOffset: Int end): String end))
+            :args (
+              (TypedString 'test.quest' :type String)
+              (TypedInt 16 :type Int)
+              (TypedInt 17 :type Int)
+            ))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedSelect 'addNote' :type Fun(d: diagnostics.Diagnostic note: String): Ok
+          :target (TypedVar 'diagnostics' :type Record make: Fun(sev: Option fatal error warning info end msg: String sp: Tuple file: String startOffset: Int endOffset: Int end): Diagnostic fatal: Fun(msg: String sp: Tuple file: String startOffset: Int endOffset: Int end): Diagnostic error: Fun(msg: String sp: Tuple file: String startOffset: Int endOffset: Int end): Diagnostic warning: Fun(msg: String sp: Tuple file: String startOffset: Int endOffset: Int end): Diagnostic info: Fun(msg: String sp: Tuple file: String startOffset: Int endOffset: Int end): Diagnostic severity: Fun(d: Diagnostic): Option fatal error warning info end message: Fun(d: Diagnostic): String span: Fun(d: Diagnostic): Tuple file: String startOffset: Int endOffset: Int end labels: Fun(d: Diagnostic): vector.T(Tuple sp: Tuple file: String startOffset: Int endOffset: Int end message: String isPrimary: Bool end) notes: Fun(d: Diagnostic): vector.T(String) help: Fun(d: Diagnostic): maybe.T(String) code: Fun(d: Diagnostic): maybe.T(String) addLabel: Fun(d: Diagnostic sp: Tuple file: String startOffset: Int endOffset: Int end msg: String isPrimary: Bool): Ok addNote: Fun(d: Diagnostic note: String): Ok setHelp: Fun(d: Diagnostic h: String): Ok setCode: Fun(d: Diagnostic c: String): Ok severityString: Fun(sev: Option fatal error warning info end): String format: Fun(d: Diagnostic sm: location.SourceMap): String render: Fun(d: Diagnostic sm: location.SourceMap w: Writer.T): Ok end))
+        :args (
+          (TypedVar 'dWarn' :type diagnostics.Diagnostic)
+          (TypedString 'variable defined here but never read' :type String)
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedSelect 'setHelp' :type Fun(d: diagnostics.Diagnostic h: String): Ok
+          :target (TypedVar 'diagnostics' :type Record make: Fun(sev: Option fatal error warning info end msg: String sp: Tuple file: String startOffset: Int endOffset: Int end): Diagnostic fatal: Fun(msg: String sp: Tuple file: String startOffset: Int endOffset: Int end): Diagnostic error: Fun(msg: String sp: Tuple file: String startOffset: Int endOffset: Int end): Diagnostic warning: Fun(msg: String sp: Tuple file: String startOffset: Int endOffset: Int end): Diagnostic info: Fun(msg: String sp: Tuple file: String startOffset: Int endOffset: Int end): Diagnostic severity: Fun(d: Diagnostic): Option fatal error warning info end message: Fun(d: Diagnostic): String span: Fun(d: Diagnostic): Tuple file: String startOffset: Int endOffset: Int end labels: Fun(d: Diagnostic): vector.T(Tuple sp: Tuple file: String startOffset: Int endOffset: Int end message: String isPrimary: Bool end) notes: Fun(d: Diagnostic): vector.T(String) help: Fun(d: Diagnostic): maybe.T(String) code: Fun(d: Diagnostic): maybe.T(String) addLabel: Fun(d: Diagnostic sp: Tuple file: String startOffset: Int endOffset: Int end msg: String isPrimary: Bool): Ok addNote: Fun(d: Diagnostic note: String): Ok setHelp: Fun(d: Diagnostic h: String): Ok setCode: Fun(d: Diagnostic c: String): Ok severityString: Fun(sev: Option fatal error warning info end): String format: Fun(d: Diagnostic sm: location.SourceMap): String render: Fun(d: Diagnostic sm: location.SourceMap w: Writer.T): Ok end))
+        :args (
+          (TypedVar 'dWarn' :type diagnostics.Diagnostic)
+          (TypedString 'prefix with underscore if intentionally unused' :type String)
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printStr' :type Fun(s: String): Ok)
+        :args (
+          (TypedApp :type String
+            :func (TypedSelect 'severityString' :type Fun(sev: Option fatal error warning info end): String
+              :target (TypedVar 'diagnostics' :type Record make: Fun(sev: Option fatal error warning info end msg: String sp: Tuple file: String startOffset: Int endOffset: Int end): Diagnostic fatal: Fun(msg: String sp: Tuple file: String startOffset: Int endOffset: Int end): Diagnostic error: Fun(msg: String sp: Tuple file: String startOffset: Int endOffset: Int end): Diagnostic warning: Fun(msg: String sp: Tuple file: String startOffset: Int endOffset: Int end): Diagnostic info: Fun(msg: String sp: Tuple file: String startOffset: Int endOffset: Int end): Diagnostic severity: Fun(d: Diagnostic): Option fatal error warning info end message: Fun(d: Diagnostic): String span: Fun(d: Diagnostic): Tuple file: String startOffset: Int endOffset: Int end labels: Fun(d: Diagnostic): vector.T(Tuple sp: Tuple file: String startOffset: Int endOffset: Int end message: String isPrimary: Bool end) notes: Fun(d: Diagnostic): vector.T(String) help: Fun(d: Diagnostic): maybe.T(String) code: Fun(d: Diagnostic): maybe.T(String) addLabel: Fun(d: Diagnostic sp: Tuple file: String startOffset: Int endOffset: Int end msg: String isPrimary: Bool): Ok addNote: Fun(d: Diagnostic note: String): Ok setHelp: Fun(d: Diagnostic h: String): Ok setCode: Fun(d: Diagnostic c: String): Ok severityString: Fun(sev: Option fatal error warning info end): String format: Fun(d: Diagnostic sm: location.SourceMap): String render: Fun(d: Diagnostic sm: location.SourceMap w: Writer.T): Ok end))
+            :args (
+              (TypedApp :type Option fatal error warning info end
+                :func (TypedSelect 'severity' :type Fun(d: diagnostics.Diagnostic): Option fatal error warning info end
+                  :target (TypedVar 'diagnostics' :type Record make: Fun(sev: Option fatal error warning info end msg: String sp: Tuple file: String startOffset: Int endOffset: Int end): Diagnostic fatal: Fun(msg: String sp: Tuple file: String startOffset: Int endOffset: Int end): Diagnostic error: Fun(msg: String sp: Tuple file: String startOffset: Int endOffset: Int end): Diagnostic warning: Fun(msg: String sp: Tuple file: String startOffset: Int endOffset: Int end): Diagnostic info: Fun(msg: String sp: Tuple file: String startOffset: Int endOffset: Int end): Diagnostic severity: Fun(d: Diagnostic): Option fatal error warning info end message: Fun(d: Diagnostic): String span: Fun(d: Diagnostic): Tuple file: String startOffset: Int endOffset: Int end labels: Fun(d: Diagnostic): vector.T(Tuple sp: Tuple file: String startOffset: Int endOffset: Int end message: String isPrimary: Bool end) notes: Fun(d: Diagnostic): vector.T(String) help: Fun(d: Diagnostic): maybe.T(String) code: Fun(d: Diagnostic): maybe.T(String) addLabel: Fun(d: Diagnostic sp: Tuple file: String startOffset: Int endOffset: Int end msg: String isPrimary: Bool): Ok addNote: Fun(d: Diagnostic note: String): Ok setHelp: Fun(d: Diagnostic h: String): Ok setCode: Fun(d: Diagnostic c: String): Ok severityString: Fun(sev: Option fatal error warning info end): String format: Fun(d: Diagnostic sm: location.SourceMap): String render: Fun(d: Diagnostic sm: location.SourceMap w: Writer.T): Ok end))
+                :args (
+                  (TypedVar 'dWarn' :type diagnostics.Diagnostic)
+                ))
+            ))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printStr' :type Fun(s: String): Ok)
+        :args (
+          (TypedApp :type String
+            :func (TypedSelect 'format' :type Fun(d: diagnostics.Diagnostic sm: location.SourceMap): String
+              :target (TypedVar 'diagnostics' :type Record make: Fun(sev: Option fatal error warning info end msg: String sp: Tuple file: String startOffset: Int endOffset: Int end): Diagnostic fatal: Fun(msg: String sp: Tuple file: String startOffset: Int endOffset: Int end): Diagnostic error: Fun(msg: String sp: Tuple file: String startOffset: Int endOffset: Int end): Diagnostic warning: Fun(msg: String sp: Tuple file: String startOffset: Int endOffset: Int end): Diagnostic info: Fun(msg: String sp: Tuple file: String startOffset: Int endOffset: Int end): Diagnostic severity: Fun(d: Diagnostic): Option fatal error warning info end message: Fun(d: Diagnostic): String span: Fun(d: Diagnostic): Tuple file: String startOffset: Int endOffset: Int end labels: Fun(d: Diagnostic): vector.T(Tuple sp: Tuple file: String startOffset: Int endOffset: Int end message: String isPrimary: Bool end) notes: Fun(d: Diagnostic): vector.T(String) help: Fun(d: Diagnostic): maybe.T(String) code: Fun(d: Diagnostic): maybe.T(String) addLabel: Fun(d: Diagnostic sp: Tuple file: String startOffset: Int endOffset: Int end msg: String isPrimary: Bool): Ok addNote: Fun(d: Diagnostic note: String): Ok setHelp: Fun(d: Diagnostic h: String): Ok setCode: Fun(d: Diagnostic c: String): Ok severityString: Fun(sev: Option fatal error warning info end): String format: Fun(d: Diagnostic sm: location.SourceMap): String render: Fun(d: Diagnostic sm: location.SourceMap w: Writer.T): Ok end))
+            :args (
+              (TypedVar 'dWarn' :type diagnostics.Diagnostic)
+              (TypedVar 'sm' :type location.SourceMap)
+            ))
+        )))
+    (TypedLetValue 'dErr' :type diagnostics.Diagnostic
+      :value (TypedApp :type diagnostics.Diagnostic
+        :func (TypedSelect 'error' :type Fun(msg: String sp: Tuple file: String startOffset: Int endOffset: Int end): diagnostics.Diagnostic
+          :target (TypedVar 'diagnostics' :type Record make: Fun(sev: Option fatal error warning info end msg: String sp: Tuple file: String startOffset: Int endOffset: Int end): Diagnostic fatal: Fun(msg: String sp: Tuple file: String startOffset: Int endOffset: Int end): Diagnostic error: Fun(msg: String sp: Tuple file: String startOffset: Int endOffset: Int end): Diagnostic warning: Fun(msg: String sp: Tuple file: String startOffset: Int endOffset: Int end): Diagnostic info: Fun(msg: String sp: Tuple file: String startOffset: Int endOffset: Int end): Diagnostic severity: Fun(d: Diagnostic): Option fatal error warning info end message: Fun(d: Diagnostic): String span: Fun(d: Diagnostic): Tuple file: String startOffset: Int endOffset: Int end labels: Fun(d: Diagnostic): vector.T(Tuple sp: Tuple file: String startOffset: Int endOffset: Int end message: String isPrimary: Bool end) notes: Fun(d: Diagnostic): vector.T(String) help: Fun(d: Diagnostic): maybe.T(String) code: Fun(d: Diagnostic): maybe.T(String) addLabel: Fun(d: Diagnostic sp: Tuple file: String startOffset: Int endOffset: Int end msg: String isPrimary: Bool): Ok addNote: Fun(d: Diagnostic note: String): Ok setHelp: Fun(d: Diagnostic h: String): Ok setCode: Fun(d: Diagnostic c: String): Ok severityString: Fun(sev: Option fatal error warning info end): String format: Fun(d: Diagnostic sm: location.SourceMap): String render: Fun(d: Diagnostic sm: location.SourceMap w: Writer.T): Ok end))
+        :args (
+          (TypedString 'type mismatch' :type String)
+          (TypedApp :type Tuple file: String startOffset: Int endOffset: Int end
+            :func (TypedSelect 'span' :type Fun(file: String startOffset: Int endOffset: Int): Tuple file: String startOffset: Int endOffset: Int end
+              :target (TypedVar 'location' :type Record newSourceMap: Fun(file: String text: String): SourceMap span: Fun(file: String startOffset: Int endOffset: Int): Tuple file: String startOffset: Int endOffset: Int end pointSpan: Fun(file: String offset: Int): Tuple file: String startOffset: Int endOffset: Int end file: Fun(sm: SourceMap): String text: Fun(sm: SourceMap): String lineCount: Fun(sm: SourceMap): Int locate: Fun(sm: SourceMap offset: Int): Tuple offset: Int line: Int col: Int end locateSpan: Fun(sm: SourceMap sp: Tuple file: String startOffset: Int endOffset: Int end): Tuple start: Tuple offset: Int line: Int col: Int end endPos: Tuple offset: Int line: Int col: Int end end getLine: Fun(sm: SourceMap lineNum: Int): String extractSnippet: Fun(sm: SourceMap sp: Tuple file: String startOffset: Int endOffset: Int end): String end))
+            :args (
+              (TypedString 'test.quest' :type String)
+              (TypedInt 34 :type Int)
+              (TypedInt 39 :type Int)
+            ))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printStr' :type Fun(s: String): Ok)
+        :args (
+          (TypedApp :type String
+            :func (TypedSelect 'format' :type Fun(d: diagnostics.Diagnostic sm: location.SourceMap): String
+              :target (TypedVar 'diagnostics' :type Record make: Fun(sev: Option fatal error warning info end msg: String sp: Tuple file: String startOffset: Int endOffset: Int end): Diagnostic fatal: Fun(msg: String sp: Tuple file: String startOffset: Int endOffset: Int end): Diagnostic error: Fun(msg: String sp: Tuple file: String startOffset: Int endOffset: Int end): Diagnostic warning: Fun(msg: String sp: Tuple file: String startOffset: Int endOffset: Int end): Diagnostic info: Fun(msg: String sp: Tuple file: String startOffset: Int endOffset: Int end): Diagnostic severity: Fun(d: Diagnostic): Option fatal error warning info end message: Fun(d: Diagnostic): String span: Fun(d: Diagnostic): Tuple file: String startOffset: Int endOffset: Int end labels: Fun(d: Diagnostic): vector.T(Tuple sp: Tuple file: String startOffset: Int endOffset: Int end message: String isPrimary: Bool end) notes: Fun(d: Diagnostic): vector.T(String) help: Fun(d: Diagnostic): maybe.T(String) code: Fun(d: Diagnostic): maybe.T(String) addLabel: Fun(d: Diagnostic sp: Tuple file: String startOffset: Int endOffset: Int end msg: String isPrimary: Bool): Ok addNote: Fun(d: Diagnostic note: String): Ok setHelp: Fun(d: Diagnostic h: String): Ok setCode: Fun(d: Diagnostic c: String): Ok severityString: Fun(sev: Option fatal error warning info end): String format: Fun(d: Diagnostic sm: location.SourceMap): String render: Fun(d: Diagnostic sm: location.SourceMap w: Writer.T): Ok end))
+            :args (
+              (TypedVar 'dErr' :type diagnostics.Diagnostic)
+              (TypedVar 'sm' :type location.SourceMap)
+            ))
+        )))
+    (TypedLetValue 'bag' :type T
+      :value (TypedApp :type T
+        :func (TypedSelect 'new' :type Fun(): T
+          :target (TypedVar 'diagbag' :type Record fatalError: Exception(diagnostics.Diagnostic) new: Fun(): T add: Fun(bag: T d: diagnostics.Diagnostic): Ok addError: Fun(bag: T sp: Tuple file: String startOffset: Int endOffset: Int end msg: String): Ok addWarning: Fun(bag: T sp: Tuple file: String startOffset: Int endOffset: Int end msg: String): Ok addFatal: Fun(bag: T sp: Tuple file: String startOffset: Int endOffset: Int end msg: String): Ok hasErrors: Fun(bag: T): Bool errorCount: Fun(bag: T): Int warningCount: Fun(bag: T): Int count: Fun(bag: T): Int get: Fun(bag: T idx: Int): diagnostics.Diagnostic getAll: Fun(bag: T): vector.T(diagnostics.Diagnostic) renderAll: Fun(bag: T sm: location.SourceMap w: Writer.T): Ok end))
+        :args ()))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printBool' :type Fun(b: Bool): Ok)
+        :args (
+          (TypedApp :type Bool
+            :func (TypedSelect 'hasErrors' :type Fun(bag: T): Bool
+              :target (TypedVar 'diagbag' :type Record fatalError: Exception(diagnostics.Diagnostic) new: Fun(): T add: Fun(bag: T d: diagnostics.Diagnostic): Ok addError: Fun(bag: T sp: Tuple file: String startOffset: Int endOffset: Int end msg: String): Ok addWarning: Fun(bag: T sp: Tuple file: String startOffset: Int endOffset: Int end msg: String): Ok addFatal: Fun(bag: T sp: Tuple file: String startOffset: Int endOffset: Int end msg: String): Ok hasErrors: Fun(bag: T): Bool errorCount: Fun(bag: T): Int warningCount: Fun(bag: T): Int count: Fun(bag: T): Int get: Fun(bag: T idx: Int): diagnostics.Diagnostic getAll: Fun(bag: T): vector.T(diagnostics.Diagnostic) renderAll: Fun(bag: T sm: location.SourceMap w: Writer.T): Ok end))
+            :args (
+              (TypedVar 'bag' :type T)
+            ))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printInt' :type Fun(n: Int): Ok)
+        :args (
+          (TypedApp :type Int
+            :func (TypedSelect 'count' :type Fun(bag: T): Int
+              :target (TypedVar 'diagbag' :type Record fatalError: Exception(diagnostics.Diagnostic) new: Fun(): T add: Fun(bag: T d: diagnostics.Diagnostic): Ok addError: Fun(bag: T sp: Tuple file: String startOffset: Int endOffset: Int end msg: String): Ok addWarning: Fun(bag: T sp: Tuple file: String startOffset: Int endOffset: Int end msg: String): Ok addFatal: Fun(bag: T sp: Tuple file: String startOffset: Int endOffset: Int end msg: String): Ok hasErrors: Fun(bag: T): Bool errorCount: Fun(bag: T): Int warningCount: Fun(bag: T): Int count: Fun(bag: T): Int get: Fun(bag: T idx: Int): diagnostics.Diagnostic getAll: Fun(bag: T): vector.T(diagnostics.Diagnostic) renderAll: Fun(bag: T sm: location.SourceMap w: Writer.T): Ok end))
+            :args (
+              (TypedVar 'bag' :type T)
+            ))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedSelect 'addWarning' :type Fun(bag: T sp: Tuple file: String startOffset: Int endOffset: Int end msg: String): Ok
+          :target (TypedVar 'diagbag' :type Record fatalError: Exception(diagnostics.Diagnostic) new: Fun(): T add: Fun(bag: T d: diagnostics.Diagnostic): Ok addError: Fun(bag: T sp: Tuple file: String startOffset: Int endOffset: Int end msg: String): Ok addWarning: Fun(bag: T sp: Tuple file: String startOffset: Int endOffset: Int end msg: String): Ok addFatal: Fun(bag: T sp: Tuple file: String startOffset: Int endOffset: Int end msg: String): Ok hasErrors: Fun(bag: T): Bool errorCount: Fun(bag: T): Int warningCount: Fun(bag: T): Int count: Fun(bag: T): Int get: Fun(bag: T idx: Int): diagnostics.Diagnostic getAll: Fun(bag: T): vector.T(diagnostics.Diagnostic) renderAll: Fun(bag: T sm: location.SourceMap w: Writer.T): Ok end))
+        :args (
+          (TypedVar 'bag' :type T)
+          (TypedApp :type Tuple file: String startOffset: Int endOffset: Int end
+            :func (TypedSelect 'span' :type Fun(file: String startOffset: Int endOffset: Int): Tuple file: String startOffset: Int endOffset: Int end
+              :target (TypedVar 'location' :type Record newSourceMap: Fun(file: String text: String): SourceMap span: Fun(file: String startOffset: Int endOffset: Int): Tuple file: String startOffset: Int endOffset: Int end pointSpan: Fun(file: String offset: Int): Tuple file: String startOffset: Int endOffset: Int end file: Fun(sm: SourceMap): String text: Fun(sm: SourceMap): String lineCount: Fun(sm: SourceMap): Int locate: Fun(sm: SourceMap offset: Int): Tuple offset: Int line: Int col: Int end locateSpan: Fun(sm: SourceMap sp: Tuple file: String startOffset: Int endOffset: Int end): Tuple start: Tuple offset: Int line: Int col: Int end endPos: Tuple offset: Int line: Int col: Int end end getLine: Fun(sm: SourceMap lineNum: Int): String extractSnippet: Fun(sm: SourceMap sp: Tuple file: String startOffset: Int endOffset: Int end): String end))
+            :args (
+              (TypedString 'test.quest' :type String)
+              (TypedInt 0 :type Int)
+              (TypedInt 3 :type Int)
+            ))
+          (TypedString 'consider explicit type' :type String)
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printBool' :type Fun(b: Bool): Ok)
+        :args (
+          (TypedApp :type Bool
+            :func (TypedSelect 'hasErrors' :type Fun(bag: T): Bool
+              :target (TypedVar 'diagbag' :type Record fatalError: Exception(diagnostics.Diagnostic) new: Fun(): T add: Fun(bag: T d: diagnostics.Diagnostic): Ok addError: Fun(bag: T sp: Tuple file: String startOffset: Int endOffset: Int end msg: String): Ok addWarning: Fun(bag: T sp: Tuple file: String startOffset: Int endOffset: Int end msg: String): Ok addFatal: Fun(bag: T sp: Tuple file: String startOffset: Int endOffset: Int end msg: String): Ok hasErrors: Fun(bag: T): Bool errorCount: Fun(bag: T): Int warningCount: Fun(bag: T): Int count: Fun(bag: T): Int get: Fun(bag: T idx: Int): diagnostics.Diagnostic getAll: Fun(bag: T): vector.T(diagnostics.Diagnostic) renderAll: Fun(bag: T sm: location.SourceMap w: Writer.T): Ok end))
+            :args (
+              (TypedVar 'bag' :type T)
+            ))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printInt' :type Fun(n: Int): Ok)
+        :args (
+          (TypedApp :type Int
+            :func (TypedSelect 'warningCount' :type Fun(bag: T): Int
+              :target (TypedVar 'diagbag' :type Record fatalError: Exception(diagnostics.Diagnostic) new: Fun(): T add: Fun(bag: T d: diagnostics.Diagnostic): Ok addError: Fun(bag: T sp: Tuple file: String startOffset: Int endOffset: Int end msg: String): Ok addWarning: Fun(bag: T sp: Tuple file: String startOffset: Int endOffset: Int end msg: String): Ok addFatal: Fun(bag: T sp: Tuple file: String startOffset: Int endOffset: Int end msg: String): Ok hasErrors: Fun(bag: T): Bool errorCount: Fun(bag: T): Int warningCount: Fun(bag: T): Int count: Fun(bag: T): Int get: Fun(bag: T idx: Int): diagnostics.Diagnostic getAll: Fun(bag: T): vector.T(diagnostics.Diagnostic) renderAll: Fun(bag: T sm: location.SourceMap w: Writer.T): Ok end))
+            :args (
+              (TypedVar 'bag' :type T)
+            ))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printInt' :type Fun(n: Int): Ok)
+        :args (
+          (TypedApp :type Int
+            :func (TypedSelect 'errorCount' :type Fun(bag: T): Int
+              :target (TypedVar 'diagbag' :type Record fatalError: Exception(diagnostics.Diagnostic) new: Fun(): T add: Fun(bag: T d: diagnostics.Diagnostic): Ok addError: Fun(bag: T sp: Tuple file: String startOffset: Int endOffset: Int end msg: String): Ok addWarning: Fun(bag: T sp: Tuple file: String startOffset: Int endOffset: Int end msg: String): Ok addFatal: Fun(bag: T sp: Tuple file: String startOffset: Int endOffset: Int end msg: String): Ok hasErrors: Fun(bag: T): Bool errorCount: Fun(bag: T): Int warningCount: Fun(bag: T): Int count: Fun(bag: T): Int get: Fun(bag: T idx: Int): diagnostics.Diagnostic getAll: Fun(bag: T): vector.T(diagnostics.Diagnostic) renderAll: Fun(bag: T sm: location.SourceMap w: Writer.T): Ok end))
+            :args (
+              (TypedVar 'bag' :type T)
+            ))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printInt' :type Fun(n: Int): Ok)
+        :args (
+          (TypedApp :type Int
+            :func (TypedSelect 'count' :type Fun(bag: T): Int
+              :target (TypedVar 'diagbag' :type Record fatalError: Exception(diagnostics.Diagnostic) new: Fun(): T add: Fun(bag: T d: diagnostics.Diagnostic): Ok addError: Fun(bag: T sp: Tuple file: String startOffset: Int endOffset: Int end msg: String): Ok addWarning: Fun(bag: T sp: Tuple file: String startOffset: Int endOffset: Int end msg: String): Ok addFatal: Fun(bag: T sp: Tuple file: String startOffset: Int endOffset: Int end msg: String): Ok hasErrors: Fun(bag: T): Bool errorCount: Fun(bag: T): Int warningCount: Fun(bag: T): Int count: Fun(bag: T): Int get: Fun(bag: T idx: Int): diagnostics.Diagnostic getAll: Fun(bag: T): vector.T(diagnostics.Diagnostic) renderAll: Fun(bag: T sm: location.SourceMap w: Writer.T): Ok end))
+            :args (
+              (TypedVar 'bag' :type T)
+            ))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedSelect 'addError' :type Fun(bag: T sp: Tuple file: String startOffset: Int endOffset: Int end msg: String): Ok
+          :target (TypedVar 'diagbag' :type Record fatalError: Exception(diagnostics.Diagnostic) new: Fun(): T add: Fun(bag: T d: diagnostics.Diagnostic): Ok addError: Fun(bag: T sp: Tuple file: String startOffset: Int endOffset: Int end msg: String): Ok addWarning: Fun(bag: T sp: Tuple file: String startOffset: Int endOffset: Int end msg: String): Ok addFatal: Fun(bag: T sp: Tuple file: String startOffset: Int endOffset: Int end msg: String): Ok hasErrors: Fun(bag: T): Bool errorCount: Fun(bag: T): Int warningCount: Fun(bag: T): Int count: Fun(bag: T): Int get: Fun(bag: T idx: Int): diagnostics.Diagnostic getAll: Fun(bag: T): vector.T(diagnostics.Diagnostic) renderAll: Fun(bag: T sm: location.SourceMap w: Writer.T): Ok end))
+        :args (
+          (TypedVar 'bag' :type T)
+          (TypedApp :type Tuple file: String startOffset: Int endOffset: Int end
+            :func (TypedSelect 'span' :type Fun(file: String startOffset: Int endOffset: Int): Tuple file: String startOffset: Int endOffset: Int end
+              :target (TypedVar 'location' :type Record newSourceMap: Fun(file: String text: String): SourceMap span: Fun(file: String startOffset: Int endOffset: Int): Tuple file: String startOffset: Int endOffset: Int end pointSpan: Fun(file: String offset: Int): Tuple file: String startOffset: Int endOffset: Int end file: Fun(sm: SourceMap): String text: Fun(sm: SourceMap): String lineCount: Fun(sm: SourceMap): Int locate: Fun(sm: SourceMap offset: Int): Tuple offset: Int line: Int col: Int end locateSpan: Fun(sm: SourceMap sp: Tuple file: String startOffset: Int endOffset: Int end): Tuple start: Tuple offset: Int line: Int col: Int end endPos: Tuple offset: Int line: Int col: Int end end getLine: Fun(sm: SourceMap lineNum: Int): String extractSnippet: Fun(sm: SourceMap sp: Tuple file: String startOffset: Int endOffset: Int end): String end))
+            :args (
+              (TypedString 'test.quest' :type String)
+              (TypedInt 8 :type Int)
+              (TypedInt 10 :type Int)
+            ))
+          (TypedString 'invalid literal' :type String)
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printBool' :type Fun(b: Bool): Ok)
+        :args (
+          (TypedApp :type Bool
+            :func (TypedSelect 'hasErrors' :type Fun(bag: T): Bool
+              :target (TypedVar 'diagbag' :type Record fatalError: Exception(diagnostics.Diagnostic) new: Fun(): T add: Fun(bag: T d: diagnostics.Diagnostic): Ok addError: Fun(bag: T sp: Tuple file: String startOffset: Int endOffset: Int end msg: String): Ok addWarning: Fun(bag: T sp: Tuple file: String startOffset: Int endOffset: Int end msg: String): Ok addFatal: Fun(bag: T sp: Tuple file: String startOffset: Int endOffset: Int end msg: String): Ok hasErrors: Fun(bag: T): Bool errorCount: Fun(bag: T): Int warningCount: Fun(bag: T): Int count: Fun(bag: T): Int get: Fun(bag: T idx: Int): diagnostics.Diagnostic getAll: Fun(bag: T): vector.T(diagnostics.Diagnostic) renderAll: Fun(bag: T sm: location.SourceMap w: Writer.T): Ok end))
+            :args (
+              (TypedVar 'bag' :type T)
+            ))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printInt' :type Fun(n: Int): Ok)
+        :args (
+          (TypedApp :type Int
+            :func (TypedSelect 'warningCount' :type Fun(bag: T): Int
+              :target (TypedVar 'diagbag' :type Record fatalError: Exception(diagnostics.Diagnostic) new: Fun(): T add: Fun(bag: T d: diagnostics.Diagnostic): Ok addError: Fun(bag: T sp: Tuple file: String startOffset: Int endOffset: Int end msg: String): Ok addWarning: Fun(bag: T sp: Tuple file: String startOffset: Int endOffset: Int end msg: String): Ok addFatal: Fun(bag: T sp: Tuple file: String startOffset: Int endOffset: Int end msg: String): Ok hasErrors: Fun(bag: T): Bool errorCount: Fun(bag: T): Int warningCount: Fun(bag: T): Int count: Fun(bag: T): Int get: Fun(bag: T idx: Int): diagnostics.Diagnostic getAll: Fun(bag: T): vector.T(diagnostics.Diagnostic) renderAll: Fun(bag: T sm: location.SourceMap w: Writer.T): Ok end))
+            :args (
+              (TypedVar 'bag' :type T)
+            ))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printInt' :type Fun(n: Int): Ok)
+        :args (
+          (TypedApp :type Int
+            :func (TypedSelect 'errorCount' :type Fun(bag: T): Int
+              :target (TypedVar 'diagbag' :type Record fatalError: Exception(diagnostics.Diagnostic) new: Fun(): T add: Fun(bag: T d: diagnostics.Diagnostic): Ok addError: Fun(bag: T sp: Tuple file: String startOffset: Int endOffset: Int end msg: String): Ok addWarning: Fun(bag: T sp: Tuple file: String startOffset: Int endOffset: Int end msg: String): Ok addFatal: Fun(bag: T sp: Tuple file: String startOffset: Int endOffset: Int end msg: String): Ok hasErrors: Fun(bag: T): Bool errorCount: Fun(bag: T): Int warningCount: Fun(bag: T): Int count: Fun(bag: T): Int get: Fun(bag: T idx: Int): diagnostics.Diagnostic getAll: Fun(bag: T): vector.T(diagnostics.Diagnostic) renderAll: Fun(bag: T sm: location.SourceMap w: Writer.T): Ok end))
+            :args (
+              (TypedVar 'bag' :type T)
+            ))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printInt' :type Fun(n: Int): Ok)
+        :args (
+          (TypedApp :type Int
+            :func (TypedSelect 'count' :type Fun(bag: T): Int
+              :target (TypedVar 'diagbag' :type Record fatalError: Exception(diagnostics.Diagnostic) new: Fun(): T add: Fun(bag: T d: diagnostics.Diagnostic): Ok addError: Fun(bag: T sp: Tuple file: String startOffset: Int endOffset: Int end msg: String): Ok addWarning: Fun(bag: T sp: Tuple file: String startOffset: Int endOffset: Int end msg: String): Ok addFatal: Fun(bag: T sp: Tuple file: String startOffset: Int endOffset: Int end msg: String): Ok hasErrors: Fun(bag: T): Bool errorCount: Fun(bag: T): Int warningCount: Fun(bag: T): Int count: Fun(bag: T): Int get: Fun(bag: T idx: Int): diagnostics.Diagnostic getAll: Fun(bag: T): vector.T(diagnostics.Diagnostic) renderAll: Fun(bag: T sm: location.SourceMap w: Writer.T): Ok end))
+            :args (
+              (TypedVar 'bag' :type T)
+            ))
+        )))
+    (TypedLetValue 'caughtFatal' :type Bool
+      :value (TypedTry :type Bool
+        :body (TypedBlock :type Bool
+          :bindings (
+            (TypedExprStmt
+              :expr (TypedApp :type Ok
+                :func (TypedSelect 'addFatal' :type Fun(bag: T sp: Tuple file: String startOffset: Int endOffset: Int end msg: String): Ok
+                  :target (TypedVar 'diagbag' :type Record fatalError: Exception(diagnostics.Diagnostic) new: Fun(): T add: Fun(bag: T d: diagnostics.Diagnostic): Ok addError: Fun(bag: T sp: Tuple file: String startOffset: Int endOffset: Int end msg: String): Ok addWarning: Fun(bag: T sp: Tuple file: String startOffset: Int endOffset: Int end msg: String): Ok addFatal: Fun(bag: T sp: Tuple file: String startOffset: Int endOffset: Int end msg: String): Ok hasErrors: Fun(bag: T): Bool errorCount: Fun(bag: T): Int warningCount: Fun(bag: T): Int count: Fun(bag: T): Int get: Fun(bag: T idx: Int): diagnostics.Diagnostic getAll: Fun(bag: T): vector.T(diagnostics.Diagnostic) renderAll: Fun(bag: T sm: location.SourceMap w: Writer.T): Ok end))
+                :args (
+                  (TypedVar 'bag' :type T)
+                  (TypedApp :type Tuple file: String startOffset: Int endOffset: Int end
+                    :func (TypedSelect 'span' :type Fun(file: String startOffset: Int endOffset: Int): Tuple file: String startOffset: Int endOffset: Int end
+                      :target (TypedVar 'location' :type Record newSourceMap: Fun(file: String text: String): SourceMap span: Fun(file: String startOffset: Int endOffset: Int): Tuple file: String startOffset: Int endOffset: Int end pointSpan: Fun(file: String offset: Int): Tuple file: String startOffset: Int endOffset: Int end file: Fun(sm: SourceMap): String text: Fun(sm: SourceMap): String lineCount: Fun(sm: SourceMap): Int locate: Fun(sm: SourceMap offset: Int): Tuple offset: Int line: Int col: Int end locateSpan: Fun(sm: SourceMap sp: Tuple file: String startOffset: Int endOffset: Int end): Tuple start: Tuple offset: Int line: Int col: Int end endPos: Tuple offset: Int line: Int col: Int end end getLine: Fun(sm: SourceMap lineNum: Int): String extractSnippet: Fun(sm: SourceMap sp: Tuple file: String startOffset: Int endOffset: Int end): String end))
+                    :args (
+                      (TypedString 'test.quest' :type String)
+                      (TypedInt 24 :type Int)
+                      (TypedInt 39 :type Int)
+                    ))
+                  (TypedString 'unrecoverable syntax failure' :type String)
+                )))
+          )
+          :result (TypedBool false))
+        :branches (
+          (TypedTryBranch
+            :exc_pattern (TypedSelect 'fatalError' :type Exception(diagnostics.Diagnostic)
+              :target (TypedVar 'diagbag' :type Record fatalError: Exception(diagnostics.Diagnostic) new: Fun(): T add: Fun(bag: T d: diagnostics.Diagnostic): Ok addError: Fun(bag: T sp: Tuple file: String startOffset: Int endOffset: Int end msg: String): Ok addWarning: Fun(bag: T sp: Tuple file: String startOffset: Int endOffset: Int end msg: String): Ok addFatal: Fun(bag: T sp: Tuple file: String startOffset: Int endOffset: Int end msg: String): Ok hasErrors: Fun(bag: T): Bool errorCount: Fun(bag: T): Int warningCount: Fun(bag: T): Int count: Fun(bag: T): Int get: Fun(bag: T idx: Int): diagnostics.Diagnostic getAll: Fun(bag: T): vector.T(diagnostics.Diagnostic) renderAll: Fun(bag: T sm: location.SourceMap w: Writer.T): Ok end))
+            :body (TypedBlock :type Bool
+              :bindings (
+                (TypedExprStmt
+                  :expr (TypedApp :type Ok
+                    :func (TypedVar 'printStr' :type Fun(s: String): Ok)
+                    :args (
+                      (TypedApp :type String
+                        :func (TypedSelect 'message' :type Fun(d: diagnostics.Diagnostic): String
+                          :target (TypedVar 'diagnostics' :type Record make: Fun(sev: Option fatal error warning info end msg: String sp: Tuple file: String startOffset: Int endOffset: Int end): Diagnostic fatal: Fun(msg: String sp: Tuple file: String startOffset: Int endOffset: Int end): Diagnostic error: Fun(msg: String sp: Tuple file: String startOffset: Int endOffset: Int end): Diagnostic warning: Fun(msg: String sp: Tuple file: String startOffset: Int endOffset: Int end): Diagnostic info: Fun(msg: String sp: Tuple file: String startOffset: Int endOffset: Int end): Diagnostic severity: Fun(d: Diagnostic): Option fatal error warning info end message: Fun(d: Diagnostic): String span: Fun(d: Diagnostic): Tuple file: String startOffset: Int endOffset: Int end labels: Fun(d: Diagnostic): vector.T(Tuple sp: Tuple file: String startOffset: Int endOffset: Int end message: String isPrimary: Bool end) notes: Fun(d: Diagnostic): vector.T(String) help: Fun(d: Diagnostic): maybe.T(String) code: Fun(d: Diagnostic): maybe.T(String) addLabel: Fun(d: Diagnostic sp: Tuple file: String startOffset: Int endOffset: Int end msg: String isPrimary: Bool): Ok addNote: Fun(d: Diagnostic note: String): Ok setHelp: Fun(d: Diagnostic h: String): Ok setCode: Fun(d: Diagnostic c: String): Ok severityString: Fun(sev: Option fatal error warning info end): String format: Fun(d: Diagnostic sm: location.SourceMap): String render: Fun(d: Diagnostic sm: location.SourceMap w: Writer.T): Ok end))
+                        :args (
+                          (TypedVar 'fatalDiag' :type diagnostics.Diagnostic)
+                        ))
+                    )))
+              )
+              :result (TypedBool true)))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printBool' :type Fun(b: Bool): Ok)
+        :args (
+          (TypedVar 'caughtFatal' :type Bool)
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printInt' :type Fun(n: Int): Ok)
+        :args (
+          (TypedApp :type Int
+            :func (TypedSelect 'errorCount' :type Fun(bag: T): Int
+              :target (TypedVar 'diagbag' :type Record fatalError: Exception(diagnostics.Diagnostic) new: Fun(): T add: Fun(bag: T d: diagnostics.Diagnostic): Ok addError: Fun(bag: T sp: Tuple file: String startOffset: Int endOffset: Int end msg: String): Ok addWarning: Fun(bag: T sp: Tuple file: String startOffset: Int endOffset: Int end msg: String): Ok addFatal: Fun(bag: T sp: Tuple file: String startOffset: Int endOffset: Int end msg: String): Ok hasErrors: Fun(bag: T): Bool errorCount: Fun(bag: T): Int warningCount: Fun(bag: T): Int count: Fun(bag: T): Int get: Fun(bag: T idx: Int): diagnostics.Diagnostic getAll: Fun(bag: T): vector.T(diagnostics.Diagnostic) renderAll: Fun(bag: T sm: location.SourceMap w: Writer.T): Ok end))
+            :args (
+              (TypedVar 'bag' :type T)
+            ))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printInt' :type Fun(n: Int): Ok)
+        :args (
+          (TypedApp :type Int
+            :func (TypedSelect 'count' :type Fun(bag: T): Int
+              :target (TypedVar 'diagbag' :type Record fatalError: Exception(diagnostics.Diagnostic) new: Fun(): T add: Fun(bag: T d: diagnostics.Diagnostic): Ok addError: Fun(bag: T sp: Tuple file: String startOffset: Int endOffset: Int end msg: String): Ok addWarning: Fun(bag: T sp: Tuple file: String startOffset: Int endOffset: Int end msg: String): Ok addFatal: Fun(bag: T sp: Tuple file: String startOffset: Int endOffset: Int end msg: String): Ok hasErrors: Fun(bag: T): Bool errorCount: Fun(bag: T): Int warningCount: Fun(bag: T): Int count: Fun(bag: T): Int get: Fun(bag: T idx: Int): diagnostics.Diagnostic getAll: Fun(bag: T): vector.T(diagnostics.Diagnostic) renderAll: Fun(bag: T sm: location.SourceMap w: Writer.T): Ok end))
+            :args (
+              (TypedVar 'bag' :type T)
+            ))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printStr' :type Fun(s: String): Ok)
+        :args (
+          (TypedString '--- Render All Diagnostics ---' :type String)
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedSelect 'renderAll' :type Fun(bag: T sm: location.SourceMap w: Writer.T): Ok
+          :target (TypedVar 'diagbag' :type Record fatalError: Exception(diagnostics.Diagnostic) new: Fun(): T add: Fun(bag: T d: diagnostics.Diagnostic): Ok addError: Fun(bag: T sp: Tuple file: String startOffset: Int endOffset: Int end msg: String): Ok addWarning: Fun(bag: T sp: Tuple file: String startOffset: Int endOffset: Int end msg: String): Ok addFatal: Fun(bag: T sp: Tuple file: String startOffset: Int endOffset: Int end msg: String): Ok hasErrors: Fun(bag: T): Bool errorCount: Fun(bag: T): Int warningCount: Fun(bag: T): Int count: Fun(bag: T): Int get: Fun(bag: T idx: Int): diagnostics.Diagnostic getAll: Fun(bag: T): vector.T(diagnostics.Diagnostic) renderAll: Fun(bag: T sm: location.SourceMap w: Writer.T): Ok end))
+        :args (
+          (TypedVar 'bag' :type T)
+          (TypedVar 'sm' :type location.SourceMap)
+          (TypedVar 'wOut' :type Writer.T)
+        )))
+  ))

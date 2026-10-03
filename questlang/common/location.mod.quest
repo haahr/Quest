@@ -1,0 +1,141 @@
+(* Self-Hosted Quest Compiler: Source Location and Coordinates *)
+
+module location : Location
+import
+    collections/vector : collections/Vector
+    util/sort : util/Sort
+    stringOp = string : StringOp
+export
+    Let Pos = Tuple
+        offset: Int
+        line: Int
+        col: Int
+    end;
+
+    Let Span = Tuple
+        file: String
+        startOffset: Int
+        endOffset: Int
+    end;
+
+    Let SourceMap = Tuple
+        file: String
+        text: String
+        lineStarts: vector.T(Int)
+    end;
+
+    let newSourceMap(file: String text: String): SourceMap =
+        begin
+            let lineStarts = vector.new(:Int);
+            vector.append(:Int lineStarts 0);
+            let n = stringOp.length(text);
+            if n > 0 then
+                for i = 0 upto {n - 1} do
+                    if stringOp.getChar(text i) is '\n' then
+                        vector.append(:Int lineStarts {i + 1});
+                    end;
+                end;
+            end;
+            tuple
+                let file = file
+                let text = text
+                let lineStarts = lineStarts
+            end
+        end;
+
+    let span(file: String startOffset: Int endOffset: Int): Span =
+        tuple
+            let file = file
+            let startOffset = startOffset
+            let endOffset = endOffset
+        end;
+
+    let pointSpan(file: String offset: Int): Span =
+        span(file offset offset);
+
+    let file(sm: SourceMap): String =
+        sm.file;
+
+    let text(sm: SourceMap): String =
+        sm.text;
+
+    let lineCount(sm: SourceMap): Int =
+        vector.length(:Int sm.lineStarts);
+
+    let locate(sm: SourceMap offset: Int): Pos =
+        begin
+            let totalLines = vector.length(:Int sm.lineStarts);
+            let totalLen = stringOp.length(sm.text);
+            let var off = offset;
+            if off < 0 then
+                off := 0;
+            elsif off > totalLen then
+                off := totalLen;
+            end;
+            let k = sort.bisectRightVector(:Int sm.lineStarts off sort.intCompare);
+            let var lineIdx = k - 1;
+            if lineIdx < 0 then
+                lineIdx := 0;
+            elsif lineIdx >= totalLines then
+                lineIdx := totalLines - 1;
+            end;
+            let lineStart = vector.get(:Int sm.lineStarts lineIdx);
+            let lineNum = lineIdx + 1;
+            let colNum = {off - lineStart} + 1;
+            tuple
+                let offset = off
+                let line = lineNum
+                let col = colNum
+            end
+        end;
+
+    let locateSpan(sm: SourceMap sp: Span): Tuple start: Pos endPos: Pos end =
+        tuple
+            let start = locate(sm sp.startOffset)
+            let endPos = locate(sm sp.endOffset)
+        end;
+
+    let getLine(sm: SourceMap lineNum: Int): String =
+        begin
+            let totalLines = vector.length(:Int sm.lineStarts);
+            if {lineNum < 1} orif {lineNum > totalLines} then
+                ""
+            else
+                let startIdx = vector.get(:Int sm.lineStarts {lineNum - 1});
+                let totalLen = stringOp.length(sm.text);
+                let var endIdx =
+                    if lineNum < totalLines then
+                        vector.get(:Int sm.lineStarts lineNum)
+                    else
+                        totalLen
+                    end;
+                if {endIdx > startIdx} andif {stringOp.getChar(sm.text {endIdx - 1}) is '\n'} then
+                    endIdx := endIdx - 1;
+                end;
+                if {endIdx > startIdx} andif {stringOp.getChar(sm.text {endIdx - 1}) is '\r'} then
+                    endIdx := endIdx - 1;
+                end;
+                if endIdx > startIdx then
+                    stringOp.getSub(sm.text startIdx {endIdx - startIdx})
+                else
+                    ""
+                end
+            end
+        end;
+
+    let extractSnippet(sm: SourceMap sp: Span): String =
+        begin
+            let totalLen = stringOp.length(sm.text);
+            let var st = sp.startOffset;
+            let var en = sp.endOffset;
+            if st < 0 then st := 0 end;
+            if st > totalLen then st := totalLen end;
+            if en < st then en := st end;
+            if en > totalLen then en := totalLen end;
+            if en > st then
+                stringOp.getSub(sm.text st {en - st})
+            else
+                ""
+            end
+        end;
+end;

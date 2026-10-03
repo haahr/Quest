@@ -140,8 +140,8 @@ def format_type_for_qi(t: QType) -> str:
 
     if isinstance(t, QOptionType):
         opts = " ".join(
-            f"{o.name}: {format_type_for_qi(o.type_val)}" if o.type_val != OK_TYPE else o.name
-            for o in t.variants
+            f"{o.name} with {format_type_for_qi(o.payload_type)}" if o.payload_type is not None else o.name
+            for o in t.options
         )
         return f"Option {opts} end" if opts else "Option end"
 
@@ -299,6 +299,35 @@ def compile_interface_to_header(decl: ast.InterfaceDecl, iface_scope: Scope) -> 
             if path not in ("word",):
                 lines.append(f'#include "{path}.h"')
         lines.append("")
+
+    # Aggregate struct definitions used in the interface
+    from quest.codegen.c_analysis import collect_aggregate_types
+    from quest.codegen.c_declarations import CDeclarationEmitter
+    from quest.codegen.c_types import RecordNamingContext
+
+    record_ctx = RecordNamingContext()
+    agg_types: list[tuple[str, QType]] = []
+    agg_names: set[str] = set()
+    for name, tsym in iface_scope.types.items():
+        if tsym and tsym.definition:
+            s_agg, _, _ = collect_aggregate_types(tsym.definition, record_ctx)
+            for item in s_agg:
+                if item[0] not in agg_names:
+                    agg_names.add(item[0])
+                    agg_types.append(item)
+
+    for name, vsym in iface_scope.values.items():
+        if vsym and vsym.type_val:
+            s_agg, _, _ = collect_aggregate_types(vsym.type_val, record_ctx)
+            for item in s_agg:
+                if item[0] not in agg_names:
+                    agg_names.add(item[0])
+                    agg_types.append(item)
+
+    if agg_types:
+        emitter = CDeclarationEmitter(record_ctx, qtype_to_c_type, lambda *_: ([], []))
+        lines.extend(emitter.emit_forward_typedefs(agg_types))
+        lines.extend(emitter.emit_aggregate_structs(agg_types))
 
     # Abstract types (erased to QVal in C)
     lines.append("/* --- Type Declarations --- */")

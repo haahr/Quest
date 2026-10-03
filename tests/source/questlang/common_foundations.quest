@@ -1,0 +1,123 @@
+(* Self-Hosted Quest Compiler: Test Common Foundations (location, diagnostics, diagbag) *)
+
+import
+    questlang/common/location : questlang/common/Location
+    questlang/common/diagnostics : questlang/common/Diagnostics
+    questlang/common/diagbag : questlang/common/DiagBag
+    collections/vector : collections/Vector
+    util/maybe : util/Maybe
+    writer : Writer
+    conv : Conv
+;
+
+let wOut = writer.output;
+
+let printStr(s: String): Ok =
+    begin
+        writer.putString(wOut s);
+        writer.putString(wOut "\n");
+    end;
+
+let printInt(n: Int): Ok =
+    printStr(conv.int(n));
+
+let printBool(b: Bool): Ok =
+    printStr(conv.bool(b));
+
+(* =========================================================================
+ * 1. Location & SourceMap Tests
+ * ========================================================================= *)
+
+let sampleCode = "let x = 10;\nlet y = 20;\nlet sum = x + y;\n";
+let sm = location.newSourceMap("test.quest" sampleCode);
+
+printStr(location.file(sm));
+printInt(location.lineCount(sm));
+
+(* Locate line 1 start, middle, end *)
+let p1 = location.locate(sm 0);
+printInt(p1.line);
+printInt(p1.col);
+
+let p2 = location.locate(sm 4);
+printInt(p2.line);
+printInt(p2.col);
+
+(* Locate line 2 *)
+let p3 = location.locate(sm 12);
+printInt(p3.line);
+printInt(p3.col);
+
+(* Locate line 3 *)
+let p4 = location.locate(sm 24);
+printInt(p4.line);
+printInt(p4.col);
+
+(* Get lines *)
+printStr(location.getLine(sm 1));
+printStr(location.getLine(sm 2));
+printStr(location.getLine(sm 3));
+printStr(location.getLine(sm 99));
+
+(* Spans & Snippets *)
+let sp1 = location.span("test.quest" 4 5);
+printStr(location.extractSnippet(sm sp1));
+
+let sp2 = location.span("test.quest" 12 17);
+printStr(location.extractSnippet(sm sp2));
+
+let spSpan = location.locateSpan(sm sp2);
+printInt(spSpan.start.line);
+printInt(spSpan.start.col);
+printInt(spSpan.endPos.line);
+printInt(spSpan.endPos.col);
+
+(* =========================================================================
+ * 2. Diagnostics Model & Formatting Tests
+ * ========================================================================= *)
+
+let dWarn = diagnostics.warning("unused variable 'y'" location.span("test.quest" 16 17));
+diagnostics.addNote(dWarn "variable defined here but never read");
+diagnostics.setHelp(dWarn "prefix with underscore if intentionally unused");
+
+printStr(diagnostics.severityString(diagnostics.severity(dWarn)));
+printStr(diagnostics.format(dWarn sm));
+
+let dErr = diagnostics.error("type mismatch" location.span("test.quest" 34 39));
+printStr(diagnostics.format(dErr sm));
+
+(* =========================================================================
+ * 3. Diagnostic Bag Tests
+ * ========================================================================= *)
+
+let bag = diagbag.new();
+printBool(diagbag.hasErrors(bag));
+printInt(diagbag.count(bag));
+
+diagbag.addWarning(bag location.span("test.quest" 0 3) "consider explicit type");
+printBool(diagbag.hasErrors(bag));
+printInt(diagbag.warningCount(bag));
+printInt(diagbag.errorCount(bag));
+printInt(diagbag.count(bag));
+
+diagbag.addError(bag location.span("test.quest" 8 10) "invalid literal");
+printBool(diagbag.hasErrors(bag));
+printInt(diagbag.warningCount(bag));
+printInt(diagbag.errorCount(bag));
+printInt(diagbag.count(bag));
+
+(* Test fatal error exception *)
+let caughtFatal =
+    try
+        diagbag.addFatal(bag location.span("test.quest" 24 39) "unrecoverable syntax failure");
+        false
+    when diagbag.fatalError with fatalDiag then
+        printStr(diagnostics.message(fatalDiag));
+        true
+    end;
+printBool(caughtFatal);
+printInt(diagbag.errorCount(bag));
+printInt(diagbag.count(bag));
+
+printStr("--- Render All Diagnostics ---");
+diagbag.renderAll(bag sm wOut);

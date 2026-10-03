@@ -1,0 +1,63 @@
+(* Self-Hosted Quest Compiler: Diagnostic Model and Rendering *)
+
+interface Diagnostics
+import
+    questlang/common/location : questlang/common/Location
+    collections/vector : collections/Vector
+    util/maybe : util/Maybe
+    writer : Writer
+export
+    Def Severity = Option
+        fatal
+        error
+        warning
+        info
+    end
+
+    Def Label = Tuple
+        sp: location.Span
+        message: String
+        isPrimary: Bool
+    end
+
+    Diagnostic::TYPE
+
+    (* =========================================================================
+     * Constructors & Factories
+     * ========================================================================= *)
+
+    make(sev: Severity msg: String sp: location.Span): Diagnostic
+    fatal(msg: String sp: location.Span): Diagnostic
+    error(msg: String sp: location.Span): Diagnostic
+    warning(msg: String sp: location.Span): Diagnostic
+    info(msg: String sp: location.Span): Diagnostic
+
+    (* =========================================================================
+     * Accessors
+     * ========================================================================= *)
+
+    severity(d: Diagnostic): Severity
+    message(d: Diagnostic): String
+    span(d: Diagnostic): location.Span
+    labels(d: Diagnostic): vector.T(Label)
+    notes(d: Diagnostic): vector.T(String)
+    help(d: Diagnostic): maybe.T(String)
+    code(d: Diagnostic): maybe.T(String)
+
+    (* =========================================================================
+     * Mutators / Builders
+     * ========================================================================= *)
+
+    addLabel(d: Diagnostic sp: location.Span msg: String isPrimary: Bool): Ok
+    addNote(d: Diagnostic note: String): Ok
+    setHelp(d: Diagnostic h: String): Ok
+    setCode(d: Diagnostic c: String): Ok
+
+    (* =========================================================================
+     * Formatting & Rendering
+     * ========================================================================= *)
+
+    severityString(sev: Severity): String
+    format(d: Diagnostic sm: location.SourceMap): String
+    render(d: Diagnostic sm: location.SourceMap w: writer.T): Ok
+end;

@@ -1,0 +1,166 @@
+(* Self-Hosted Quest Compiler: Diagnostic Model and Rendering *)
+
+module diagnostics : Diagnostics
+import
+    questlang/common/location : questlang/common/Location
+    collections/vector : collections/Vector
+    util/maybe : util/Maybe
+    util/stringBuilder : util/StringBuilder
+    writer : Writer
+    conv : Conv
+    stringOp = string : StringOp
+export
+    Let Severity = Option
+        fatal
+        error
+        warning
+        info
+    end;
+
+    Let Label = Tuple
+        sp: location.Span
+        message: String
+        isPrimary: Bool
+    end;
+
+    Let Diagnostic = Tuple
+        severity: Severity
+        message: String
+        sp: location.Span
+        labels: vector.T(Label)
+        notes: vector.T(String)
+        var help: maybe.T(String)
+        var code: maybe.T(String)
+    end;
+
+    let make(sev: Severity msg: String sp: location.Span): Diagnostic =
+        tuple
+            let severity = sev
+            let message = msg
+            let sp = sp
+            let labels = vector.new(:Label)
+            let notes = vector.new(:String)
+            let var help = maybe.none(:String)
+            let var code = maybe.none(:String)
+        end;
+
+    let fatal(msg: String sp: location.Span): Diagnostic =
+        make(option fatal of Severity end msg sp);
+
+    let error(msg: String sp: location.Span): Diagnostic =
+        make(option error of Severity end msg sp);
+
+    let warning(msg: String sp: location.Span): Diagnostic =
+        make(option warning of Severity end msg sp);
+
+    let info(msg: String sp: location.Span): Diagnostic =
+        make(option info of Severity end msg sp);
+
+    let severity(d: Diagnostic): Severity = d.severity;
+    let message(d: Diagnostic): String = d.message;
+    let span(d: Diagnostic): location.Span = d.sp;
+    let labels(d: Diagnostic): vector.T(Label) = d.labels;
+    let notes(d: Diagnostic): vector.T(String) = d.notes;
+    let help(d: Diagnostic): maybe.T(String) = d.help;
+    let code(d: Diagnostic): maybe.T(String) = d.code;
+
+    let addLabel(d: Diagnostic sp: location.Span msg: String isPrimary: Bool): Ok =
+        begin
+            let l: Label = tuple
+                let sp = sp
+                let message = msg
+                let isPrimary = isPrimary
+            end;
+            vector.append(:Label d.labels l);
+        end;
+
+    let addNote(d: Diagnostic note: String): Ok =
+        vector.append(:String d.notes note);
+
+    let setHelp(d: Diagnostic h: String): Ok =
+        begin
+            d.help := maybe.some(:String h);
+            ok
+        end;
+
+    let setCode(d: Diagnostic c: String): Ok =
+        begin
+            d.code := maybe.some(:String c);
+            ok
+        end;
+
+    let severityString(sev: Severity): String =
+        case sev
+            when fatal then "fatal error"
+            when error then "error"
+            when warning then "warning"
+            when info then "info"
+        end;
+
+    let format(d: Diagnostic sm: location.SourceMap): String =
+        begin
+            let sb = stringBuilder.new();
+            let sevStr = severityString(d.severity);
+            let sp = d.sp;
+            if {stringOp.length(sp.file) > 0} andif {sp.startOffset >= 0} then
+                let pos = location.locate(sm sp.startOffset);
+                stringBuilder.append(sb sp.file);
+                stringBuilder.append(sb ":");
+                stringBuilder.append(sb conv.int(pos.line));
+                stringBuilder.append(sb ":");
+                stringBuilder.append(sb conv.int(pos.col));
+                stringBuilder.append(sb ": ");
+                stringBuilder.append(sb sevStr);
+                stringBuilder.append(sb ": ");
+                stringBuilder.append(sb d.message);
+                stringBuilder.append(sb "\n");
+
+                let lineStr = location.getLine(sm pos.line);
+                let lineLen = stringOp.length(lineStr);
+                if lineLen > 0 then
+                    stringBuilder.append(sb "    ");
+                    stringBuilder.append(sb lineStr);
+                    stringBuilder.append(sb "\n");
+
+                    let padCount = if pos.col > 1 then pos.col - 1 else 0 end;
+                    let padStr = stringOp.new(padCount ' ');
+                    let var spanLen = sp.endOffset - sp.startOffset;
+                    if spanLen < 1 then spanLen := 1 end;
+                    let maxLen = {lineLen - padCount};
+                    if {maxLen > 0} andif {spanLen > maxLen} then
+                        spanLen := maxLen;
+                    end;
+                    let underStr = stringOp.new(spanLen '^');
+                    stringBuilder.append(sb "    ");
+                    stringBuilder.append(sb padStr);
+                    stringBuilder.append(sb underStr);
+                    stringBuilder.append(sb "\n");
+                end;
+            else
+                stringBuilder.append(sb sevStr);
+                stringBuilder.append(sb ": ");
+                stringBuilder.append(sb d.message);
+                stringBuilder.append(sb "\n");
+            end;
+
+            let noteCount = vector.length(:String d.notes);
+            if noteCount > 0 then
+                for i = 0 upto {noteCount - 1} do
+                    stringBuilder.append(sb "  = note: ");
+                    stringBuilder.append(sb vector.get(:String d.notes i));
+                    stringBuilder.append(sb "\n");
+                end;
+            end;
+
+            if maybe.isSome(:String d.help) then
+                stringBuilder.append(sb "  = help: ");
+                stringBuilder.append(sb maybe.unwrap(:String d.help));
+                stringBuilder.append(sb "\n");
+            end;
+
+            stringBuilder.toString(sb)
+        end;
+
+    let render(d: Diagnostic sm: location.SourceMap w: writer.T): Ok =
+        writer.putString(w format(d sm));
+end;

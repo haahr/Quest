@@ -24,6 +24,7 @@ from quest.grammar import parse_quest_program
 from quest.module_compiler import compile_module_file
 from quest.module_loader import (
     DEFAULT_LIB_DIR,
+    DEFAULT_PROJECT_DIR,
     canonicalize_interface_name,
     canonicalize_module_name,
     canonicalize_module_path,
@@ -127,6 +128,8 @@ class BuildEngine:
                 paths.append(p)
         if DEFAULT_LIB_DIR.is_dir() and DEFAULT_LIB_DIR.resolve() not in paths:
             paths.append(DEFAULT_LIB_DIR.resolve())
+        if DEFAULT_PROJECT_DIR.is_dir() and DEFAULT_PROJECT_DIR.resolve() not in paths:
+            paths.append(DEFAULT_PROJECT_DIR.resolve())
         return paths
 
     def compile_main_unit(

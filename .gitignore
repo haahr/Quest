@@ -29,6 +29,8 @@ htmlcov/
 .deps/
 lib/**/*.c
 lib/**/*.h
+questlang/**/*.c
+questlang/**/*.h
 !runtime/quest_runtime.c
 !runtime/quest_runtime.h
 !runtime/quest_serialization.c

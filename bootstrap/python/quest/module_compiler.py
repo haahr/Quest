@@ -27,6 +27,7 @@ from quest.env import Environment
 from quest.grammar import parse_quest_program
 from quest.module_loader import (
     DEFAULT_LIB_DIR,
+    DEFAULT_PROJECT_DIR,
     canonicalize_interface_name,
     canonicalize_module_name,
     canonicalize_module_path,
@@ -139,6 +140,7 @@ def compile_module(
         search_dirs.append(env.current_dir)
     search_dirs.extend(include_paths or [])
     search_dirs.append(DEFAULT_LIB_DIR)
+    search_dirs.append(DEFAULT_PROJECT_DIR)
 
     for s_dir in search_dirs:
         cand = s_dir / header_name
@@ -301,21 +303,28 @@ def compile_module_file(
     else:
         output_dir = Path(output_dir).resolve()
 
-    return compile_module(
-        decl,
-        env,
-        output_dir=output_dir,
-        include_paths=env.include_paths,
-        compiler_path=compiler_path,
-        nogc=nogc,
-        extra_c_flags=extra_c_flags,
-        source_map=source_map,
-        stem_name=stem,
-        canonical_name=canon_name,
-        emit_deps=emit_deps,
-        source_file=mod_path,
-        build_dir=build_dir,
-    )
+    from quest.module_loader import _COMPILING_MODULES
+
+    canon_key = canon_name.lower()
+    _COMPILING_MODULES.add(canon_key)
+    try:
+        return compile_module(
+            decl,
+            env,
+            output_dir=output_dir,
+            include_paths=env.include_paths,
+            compiler_path=compiler_path,
+            nogc=nogc,
+            extra_c_flags=extra_c_flags,
+            source_map=source_map,
+            stem_name=stem,
+            canonical_name=canon_name,
+            emit_deps=emit_deps,
+            source_file=mod_path,
+            build_dir=build_dir,
+        )
+    finally:
+        _COMPILING_MODULES.discard(canon_key)
 
 
 def compile_hierarchical_module(

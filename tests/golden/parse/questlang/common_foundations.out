@@ -1,0 +1,970 @@
+(Program
+  :phrases (
+    (ImportPhrase
+      :items (
+        (ImportItem ('location') 'Location' ('questlang/common/location') 'questlang/common/Location')
+        (ImportItem ('diagnostics') 'Diagnostics' ('questlang/common/diagnostics') 'questlang/common/Diagnostics')
+        (ImportItem ('diagbag') 'DiagBag' ('questlang/common/diagbag') 'questlang/common/DiagBag')
+        (ImportItem ('vector') 'Vector' ('collections/vector') 'collections/Vector')
+        (ImportItem ('maybe') 'Maybe' ('util/maybe') 'util/Maybe')
+        (ImportItem ('writer') 'Writer')
+        (ImportItem ('conv') 'Conv')
+      )
+    )
+    (LetValueBinding
+      :name 'wOut'
+      :value (ExprSelect
+        :target (ExprId 'writer')
+        :field 'output'
+      )
+    )
+    (LetValueBinding
+      :name 'printStr'
+      :value (ExprBlock
+        :bindings (
+          (ExprStmt
+            :expr (ExprApp
+              :func (ExprSelect
+                :target (ExprId 'writer')
+                :field 'putString'
+              )
+              :args (
+                (ExprId 'wOut')
+                (ExprId 's')
+              )
+            )
+          )
+          (ExprStmt
+            :expr (ExprApp
+              :func (ExprSelect
+                :target (ExprId 'writer')
+                :field 'putString'
+              )
+              :args (
+                (ExprId 'wOut')
+                (ExprString '\n' '"\\n"')
+              )
+            )
+          )
+        )
+      )
+      :params (
+        (FormalParam
+          :name 's'
+          :type_annot (TypePath ('String'))
+          :mode VALUE
+        )
+      )
+      :type_annot (TypePath ('Ok'))
+    )
+    (LetValueBinding
+      :name 'printInt'
+      :value (ExprApp
+        :func (ExprId 'printStr')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'conv')
+              :field 'int'
+            )
+            :args (
+              (ExprId 'n')
+            )
+          )
+        )
+      )
+      :params (
+        (FormalParam
+          :name 'n'
+          :type_annot (TypePath ('Int'))
+          :mode VALUE
+        )
+      )
+      :type_annot (TypePath ('Ok'))
+    )
+    (LetValueBinding
+      :name 'printBool'
+      :value (ExprApp
+        :func (ExprId 'printStr')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'conv')
+              :field 'bool'
+            )
+            :args (
+              (ExprId 'b')
+            )
+          )
+        )
+      )
+      :params (
+        (FormalParam
+          :name 'b'
+          :type_annot (TypePath ('Bool'))
+          :mode VALUE
+        )
+      )
+      :type_annot (TypePath ('Ok'))
+    )
+    (LetValueBinding
+      :name 'sampleCode'
+      :value (ExprString 'let x = 10;\nlet y = 20;\nlet sum = x + y;\n' '"let x = 10;\\nlet y = 20;\\nlet sum = x + y;\\n"')
+    )
+    (LetValueBinding
+      :name 'sm'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'location')
+          :field 'newSourceMap'
+        )
+        :args (
+          (ExprString 'test.quest' '"test.quest"')
+          (ExprId 'sampleCode')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printStr')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'location')
+              :field 'file'
+            )
+            :args (
+              (ExprId 'sm')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printInt')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'location')
+              :field 'lineCount'
+            )
+            :args (
+              (ExprId 'sm')
+            )
+          )
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'p1'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'location')
+          :field 'locate'
+        )
+        :args (
+          (ExprId 'sm')
+          (ExprInt 0 '0')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printInt')
+        :args (
+          (ExprSelect
+            :target (ExprId 'p1')
+            :field 'line'
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printInt')
+        :args (
+          (ExprSelect
+            :target (ExprId 'p1')
+            :field 'col'
+          )
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'p2'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'location')
+          :field 'locate'
+        )
+        :args (
+          (ExprId 'sm')
+          (ExprInt 4 '4')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printInt')
+        :args (
+          (ExprSelect
+            :target (ExprId 'p2')
+            :field 'line'
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printInt')
+        :args (
+          (ExprSelect
+            :target (ExprId 'p2')
+            :field 'col'
+          )
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'p3'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'location')
+          :field 'locate'
+        )
+        :args (
+          (ExprId 'sm')
+          (ExprInt 12 '12')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printInt')
+        :args (
+          (ExprSelect
+            :target (ExprId 'p3')
+            :field 'line'
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printInt')
+        :args (
+          (ExprSelect
+            :target (ExprId 'p3')
+            :field 'col'
+          )
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'p4'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'location')
+          :field 'locate'
+        )
+        :args (
+          (ExprId 'sm')
+          (ExprInt 24 '24')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printInt')
+        :args (
+          (ExprSelect
+            :target (ExprId 'p4')
+            :field 'line'
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printInt')
+        :args (
+          (ExprSelect
+            :target (ExprId 'p4')
+            :field 'col'
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printStr')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'location')
+              :field 'getLine'
+            )
+            :args (
+              (ExprId 'sm')
+              (ExprInt 1 '1')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printStr')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'location')
+              :field 'getLine'
+            )
+            :args (
+              (ExprId 'sm')
+              (ExprInt 2 '2')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printStr')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'location')
+              :field 'getLine'
+            )
+            :args (
+              (ExprId 'sm')
+              (ExprInt 3 '3')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printStr')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'location')
+              :field 'getLine'
+            )
+            :args (
+              (ExprId 'sm')
+              (ExprInt 99 '99')
+            )
+          )
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'sp1'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'location')
+          :field 'span'
+        )
+        :args (
+          (ExprString 'test.quest' '"test.quest"')
+          (ExprInt 4 '4')
+          (ExprInt 5 '5')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printStr')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'location')
+              :field 'extractSnippet'
+            )
+            :args (
+              (ExprId 'sm')
+              (ExprId 'sp1')
+            )
+          )
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'sp2'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'location')
+          :field 'span'
+        )
+        :args (
+          (ExprString 'test.quest' '"test.quest"')
+          (ExprInt 12 '12')
+          (ExprInt 17 '17')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printStr')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'location')
+              :field 'extractSnippet'
+            )
+            :args (
+              (ExprId 'sm')
+              (ExprId 'sp2')
+            )
+          )
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'spSpan'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'location')
+          :field 'locateSpan'
+        )
+        :args (
+          (ExprId 'sm')
+          (ExprId 'sp2')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printInt')
+        :args (
+          (ExprSelect
+            :target (ExprSelect
+              :target (ExprId 'spSpan')
+              :field 'start'
+            )
+            :field 'line'
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printInt')
+        :args (
+          (ExprSelect
+            :target (ExprSelect
+              :target (ExprId 'spSpan')
+              :field 'start'
+            )
+            :field 'col'
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printInt')
+        :args (
+          (ExprSelect
+            :target (ExprSelect
+              :target (ExprId 'spSpan')
+              :field 'endPos'
+            )
+            :field 'line'
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printInt')
+        :args (
+          (ExprSelect
+            :target (ExprSelect
+              :target (ExprId 'spSpan')
+              :field 'endPos'
+            )
+            :field 'col'
+          )
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'dWarn'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'diagnostics')
+          :field 'warning'
+        )
+        :args (
+          (ExprString "unused variable 'y'" '"unused variable \'y\'"')
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'location')
+              :field 'span'
+            )
+            :args (
+              (ExprString 'test.quest' '"test.quest"')
+              (ExprInt 16 '16')
+              (ExprInt 17 '17')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'diagnostics')
+          :field 'addNote'
+        )
+        :args (
+          (ExprId 'dWarn')
+          (ExprString 'variable defined here but never read' '"variable defined here but never read"')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'diagnostics')
+          :field 'setHelp'
+        )
+        :args (
+          (ExprId 'dWarn')
+          (ExprString 'prefix with underscore if intentionally unused' '"prefix with underscore if intentionally unused"')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printStr')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'diagnostics')
+              :field 'severityString'
+            )
+            :args (
+              (ExprApp
+                :func (ExprSelect
+                  :target (ExprId 'diagnostics')
+                  :field 'severity'
+                )
+                :args (
+                  (ExprId 'dWarn')
+                )
+              )
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printStr')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'diagnostics')
+              :field 'format'
+            )
+            :args (
+              (ExprId 'dWarn')
+              (ExprId 'sm')
+            )
+          )
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'dErr'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'diagnostics')
+          :field 'error'
+        )
+        :args (
+          (ExprString 'type mismatch' '"type mismatch"')
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'location')
+              :field 'span'
+            )
+            :args (
+              (ExprString 'test.quest' '"test.quest"')
+              (ExprInt 34 '34')
+              (ExprInt 39 '39')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printStr')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'diagnostics')
+              :field 'format'
+            )
+            :args (
+              (ExprId 'dErr')
+              (ExprId 'sm')
+            )
+          )
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'bag'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'diagbag')
+          :field 'new'
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printBool')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'diagbag')
+              :field 'hasErrors'
+            )
+            :args (
+              (ExprId 'bag')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printInt')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'diagbag')
+              :field 'count'
+            )
+            :args (
+              (ExprId 'bag')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'diagbag')
+          :field 'addWarning'
+        )
+        :args (
+          (ExprId 'bag')
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'location')
+              :field 'span'
+            )
+            :args (
+              (ExprString 'test.quest' '"test.quest"')
+              (ExprInt 0 '0')
+              (ExprInt 3 '3')
+            )
+          )
+          (ExprString 'consider explicit type' '"consider explicit type"')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printBool')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'diagbag')
+              :field 'hasErrors'
+            )
+            :args (
+              (ExprId 'bag')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printInt')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'diagbag')
+              :field 'warningCount'
+            )
+            :args (
+              (ExprId 'bag')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printInt')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'diagbag')
+              :field 'errorCount'
+            )
+            :args (
+              (ExprId 'bag')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printInt')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'diagbag')
+              :field 'count'
+            )
+            :args (
+              (ExprId 'bag')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'diagbag')
+          :field 'addError'
+        )
+        :args (
+          (ExprId 'bag')
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'location')
+              :field 'span'
+            )
+            :args (
+              (ExprString 'test.quest' '"test.quest"')
+              (ExprInt 8 '8')
+              (ExprInt 10 '10')
+            )
+          )
+          (ExprString 'invalid literal' '"invalid literal"')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printBool')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'diagbag')
+              :field 'hasErrors'
+            )
+            :args (
+              (ExprId 'bag')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printInt')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'diagbag')
+              :field 'warningCount'
+            )
+            :args (
+              (ExprId 'bag')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printInt')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'diagbag')
+              :field 'errorCount'
+            )
+            :args (
+              (ExprId 'bag')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printInt')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'diagbag')
+              :field 'count'
+            )
+            :args (
+              (ExprId 'bag')
+            )
+          )
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'caughtFatal'
+      :value (ExprTry
+        :body (ExprBlock
+          :bindings (
+            (ExprStmt
+              :expr (ExprApp
+                :func (ExprSelect
+                  :target (ExprId 'diagbag')
+                  :field 'addFatal'
+                )
+                :args (
+                  (ExprId 'bag')
+                  (ExprApp
+                    :func (ExprSelect
+                      :target (ExprId 'location')
+                      :field 'span'
+                    )
+                    :args (
+                      (ExprString 'test.quest' '"test.quest"')
+                      (ExprInt 24 '24')
+                      (ExprInt 39 '39')
+                    )
+                  )
+                  (ExprString 'unrecoverable syntax failure' '"unrecoverable syntax failure"')
+                )
+              )
+            )
+            (ExprStmt
+              :expr (ExprBool False)
+            )
+          )
+        )
+        :branches (
+          (TryBranch
+            :exc_pattern (ExprSelect
+              :target (ExprId 'diagbag')
+              :field 'fatalError'
+            )
+            :binder 'fatalDiag'
+            :body (ExprBlock
+              :bindings (
+                (ExprStmt
+                  :expr (ExprApp
+                    :func (ExprId 'printStr')
+                    :args (
+                      (ExprApp
+                        :func (ExprSelect
+                          :target (ExprId 'diagnostics')
+                          :field 'message'
+                        )
+                        :args (
+                          (ExprId 'fatalDiag')
+                        )
+                      )
+                    )
+                  )
+                )
+                (ExprStmt
+                  :expr (ExprBool True)
+                )
+              )
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printBool')
+        :args (
+          (ExprId 'caughtFatal')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printInt')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'diagbag')
+              :field 'errorCount'
+            )
+            :args (
+              (ExprId 'bag')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printInt')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'diagbag')
+              :field 'count'
+            )
+            :args (
+              (ExprId 'bag')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printStr')
+        :args (
+          (ExprString '--- Render All Diagnostics ---' '"--- Render All Diagnostics ---"')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'diagbag')
+          :field 'renderAll'
+        )
+        :args (
+          (ExprId 'bag')
+          (ExprId 'sm')
+          (ExprId 'wOut')
+        )
+      )
+    )
+  )
+)

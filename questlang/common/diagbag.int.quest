@@ -1,0 +1,51 @@
+(* Self-Hosted Quest Compiler: Diagnostic Bag and Reporter *)
+
+interface DiagBag
+import
+    questlang/common/location : questlang/common/Location
+    questlang/common/diagnostics : questlang/common/Diagnostics
+    collections/vector : collections/Vector
+    writer : Writer
+export
+    (* Exception raised on unrecoverable fatal compiler errors *)
+    fatalError: Exception(diagnostics.Diagnostic)
+
+    (* Abstract diagnostic bag accumulator type *)
+    T::TYPE
+
+    (* Create a new empty diagnostic bag *)
+    new(): T
+
+    (* Add an existing diagnostic to the bag *)
+    add(bag: T d: diagnostics.Diagnostic): Ok
+
+    (* Construct and append an error diagnostic *)
+    addError(bag: T sp: location.Span msg: String): Ok
+
+    (* Construct and append a warning diagnostic *)
+    addWarning(bag: T sp: location.Span msg: String): Ok
+
+    (* Construct, append, and immediately raise a fatal error diagnostic *)
+    addFatal(bag: T sp: location.Span msg: String): Ok
+
+    (* True if any error or fatal diagnostic has been recorded *)
+    hasErrors(bag: T): Bool
+
+    (* Number of error and fatal diagnostics recorded *)
+    errorCount(bag: T): Int
+
+    (* Number of warning diagnostics recorded *)
+    warningCount(bag: T): Int
+
+    (* Total number of diagnostics recorded *)
+    count(bag: T): Int
+
+    (* Retrieve diagnostic by 0-indexed position *)
+    get(bag: T idx: Int): diagnostics.Diagnostic
+
+    (* Retrieve backing vector of all recorded diagnostics *)
+    getAll(bag: T): vector.T(diagnostics.Diagnostic)
+
+    (* Render all diagnostics in order to the given character writer *)
+    renderAll(bag: T sm: location.SourceMap w: writer.T): Ok
+end;

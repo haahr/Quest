@@ -2954,7 +2954,7 @@ class CEmitter:
                         c_b_type = self.c_type(b_type)
                         branch_lines.append(f"{c_b_type} {b_name};")
                         extracted = self._emit_qval_extract(f"{caught_name}.payload", b_type)
-                        branch_lines.append(f"{b_name} = ({c_b_type})({extracted});")
+                        branch_lines.append(f"{b_name} = {extracted};")
                     self.emit_to(branch.body, dest, branch_lines)
                     for bl in branch_lines:
                         lines.append(f"            {bl}" if bl.strip() else bl)
