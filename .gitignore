@@ -24,6 +24,7 @@ htmlcov/
 *.dylib
 *.out
 *.qi
+*.qm
 *.d
 .deps/
 lib/**/*.c
