@@ -173,8 +173,21 @@ class BuildEngine:
                         imported_modules.append(ImportedModuleRef(name=mod_ref, interface=iface_path))
 
         typed_prog = TypeElaborator(env=env).elaborate_program(ast_prog, env=env)
-        emitter = CEmitter(echo=False, module_prefix=stem, env=env)
+        emitter = CEmitter(echo=False, env=env)
         c_code = emitter.emit_program(typed_prog)
+
+        if emitter.analysis is not None:
+            existing_mod_names = {m.name for m in imported_modules}
+            for mod in emitter.analysis.sorted_modules:
+                if getattr(mod, "is_precompiled", False) and mod.name != "dynamic":
+                    if mod.name not in existing_mod_names:
+                        imported_modules.append(
+                            ImportedModuleRef(
+                                name=mod.name,
+                                interface=mod.interface_name or "",
+                            )
+                        )
+                        existing_mod_names.add(mod.name)
 
         self.logger.log("EMIT C", str(c_path))
         c_path.write_text(c_code, encoding="utf-8")

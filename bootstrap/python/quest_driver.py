@@ -130,10 +130,16 @@ def run_driver(args: list[str]) -> int:
         help="Expected exit code of target program (for testing).",
     )
     arg_parser.add_argument(
+        "-v", "--verbose",
+        dest="verbose",
+        action="store_true",
+        help="Stream build operations to stderr.",
+    )
+    arg_parser.add_argument(
         "--build-dir", "--build_dir",
         dest="build_dir",
-        default=None,
-        help="Directory path for transient build artifacts.",
+        default=".build",
+        help="Directory path for transient build artifacts (default: .build).",
     )
     arg_parser.add_argument(
         "--whole-program", "--whole_program",
@@ -145,7 +151,7 @@ def run_driver(args: list[str]) -> int:
         "--emit-deps", "--emit_deps",
         dest="emit_deps",
         action="store_true",
-        help="Emit Makefile dependency files (.d) in .deps/ directories for compiled modules.",
+        help="Deprecated: module dependencies are recorded in .qm manifests.",
     )
 
     parsed_args = arg_parser.parse_args(driver_args)
@@ -187,7 +193,14 @@ def run_driver(args: list[str]) -> int:
             from quest.interface_compiler import compile_interface_file
             try:
                 include_paths = [Path(p) for p in parsed_args.include_paths]
-                compile_interface_file(file_path, include_paths=include_paths)
+                build_dir = Path(parsed_args.build_dir) if parsed_args.build_dir else Path(".build")
+                build_dir.mkdir(parents=True, exist_ok=True)
+                compile_interface_file(
+                    file_path,
+                    output_dir=build_dir,
+                    include_paths=include_paths,
+                    build_dir=build_dir,
+                )
                 return 0
             except Exception as err:
                 sys.stderr.write(f"quest: error: {err}\n")
@@ -196,12 +209,14 @@ def run_driver(args: list[str]) -> int:
             from quest.module_compiler import compile_module_file
             try:
                 include_paths = [Path(p) for p in parsed_args.include_paths]
-                output_dir = Path(parsed_args.output).parent if parsed_args.output else None
+                build_dir = Path(parsed_args.build_dir) if parsed_args.build_dir else Path(".build")
+                build_dir.mkdir(parents=True, exist_ok=True)
+                output_dir = Path(parsed_args.output).parent if parsed_args.output else build_dir
                 compile_module_file(
                     file_path,
                     output_dir=output_dir,
                     include_paths=include_paths,
-                    emit_deps=parsed_args.emit_deps,
+                    build_dir=build_dir,
                 )
                 return 0
             except Exception as err:
@@ -216,6 +231,31 @@ def run_driver(args: list[str]) -> int:
 
     # Configure pipeline and options
     has_output = parsed_args.output is not None
+    if (
+        has_output
+        and not parsed_args.whole_program
+        and not parsed_args.stop_after
+        and not parsed_args.dump_after
+        and not parsed_args.echo
+        and source_file not in (None, "-")
+        and not is_inline_code
+    ):
+        file_path = Path(source_file)
+        build_dir = Path(parsed_args.build_dir) if parsed_args.build_dir else Path(".build")
+        include_paths = [Path(p) for p in parsed_args.include_paths]
+        from quest.build.engine import BuildEngine
+        engine = BuildEngine(
+            build_dir=build_dir,
+            include_paths=include_paths,
+            verbose=parsed_args.verbose,
+            nogc=False,
+        )
+        try:
+            engine.build_main(file_path, output_binary=Path(parsed_args.output))
+            return 0
+        except Exception as err:
+            sys.stderr.write(f"quest: error: {err}\n")
+            return 1
     has_objects = bool(extra_objects)
     needs_c_pipeline = (
         has_output
@@ -415,10 +455,16 @@ def run_compile(args: list[str]) -> int:
         help="Print Cardelli-format result of the final phrase when compiling C code.",
     )
     arg_parser.add_argument(
+        "-v", "--verbose",
+        dest="verbose",
+        action="store_true",
+        help="Stream build operations to stderr.",
+    )
+    arg_parser.add_argument(
         "--build-dir", "--build_dir",
         dest="build_dir",
-        default=None,
-        help="Directory path for transient build artifacts.",
+        default=".build",
+        help="Directory path for transient build artifacts (default: .build).",
     )
     arg_parser.add_argument(
         "--whole-program", "--whole_program",
@@ -430,7 +476,7 @@ def run_compile(args: list[str]) -> int:
         "--emit-deps", "--emit_deps",
         dest="emit_deps",
         action="store_true",
-        help="Emit Makefile dependency files (.d) in .deps/ directories for compiled modules.",
+        help="Deprecated: module dependencies are recorded in .qm manifests.",
     )
 
     parsed_args = arg_parser.parse_args(args)
@@ -475,7 +521,14 @@ def run_compile(args: list[str]) -> int:
             from quest.interface_compiler import compile_interface_file
             try:
                 include_paths = [Path(p) for p in parsed_args.include_paths]
-                compile_interface_file(file_path, include_paths=include_paths)
+                build_dir = Path(parsed_args.build_dir) if parsed_args.build_dir else Path(".build")
+                build_dir.mkdir(parents=True, exist_ok=True)
+                compile_interface_file(
+                    file_path,
+                    output_dir=build_dir,
+                    include_paths=include_paths,
+                    build_dir=build_dir,
+                )
                 return 0
             except Exception as err:
                 sys.stderr.write(f"quest compile: error: {err}\n")
@@ -484,12 +537,14 @@ def run_compile(args: list[str]) -> int:
             from quest.module_compiler import compile_module_file
             try:
                 include_paths = [Path(p) for p in parsed_args.include_paths]
-                output_dir = Path(parsed_args.output).parent if parsed_args.output else None
+                build_dir = Path(parsed_args.build_dir) if parsed_args.build_dir else Path(".build")
+                build_dir.mkdir(parents=True, exist_ok=True)
+                output_dir = Path(parsed_args.output).parent if parsed_args.output else build_dir
                 compile_module_file(
                     file_path,
                     output_dir=output_dir,
                     include_paths=include_paths,
-                    emit_deps=parsed_args.emit_deps,
+                    build_dir=build_dir,
                 )
                 return 0
             except Exception as err:
@@ -507,6 +562,36 @@ def run_compile(args: list[str]) -> int:
             return 1
 
     output_path = Path(parsed_args.output) if parsed_args.output else default_out
+
+    if (
+        not parsed_args.whole_program
+        and not parsed_args.emit_c
+        and not parsed_args.stop_after
+        and not parsed_args.dump_after
+        and not parsed_args.echo
+        and not parsed_args.print_result
+        and source_file not in (None, "-")
+        and not is_inline_code
+    ):
+        file_path = Path(source_file)
+        build_dir = Path(parsed_args.build_dir) if parsed_args.build_dir else Path(".build")
+        include_paths = [Path(p) for p in parsed_args.include_paths]
+        from quest.build.engine import BuildEngine
+        engine = BuildEngine(
+            build_dir=build_dir,
+            include_paths=include_paths,
+            verbose=parsed_args.verbose,
+            nogc=parsed_args.nogc,
+        )
+        try:
+            if parsed_args.compile_only:
+                engine._compile_main_file(file_path)
+            else:
+                engine.build_main(file_path, output_binary=output_path)
+            return 0
+        except Exception as err:
+            sys.stderr.write(f"quest compile: error: {err}\n")
+            return 1
 
     options = CompilerOptions(
         stop_after=parsed_args.stop_after,
