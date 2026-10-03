@@ -24,6 +24,8 @@ from quest.grammar import parse_quest_program
 from quest.module_compiler import compile_module_file
 from quest.module_loader import (
     DEFAULT_LIB_DIR,
+    canonicalize_interface_name,
+    canonicalize_module_name,
     canonicalize_module_path,
     load_interface,
     resolve_interface_source_file,
@@ -55,9 +57,7 @@ def interfaces_conform(actual: Optional[str], expected: Optional[str]) -> bool:
     """Checks whether an actual module interface matches an expected interface name."""
     if not actual or not expected:
         return True
-    if actual == expected or actual.lower() == expected.lower():
-        return True
-    return actual.split("/")[-1].lower() == expected.split("/")[-1].lower()
+    return actual == expected
 
 
 def detect_module_cycle(graph: dict[str, list[str]]) -> Optional[list[str]]:
@@ -175,17 +175,20 @@ class BuildEngine:
                     if env.lookup_interface(iface_path) is None and env.lookup_interface(it.interface_name) is None:
                         load_interface(iface_path, env)
                     imp_src = resolve_interface_source_file(iface_path, env.current_dir, env.include_paths)
+                    canon_imp_iface = canonicalize_interface_name(imp_src, env.include_paths, iface_path)
                     imp_mtime = imp_src.stat().st_mtime if imp_src and imp_src.is_file() else 0.0
                     imported_interfaces.append(
                         ImportedInterfaceRef(
-                            name=iface_path,
+                            name=canon_imp_iface,
                             source=str(imp_src.resolve()) if imp_src else "",
                             mtime=imp_mtime,
                         )
                     )
                     for iname, mpath in zip(it.names, it.effective_module_paths):
                         mod_ref = mpath if mpath else iname
-                        imported_modules.append(ImportedModuleRef(name=mod_ref, interface=iface_path))
+                        mod_src = resolve_module_file(mod_ref, env.current_dir, env.include_paths)
+                        canon_mod_ref = canonicalize_module_name(mod_src, env.include_paths, mod_ref)
+                        imported_modules.append(ImportedModuleRef(name=canon_mod_ref, interface=canon_imp_iface))
 
         typed_prog = TypeElaborator(env=env).elaborate_program(ast_prog, env=env)
         emitter = CEmitter(echo=False, env=env)
@@ -195,14 +198,26 @@ class BuildEngine:
             existing_mod_names = {m.name for m in imported_modules}
             for mod in emitter.analysis.sorted_modules:
                 if getattr(mod, "is_precompiled", False) and mod.name != "dynamic":
-                    if mod.name not in existing_mod_names:
+                    mod_src = resolve_module_file(mod.name, env.current_dir, env.include_paths)
+                    canon_mod_name = canonicalize_module_name(mod_src, env.include_paths, mod.name)
+                    if canon_mod_name not in existing_mod_names:
+                        iface_src = (
+                            resolve_interface_source_file(mod.interface_name, env.current_dir, env.include_paths)
+                            if mod.interface_name
+                            else None
+                        )
+                        canon_iface_name = (
+                            canonicalize_interface_name(iface_src, env.include_paths, mod.interface_name)
+                            if mod.interface_name
+                            else ""
+                        )
                         imported_modules.append(
                             ImportedModuleRef(
-                                name=mod.name,
-                                interface=mod.interface_name or "",
+                                name=canon_mod_name,
+                                interface=canon_iface_name,
                             )
                         )
-                        existing_mod_names.add(mod.name)
+                        existing_mod_names.add(canon_mod_name)
 
         self.logger.log("EMIT C", str(c_path))
         c_path.write_text(c_code, encoding="utf-8")
@@ -282,19 +297,26 @@ class BuildEngine:
                 return
             norm_name = mod_name.lower()
             stem_name = Path(mod_name).name.lower()
-            expected_interfaces.setdefault(norm_name, []).append((importer, expected_iface))
-            if stem_name != norm_name:
+            expected_interfaces.setdefault(mod_name, []).append((importer, expected_iface))
+            if norm_name != mod_name:
+                expected_interfaces.setdefault(norm_name, []).append((importer, expected_iface))
+            if stem_name not in (mod_name, norm_name):
                 expected_interfaces.setdefault(stem_name, []).append((importer, expected_iface))
 
             if norm_name in RUNTIME_BUILTINS:
-                if not interfaces_conform(norm_name, expected_iface):
+                builtin_iface = "Dynamic" if norm_name == "dynamic" else mod_name
+                if not interfaces_conform(builtin_iface, expected_iface):
                     raise BuildError(
                         f"Type error: '{importer}' imports module '{mod_name}' as interface "
-                        f"'{expected_iface}', but builtin module '{mod_name}' implements interface '{mod_name}'"
+                        f"'{expected_iface}', but builtin module '{mod_name}' implements interface '{builtin_iface}'"
                     )
                 return
 
-            existing = module_manifests.get(norm_name) or module_manifests.get(stem_name)
+            existing = (
+                module_manifests.get(mod_name)
+                or module_manifests.get(norm_name)
+                or module_manifests.get(stem_name)
+            )
             if existing and existing.interface:
                 if not interfaces_conform(existing.interface, expected_iface):
                     raise BuildError(
@@ -472,9 +494,16 @@ class BuildEngine:
                 if manifest is not None:
                     module_manifests[item_name.lower()] = manifest
                     module_manifests[stem] = manifest
+                    if manifest.name:
+                        module_manifests[manifest.name] = manifest
+                        module_manifests[manifest.name.lower()] = manifest
                     _verify_module_interface(item_name.lower(), manifest.interface)
                     if stem != item_name.lower():
                         _verify_module_interface(stem, manifest.interface)
+                    if manifest.name and manifest.name not in (item_name.lower(), stem):
+                        _verify_module_interface(manifest.name, manifest.interface)
+                    if manifest.name and manifest.name.lower() not in (item_name.lower(), stem):
+                        _verify_module_interface(manifest.name.lower(), manifest.interface)
 
                 imported_mods: list[ImportedModuleRef] = manifest.imported_modules if manifest else []
 

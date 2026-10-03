@@ -184,11 +184,12 @@ A `.qi` file contains the complete type signature of an interface:
 ### 4.3. Quest Module Metadata (`.qm`)
 A `.qm` file records the build manifest for an implementation module or main routine:
 - `name`: Canonical module name (e.g. `"util/path"`) or `"<main>"`.
-- `interface`: Declared interface name (for modules; `null` for main routines).
+- `interface`: Canonical interface name (e.g. `"util/Path"`) for modules; `null` for main routines.
 - `source`: Path to source file (`.mod.quest` or `.quest`).
 - `object`: Path to compiled `.o` file in `.build/`.
-- `imported_modules`: Array of imported modules: `[ { "name": "util/strutil", "interface": "util/Strutil" }, ... ]`.
-- `imported_interfaces`: Array of imported interfaces with source paths and timestamps:
+- `imported_modules`: Array of imported modules with canonical module and interface names:
+  `[ { "name": "util/strutil", "interface": "util/Strutil" }, ... ]`.
+- `imported_interfaces`: Array of imported interfaces with canonical names, source paths, and timestamps:
   `[ { "name": "util/Path", "source": "lib/util/path.int.quest", "mtime": 1727891234 }, ... ]`.
 
 ### 4.4. Builtin Runtime Modules (`BUILTIN_RUNTIME_MODULES`)
@@ -305,8 +306,13 @@ Because separate compilation decouples the compilation of an importing unit from
 - To prevent type mismatches and binary desynchronization across separate compilation boundaries, the build engine
   explicitly enforces that the module's declared interface (`mod.qm.interface`) conforms to the interface expected by
   each importer (`imported_modules[...].interface`).
-- If an importer expects interface `Iface` but `mod` implements `ActualIface`, the build engine halts compilation with a
-  fatal type mismatch error before generating binary code or invoking the linker.
+- **Canonical Name Representation:** All module and interface references recorded in `.qm` metadata files are
+  canonicalized (e.g. `util/path` and `util/Path`).
+- **Strict Canonical Equality:** Interface conformance is evaluated strictly on canonical interface name equality
+  (`actual == expected`). If an importer expects canonical interface `gui/Window` but the imported module implements
+  `os/Window`, or if package prefixes differ across modules, the build engine immediately detects the mismatch and halts
+  compilation with a fatal type error (`Type error: '<importer>' imports module '<mod>' as interface '<expected>', but
+  module '<mod>' implements interface '<actual>'`) before generating binary code or invoking the linker.
 
 ---
 

@@ -225,6 +225,35 @@ def canonicalize_module_path(
     return filename
 
 
+def canonicalize_interface_name(
+    file_path: Optional[Path],
+    include_paths: list[Path],
+    declared_name: str,
+) -> str:
+    """Computes canonical hierarchical interface name (e.g. 'util/Path')."""
+    if file_path is None:
+        return declared_name
+    canon_mod = canonicalize_module_path(file_path, include_paths)
+    base_name = declared_name.split("/")[-1]
+    if "/" in canon_mod:
+        parent_dir = str(Path(canon_mod).parent)
+        return f"{parent_dir}/{base_name}"
+    if "/" in declared_name:
+        return declared_name
+    return base_name
+
+
+def canonicalize_module_name(
+    file_path: Optional[Path],
+    include_paths: list[Path],
+    raw_name: str,
+) -> str:
+    """Computes canonical hierarchical module name (e.g. 'util/path')."""
+    if file_path is None:
+        return raw_name
+    return canonicalize_module_path(file_path, include_paths)
+
+
 def load_interface(name: str, env: Environment) -> Scope:
     """Loads, validates, and elaborates an interface from a .int.quest file."""
     existing = env.lookup_interface(name)

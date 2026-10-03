@@ -339,6 +339,65 @@ class TestBuildEngine(unittest.TestCase):
         self.assertIn("IfaceA", str(ctx.exception))
         self.assertIn("IfaceC", str(ctx.exception))
 
+    def test_canonical_interface_cross_namespace_mismatch(self) -> None:
+        """Tests that different namespaces with the same interface base name are not conflated."""
+        gui_dir = self.root / "gui"
+        os_dir = self.root / "os"
+        gui_dir.mkdir(parents=True, exist_ok=True)
+        os_dir.mkdir(parents=True, exist_ok=True)
+
+        intf_gui = gui_dir / "window.int.quest"
+        intf_gui.write_text("interface Window export show(): Int end;\n", encoding="utf-8")
+        intf_os = os_dir / "window.int.quest"
+        intf_os.write_text("interface Window export show(): Int end;\n", encoding="utf-8")
+        compile_interface_file(intf_gui, build_dir=self.build_dir, include_paths=[self.root])
+        compile_interface_file(intf_os, build_dir=self.build_dir, include_paths=[self.root])
+
+        mod_gui = gui_dir / "window.mod.quest"
+        mod_gui.write_text("module window : Window export let show(): Int = 1; end;\n", encoding="utf-8")
+
+        main_file = self.root / "mismatch.quest"
+        main_file.write_text("import w = gui/window : os/Window;\n", encoding="utf-8")
+
+        engine = self._create_engine()
+        with self.assertRaises(BuildError) as ctx:
+            engine.build_main(main_file)
+        self.assertIn("Type error:", str(ctx.exception))
+        self.assertIn("os/Window", str(ctx.exception))
+        self.assertIn("gui/Window", str(ctx.exception))
+
+    def test_canonical_interface_matching_hierarchical(self) -> None:
+        """Tests that hierarchical modules and interfaces match on their canonical names."""
+        util_dir = self.root / "util"
+        util_dir.mkdir(parents=True, exist_ok=True)
+
+        intf_file = util_dir / "path.int.quest"
+        intf_file.write_text("interface Path export get(): Int end;\n", encoding="utf-8")
+        compile_interface_file(intf_file, build_dir=self.build_dir, include_paths=[self.root])
+
+        mod_file = util_dir / "path.mod.quest"
+        mod_file.write_text("module path : Path export let get(): Int = 42; end;\n", encoding="utf-8")
+
+        main_file = self.root / "app_path.quest"
+        main_file.write_text(
+            "import p = util/path : util/Path;\n"
+            "import writer: Writer;\n"
+            "import conv: Conv;\n"
+            "let w = writer.output;\n"
+            "writer.putString(w conv.int(p.get()));\n"
+            "writer.putString(w \"\\n\");\n",
+            encoding="utf-8",
+        )
+
+        engine = self._create_engine()
+        res = engine.build_main(main_file)
+        self.assertTrue(res.output_binary.is_file())
+
+        proc = subprocess.run([str(res.output_binary)], stdout=subprocess.PIPE, text=True)
+        self.assertEqual(proc.returncode, 0)
+        self.assertEqual(proc.stdout, "42\n")
+
 
 if __name__ == "__main__":
     unittest.main()
+

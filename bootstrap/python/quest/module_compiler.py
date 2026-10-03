@@ -27,6 +27,9 @@ from quest.env import Environment
 from quest.grammar import parse_quest_program
 from quest.module_loader import (
     DEFAULT_LIB_DIR,
+    canonicalize_interface_name,
+    canonicalize_module_name,
+    canonicalize_module_path,
     load_interface,
     resolve_interface_file,
     resolve_interface_source_file,
@@ -75,6 +78,9 @@ def compile_module(
         from quest.pipeline import CompilerOptions
         env.options = CompilerOptions(stop_after="codegen_c", build_dir=build_dir)
 
+    if canonical_name is None and source_file is not None:
+        canonical_name = canonicalize_module_path(source_file, env.include_paths)
+
     imported_modules: list[ImportedModuleRef] = []
     imported_interfaces: list[ImportedInterfaceRef] = []
 
@@ -86,10 +92,13 @@ def compile_module(
     tgt_src = resolve_interface_source_file(
         module_decl.interface_name, env.current_dir, env.include_paths
     )
+    canon_target_interface = canonicalize_interface_name(
+        tgt_src, env.include_paths, module_decl.interface_name
+    )
     tgt_mtime = tgt_src.stat().st_mtime if tgt_src and tgt_src.is_file() else 0.0
     imported_interfaces.append(
         ImportedInterfaceRef(
-            name=module_decl.interface_name,
+            name=canon_target_interface,
             source=str(tgt_src.resolve()) if tgt_src else "",
             mtime=tgt_mtime,
         )
@@ -102,10 +111,11 @@ def compile_module(
             load_interface(iface_path, env)
 
         imp_src = resolve_interface_source_file(iface_path, env.current_dir, env.include_paths)
+        canon_imp_iface = canonicalize_interface_name(imp_src, env.include_paths, iface_path)
         imp_mtime = imp_src.stat().st_mtime if imp_src and imp_src.is_file() else 0.0
         imported_interfaces.append(
             ImportedInterfaceRef(
-                name=iface_path,
+                name=canon_imp_iface,
                 source=str(imp_src.resolve()) if imp_src else "",
                 mtime=imp_mtime,
             )
@@ -113,7 +123,9 @@ def compile_module(
 
         for iname, mpath in zip(imp.names, imp.effective_module_paths):
             mod_ref = mpath if mpath else iname
-            imported_modules.append(ImportedModuleRef(name=mod_ref, interface=iface_path))
+            mod_src = resolve_module_file(mod_ref, env.current_dir, env.include_paths)
+            canon_mod_ref = canonicalize_module_name(mod_src, env.include_paths, mod_ref)
+            imported_modules.append(ImportedModuleRef(name=canon_mod_ref, interface=canon_imp_iface))
 
     # 3. Elaborate module
     typed_mod = elaborate_module(module_decl, env)
@@ -217,7 +229,7 @@ def compile_module(
     qm_file = output_dir / f"{base}.qm"
     manifest = ModuleManifest(
         name=mod_name,
-        interface=module_decl.interface_name,
+        interface=canon_target_interface,
         source=str(source_file.resolve()) if source_file else "",
         object=str(o_file.resolve()),
         imported_modules=imported_modules,
