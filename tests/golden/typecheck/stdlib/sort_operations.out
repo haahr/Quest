@@ -1,0 +1,905 @@
+(TypedProgram
+  :phrases (
+    (TypedImport
+      :items (
+        (TypedImportItem ('sort') : 'Sort')
+      ))
+    (TypedImport
+      :items (
+        (TypedImportItem ('vector') : 'Vector')
+      ))
+    (TypedImport
+      :items (
+        (TypedImportItem ('maybe') : 'Maybe')
+      ))
+    (TypedImport
+      :items (
+        (TypedImportItem ('writer') : 'Writer')
+      ))
+    (TypedImport
+      :items (
+        (TypedImportItem ('conv') : 'Conv')
+      ))
+    (TypedLetValue 'wOut' :type Writer.T
+      :value (TypedSelect 'output' :type Writer.T
+        :target (TypedVar 'writer' :type Record error: Exception output: Writer.T err: Writer.T file: Fun(name: String): Writer.T putString: Fun(writer: Writer.T string: String): Ok putChar: Fun(writer: Writer.T char: Char): Ok putSubString: Fun(writer: Writer.T string: String start: Int size: Int): Ok flush: Fun(writer: Writer.T): Ok close: Fun(writer: Writer.T): Ok end)))
+    (TypedLetValue 'printInt' :type Fun(n: Int): Ok
+      :value (TypedFun :params (('n' : Int)) :type Fun(n: Int): Ok
+        :body (TypedBlock :type Ok
+          :bindings (
+            (TypedExprStmt
+              :expr (TypedApp :type Ok
+                :func (TypedSelect 'putString' :type Fun(writer: Writer.T string: String): Ok
+                  :target (TypedVar 'writer' :type Record error: Exception output: Writer.T err: Writer.T file: Fun(name: String): Writer.T putString: Fun(writer: Writer.T string: String): Ok putChar: Fun(writer: Writer.T char: Char): Ok putSubString: Fun(writer: Writer.T string: String start: Int size: Int): Ok flush: Fun(writer: Writer.T): Ok close: Fun(writer: Writer.T): Ok end))
+                :args (
+                  (TypedVar 'wOut' :type Writer.T)
+                  (TypedApp :type String
+                    :func (TypedSelect 'int' :type Fun(n: Int): String
+                      :target (TypedVar 'conv' :type Record okay: Fun(): String bool: Fun(b: Bool): String int: Fun(n: Int): String real: Fun(r: Real): String char: Fun(c: Char): String string: Fun(s: String): String end))
+                    :args (
+                      (TypedVar 'n' :type Int)
+                    ))
+                )))
+          )
+          :result (TypedApp :type Ok
+            :func (TypedSelect 'putString' :type Fun(writer: Writer.T string: String): Ok
+              :target (TypedVar 'writer' :type Record error: Exception output: Writer.T err: Writer.T file: Fun(name: String): Writer.T putString: Fun(writer: Writer.T string: String): Ok putChar: Fun(writer: Writer.T char: Char): Ok putSubString: Fun(writer: Writer.T string: String start: Int size: Int): Ok flush: Fun(writer: Writer.T): Ok close: Fun(writer: Writer.T): Ok end))
+            :args (
+              (TypedVar 'wOut' :type Writer.T)
+              (TypedString ' ' :type String)
+            )))))
+    (TypedLetValue 'printBool' :type Fun(b: Bool): Ok
+      :value (TypedFun :params (('b' : Bool)) :type Fun(b: Bool): Ok
+        :body (TypedBlock :type Ok
+          :bindings (
+            (TypedExprStmt
+              :expr (TypedApp :type Ok
+                :func (TypedSelect 'putString' :type Fun(writer: Writer.T string: String): Ok
+                  :target (TypedVar 'writer' :type Record error: Exception output: Writer.T err: Writer.T file: Fun(name: String): Writer.T putString: Fun(writer: Writer.T string: String): Ok putChar: Fun(writer: Writer.T char: Char): Ok putSubString: Fun(writer: Writer.T string: String start: Int size: Int): Ok flush: Fun(writer: Writer.T): Ok close: Fun(writer: Writer.T): Ok end))
+                :args (
+                  (TypedVar 'wOut' :type Writer.T)
+                  (TypedApp :type String
+                    :func (TypedSelect 'bool' :type Fun(b: Bool): String
+                      :target (TypedVar 'conv' :type Record okay: Fun(): String bool: Fun(b: Bool): String int: Fun(n: Int): String real: Fun(r: Real): String char: Fun(c: Char): String string: Fun(s: String): String end))
+                    :args (
+                      (TypedVar 'b' :type Bool)
+                    ))
+                )))
+          )
+          :result (TypedApp :type Ok
+            :func (TypedSelect 'putString' :type Fun(writer: Writer.T string: String): Ok
+              :target (TypedVar 'writer' :type Record error: Exception output: Writer.T err: Writer.T file: Fun(name: String): Writer.T putString: Fun(writer: Writer.T string: String): Ok putChar: Fun(writer: Writer.T char: Char): Ok putSubString: Fun(writer: Writer.T string: String start: Int size: Int): Ok flush: Fun(writer: Writer.T): Ok close: Fun(writer: Writer.T): Ok end))
+            :args (
+              (TypedVar 'wOut' :type Writer.T)
+              (TypedString ' ' :type String)
+            )))))
+    (TypedLetValue 'printString' :type Fun(s: String): Ok
+      :value (TypedFun :params (('s' : String)) :type Fun(s: String): Ok
+        :body (TypedBlock :type Ok
+          :bindings (
+            (TypedExprStmt
+              :expr (TypedApp :type Ok
+                :func (TypedSelect 'putString' :type Fun(writer: Writer.T string: String): Ok
+                  :target (TypedVar 'writer' :type Record error: Exception output: Writer.T err: Writer.T file: Fun(name: String): Writer.T putString: Fun(writer: Writer.T string: String): Ok putChar: Fun(writer: Writer.T char: Char): Ok putSubString: Fun(writer: Writer.T string: String start: Int size: Int): Ok flush: Fun(writer: Writer.T): Ok close: Fun(writer: Writer.T): Ok end))
+                :args (
+                  (TypedVar 'wOut' :type Writer.T)
+                  (TypedVar 's' :type String)
+                )))
+          )
+          :result (TypedApp :type Ok
+            :func (TypedSelect 'putString' :type Fun(writer: Writer.T string: String): Ok
+              :target (TypedVar 'writer' :type Record error: Exception output: Writer.T err: Writer.T file: Fun(name: String): Writer.T putString: Fun(writer: Writer.T string: String): Ok putChar: Fun(writer: Writer.T char: Char): Ok putSubString: Fun(writer: Writer.T string: String start: Int size: Int): Ok flush: Fun(writer: Writer.T): Ok close: Fun(writer: Writer.T): Ok end))
+            :args (
+              (TypedVar 'wOut' :type Writer.T)
+              (TypedString ' ' :type String)
+            )))))
+    (TypedLetValue 'printNewline' :type Fun(dummy: Int): Ok
+      :value (TypedFun :params (('dummy' : Int)) :type Fun(dummy: Int): Ok
+        :body (TypedApp :type Ok
+          :func (TypedSelect 'putString' :type Fun(writer: Writer.T string: String): Ok
+            :target (TypedVar 'writer' :type Record error: Exception output: Writer.T err: Writer.T file: Fun(name: String): Writer.T putString: Fun(writer: Writer.T string: String): Ok putChar: Fun(writer: Writer.T char: Char): Ok putSubString: Fun(writer: Writer.T string: String start: Int size: Int): Ok flush: Fun(writer: Writer.T): Ok close: Fun(writer: Writer.T): Ok end))
+          :args (
+            (TypedVar 'wOut' :type Writer.T)
+            (TypedString '\n' :type String)
+          ))))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printInt' :type Fun(n: Int): Ok)
+        :args (
+          (TypedApp :type Int
+            :func (TypedSelect 'intCompare' :type Fun(a: Int b: Int): Int
+              :target (TypedVar 'sort' :type Record intCompare: Fun(a: Int b: Int): Int stringCompare: Fun(a: String b: String): Int realCompare: Fun(a: Real b: Real): Int reverse: All(A :: TYPE) Fun(cmp: Fun(a: A b: A): Int): Fun(a: A b: A): Int bisectRight: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): Int bisectRightVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): Int bisectRightRange: All(A :: TYPE) Fun(arr: Array(A) key: A lo: Int hi: Int cmp: Fun(a: A b: A): Int): Int bisectLeft: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): Int bisectLeftVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): Int bisectLeftRange: All(A :: TYPE) Fun(arr: Array(A) key: A lo: Int hi: Int cmp: Fun(a: A b: A): Int): Int binarySearch: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): maybe.T(Int) binarySearchVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): maybe.T(Int) sort: All(A :: TYPE) Fun(arr: Array(A) cmp: Fun(a: A b: A): Int): Ok sortVector: All(A :: TYPE) Fun(v: vector.T(A) cmp: Fun(a: A b: A): Int): Ok sorted: All(A :: TYPE) Fun(arr: Array(A) cmp: Fun(a: A b: A): Int): Array(A) sortedVector: All(A :: TYPE) Fun(v: vector.T(A) cmp: Fun(a: A b: A): Int): vector.T(A) end))
+            :args (
+              (TypedInt 10 :type Int)
+              (TypedInt 20 :type Int)
+            ))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printInt' :type Fun(n: Int): Ok)
+        :args (
+          (TypedApp :type Int
+            :func (TypedSelect 'intCompare' :type Fun(a: Int b: Int): Int
+              :target (TypedVar 'sort' :type Record intCompare: Fun(a: Int b: Int): Int stringCompare: Fun(a: String b: String): Int realCompare: Fun(a: Real b: Real): Int reverse: All(A :: TYPE) Fun(cmp: Fun(a: A b: A): Int): Fun(a: A b: A): Int bisectRight: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): Int bisectRightVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): Int bisectRightRange: All(A :: TYPE) Fun(arr: Array(A) key: A lo: Int hi: Int cmp: Fun(a: A b: A): Int): Int bisectLeft: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): Int bisectLeftVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): Int bisectLeftRange: All(A :: TYPE) Fun(arr: Array(A) key: A lo: Int hi: Int cmp: Fun(a: A b: A): Int): Int binarySearch: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): maybe.T(Int) binarySearchVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): maybe.T(Int) sort: All(A :: TYPE) Fun(arr: Array(A) cmp: Fun(a: A b: A): Int): Ok sortVector: All(A :: TYPE) Fun(v: vector.T(A) cmp: Fun(a: A b: A): Int): Ok sorted: All(A :: TYPE) Fun(arr: Array(A) cmp: Fun(a: A b: A): Int): Array(A) sortedVector: All(A :: TYPE) Fun(v: vector.T(A) cmp: Fun(a: A b: A): Int): vector.T(A) end))
+            :args (
+              (TypedInt 20 :type Int)
+              (TypedInt 20 :type Int)
+            ))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printInt' :type Fun(n: Int): Ok)
+        :args (
+          (TypedApp :type Int
+            :func (TypedSelect 'intCompare' :type Fun(a: Int b: Int): Int
+              :target (TypedVar 'sort' :type Record intCompare: Fun(a: Int b: Int): Int stringCompare: Fun(a: String b: String): Int realCompare: Fun(a: Real b: Real): Int reverse: All(A :: TYPE) Fun(cmp: Fun(a: A b: A): Int): Fun(a: A b: A): Int bisectRight: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): Int bisectRightVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): Int bisectRightRange: All(A :: TYPE) Fun(arr: Array(A) key: A lo: Int hi: Int cmp: Fun(a: A b: A): Int): Int bisectLeft: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): Int bisectLeftVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): Int bisectLeftRange: All(A :: TYPE) Fun(arr: Array(A) key: A lo: Int hi: Int cmp: Fun(a: A b: A): Int): Int binarySearch: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): maybe.T(Int) binarySearchVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): maybe.T(Int) sort: All(A :: TYPE) Fun(arr: Array(A) cmp: Fun(a: A b: A): Int): Ok sortVector: All(A :: TYPE) Fun(v: vector.T(A) cmp: Fun(a: A b: A): Int): Ok sorted: All(A :: TYPE) Fun(arr: Array(A) cmp: Fun(a: A b: A): Int): Array(A) sortedVector: All(A :: TYPE) Fun(v: vector.T(A) cmp: Fun(a: A b: A): Int): vector.T(A) end))
+            :args (
+              (TypedInt 30 :type Int)
+              (TypedInt 20 :type Int)
+            ))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printInt' :type Fun(n: Int): Ok)
+        :args (
+          (TypedApp :type Int
+            :func (TypedSelect 'stringCompare' :type Fun(a: String b: String): Int
+              :target (TypedVar 'sort' :type Record intCompare: Fun(a: Int b: Int): Int stringCompare: Fun(a: String b: String): Int realCompare: Fun(a: Real b: Real): Int reverse: All(A :: TYPE) Fun(cmp: Fun(a: A b: A): Int): Fun(a: A b: A): Int bisectRight: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): Int bisectRightVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): Int bisectRightRange: All(A :: TYPE) Fun(arr: Array(A) key: A lo: Int hi: Int cmp: Fun(a: A b: A): Int): Int bisectLeft: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): Int bisectLeftVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): Int bisectLeftRange: All(A :: TYPE) Fun(arr: Array(A) key: A lo: Int hi: Int cmp: Fun(a: A b: A): Int): Int binarySearch: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): maybe.T(Int) binarySearchVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): maybe.T(Int) sort: All(A :: TYPE) Fun(arr: Array(A) cmp: Fun(a: A b: A): Int): Ok sortVector: All(A :: TYPE) Fun(v: vector.T(A) cmp: Fun(a: A b: A): Int): Ok sorted: All(A :: TYPE) Fun(arr: Array(A) cmp: Fun(a: A b: A): Int): Array(A) sortedVector: All(A :: TYPE) Fun(v: vector.T(A) cmp: Fun(a: A b: A): Int): vector.T(A) end))
+            :args (
+              (TypedString 'apple' :type String)
+              (TypedString 'banana' :type String)
+            ))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printInt' :type Fun(n: Int): Ok)
+        :args (
+          (TypedApp :type Int
+            :func (TypedSelect 'stringCompare' :type Fun(a: String b: String): Int
+              :target (TypedVar 'sort' :type Record intCompare: Fun(a: Int b: Int): Int stringCompare: Fun(a: String b: String): Int realCompare: Fun(a: Real b: Real): Int reverse: All(A :: TYPE) Fun(cmp: Fun(a: A b: A): Int): Fun(a: A b: A): Int bisectRight: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): Int bisectRightVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): Int bisectRightRange: All(A :: TYPE) Fun(arr: Array(A) key: A lo: Int hi: Int cmp: Fun(a: A b: A): Int): Int bisectLeft: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): Int bisectLeftVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): Int bisectLeftRange: All(A :: TYPE) Fun(arr: Array(A) key: A lo: Int hi: Int cmp: Fun(a: A b: A): Int): Int binarySearch: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): maybe.T(Int) binarySearchVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): maybe.T(Int) sort: All(A :: TYPE) Fun(arr: Array(A) cmp: Fun(a: A b: A): Int): Ok sortVector: All(A :: TYPE) Fun(v: vector.T(A) cmp: Fun(a: A b: A): Int): Ok sorted: All(A :: TYPE) Fun(arr: Array(A) cmp: Fun(a: A b: A): Int): Array(A) sortedVector: All(A :: TYPE) Fun(v: vector.T(A) cmp: Fun(a: A b: A): Int): vector.T(A) end))
+            :args (
+              (TypedString 'apple' :type String)
+              (TypedString 'apple' :type String)
+            ))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printInt' :type Fun(n: Int): Ok)
+        :args (
+          (TypedApp :type Int
+            :func (TypedSelect 'stringCompare' :type Fun(a: String b: String): Int
+              :target (TypedVar 'sort' :type Record intCompare: Fun(a: Int b: Int): Int stringCompare: Fun(a: String b: String): Int realCompare: Fun(a: Real b: Real): Int reverse: All(A :: TYPE) Fun(cmp: Fun(a: A b: A): Int): Fun(a: A b: A): Int bisectRight: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): Int bisectRightVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): Int bisectRightRange: All(A :: TYPE) Fun(arr: Array(A) key: A lo: Int hi: Int cmp: Fun(a: A b: A): Int): Int bisectLeft: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): Int bisectLeftVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): Int bisectLeftRange: All(A :: TYPE) Fun(arr: Array(A) key: A lo: Int hi: Int cmp: Fun(a: A b: A): Int): Int binarySearch: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): maybe.T(Int) binarySearchVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): maybe.T(Int) sort: All(A :: TYPE) Fun(arr: Array(A) cmp: Fun(a: A b: A): Int): Ok sortVector: All(A :: TYPE) Fun(v: vector.T(A) cmp: Fun(a: A b: A): Int): Ok sorted: All(A :: TYPE) Fun(arr: Array(A) cmp: Fun(a: A b: A): Int): Array(A) sortedVector: All(A :: TYPE) Fun(v: vector.T(A) cmp: Fun(a: A b: A): Int): vector.T(A) end))
+            :args (
+              (TypedString 'banana' :type String)
+              (TypedString 'apple' :type String)
+            ))
+        )))
+    (TypedLetValue 'revInt' :type Fun(a: Int b: Int): Int
+      :value (TypedApp :type Fun(a: Int b: Int): Int
+        :func (TypedTypeApp [Int] :type Fun(cmp: Fun(a: Int b: Int): Int): Fun(a: Int b: Int): Int
+          :func (TypedSelect 'reverse' :type All(A :: TYPE) Fun(cmp: Fun(a: A b: A): Int): Fun(a: A b: A): Int
+            :target (TypedVar 'sort' :type Record intCompare: Fun(a: Int b: Int): Int stringCompare: Fun(a: String b: String): Int realCompare: Fun(a: Real b: Real): Int reverse: All(A :: TYPE) Fun(cmp: Fun(a: A b: A): Int): Fun(a: A b: A): Int bisectRight: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): Int bisectRightVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): Int bisectRightRange: All(A :: TYPE) Fun(arr: Array(A) key: A lo: Int hi: Int cmp: Fun(a: A b: A): Int): Int bisectLeft: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): Int bisectLeftVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): Int bisectLeftRange: All(A :: TYPE) Fun(arr: Array(A) key: A lo: Int hi: Int cmp: Fun(a: A b: A): Int): Int binarySearch: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): maybe.T(Int) binarySearchVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): maybe.T(Int) sort: All(A :: TYPE) Fun(arr: Array(A) cmp: Fun(a: A b: A): Int): Ok sortVector: All(A :: TYPE) Fun(v: vector.T(A) cmp: Fun(a: A b: A): Int): Ok sorted: All(A :: TYPE) Fun(arr: Array(A) cmp: Fun(a: A b: A): Int): Array(A) sortedVector: All(A :: TYPE) Fun(v: vector.T(A) cmp: Fun(a: A b: A): Int): vector.T(A) end)))
+        :args (
+          (TypedSelect 'intCompare' :type Fun(a: Int b: Int): Int
+            :target (TypedVar 'sort' :type Record intCompare: Fun(a: Int b: Int): Int stringCompare: Fun(a: String b: String): Int realCompare: Fun(a: Real b: Real): Int reverse: All(A :: TYPE) Fun(cmp: Fun(a: A b: A): Int): Fun(a: A b: A): Int bisectRight: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): Int bisectRightVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): Int bisectRightRange: All(A :: TYPE) Fun(arr: Array(A) key: A lo: Int hi: Int cmp: Fun(a: A b: A): Int): Int bisectLeft: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): Int bisectLeftVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): Int bisectLeftRange: All(A :: TYPE) Fun(arr: Array(A) key: A lo: Int hi: Int cmp: Fun(a: A b: A): Int): Int binarySearch: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): maybe.T(Int) binarySearchVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): maybe.T(Int) sort: All(A :: TYPE) Fun(arr: Array(A) cmp: Fun(a: A b: A): Int): Ok sortVector: All(A :: TYPE) Fun(v: vector.T(A) cmp: Fun(a: A b: A): Int): Ok sorted: All(A :: TYPE) Fun(arr: Array(A) cmp: Fun(a: A b: A): Int): Array(A) sortedVector: All(A :: TYPE) Fun(v: vector.T(A) cmp: Fun(a: A b: A): Int): vector.T(A) end))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printInt' :type Fun(n: Int): Ok)
+        :args (
+          (TypedApp :type Int
+            :func (TypedVar 'revInt' :type Fun(a: Int b: Int): Int)
+            :args (
+              (TypedInt 10 :type Int)
+              (TypedInt 20 :type Int)
+            ))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printInt' :type Fun(n: Int): Ok)
+        :args (
+          (TypedApp :type Int
+            :func (TypedVar 'revInt' :type Fun(a: Int b: Int): Int)
+            :args (
+              (TypedInt 20 :type Int)
+              (TypedInt 10 :type Int)
+            ))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printNewline' :type Fun(dummy: Int): Ok)
+        :args (
+          (TypedInt 0 :type Int)
+        )))
+    (TypedLetValue 'arr1' :type Array(Int)
+      :value (TypedArrayRep :type Array(Int)
+        :count (TypedInt 6 :type Int)
+        :init (TypedInt 0 :type Int)))
+    (TypedExprStmt
+      :expr (TypedIndexAssign
+        :target (TypedVar 'arr1' :type Array(Int))
+        :index (TypedInt 0 :type Int)
+        :value (TypedInt 10 :type Int)))
+    (TypedExprStmt
+      :expr (TypedIndexAssign
+        :target (TypedVar 'arr1' :type Array(Int))
+        :index (TypedInt 1 :type Int)
+        :value (TypedInt 20 :type Int)))
+    (TypedExprStmt
+      :expr (TypedIndexAssign
+        :target (TypedVar 'arr1' :type Array(Int))
+        :index (TypedInt 2 :type Int)
+        :value (TypedInt 20 :type Int)))
+    (TypedExprStmt
+      :expr (TypedIndexAssign
+        :target (TypedVar 'arr1' :type Array(Int))
+        :index (TypedInt 3 :type Int)
+        :value (TypedInt 20 :type Int)))
+    (TypedExprStmt
+      :expr (TypedIndexAssign
+        :target (TypedVar 'arr1' :type Array(Int))
+        :index (TypedInt 4 :type Int)
+        :value (TypedInt 30 :type Int)))
+    (TypedExprStmt
+      :expr (TypedIndexAssign
+        :target (TypedVar 'arr1' :type Array(Int))
+        :index (TypedInt 5 :type Int)
+        :value (TypedInt 40 :type Int)))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printInt' :type Fun(n: Int): Ok)
+        :args (
+          (TypedApp :type Int
+            :func (TypedTypeApp [Int] :type Fun(arr: Array(Int) key: Int cmp: Fun(a: Int b: Int): Int): Int
+              :func (TypedSelect 'bisectRight' :type All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): Int
+                :target (TypedVar 'sort' :type Record intCompare: Fun(a: Int b: Int): Int stringCompare: Fun(a: String b: String): Int realCompare: Fun(a: Real b: Real): Int reverse: All(A :: TYPE) Fun(cmp: Fun(a: A b: A): Int): Fun(a: A b: A): Int bisectRight: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): Int bisectRightVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): Int bisectRightRange: All(A :: TYPE) Fun(arr: Array(A) key: A lo: Int hi: Int cmp: Fun(a: A b: A): Int): Int bisectLeft: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): Int bisectLeftVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): Int bisectLeftRange: All(A :: TYPE) Fun(arr: Array(A) key: A lo: Int hi: Int cmp: Fun(a: A b: A): Int): Int binarySearch: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): maybe.T(Int) binarySearchVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): maybe.T(Int) sort: All(A :: TYPE) Fun(arr: Array(A) cmp: Fun(a: A b: A): Int): Ok sortVector: All(A :: TYPE) Fun(v: vector.T(A) cmp: Fun(a: A b: A): Int): Ok sorted: All(A :: TYPE) Fun(arr: Array(A) cmp: Fun(a: A b: A): Int): Array(A) sortedVector: All(A :: TYPE) Fun(v: vector.T(A) cmp: Fun(a: A b: A): Int): vector.T(A) end)))
+            :args (
+              (TypedVar 'arr1' :type Array(Int))
+              (TypedInt 5 :type Int)
+              (TypedSelect 'intCompare' :type Fun(a: Int b: Int): Int
+                :target (TypedVar 'sort' :type Record intCompare: Fun(a: Int b: Int): Int stringCompare: Fun(a: String b: String): Int realCompare: Fun(a: Real b: Real): Int reverse: All(A :: TYPE) Fun(cmp: Fun(a: A b: A): Int): Fun(a: A b: A): Int bisectRight: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): Int bisectRightVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): Int bisectRightRange: All(A :: TYPE) Fun(arr: Array(A) key: A lo: Int hi: Int cmp: Fun(a: A b: A): Int): Int bisectLeft: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): Int bisectLeftVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): Int bisectLeftRange: All(A :: TYPE) Fun(arr: Array(A) key: A lo: Int hi: Int cmp: Fun(a: A b: A): Int): Int binarySearch: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): maybe.T(Int) binarySearchVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): maybe.T(Int) sort: All(A :: TYPE) Fun(arr: Array(A) cmp: Fun(a: A b: A): Int): Ok sortVector: All(A :: TYPE) Fun(v: vector.T(A) cmp: Fun(a: A b: A): Int): Ok sorted: All(A :: TYPE) Fun(arr: Array(A) cmp: Fun(a: A b: A): Int): Array(A) sortedVector: All(A :: TYPE) Fun(v: vector.T(A) cmp: Fun(a: A b: A): Int): vector.T(A) end))
+            ))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printInt' :type Fun(n: Int): Ok)
+        :args (
+          (TypedApp :type Int
+            :func (TypedTypeApp [Int] :type Fun(arr: Array(Int) key: Int cmp: Fun(a: Int b: Int): Int): Int
+              :func (TypedSelect 'bisectRight' :type All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): Int
+                :target (TypedVar 'sort' :type Record intCompare: Fun(a: Int b: Int): Int stringCompare: Fun(a: String b: String): Int realCompare: Fun(a: Real b: Real): Int reverse: All(A :: TYPE) Fun(cmp: Fun(a: A b: A): Int): Fun(a: A b: A): Int bisectRight: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): Int bisectRightVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): Int bisectRightRange: All(A :: TYPE) Fun(arr: Array(A) key: A lo: Int hi: Int cmp: Fun(a: A b: A): Int): Int bisectLeft: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): Int bisectLeftVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): Int bisectLeftRange: All(A :: TYPE) Fun(arr: Array(A) key: A lo: Int hi: Int cmp: Fun(a: A b: A): Int): Int binarySearch: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): maybe.T(Int) binarySearchVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): maybe.T(Int) sort: All(A :: TYPE) Fun(arr: Array(A) cmp: Fun(a: A b: A): Int): Ok sortVector: All(A :: TYPE) Fun(v: vector.T(A) cmp: Fun(a: A b: A): Int): Ok sorted: All(A :: TYPE) Fun(arr: Array(A) cmp: Fun(a: A b: A): Int): Array(A) sortedVector: All(A :: TYPE) Fun(v: vector.T(A) cmp: Fun(a: A b: A): Int): vector.T(A) end)))
+            :args (
+              (TypedVar 'arr1' :type Array(Int))
+              (TypedInt 10 :type Int)
+              (TypedSelect 'intCompare' :type Fun(a: Int b: Int): Int
+                :target (TypedVar 'sort' :type Record intCompare: Fun(a: Int b: Int): Int stringCompare: Fun(a: String b: String): Int realCompare: Fun(a: Real b: Real): Int reverse: All(A :: TYPE) Fun(cmp: Fun(a: A b: A): Int): Fun(a: A b: A): Int bisectRight: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): Int bisectRightVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): Int bisectRightRange: All(A :: TYPE) Fun(arr: Array(A) key: A lo: Int hi: Int cmp: Fun(a: A b: A): Int): Int bisectLeft: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): Int bisectLeftVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): Int bisectLeftRange: All(A :: TYPE) Fun(arr: Array(A) key: A lo: Int hi: Int cmp: Fun(a: A b: A): Int): Int binarySearch: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): maybe.T(Int) binarySearchVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): maybe.T(Int) sort: All(A :: TYPE) Fun(arr: Array(A) cmp: Fun(a: A b: A): Int): Ok sortVector: All(A :: TYPE) Fun(v: vector.T(A) cmp: Fun(a: A b: A): Int): Ok sorted: All(A :: TYPE) Fun(arr: Array(A) cmp: Fun(a: A b: A): Int): Array(A) sortedVector: All(A :: TYPE) Fun(v: vector.T(A) cmp: Fun(a: A b: A): Int): vector.T(A) end))
+            ))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printInt' :type Fun(n: Int): Ok)
+        :args (
+          (TypedApp :type Int
+            :func (TypedTypeApp [Int] :type Fun(arr: Array(Int) key: Int cmp: Fun(a: Int b: Int): Int): Int
+              :func (TypedSelect 'bisectRight' :type All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): Int
+                :target (TypedVar 'sort' :type Record intCompare: Fun(a: Int b: Int): Int stringCompare: Fun(a: String b: String): Int realCompare: Fun(a: Real b: Real): Int reverse: All(A :: TYPE) Fun(cmp: Fun(a: A b: A): Int): Fun(a: A b: A): Int bisectRight: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): Int bisectRightVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): Int bisectRightRange: All(A :: TYPE) Fun(arr: Array(A) key: A lo: Int hi: Int cmp: Fun(a: A b: A): Int): Int bisectLeft: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): Int bisectLeftVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): Int bisectLeftRange: All(A :: TYPE) Fun(arr: Array(A) key: A lo: Int hi: Int cmp: Fun(a: A b: A): Int): Int binarySearch: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): maybe.T(Int) binarySearchVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): maybe.T(Int) sort: All(A :: TYPE) Fun(arr: Array(A) cmp: Fun(a: A b: A): Int): Ok sortVector: All(A :: TYPE) Fun(v: vector.T(A) cmp: Fun(a: A b: A): Int): Ok sorted: All(A :: TYPE) Fun(arr: Array(A) cmp: Fun(a: A b: A): Int): Array(A) sortedVector: All(A :: TYPE) Fun(v: vector.T(A) cmp: Fun(a: A b: A): Int): vector.T(A) end)))
+            :args (
+              (TypedVar 'arr1' :type Array(Int))
+              (TypedInt 20 :type Int)
+              (TypedSelect 'intCompare' :type Fun(a: Int b: Int): Int
+                :target (TypedVar 'sort' :type Record intCompare: Fun(a: Int b: Int): Int stringCompare: Fun(a: String b: String): Int realCompare: Fun(a: Real b: Real): Int reverse: All(A :: TYPE) Fun(cmp: Fun(a: A b: A): Int): Fun(a: A b: A): Int bisectRight: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): Int bisectRightVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): Int bisectRightRange: All(A :: TYPE) Fun(arr: Array(A) key: A lo: Int hi: Int cmp: Fun(a: A b: A): Int): Int bisectLeft: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): Int bisectLeftVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): Int bisectLeftRange: All(A :: TYPE) Fun(arr: Array(A) key: A lo: Int hi: Int cmp: Fun(a: A b: A): Int): Int binarySearch: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): maybe.T(Int) binarySearchVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): maybe.T(Int) sort: All(A :: TYPE) Fun(arr: Array(A) cmp: Fun(a: A b: A): Int): Ok sortVector: All(A :: TYPE) Fun(v: vector.T(A) cmp: Fun(a: A b: A): Int): Ok sorted: All(A :: TYPE) Fun(arr: Array(A) cmp: Fun(a: A b: A): Int): Array(A) sortedVector: All(A :: TYPE) Fun(v: vector.T(A) cmp: Fun(a: A b: A): Int): vector.T(A) end))
+            ))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printInt' :type Fun(n: Int): Ok)
+        :args (
+          (TypedApp :type Int
+            :func (TypedTypeApp [Int] :type Fun(arr: Array(Int) key: Int cmp: Fun(a: Int b: Int): Int): Int
+              :func (TypedSelect 'bisectRight' :type All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): Int
+                :target (TypedVar 'sort' :type Record intCompare: Fun(a: Int b: Int): Int stringCompare: Fun(a: String b: String): Int realCompare: Fun(a: Real b: Real): Int reverse: All(A :: TYPE) Fun(cmp: Fun(a: A b: A): Int): Fun(a: A b: A): Int bisectRight: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): Int bisectRightVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): Int bisectRightRange: All(A :: TYPE) Fun(arr: Array(A) key: A lo: Int hi: Int cmp: Fun(a: A b: A): Int): Int bisectLeft: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): Int bisectLeftVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): Int bisectLeftRange: All(A :: TYPE) Fun(arr: Array(A) key: A lo: Int hi: Int cmp: Fun(a: A b: A): Int): Int binarySearch: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): maybe.T(Int) binarySearchVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): maybe.T(Int) sort: All(A :: TYPE) Fun(arr: Array(A) cmp: Fun(a: A b: A): Int): Ok sortVector: All(A :: TYPE) Fun(v: vector.T(A) cmp: Fun(a: A b: A): Int): Ok sorted: All(A :: TYPE) Fun(arr: Array(A) cmp: Fun(a: A b: A): Int): Array(A) sortedVector: All(A :: TYPE) Fun(v: vector.T(A) cmp: Fun(a: A b: A): Int): vector.T(A) end)))
+            :args (
+              (TypedVar 'arr1' :type Array(Int))
+              (TypedInt 25 :type Int)
+              (TypedSelect 'intCompare' :type Fun(a: Int b: Int): Int
+                :target (TypedVar 'sort' :type Record intCompare: Fun(a: Int b: Int): Int stringCompare: Fun(a: String b: String): Int realCompare: Fun(a: Real b: Real): Int reverse: All(A :: TYPE) Fun(cmp: Fun(a: A b: A): Int): Fun(a: A b: A): Int bisectRight: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): Int bisectRightVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): Int bisectRightRange: All(A :: TYPE) Fun(arr: Array(A) key: A lo: Int hi: Int cmp: Fun(a: A b: A): Int): Int bisectLeft: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): Int bisectLeftVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): Int bisectLeftRange: All(A :: TYPE) Fun(arr: Array(A) key: A lo: Int hi: Int cmp: Fun(a: A b: A): Int): Int binarySearch: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): maybe.T(Int) binarySearchVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): maybe.T(Int) sort: All(A :: TYPE) Fun(arr: Array(A) cmp: Fun(a: A b: A): Int): Ok sortVector: All(A :: TYPE) Fun(v: vector.T(A) cmp: Fun(a: A b: A): Int): Ok sorted: All(A :: TYPE) Fun(arr: Array(A) cmp: Fun(a: A b: A): Int): Array(A) sortedVector: All(A :: TYPE) Fun(v: vector.T(A) cmp: Fun(a: A b: A): Int): vector.T(A) end))
+            ))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printInt' :type Fun(n: Int): Ok)
+        :args (
+          (TypedApp :type Int
+            :func (TypedTypeApp [Int] :type Fun(arr: Array(Int) key: Int cmp: Fun(a: Int b: Int): Int): Int
+              :func (TypedSelect 'bisectRight' :type All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): Int
+                :target (TypedVar 'sort' :type Record intCompare: Fun(a: Int b: Int): Int stringCompare: Fun(a: String b: String): Int realCompare: Fun(a: Real b: Real): Int reverse: All(A :: TYPE) Fun(cmp: Fun(a: A b: A): Int): Fun(a: A b: A): Int bisectRight: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): Int bisectRightVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): Int bisectRightRange: All(A :: TYPE) Fun(arr: Array(A) key: A lo: Int hi: Int cmp: Fun(a: A b: A): Int): Int bisectLeft: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): Int bisectLeftVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): Int bisectLeftRange: All(A :: TYPE) Fun(arr: Array(A) key: A lo: Int hi: Int cmp: Fun(a: A b: A): Int): Int binarySearch: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): maybe.T(Int) binarySearchVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): maybe.T(Int) sort: All(A :: TYPE) Fun(arr: Array(A) cmp: Fun(a: A b: A): Int): Ok sortVector: All(A :: TYPE) Fun(v: vector.T(A) cmp: Fun(a: A b: A): Int): Ok sorted: All(A :: TYPE) Fun(arr: Array(A) cmp: Fun(a: A b: A): Int): Array(A) sortedVector: All(A :: TYPE) Fun(v: vector.T(A) cmp: Fun(a: A b: A): Int): vector.T(A) end)))
+            :args (
+              (TypedVar 'arr1' :type Array(Int))
+              (TypedInt 40 :type Int)
+              (TypedSelect 'intCompare' :type Fun(a: Int b: Int): Int
+                :target (TypedVar 'sort' :type Record intCompare: Fun(a: Int b: Int): Int stringCompare: Fun(a: String b: String): Int realCompare: Fun(a: Real b: Real): Int reverse: All(A :: TYPE) Fun(cmp: Fun(a: A b: A): Int): Fun(a: A b: A): Int bisectRight: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): Int bisectRightVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): Int bisectRightRange: All(A :: TYPE) Fun(arr: Array(A) key: A lo: Int hi: Int cmp: Fun(a: A b: A): Int): Int bisectLeft: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): Int bisectLeftVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): Int bisectLeftRange: All(A :: TYPE) Fun(arr: Array(A) key: A lo: Int hi: Int cmp: Fun(a: A b: A): Int): Int binarySearch: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): maybe.T(Int) binarySearchVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): maybe.T(Int) sort: All(A :: TYPE) Fun(arr: Array(A) cmp: Fun(a: A b: A): Int): Ok sortVector: All(A :: TYPE) Fun(v: vector.T(A) cmp: Fun(a: A b: A): Int): Ok sorted: All(A :: TYPE) Fun(arr: Array(A) cmp: Fun(a: A b: A): Int): Array(A) sortedVector: All(A :: TYPE) Fun(v: vector.T(A) cmp: Fun(a: A b: A): Int): vector.T(A) end))
+            ))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printInt' :type Fun(n: Int): Ok)
+        :args (
+          (TypedApp :type Int
+            :func (TypedTypeApp [Int] :type Fun(arr: Array(Int) key: Int cmp: Fun(a: Int b: Int): Int): Int
+              :func (TypedSelect 'bisectRight' :type All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): Int
+                :target (TypedVar 'sort' :type Record intCompare: Fun(a: Int b: Int): Int stringCompare: Fun(a: String b: String): Int realCompare: Fun(a: Real b: Real): Int reverse: All(A :: TYPE) Fun(cmp: Fun(a: A b: A): Int): Fun(a: A b: A): Int bisectRight: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): Int bisectRightVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): Int bisectRightRange: All(A :: TYPE) Fun(arr: Array(A) key: A lo: Int hi: Int cmp: Fun(a: A b: A): Int): Int bisectLeft: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): Int bisectLeftVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): Int bisectLeftRange: All(A :: TYPE) Fun(arr: Array(A) key: A lo: Int hi: Int cmp: Fun(a: A b: A): Int): Int binarySearch: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): maybe.T(Int) binarySearchVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): maybe.T(Int) sort: All(A :: TYPE) Fun(arr: Array(A) cmp: Fun(a: A b: A): Int): Ok sortVector: All(A :: TYPE) Fun(v: vector.T(A) cmp: Fun(a: A b: A): Int): Ok sorted: All(A :: TYPE) Fun(arr: Array(A) cmp: Fun(a: A b: A): Int): Array(A) sortedVector: All(A :: TYPE) Fun(v: vector.T(A) cmp: Fun(a: A b: A): Int): vector.T(A) end)))
+            :args (
+              (TypedVar 'arr1' :type Array(Int))
+              (TypedInt 50 :type Int)
+              (TypedSelect 'intCompare' :type Fun(a: Int b: Int): Int
+                :target (TypedVar 'sort' :type Record intCompare: Fun(a: Int b: Int): Int stringCompare: Fun(a: String b: String): Int realCompare: Fun(a: Real b: Real): Int reverse: All(A :: TYPE) Fun(cmp: Fun(a: A b: A): Int): Fun(a: A b: A): Int bisectRight: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): Int bisectRightVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): Int bisectRightRange: All(A :: TYPE) Fun(arr: Array(A) key: A lo: Int hi: Int cmp: Fun(a: A b: A): Int): Int bisectLeft: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): Int bisectLeftVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): Int bisectLeftRange: All(A :: TYPE) Fun(arr: Array(A) key: A lo: Int hi: Int cmp: Fun(a: A b: A): Int): Int binarySearch: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): maybe.T(Int) binarySearchVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): maybe.T(Int) sort: All(A :: TYPE) Fun(arr: Array(A) cmp: Fun(a: A b: A): Int): Ok sortVector: All(A :: TYPE) Fun(v: vector.T(A) cmp: Fun(a: A b: A): Int): Ok sorted: All(A :: TYPE) Fun(arr: Array(A) cmp: Fun(a: A b: A): Int): Array(A) sortedVector: All(A :: TYPE) Fun(v: vector.T(A) cmp: Fun(a: A b: A): Int): vector.T(A) end))
+            ))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printNewline' :type Fun(dummy: Int): Ok)
+        :args (
+          (TypedInt 0 :type Int)
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printInt' :type Fun(n: Int): Ok)
+        :args (
+          (TypedApp :type Int
+            :func (TypedTypeApp [Int] :type Fun(arr: Array(Int) key: Int cmp: Fun(a: Int b: Int): Int): Int
+              :func (TypedSelect 'bisectLeft' :type All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): Int
+                :target (TypedVar 'sort' :type Record intCompare: Fun(a: Int b: Int): Int stringCompare: Fun(a: String b: String): Int realCompare: Fun(a: Real b: Real): Int reverse: All(A :: TYPE) Fun(cmp: Fun(a: A b: A): Int): Fun(a: A b: A): Int bisectRight: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): Int bisectRightVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): Int bisectRightRange: All(A :: TYPE) Fun(arr: Array(A) key: A lo: Int hi: Int cmp: Fun(a: A b: A): Int): Int bisectLeft: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): Int bisectLeftVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): Int bisectLeftRange: All(A :: TYPE) Fun(arr: Array(A) key: A lo: Int hi: Int cmp: Fun(a: A b: A): Int): Int binarySearch: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): maybe.T(Int) binarySearchVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): maybe.T(Int) sort: All(A :: TYPE) Fun(arr: Array(A) cmp: Fun(a: A b: A): Int): Ok sortVector: All(A :: TYPE) Fun(v: vector.T(A) cmp: Fun(a: A b: A): Int): Ok sorted: All(A :: TYPE) Fun(arr: Array(A) cmp: Fun(a: A b: A): Int): Array(A) sortedVector: All(A :: TYPE) Fun(v: vector.T(A) cmp: Fun(a: A b: A): Int): vector.T(A) end)))
+            :args (
+              (TypedVar 'arr1' :type Array(Int))
+              (TypedInt 5 :type Int)
+              (TypedSelect 'intCompare' :type Fun(a: Int b: Int): Int
+                :target (TypedVar 'sort' :type Record intCompare: Fun(a: Int b: Int): Int stringCompare: Fun(a: String b: String): Int realCompare: Fun(a: Real b: Real): Int reverse: All(A :: TYPE) Fun(cmp: Fun(a: A b: A): Int): Fun(a: A b: A): Int bisectRight: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): Int bisectRightVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): Int bisectRightRange: All(A :: TYPE) Fun(arr: Array(A) key: A lo: Int hi: Int cmp: Fun(a: A b: A): Int): Int bisectLeft: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): Int bisectLeftVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): Int bisectLeftRange: All(A :: TYPE) Fun(arr: Array(A) key: A lo: Int hi: Int cmp: Fun(a: A b: A): Int): Int binarySearch: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): maybe.T(Int) binarySearchVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): maybe.T(Int) sort: All(A :: TYPE) Fun(arr: Array(A) cmp: Fun(a: A b: A): Int): Ok sortVector: All(A :: TYPE) Fun(v: vector.T(A) cmp: Fun(a: A b: A): Int): Ok sorted: All(A :: TYPE) Fun(arr: Array(A) cmp: Fun(a: A b: A): Int): Array(A) sortedVector: All(A :: TYPE) Fun(v: vector.T(A) cmp: Fun(a: A b: A): Int): vector.T(A) end))
+            ))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printInt' :type Fun(n: Int): Ok)
+        :args (
+          (TypedApp :type Int
+            :func (TypedTypeApp [Int] :type Fun(arr: Array(Int) key: Int cmp: Fun(a: Int b: Int): Int): Int
+              :func (TypedSelect 'bisectLeft' :type All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): Int
+                :target (TypedVar 'sort' :type Record intCompare: Fun(a: Int b: Int): Int stringCompare: Fun(a: String b: String): Int realCompare: Fun(a: Real b: Real): Int reverse: All(A :: TYPE) Fun(cmp: Fun(a: A b: A): Int): Fun(a: A b: A): Int bisectRight: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): Int bisectRightVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): Int bisectRightRange: All(A :: TYPE) Fun(arr: Array(A) key: A lo: Int hi: Int cmp: Fun(a: A b: A): Int): Int bisectLeft: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): Int bisectLeftVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): Int bisectLeftRange: All(A :: TYPE) Fun(arr: Array(A) key: A lo: Int hi: Int cmp: Fun(a: A b: A): Int): Int binarySearch: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): maybe.T(Int) binarySearchVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): maybe.T(Int) sort: All(A :: TYPE) Fun(arr: Array(A) cmp: Fun(a: A b: A): Int): Ok sortVector: All(A :: TYPE) Fun(v: vector.T(A) cmp: Fun(a: A b: A): Int): Ok sorted: All(A :: TYPE) Fun(arr: Array(A) cmp: Fun(a: A b: A): Int): Array(A) sortedVector: All(A :: TYPE) Fun(v: vector.T(A) cmp: Fun(a: A b: A): Int): vector.T(A) end)))
+            :args (
+              (TypedVar 'arr1' :type Array(Int))
+              (TypedInt 10 :type Int)
+              (TypedSelect 'intCompare' :type Fun(a: Int b: Int): Int
+                :target (TypedVar 'sort' :type Record intCompare: Fun(a: Int b: Int): Int stringCompare: Fun(a: String b: String): Int realCompare: Fun(a: Real b: Real): Int reverse: All(A :: TYPE) Fun(cmp: Fun(a: A b: A): Int): Fun(a: A b: A): Int bisectRight: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): Int bisectRightVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): Int bisectRightRange: All(A :: TYPE) Fun(arr: Array(A) key: A lo: Int hi: Int cmp: Fun(a: A b: A): Int): Int bisectLeft: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): Int bisectLeftVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): Int bisectLeftRange: All(A :: TYPE) Fun(arr: Array(A) key: A lo: Int hi: Int cmp: Fun(a: A b: A): Int): Int binarySearch: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): maybe.T(Int) binarySearchVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): maybe.T(Int) sort: All(A :: TYPE) Fun(arr: Array(A) cmp: Fun(a: A b: A): Int): Ok sortVector: All(A :: TYPE) Fun(v: vector.T(A) cmp: Fun(a: A b: A): Int): Ok sorted: All(A :: TYPE) Fun(arr: Array(A) cmp: Fun(a: A b: A): Int): Array(A) sortedVector: All(A :: TYPE) Fun(v: vector.T(A) cmp: Fun(a: A b: A): Int): vector.T(A) end))
+            ))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printInt' :type Fun(n: Int): Ok)
+        :args (
+          (TypedApp :type Int
+            :func (TypedTypeApp [Int] :type Fun(arr: Array(Int) key: Int cmp: Fun(a: Int b: Int): Int): Int
+              :func (TypedSelect 'bisectLeft' :type All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): Int
+                :target (TypedVar 'sort' :type Record intCompare: Fun(a: Int b: Int): Int stringCompare: Fun(a: String b: String): Int realCompare: Fun(a: Real b: Real): Int reverse: All(A :: TYPE) Fun(cmp: Fun(a: A b: A): Int): Fun(a: A b: A): Int bisectRight: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): Int bisectRightVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): Int bisectRightRange: All(A :: TYPE) Fun(arr: Array(A) key: A lo: Int hi: Int cmp: Fun(a: A b: A): Int): Int bisectLeft: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): Int bisectLeftVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): Int bisectLeftRange: All(A :: TYPE) Fun(arr: Array(A) key: A lo: Int hi: Int cmp: Fun(a: A b: A): Int): Int binarySearch: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): maybe.T(Int) binarySearchVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): maybe.T(Int) sort: All(A :: TYPE) Fun(arr: Array(A) cmp: Fun(a: A b: A): Int): Ok sortVector: All(A :: TYPE) Fun(v: vector.T(A) cmp: Fun(a: A b: A): Int): Ok sorted: All(A :: TYPE) Fun(arr: Array(A) cmp: Fun(a: A b: A): Int): Array(A) sortedVector: All(A :: TYPE) Fun(v: vector.T(A) cmp: Fun(a: A b: A): Int): vector.T(A) end)))
+            :args (
+              (TypedVar 'arr1' :type Array(Int))
+              (TypedInt 20 :type Int)
+              (TypedSelect 'intCompare' :type Fun(a: Int b: Int): Int
+                :target (TypedVar 'sort' :type Record intCompare: Fun(a: Int b: Int): Int stringCompare: Fun(a: String b: String): Int realCompare: Fun(a: Real b: Real): Int reverse: All(A :: TYPE) Fun(cmp: Fun(a: A b: A): Int): Fun(a: A b: A): Int bisectRight: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): Int bisectRightVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): Int bisectRightRange: All(A :: TYPE) Fun(arr: Array(A) key: A lo: Int hi: Int cmp: Fun(a: A b: A): Int): Int bisectLeft: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): Int bisectLeftVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): Int bisectLeftRange: All(A :: TYPE) Fun(arr: Array(A) key: A lo: Int hi: Int cmp: Fun(a: A b: A): Int): Int binarySearch: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): maybe.T(Int) binarySearchVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): maybe.T(Int) sort: All(A :: TYPE) Fun(arr: Array(A) cmp: Fun(a: A b: A): Int): Ok sortVector: All(A :: TYPE) Fun(v: vector.T(A) cmp: Fun(a: A b: A): Int): Ok sorted: All(A :: TYPE) Fun(arr: Array(A) cmp: Fun(a: A b: A): Int): Array(A) sortedVector: All(A :: TYPE) Fun(v: vector.T(A) cmp: Fun(a: A b: A): Int): vector.T(A) end))
+            ))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printInt' :type Fun(n: Int): Ok)
+        :args (
+          (TypedApp :type Int
+            :func (TypedTypeApp [Int] :type Fun(arr: Array(Int) key: Int cmp: Fun(a: Int b: Int): Int): Int
+              :func (TypedSelect 'bisectLeft' :type All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): Int
+                :target (TypedVar 'sort' :type Record intCompare: Fun(a: Int b: Int): Int stringCompare: Fun(a: String b: String): Int realCompare: Fun(a: Real b: Real): Int reverse: All(A :: TYPE) Fun(cmp: Fun(a: A b: A): Int): Fun(a: A b: A): Int bisectRight: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): Int bisectRightVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): Int bisectRightRange: All(A :: TYPE) Fun(arr: Array(A) key: A lo: Int hi: Int cmp: Fun(a: A b: A): Int): Int bisectLeft: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): Int bisectLeftVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): Int bisectLeftRange: All(A :: TYPE) Fun(arr: Array(A) key: A lo: Int hi: Int cmp: Fun(a: A b: A): Int): Int binarySearch: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): maybe.T(Int) binarySearchVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): maybe.T(Int) sort: All(A :: TYPE) Fun(arr: Array(A) cmp: Fun(a: A b: A): Int): Ok sortVector: All(A :: TYPE) Fun(v: vector.T(A) cmp: Fun(a: A b: A): Int): Ok sorted: All(A :: TYPE) Fun(arr: Array(A) cmp: Fun(a: A b: A): Int): Array(A) sortedVector: All(A :: TYPE) Fun(v: vector.T(A) cmp: Fun(a: A b: A): Int): vector.T(A) end)))
+            :args (
+              (TypedVar 'arr1' :type Array(Int))
+              (TypedInt 25 :type Int)
+              (TypedSelect 'intCompare' :type Fun(a: Int b: Int): Int
+                :target (TypedVar 'sort' :type Record intCompare: Fun(a: Int b: Int): Int stringCompare: Fun(a: String b: String): Int realCompare: Fun(a: Real b: Real): Int reverse: All(A :: TYPE) Fun(cmp: Fun(a: A b: A): Int): Fun(a: A b: A): Int bisectRight: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): Int bisectRightVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): Int bisectRightRange: All(A :: TYPE) Fun(arr: Array(A) key: A lo: Int hi: Int cmp: Fun(a: A b: A): Int): Int bisectLeft: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): Int bisectLeftVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): Int bisectLeftRange: All(A :: TYPE) Fun(arr: Array(A) key: A lo: Int hi: Int cmp: Fun(a: A b: A): Int): Int binarySearch: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): maybe.T(Int) binarySearchVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): maybe.T(Int) sort: All(A :: TYPE) Fun(arr: Array(A) cmp: Fun(a: A b: A): Int): Ok sortVector: All(A :: TYPE) Fun(v: vector.T(A) cmp: Fun(a: A b: A): Int): Ok sorted: All(A :: TYPE) Fun(arr: Array(A) cmp: Fun(a: A b: A): Int): Array(A) sortedVector: All(A :: TYPE) Fun(v: vector.T(A) cmp: Fun(a: A b: A): Int): vector.T(A) end))
+            ))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printInt' :type Fun(n: Int): Ok)
+        :args (
+          (TypedApp :type Int
+            :func (TypedTypeApp [Int] :type Fun(arr: Array(Int) key: Int cmp: Fun(a: Int b: Int): Int): Int
+              :func (TypedSelect 'bisectLeft' :type All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): Int
+                :target (TypedVar 'sort' :type Record intCompare: Fun(a: Int b: Int): Int stringCompare: Fun(a: String b: String): Int realCompare: Fun(a: Real b: Real): Int reverse: All(A :: TYPE) Fun(cmp: Fun(a: A b: A): Int): Fun(a: A b: A): Int bisectRight: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): Int bisectRightVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): Int bisectRightRange: All(A :: TYPE) Fun(arr: Array(A) key: A lo: Int hi: Int cmp: Fun(a: A b: A): Int): Int bisectLeft: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): Int bisectLeftVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): Int bisectLeftRange: All(A :: TYPE) Fun(arr: Array(A) key: A lo: Int hi: Int cmp: Fun(a: A b: A): Int): Int binarySearch: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): maybe.T(Int) binarySearchVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): maybe.T(Int) sort: All(A :: TYPE) Fun(arr: Array(A) cmp: Fun(a: A b: A): Int): Ok sortVector: All(A :: TYPE) Fun(v: vector.T(A) cmp: Fun(a: A b: A): Int): Ok sorted: All(A :: TYPE) Fun(arr: Array(A) cmp: Fun(a: A b: A): Int): Array(A) sortedVector: All(A :: TYPE) Fun(v: vector.T(A) cmp: Fun(a: A b: A): Int): vector.T(A) end)))
+            :args (
+              (TypedVar 'arr1' :type Array(Int))
+              (TypedInt 40 :type Int)
+              (TypedSelect 'intCompare' :type Fun(a: Int b: Int): Int
+                :target (TypedVar 'sort' :type Record intCompare: Fun(a: Int b: Int): Int stringCompare: Fun(a: String b: String): Int realCompare: Fun(a: Real b: Real): Int reverse: All(A :: TYPE) Fun(cmp: Fun(a: A b: A): Int): Fun(a: A b: A): Int bisectRight: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): Int bisectRightVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): Int bisectRightRange: All(A :: TYPE) Fun(arr: Array(A) key: A lo: Int hi: Int cmp: Fun(a: A b: A): Int): Int bisectLeft: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): Int bisectLeftVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): Int bisectLeftRange: All(A :: TYPE) Fun(arr: Array(A) key: A lo: Int hi: Int cmp: Fun(a: A b: A): Int): Int binarySearch: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): maybe.T(Int) binarySearchVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): maybe.T(Int) sort: All(A :: TYPE) Fun(arr: Array(A) cmp: Fun(a: A b: A): Int): Ok sortVector: All(A :: TYPE) Fun(v: vector.T(A) cmp: Fun(a: A b: A): Int): Ok sorted: All(A :: TYPE) Fun(arr: Array(A) cmp: Fun(a: A b: A): Int): Array(A) sortedVector: All(A :: TYPE) Fun(v: vector.T(A) cmp: Fun(a: A b: A): Int): vector.T(A) end))
+            ))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printInt' :type Fun(n: Int): Ok)
+        :args (
+          (TypedApp :type Int
+            :func (TypedTypeApp [Int] :type Fun(arr: Array(Int) key: Int cmp: Fun(a: Int b: Int): Int): Int
+              :func (TypedSelect 'bisectLeft' :type All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): Int
+                :target (TypedVar 'sort' :type Record intCompare: Fun(a: Int b: Int): Int stringCompare: Fun(a: String b: String): Int realCompare: Fun(a: Real b: Real): Int reverse: All(A :: TYPE) Fun(cmp: Fun(a: A b: A): Int): Fun(a: A b: A): Int bisectRight: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): Int bisectRightVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): Int bisectRightRange: All(A :: TYPE) Fun(arr: Array(A) key: A lo: Int hi: Int cmp: Fun(a: A b: A): Int): Int bisectLeft: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): Int bisectLeftVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): Int bisectLeftRange: All(A :: TYPE) Fun(arr: Array(A) key: A lo: Int hi: Int cmp: Fun(a: A b: A): Int): Int binarySearch: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): maybe.T(Int) binarySearchVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): maybe.T(Int) sort: All(A :: TYPE) Fun(arr: Array(A) cmp: Fun(a: A b: A): Int): Ok sortVector: All(A :: TYPE) Fun(v: vector.T(A) cmp: Fun(a: A b: A): Int): Ok sorted: All(A :: TYPE) Fun(arr: Array(A) cmp: Fun(a: A b: A): Int): Array(A) sortedVector: All(A :: TYPE) Fun(v: vector.T(A) cmp: Fun(a: A b: A): Int): vector.T(A) end)))
+            :args (
+              (TypedVar 'arr1' :type Array(Int))
+              (TypedInt 50 :type Int)
+              (TypedSelect 'intCompare' :type Fun(a: Int b: Int): Int
+                :target (TypedVar 'sort' :type Record intCompare: Fun(a: Int b: Int): Int stringCompare: Fun(a: String b: String): Int realCompare: Fun(a: Real b: Real): Int reverse: All(A :: TYPE) Fun(cmp: Fun(a: A b: A): Int): Fun(a: A b: A): Int bisectRight: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): Int bisectRightVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): Int bisectRightRange: All(A :: TYPE) Fun(arr: Array(A) key: A lo: Int hi: Int cmp: Fun(a: A b: A): Int): Int bisectLeft: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): Int bisectLeftVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): Int bisectLeftRange: All(A :: TYPE) Fun(arr: Array(A) key: A lo: Int hi: Int cmp: Fun(a: A b: A): Int): Int binarySearch: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): maybe.T(Int) binarySearchVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): maybe.T(Int) sort: All(A :: TYPE) Fun(arr: Array(A) cmp: Fun(a: A b: A): Int): Ok sortVector: All(A :: TYPE) Fun(v: vector.T(A) cmp: Fun(a: A b: A): Int): Ok sorted: All(A :: TYPE) Fun(arr: Array(A) cmp: Fun(a: A b: A): Int): Array(A) sortedVector: All(A :: TYPE) Fun(v: vector.T(A) cmp: Fun(a: A b: A): Int): vector.T(A) end))
+            ))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printNewline' :type Fun(dummy: Int): Ok)
+        :args (
+          (TypedInt 0 :type Int)
+        )))
+    (TypedLetValue 's1' :type maybe.T(Int)
+      :value (TypedApp :type maybe.T(Int)
+        :func (TypedTypeApp [Int] :type Fun(arr: Array(Int) key: Int cmp: Fun(a: Int b: Int): Int): maybe.T(Int)
+          :func (TypedSelect 'binarySearch' :type All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): maybe.T(Int)
+            :target (TypedVar 'sort' :type Record intCompare: Fun(a: Int b: Int): Int stringCompare: Fun(a: String b: String): Int realCompare: Fun(a: Real b: Real): Int reverse: All(A :: TYPE) Fun(cmp: Fun(a: A b: A): Int): Fun(a: A b: A): Int bisectRight: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): Int bisectRightVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): Int bisectRightRange: All(A :: TYPE) Fun(arr: Array(A) key: A lo: Int hi: Int cmp: Fun(a: A b: A): Int): Int bisectLeft: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): Int bisectLeftVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): Int bisectLeftRange: All(A :: TYPE) Fun(arr: Array(A) key: A lo: Int hi: Int cmp: Fun(a: A b: A): Int): Int binarySearch: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): maybe.T(Int) binarySearchVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): maybe.T(Int) sort: All(A :: TYPE) Fun(arr: Array(A) cmp: Fun(a: A b: A): Int): Ok sortVector: All(A :: TYPE) Fun(v: vector.T(A) cmp: Fun(a: A b: A): Int): Ok sorted: All(A :: TYPE) Fun(arr: Array(A) cmp: Fun(a: A b: A): Int): Array(A) sortedVector: All(A :: TYPE) Fun(v: vector.T(A) cmp: Fun(a: A b: A): Int): vector.T(A) end)))
+        :args (
+          (TypedVar 'arr1' :type Array(Int))
+          (TypedInt 20 :type Int)
+          (TypedSelect 'intCompare' :type Fun(a: Int b: Int): Int
+            :target (TypedVar 'sort' :type Record intCompare: Fun(a: Int b: Int): Int stringCompare: Fun(a: String b: String): Int realCompare: Fun(a: Real b: Real): Int reverse: All(A :: TYPE) Fun(cmp: Fun(a: A b: A): Int): Fun(a: A b: A): Int bisectRight: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): Int bisectRightVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): Int bisectRightRange: All(A :: TYPE) Fun(arr: Array(A) key: A lo: Int hi: Int cmp: Fun(a: A b: A): Int): Int bisectLeft: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): Int bisectLeftVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): Int bisectLeftRange: All(A :: TYPE) Fun(arr: Array(A) key: A lo: Int hi: Int cmp: Fun(a: A b: A): Int): Int binarySearch: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): maybe.T(Int) binarySearchVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): maybe.T(Int) sort: All(A :: TYPE) Fun(arr: Array(A) cmp: Fun(a: A b: A): Int): Ok sortVector: All(A :: TYPE) Fun(v: vector.T(A) cmp: Fun(a: A b: A): Int): Ok sorted: All(A :: TYPE) Fun(arr: Array(A) cmp: Fun(a: A b: A): Int): Array(A) sortedVector: All(A :: TYPE) Fun(v: vector.T(A) cmp: Fun(a: A b: A): Int): vector.T(A) end))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printBool' :type Fun(b: Bool): Ok)
+        :args (
+          (TypedApp :type Bool
+            :func (TypedTypeApp [Int] :type Fun(o: maybe.T(Int)): Bool
+              :func (TypedSelect 'isSome' :type All(A :: TYPE) Fun(o: maybe.T(A)): Bool
+                :target (TypedVar 'maybe' :type Record error: Exception isSome: All(A :: TYPE) Fun(o: maybe.T(A)): Bool isNone: All(A :: TYPE) Fun(o: maybe.T(A)): Bool unwrap: All(A :: TYPE) Fun(o: maybe.T(A)): A unwrapOr: All(A :: TYPE) Fun(o: maybe.T(A) default: A): A some: All(A :: TYPE) Fun(val: A): maybe.T(A) none: All(A :: TYPE) maybe.T(A) end)))
+            :args (
+              (TypedVar 's1' :type maybe.T(Int))
+            ))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printInt' :type Fun(n: Int): Ok)
+        :args (
+          (TypedApp :type Int
+            :func (TypedTypeApp [Int] :type Fun(o: maybe.T(Int)): Int
+              :func (TypedSelect 'unwrap' :type All(A :: TYPE) Fun(o: maybe.T(A)): A
+                :target (TypedVar 'maybe' :type Record error: Exception isSome: All(A :: TYPE) Fun(o: maybe.T(A)): Bool isNone: All(A :: TYPE) Fun(o: maybe.T(A)): Bool unwrap: All(A :: TYPE) Fun(o: maybe.T(A)): A unwrapOr: All(A :: TYPE) Fun(o: maybe.T(A) default: A): A some: All(A :: TYPE) Fun(val: A): maybe.T(A) none: All(A :: TYPE) maybe.T(A) end)))
+            :args (
+              (TypedVar 's1' :type maybe.T(Int))
+            ))
+        )))
+    (TypedLetValue 's2' :type maybe.T(Int)
+      :value (TypedApp :type maybe.T(Int)
+        :func (TypedTypeApp [Int] :type Fun(arr: Array(Int) key: Int cmp: Fun(a: Int b: Int): Int): maybe.T(Int)
+          :func (TypedSelect 'binarySearch' :type All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): maybe.T(Int)
+            :target (TypedVar 'sort' :type Record intCompare: Fun(a: Int b: Int): Int stringCompare: Fun(a: String b: String): Int realCompare: Fun(a: Real b: Real): Int reverse: All(A :: TYPE) Fun(cmp: Fun(a: A b: A): Int): Fun(a: A b: A): Int bisectRight: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): Int bisectRightVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): Int bisectRightRange: All(A :: TYPE) Fun(arr: Array(A) key: A lo: Int hi: Int cmp: Fun(a: A b: A): Int): Int bisectLeft: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): Int bisectLeftVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): Int bisectLeftRange: All(A :: TYPE) Fun(arr: Array(A) key: A lo: Int hi: Int cmp: Fun(a: A b: A): Int): Int binarySearch: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): maybe.T(Int) binarySearchVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): maybe.T(Int) sort: All(A :: TYPE) Fun(arr: Array(A) cmp: Fun(a: A b: A): Int): Ok sortVector: All(A :: TYPE) Fun(v: vector.T(A) cmp: Fun(a: A b: A): Int): Ok sorted: All(A :: TYPE) Fun(arr: Array(A) cmp: Fun(a: A b: A): Int): Array(A) sortedVector: All(A :: TYPE) Fun(v: vector.T(A) cmp: Fun(a: A b: A): Int): vector.T(A) end)))
+        :args (
+          (TypedVar 'arr1' :type Array(Int))
+          (TypedInt 25 :type Int)
+          (TypedSelect 'intCompare' :type Fun(a: Int b: Int): Int
+            :target (TypedVar 'sort' :type Record intCompare: Fun(a: Int b: Int): Int stringCompare: Fun(a: String b: String): Int realCompare: Fun(a: Real b: Real): Int reverse: All(A :: TYPE) Fun(cmp: Fun(a: A b: A): Int): Fun(a: A b: A): Int bisectRight: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): Int bisectRightVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): Int bisectRightRange: All(A :: TYPE) Fun(arr: Array(A) key: A lo: Int hi: Int cmp: Fun(a: A b: A): Int): Int bisectLeft: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): Int bisectLeftVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): Int bisectLeftRange: All(A :: TYPE) Fun(arr: Array(A) key: A lo: Int hi: Int cmp: Fun(a: A b: A): Int): Int binarySearch: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): maybe.T(Int) binarySearchVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): maybe.T(Int) sort: All(A :: TYPE) Fun(arr: Array(A) cmp: Fun(a: A b: A): Int): Ok sortVector: All(A :: TYPE) Fun(v: vector.T(A) cmp: Fun(a: A b: A): Int): Ok sorted: All(A :: TYPE) Fun(arr: Array(A) cmp: Fun(a: A b: A): Int): Array(A) sortedVector: All(A :: TYPE) Fun(v: vector.T(A) cmp: Fun(a: A b: A): Int): vector.T(A) end))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printBool' :type Fun(b: Bool): Ok)
+        :args (
+          (TypedApp :type Bool
+            :func (TypedTypeApp [Int] :type Fun(o: maybe.T(Int)): Bool
+              :func (TypedSelect 'isNone' :type All(A :: TYPE) Fun(o: maybe.T(A)): Bool
+                :target (TypedVar 'maybe' :type Record error: Exception isSome: All(A :: TYPE) Fun(o: maybe.T(A)): Bool isNone: All(A :: TYPE) Fun(o: maybe.T(A)): Bool unwrap: All(A :: TYPE) Fun(o: maybe.T(A)): A unwrapOr: All(A :: TYPE) Fun(o: maybe.T(A) default: A): A some: All(A :: TYPE) Fun(val: A): maybe.T(A) none: All(A :: TYPE) maybe.T(A) end)))
+            :args (
+              (TypedVar 's2' :type maybe.T(Int))
+            ))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printNewline' :type Fun(dummy: Int): Ok)
+        :args (
+          (TypedInt 0 :type Int)
+        )))
+    (TypedLetValue 'vec1' :type vector.T(Int)
+      :value (TypedTypeApp [Int] :type vector.T(Int)
+        :func (TypedSelect 'new' :type All(A :: TYPE) vector.T(A)
+          :target (TypedVar 'vector' :type Record error: Exception new: All(A :: TYPE) vector.T(A) newWithCapacity: All(A :: TYPE) Fun(capacity: Int): vector.T(A) length: All(A :: TYPE) Fun(v: vector.T(A)): Int empty: All(A :: TYPE) Fun(v: vector.T(A)): Bool get: All(A :: TYPE) Fun(v: vector.T(A) index: Int): A set: All(A :: TYPE) Fun(v: vector.T(A) index: Int value: A): Ok first: All(A :: TYPE) Fun(v: vector.T(A)): A last: All(A :: TYPE) Fun(v: vector.T(A)): A append: All(A :: TYPE) Fun(v: vector.T(A) value: A): Ok pop: All(A :: TYPE) Fun(v: vector.T(A)): A delete: All(A :: TYPE) Fun(v: vector.T(A) index: Int): Ok clear: All(A :: TYPE) Fun(v: vector.T(A)): Ok copy: All(A :: TYPE) Fun(v: vector.T(A)): vector.T(A) concat: All(A :: TYPE) Fun(v1: vector.T(A) v2: vector.T(A)): vector.T(A) fromArray: All(A :: TYPE) Fun(arr: Array(A)): vector.T(A) toArray: All(A :: TYPE) Fun(v: vector.T(A)): Array(A) forEach: All(A :: TYPE) Fun(v: vector.T(A) action: Fun(elem: A): Ok): Ok map: All(A :: TYPE B :: TYPE) Fun(v: vector.T(A) f: Fun(elem: A): B): vector.T(B) filter: All(A :: TYPE) Fun(v: vector.T(A) pred: Fun(elem: A): Bool): vector.T(A) fold: All(A :: TYPE Acc :: TYPE) Fun(v: vector.T(A) init: Acc f: Fun(acc: Acc elem: A): Acc): Acc filterMap: All(A :: TYPE B :: TYPE) Fun(v: vector.T(A) f: Fun(elem: A): maybe.T(B)): vector.T(B) end))))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedTypeApp [Int] :type Fun(v: vector.T(Int) value: Int): Ok
+          :func (TypedSelect 'append' :type All(A :: TYPE) Fun(v: vector.T(A) value: A): Ok
+            :target (TypedVar 'vector' :type Record error: Exception new: All(A :: TYPE) vector.T(A) newWithCapacity: All(A :: TYPE) Fun(capacity: Int): vector.T(A) length: All(A :: TYPE) Fun(v: vector.T(A)): Int empty: All(A :: TYPE) Fun(v: vector.T(A)): Bool get: All(A :: TYPE) Fun(v: vector.T(A) index: Int): A set: All(A :: TYPE) Fun(v: vector.T(A) index: Int value: A): Ok first: All(A :: TYPE) Fun(v: vector.T(A)): A last: All(A :: TYPE) Fun(v: vector.T(A)): A append: All(A :: TYPE) Fun(v: vector.T(A) value: A): Ok pop: All(A :: TYPE) Fun(v: vector.T(A)): A delete: All(A :: TYPE) Fun(v: vector.T(A) index: Int): Ok clear: All(A :: TYPE) Fun(v: vector.T(A)): Ok copy: All(A :: TYPE) Fun(v: vector.T(A)): vector.T(A) concat: All(A :: TYPE) Fun(v1: vector.T(A) v2: vector.T(A)): vector.T(A) fromArray: All(A :: TYPE) Fun(arr: Array(A)): vector.T(A) toArray: All(A :: TYPE) Fun(v: vector.T(A)): Array(A) forEach: All(A :: TYPE) Fun(v: vector.T(A) action: Fun(elem: A): Ok): Ok map: All(A :: TYPE B :: TYPE) Fun(v: vector.T(A) f: Fun(elem: A): B): vector.T(B) filter: All(A :: TYPE) Fun(v: vector.T(A) pred: Fun(elem: A): Bool): vector.T(A) fold: All(A :: TYPE Acc :: TYPE) Fun(v: vector.T(A) init: Acc f: Fun(acc: Acc elem: A): Acc): Acc filterMap: All(A :: TYPE B :: TYPE) Fun(v: vector.T(A) f: Fun(elem: A): maybe.T(B)): vector.T(B) end)))
+        :args (
+          (TypedVar 'vec1' :type vector.T(Int))
+          (TypedInt 10 :type Int)
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedTypeApp [Int] :type Fun(v: vector.T(Int) value: Int): Ok
+          :func (TypedSelect 'append' :type All(A :: TYPE) Fun(v: vector.T(A) value: A): Ok
+            :target (TypedVar 'vector' :type Record error: Exception new: All(A :: TYPE) vector.T(A) newWithCapacity: All(A :: TYPE) Fun(capacity: Int): vector.T(A) length: All(A :: TYPE) Fun(v: vector.T(A)): Int empty: All(A :: TYPE) Fun(v: vector.T(A)): Bool get: All(A :: TYPE) Fun(v: vector.T(A) index: Int): A set: All(A :: TYPE) Fun(v: vector.T(A) index: Int value: A): Ok first: All(A :: TYPE) Fun(v: vector.T(A)): A last: All(A :: TYPE) Fun(v: vector.T(A)): A append: All(A :: TYPE) Fun(v: vector.T(A) value: A): Ok pop: All(A :: TYPE) Fun(v: vector.T(A)): A delete: All(A :: TYPE) Fun(v: vector.T(A) index: Int): Ok clear: All(A :: TYPE) Fun(v: vector.T(A)): Ok copy: All(A :: TYPE) Fun(v: vector.T(A)): vector.T(A) concat: All(A :: TYPE) Fun(v1: vector.T(A) v2: vector.T(A)): vector.T(A) fromArray: All(A :: TYPE) Fun(arr: Array(A)): vector.T(A) toArray: All(A :: TYPE) Fun(v: vector.T(A)): Array(A) forEach: All(A :: TYPE) Fun(v: vector.T(A) action: Fun(elem: A): Ok): Ok map: All(A :: TYPE B :: TYPE) Fun(v: vector.T(A) f: Fun(elem: A): B): vector.T(B) filter: All(A :: TYPE) Fun(v: vector.T(A) pred: Fun(elem: A): Bool): vector.T(A) fold: All(A :: TYPE Acc :: TYPE) Fun(v: vector.T(A) init: Acc f: Fun(acc: Acc elem: A): Acc): Acc filterMap: All(A :: TYPE B :: TYPE) Fun(v: vector.T(A) f: Fun(elem: A): maybe.T(B)): vector.T(B) end)))
+        :args (
+          (TypedVar 'vec1' :type vector.T(Int))
+          (TypedInt 20 :type Int)
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedTypeApp [Int] :type Fun(v: vector.T(Int) value: Int): Ok
+          :func (TypedSelect 'append' :type All(A :: TYPE) Fun(v: vector.T(A) value: A): Ok
+            :target (TypedVar 'vector' :type Record error: Exception new: All(A :: TYPE) vector.T(A) newWithCapacity: All(A :: TYPE) Fun(capacity: Int): vector.T(A) length: All(A :: TYPE) Fun(v: vector.T(A)): Int empty: All(A :: TYPE) Fun(v: vector.T(A)): Bool get: All(A :: TYPE) Fun(v: vector.T(A) index: Int): A set: All(A :: TYPE) Fun(v: vector.T(A) index: Int value: A): Ok first: All(A :: TYPE) Fun(v: vector.T(A)): A last: All(A :: TYPE) Fun(v: vector.T(A)): A append: All(A :: TYPE) Fun(v: vector.T(A) value: A): Ok pop: All(A :: TYPE) Fun(v: vector.T(A)): A delete: All(A :: TYPE) Fun(v: vector.T(A) index: Int): Ok clear: All(A :: TYPE) Fun(v: vector.T(A)): Ok copy: All(A :: TYPE) Fun(v: vector.T(A)): vector.T(A) concat: All(A :: TYPE) Fun(v1: vector.T(A) v2: vector.T(A)): vector.T(A) fromArray: All(A :: TYPE) Fun(arr: Array(A)): vector.T(A) toArray: All(A :: TYPE) Fun(v: vector.T(A)): Array(A) forEach: All(A :: TYPE) Fun(v: vector.T(A) action: Fun(elem: A): Ok): Ok map: All(A :: TYPE B :: TYPE) Fun(v: vector.T(A) f: Fun(elem: A): B): vector.T(B) filter: All(A :: TYPE) Fun(v: vector.T(A) pred: Fun(elem: A): Bool): vector.T(A) fold: All(A :: TYPE Acc :: TYPE) Fun(v: vector.T(A) init: Acc f: Fun(acc: Acc elem: A): Acc): Acc filterMap: All(A :: TYPE B :: TYPE) Fun(v: vector.T(A) f: Fun(elem: A): maybe.T(B)): vector.T(B) end)))
+        :args (
+          (TypedVar 'vec1' :type vector.T(Int))
+          (TypedInt 20 :type Int)
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedTypeApp [Int] :type Fun(v: vector.T(Int) value: Int): Ok
+          :func (TypedSelect 'append' :type All(A :: TYPE) Fun(v: vector.T(A) value: A): Ok
+            :target (TypedVar 'vector' :type Record error: Exception new: All(A :: TYPE) vector.T(A) newWithCapacity: All(A :: TYPE) Fun(capacity: Int): vector.T(A) length: All(A :: TYPE) Fun(v: vector.T(A)): Int empty: All(A :: TYPE) Fun(v: vector.T(A)): Bool get: All(A :: TYPE) Fun(v: vector.T(A) index: Int): A set: All(A :: TYPE) Fun(v: vector.T(A) index: Int value: A): Ok first: All(A :: TYPE) Fun(v: vector.T(A)): A last: All(A :: TYPE) Fun(v: vector.T(A)): A append: All(A :: TYPE) Fun(v: vector.T(A) value: A): Ok pop: All(A :: TYPE) Fun(v: vector.T(A)): A delete: All(A :: TYPE) Fun(v: vector.T(A) index: Int): Ok clear: All(A :: TYPE) Fun(v: vector.T(A)): Ok copy: All(A :: TYPE) Fun(v: vector.T(A)): vector.T(A) concat: All(A :: TYPE) Fun(v1: vector.T(A) v2: vector.T(A)): vector.T(A) fromArray: All(A :: TYPE) Fun(arr: Array(A)): vector.T(A) toArray: All(A :: TYPE) Fun(v: vector.T(A)): Array(A) forEach: All(A :: TYPE) Fun(v: vector.T(A) action: Fun(elem: A): Ok): Ok map: All(A :: TYPE B :: TYPE) Fun(v: vector.T(A) f: Fun(elem: A): B): vector.T(B) filter: All(A :: TYPE) Fun(v: vector.T(A) pred: Fun(elem: A): Bool): vector.T(A) fold: All(A :: TYPE Acc :: TYPE) Fun(v: vector.T(A) init: Acc f: Fun(acc: Acc elem: A): Acc): Acc filterMap: All(A :: TYPE B :: TYPE) Fun(v: vector.T(A) f: Fun(elem: A): maybe.T(B)): vector.T(B) end)))
+        :args (
+          (TypedVar 'vec1' :type vector.T(Int))
+          (TypedInt 30 :type Int)
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printInt' :type Fun(n: Int): Ok)
+        :args (
+          (TypedApp :type Int
+            :func (TypedTypeApp [Int] :type Fun(v: vector.T(Int) key: Int cmp: Fun(a: Int b: Int): Int): Int
+              :func (TypedSelect 'bisectRightVector' :type All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): Int
+                :target (TypedVar 'sort' :type Record intCompare: Fun(a: Int b: Int): Int stringCompare: Fun(a: String b: String): Int realCompare: Fun(a: Real b: Real): Int reverse: All(A :: TYPE) Fun(cmp: Fun(a: A b: A): Int): Fun(a: A b: A): Int bisectRight: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): Int bisectRightVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): Int bisectRightRange: All(A :: TYPE) Fun(arr: Array(A) key: A lo: Int hi: Int cmp: Fun(a: A b: A): Int): Int bisectLeft: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): Int bisectLeftVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): Int bisectLeftRange: All(A :: TYPE) Fun(arr: Array(A) key: A lo: Int hi: Int cmp: Fun(a: A b: A): Int): Int binarySearch: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): maybe.T(Int) binarySearchVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): maybe.T(Int) sort: All(A :: TYPE) Fun(arr: Array(A) cmp: Fun(a: A b: A): Int): Ok sortVector: All(A :: TYPE) Fun(v: vector.T(A) cmp: Fun(a: A b: A): Int): Ok sorted: All(A :: TYPE) Fun(arr: Array(A) cmp: Fun(a: A b: A): Int): Array(A) sortedVector: All(A :: TYPE) Fun(v: vector.T(A) cmp: Fun(a: A b: A): Int): vector.T(A) end)))
+            :args (
+              (TypedVar 'vec1' :type vector.T(Int))
+              (TypedInt 20 :type Int)
+              (TypedSelect 'intCompare' :type Fun(a: Int b: Int): Int
+                :target (TypedVar 'sort' :type Record intCompare: Fun(a: Int b: Int): Int stringCompare: Fun(a: String b: String): Int realCompare: Fun(a: Real b: Real): Int reverse: All(A :: TYPE) Fun(cmp: Fun(a: A b: A): Int): Fun(a: A b: A): Int bisectRight: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): Int bisectRightVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): Int bisectRightRange: All(A :: TYPE) Fun(arr: Array(A) key: A lo: Int hi: Int cmp: Fun(a: A b: A): Int): Int bisectLeft: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): Int bisectLeftVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): Int bisectLeftRange: All(A :: TYPE) Fun(arr: Array(A) key: A lo: Int hi: Int cmp: Fun(a: A b: A): Int): Int binarySearch: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): maybe.T(Int) binarySearchVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): maybe.T(Int) sort: All(A :: TYPE) Fun(arr: Array(A) cmp: Fun(a: A b: A): Int): Ok sortVector: All(A :: TYPE) Fun(v: vector.T(A) cmp: Fun(a: A b: A): Int): Ok sorted: All(A :: TYPE) Fun(arr: Array(A) cmp: Fun(a: A b: A): Int): Array(A) sortedVector: All(A :: TYPE) Fun(v: vector.T(A) cmp: Fun(a: A b: A): Int): vector.T(A) end))
+            ))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printInt' :type Fun(n: Int): Ok)
+        :args (
+          (TypedApp :type Int
+            :func (TypedTypeApp [Int] :type Fun(v: vector.T(Int) key: Int cmp: Fun(a: Int b: Int): Int): Int
+              :func (TypedSelect 'bisectLeftVector' :type All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): Int
+                :target (TypedVar 'sort' :type Record intCompare: Fun(a: Int b: Int): Int stringCompare: Fun(a: String b: String): Int realCompare: Fun(a: Real b: Real): Int reverse: All(A :: TYPE) Fun(cmp: Fun(a: A b: A): Int): Fun(a: A b: A): Int bisectRight: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): Int bisectRightVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): Int bisectRightRange: All(A :: TYPE) Fun(arr: Array(A) key: A lo: Int hi: Int cmp: Fun(a: A b: A): Int): Int bisectLeft: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): Int bisectLeftVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): Int bisectLeftRange: All(A :: TYPE) Fun(arr: Array(A) key: A lo: Int hi: Int cmp: Fun(a: A b: A): Int): Int binarySearch: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): maybe.T(Int) binarySearchVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): maybe.T(Int) sort: All(A :: TYPE) Fun(arr: Array(A) cmp: Fun(a: A b: A): Int): Ok sortVector: All(A :: TYPE) Fun(v: vector.T(A) cmp: Fun(a: A b: A): Int): Ok sorted: All(A :: TYPE) Fun(arr: Array(A) cmp: Fun(a: A b: A): Int): Array(A) sortedVector: All(A :: TYPE) Fun(v: vector.T(A) cmp: Fun(a: A b: A): Int): vector.T(A) end)))
+            :args (
+              (TypedVar 'vec1' :type vector.T(Int))
+              (TypedInt 20 :type Int)
+              (TypedSelect 'intCompare' :type Fun(a: Int b: Int): Int
+                :target (TypedVar 'sort' :type Record intCompare: Fun(a: Int b: Int): Int stringCompare: Fun(a: String b: String): Int realCompare: Fun(a: Real b: Real): Int reverse: All(A :: TYPE) Fun(cmp: Fun(a: A b: A): Int): Fun(a: A b: A): Int bisectRight: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): Int bisectRightVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): Int bisectRightRange: All(A :: TYPE) Fun(arr: Array(A) key: A lo: Int hi: Int cmp: Fun(a: A b: A): Int): Int bisectLeft: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): Int bisectLeftVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): Int bisectLeftRange: All(A :: TYPE) Fun(arr: Array(A) key: A lo: Int hi: Int cmp: Fun(a: A b: A): Int): Int binarySearch: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): maybe.T(Int) binarySearchVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): maybe.T(Int) sort: All(A :: TYPE) Fun(arr: Array(A) cmp: Fun(a: A b: A): Int): Ok sortVector: All(A :: TYPE) Fun(v: vector.T(A) cmp: Fun(a: A b: A): Int): Ok sorted: All(A :: TYPE) Fun(arr: Array(A) cmp: Fun(a: A b: A): Int): Array(A) sortedVector: All(A :: TYPE) Fun(v: vector.T(A) cmp: Fun(a: A b: A): Int): vector.T(A) end))
+            ))
+        )))
+    (TypedLetValue 'sv1' :type maybe.T(Int)
+      :value (TypedApp :type maybe.T(Int)
+        :func (TypedTypeApp [Int] :type Fun(v: vector.T(Int) key: Int cmp: Fun(a: Int b: Int): Int): maybe.T(Int)
+          :func (TypedSelect 'binarySearchVector' :type All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): maybe.T(Int)
+            :target (TypedVar 'sort' :type Record intCompare: Fun(a: Int b: Int): Int stringCompare: Fun(a: String b: String): Int realCompare: Fun(a: Real b: Real): Int reverse: All(A :: TYPE) Fun(cmp: Fun(a: A b: A): Int): Fun(a: A b: A): Int bisectRight: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): Int bisectRightVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): Int bisectRightRange: All(A :: TYPE) Fun(arr: Array(A) key: A lo: Int hi: Int cmp: Fun(a: A b: A): Int): Int bisectLeft: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): Int bisectLeftVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): Int bisectLeftRange: All(A :: TYPE) Fun(arr: Array(A) key: A lo: Int hi: Int cmp: Fun(a: A b: A): Int): Int binarySearch: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): maybe.T(Int) binarySearchVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): maybe.T(Int) sort: All(A :: TYPE) Fun(arr: Array(A) cmp: Fun(a: A b: A): Int): Ok sortVector: All(A :: TYPE) Fun(v: vector.T(A) cmp: Fun(a: A b: A): Int): Ok sorted: All(A :: TYPE) Fun(arr: Array(A) cmp: Fun(a: A b: A): Int): Array(A) sortedVector: All(A :: TYPE) Fun(v: vector.T(A) cmp: Fun(a: A b: A): Int): vector.T(A) end)))
+        :args (
+          (TypedVar 'vec1' :type vector.T(Int))
+          (TypedInt 30 :type Int)
+          (TypedSelect 'intCompare' :type Fun(a: Int b: Int): Int
+            :target (TypedVar 'sort' :type Record intCompare: Fun(a: Int b: Int): Int stringCompare: Fun(a: String b: String): Int realCompare: Fun(a: Real b: Real): Int reverse: All(A :: TYPE) Fun(cmp: Fun(a: A b: A): Int): Fun(a: A b: A): Int bisectRight: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): Int bisectRightVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): Int bisectRightRange: All(A :: TYPE) Fun(arr: Array(A) key: A lo: Int hi: Int cmp: Fun(a: A b: A): Int): Int bisectLeft: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): Int bisectLeftVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): Int bisectLeftRange: All(A :: TYPE) Fun(arr: Array(A) key: A lo: Int hi: Int cmp: Fun(a: A b: A): Int): Int binarySearch: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): maybe.T(Int) binarySearchVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): maybe.T(Int) sort: All(A :: TYPE) Fun(arr: Array(A) cmp: Fun(a: A b: A): Int): Ok sortVector: All(A :: TYPE) Fun(v: vector.T(A) cmp: Fun(a: A b: A): Int): Ok sorted: All(A :: TYPE) Fun(arr: Array(A) cmp: Fun(a: A b: A): Int): Array(A) sortedVector: All(A :: TYPE) Fun(v: vector.T(A) cmp: Fun(a: A b: A): Int): vector.T(A) end))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printBool' :type Fun(b: Bool): Ok)
+        :args (
+          (TypedApp :type Bool
+            :func (TypedTypeApp [Int] :type Fun(o: maybe.T(Int)): Bool
+              :func (TypedSelect 'isSome' :type All(A :: TYPE) Fun(o: maybe.T(A)): Bool
+                :target (TypedVar 'maybe' :type Record error: Exception isSome: All(A :: TYPE) Fun(o: maybe.T(A)): Bool isNone: All(A :: TYPE) Fun(o: maybe.T(A)): Bool unwrap: All(A :: TYPE) Fun(o: maybe.T(A)): A unwrapOr: All(A :: TYPE) Fun(o: maybe.T(A) default: A): A some: All(A :: TYPE) Fun(val: A): maybe.T(A) none: All(A :: TYPE) maybe.T(A) end)))
+            :args (
+              (TypedVar 'sv1' :type maybe.T(Int))
+            ))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printInt' :type Fun(n: Int): Ok)
+        :args (
+          (TypedApp :type Int
+            :func (TypedTypeApp [Int] :type Fun(o: maybe.T(Int)): Int
+              :func (TypedSelect 'unwrap' :type All(A :: TYPE) Fun(o: maybe.T(A)): A
+                :target (TypedVar 'maybe' :type Record error: Exception isSome: All(A :: TYPE) Fun(o: maybe.T(A)): Bool isNone: All(A :: TYPE) Fun(o: maybe.T(A)): Bool unwrap: All(A :: TYPE) Fun(o: maybe.T(A)): A unwrapOr: All(A :: TYPE) Fun(o: maybe.T(A) default: A): A some: All(A :: TYPE) Fun(val: A): maybe.T(A) none: All(A :: TYPE) maybe.T(A) end)))
+            :args (
+              (TypedVar 'sv1' :type maybe.T(Int))
+            ))
+        )))
+    (TypedLetValue 'sv2' :type maybe.T(Int)
+      :value (TypedApp :type maybe.T(Int)
+        :func (TypedTypeApp [Int] :type Fun(v: vector.T(Int) key: Int cmp: Fun(a: Int b: Int): Int): maybe.T(Int)
+          :func (TypedSelect 'binarySearchVector' :type All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): maybe.T(Int)
+            :target (TypedVar 'sort' :type Record intCompare: Fun(a: Int b: Int): Int stringCompare: Fun(a: String b: String): Int realCompare: Fun(a: Real b: Real): Int reverse: All(A :: TYPE) Fun(cmp: Fun(a: A b: A): Int): Fun(a: A b: A): Int bisectRight: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): Int bisectRightVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): Int bisectRightRange: All(A :: TYPE) Fun(arr: Array(A) key: A lo: Int hi: Int cmp: Fun(a: A b: A): Int): Int bisectLeft: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): Int bisectLeftVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): Int bisectLeftRange: All(A :: TYPE) Fun(arr: Array(A) key: A lo: Int hi: Int cmp: Fun(a: A b: A): Int): Int binarySearch: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): maybe.T(Int) binarySearchVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): maybe.T(Int) sort: All(A :: TYPE) Fun(arr: Array(A) cmp: Fun(a: A b: A): Int): Ok sortVector: All(A :: TYPE) Fun(v: vector.T(A) cmp: Fun(a: A b: A): Int): Ok sorted: All(A :: TYPE) Fun(arr: Array(A) cmp: Fun(a: A b: A): Int): Array(A) sortedVector: All(A :: TYPE) Fun(v: vector.T(A) cmp: Fun(a: A b: A): Int): vector.T(A) end)))
+        :args (
+          (TypedVar 'vec1' :type vector.T(Int))
+          (TypedInt 99 :type Int)
+          (TypedSelect 'intCompare' :type Fun(a: Int b: Int): Int
+            :target (TypedVar 'sort' :type Record intCompare: Fun(a: Int b: Int): Int stringCompare: Fun(a: String b: String): Int realCompare: Fun(a: Real b: Real): Int reverse: All(A :: TYPE) Fun(cmp: Fun(a: A b: A): Int): Fun(a: A b: A): Int bisectRight: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): Int bisectRightVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): Int bisectRightRange: All(A :: TYPE) Fun(arr: Array(A) key: A lo: Int hi: Int cmp: Fun(a: A b: A): Int): Int bisectLeft: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): Int bisectLeftVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): Int bisectLeftRange: All(A :: TYPE) Fun(arr: Array(A) key: A lo: Int hi: Int cmp: Fun(a: A b: A): Int): Int binarySearch: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): maybe.T(Int) binarySearchVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): maybe.T(Int) sort: All(A :: TYPE) Fun(arr: Array(A) cmp: Fun(a: A b: A): Int): Ok sortVector: All(A :: TYPE) Fun(v: vector.T(A) cmp: Fun(a: A b: A): Int): Ok sorted: All(A :: TYPE) Fun(arr: Array(A) cmp: Fun(a: A b: A): Int): Array(A) sortedVector: All(A :: TYPE) Fun(v: vector.T(A) cmp: Fun(a: A b: A): Int): vector.T(A) end))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printBool' :type Fun(b: Bool): Ok)
+        :args (
+          (TypedApp :type Bool
+            :func (TypedTypeApp [Int] :type Fun(o: maybe.T(Int)): Bool
+              :func (TypedSelect 'isNone' :type All(A :: TYPE) Fun(o: maybe.T(A)): Bool
+                :target (TypedVar 'maybe' :type Record error: Exception isSome: All(A :: TYPE) Fun(o: maybe.T(A)): Bool isNone: All(A :: TYPE) Fun(o: maybe.T(A)): Bool unwrap: All(A :: TYPE) Fun(o: maybe.T(A)): A unwrapOr: All(A :: TYPE) Fun(o: maybe.T(A) default: A): A some: All(A :: TYPE) Fun(val: A): maybe.T(A) none: All(A :: TYPE) maybe.T(A) end)))
+            :args (
+              (TypedVar 'sv2' :type maybe.T(Int))
+            ))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printNewline' :type Fun(dummy: Int): Ok)
+        :args (
+          (TypedInt 0 :type Int)
+        )))
+    (TypedLetValue 'toSort' :type Array(Int)
+      :value (TypedArrayRep :type Array(Int)
+        :count (TypedInt 8 :type Int)
+        :init (TypedInt 0 :type Int)))
+    (TypedExprStmt
+      :expr (TypedIndexAssign
+        :target (TypedVar 'toSort' :type Array(Int))
+        :index (TypedInt 0 :type Int)
+        :value (TypedInt 50 :type Int)))
+    (TypedExprStmt
+      :expr (TypedIndexAssign
+        :target (TypedVar 'toSort' :type Array(Int))
+        :index (TypedInt 1 :type Int)
+        :value (TypedInt 10 :type Int)))
+    (TypedExprStmt
+      :expr (TypedIndexAssign
+        :target (TypedVar 'toSort' :type Array(Int))
+        :index (TypedInt 2 :type Int)
+        :value (TypedInt 40 :type Int)))
+    (TypedExprStmt
+      :expr (TypedIndexAssign
+        :target (TypedVar 'toSort' :type Array(Int))
+        :index (TypedInt 3 :type Int)
+        :value (TypedInt 20 :type Int)))
+    (TypedExprStmt
+      :expr (TypedIndexAssign
+        :target (TypedVar 'toSort' :type Array(Int))
+        :index (TypedInt 4 :type Int)
+        :value (TypedInt 10 :type Int)))
+    (TypedExprStmt
+      :expr (TypedIndexAssign
+        :target (TypedVar 'toSort' :type Array(Int))
+        :index (TypedInt 5 :type Int)
+        :value (TypedInt 30 :type Int)))
+    (TypedExprStmt
+      :expr (TypedIndexAssign
+        :target (TypedVar 'toSort' :type Array(Int))
+        :index (TypedInt 6 :type Int)
+        :value (TypedInt 20 :type Int)))
+    (TypedExprStmt
+      :expr (TypedIndexAssign
+        :target (TypedVar 'toSort' :type Array(Int))
+        :index (TypedInt 7 :type Int)
+        :value (TypedInt 50 :type Int)))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedTypeApp [Int] :type Fun(arr: Array(Int) cmp: Fun(a: Int b: Int): Int): Ok
+          :func (TypedSelect 'sort' :type All(A :: TYPE) Fun(arr: Array(A) cmp: Fun(a: A b: A): Int): Ok
+            :target (TypedVar 'sort' :type Record intCompare: Fun(a: Int b: Int): Int stringCompare: Fun(a: String b: String): Int realCompare: Fun(a: Real b: Real): Int reverse: All(A :: TYPE) Fun(cmp: Fun(a: A b: A): Int): Fun(a: A b: A): Int bisectRight: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): Int bisectRightVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): Int bisectRightRange: All(A :: TYPE) Fun(arr: Array(A) key: A lo: Int hi: Int cmp: Fun(a: A b: A): Int): Int bisectLeft: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): Int bisectLeftVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): Int bisectLeftRange: All(A :: TYPE) Fun(arr: Array(A) key: A lo: Int hi: Int cmp: Fun(a: A b: A): Int): Int binarySearch: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): maybe.T(Int) binarySearchVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): maybe.T(Int) sort: All(A :: TYPE) Fun(arr: Array(A) cmp: Fun(a: A b: A): Int): Ok sortVector: All(A :: TYPE) Fun(v: vector.T(A) cmp: Fun(a: A b: A): Int): Ok sorted: All(A :: TYPE) Fun(arr: Array(A) cmp: Fun(a: A b: A): Int): Array(A) sortedVector: All(A :: TYPE) Fun(v: vector.T(A) cmp: Fun(a: A b: A): Int): vector.T(A) end)))
+        :args (
+          (TypedVar 'toSort' :type Array(Int))
+          (TypedSelect 'intCompare' :type Fun(a: Int b: Int): Int
+            :target (TypedVar 'sort' :type Record intCompare: Fun(a: Int b: Int): Int stringCompare: Fun(a: String b: String): Int realCompare: Fun(a: Real b: Real): Int reverse: All(A :: TYPE) Fun(cmp: Fun(a: A b: A): Int): Fun(a: A b: A): Int bisectRight: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): Int bisectRightVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): Int bisectRightRange: All(A :: TYPE) Fun(arr: Array(A) key: A lo: Int hi: Int cmp: Fun(a: A b: A): Int): Int bisectLeft: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): Int bisectLeftVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): Int bisectLeftRange: All(A :: TYPE) Fun(arr: Array(A) key: A lo: Int hi: Int cmp: Fun(a: A b: A): Int): Int binarySearch: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): maybe.T(Int) binarySearchVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): maybe.T(Int) sort: All(A :: TYPE) Fun(arr: Array(A) cmp: Fun(a: A b: A): Int): Ok sortVector: All(A :: TYPE) Fun(v: vector.T(A) cmp: Fun(a: A b: A): Int): Ok sorted: All(A :: TYPE) Fun(arr: Array(A) cmp: Fun(a: A b: A): Int): Array(A) sortedVector: All(A :: TYPE) Fun(v: vector.T(A) cmp: Fun(a: A b: A): Int): vector.T(A) end))
+        )))
+    (TypedExprStmt
+      :expr (TypedFor 'i' :upto
+        :start (TypedInt 0 :type Int)
+        :stop (TypedInt 7 :type Int)
+        :body (TypedApp :type Ok
+          :func (TypedVar 'printInt' :type Fun(n: Int): Ok)
+          :args (
+            (TypedIndex :type Int
+              :target (TypedVar 'toSort' :type Array(Int))
+              :index (TypedVar 'i' :type Int))
+          ))))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printNewline' :type Fun(dummy: Int): Ok)
+        :args (
+          (TypedInt 0 :type Int)
+        )))
+    (TypedLetValue 'original' :type Array(Int)
+      :value (TypedArrayRep :type Array(Int)
+        :count (TypedInt 4 :type Int)
+        :init (TypedInt 0 :type Int)))
+    (TypedExprStmt
+      :expr (TypedIndexAssign
+        :target (TypedVar 'original' :type Array(Int))
+        :index (TypedInt 0 :type Int)
+        :value (TypedInt 9 :type Int)))
+    (TypedExprStmt
+      :expr (TypedIndexAssign
+        :target (TypedVar 'original' :type Array(Int))
+        :index (TypedInt 1 :type Int)
+        :value (TypedInt 3 :type Int)))
+    (TypedExprStmt
+      :expr (TypedIndexAssign
+        :target (TypedVar 'original' :type Array(Int))
+        :index (TypedInt 2 :type Int)
+        :value (TypedInt 7 :type Int)))
+    (TypedExprStmt
+      :expr (TypedIndexAssign
+        :target (TypedVar 'original' :type Array(Int))
+        :index (TypedInt 3 :type Int)
+        :value (TypedInt 1 :type Int)))
+    (TypedLetValue 'sortedArr' :type Array(Int)
+      :value (TypedApp :type Array(Int)
+        :func (TypedTypeApp [Int] :type Fun(arr: Array(Int) cmp: Fun(a: Int b: Int): Int): Array(Int)
+          :func (TypedSelect 'sorted' :type All(A :: TYPE) Fun(arr: Array(A) cmp: Fun(a: A b: A): Int): Array(A)
+            :target (TypedVar 'sort' :type Record intCompare: Fun(a: Int b: Int): Int stringCompare: Fun(a: String b: String): Int realCompare: Fun(a: Real b: Real): Int reverse: All(A :: TYPE) Fun(cmp: Fun(a: A b: A): Int): Fun(a: A b: A): Int bisectRight: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): Int bisectRightVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): Int bisectRightRange: All(A :: TYPE) Fun(arr: Array(A) key: A lo: Int hi: Int cmp: Fun(a: A b: A): Int): Int bisectLeft: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): Int bisectLeftVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): Int bisectLeftRange: All(A :: TYPE) Fun(arr: Array(A) key: A lo: Int hi: Int cmp: Fun(a: A b: A): Int): Int binarySearch: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): maybe.T(Int) binarySearchVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): maybe.T(Int) sort: All(A :: TYPE) Fun(arr: Array(A) cmp: Fun(a: A b: A): Int): Ok sortVector: All(A :: TYPE) Fun(v: vector.T(A) cmp: Fun(a: A b: A): Int): Ok sorted: All(A :: TYPE) Fun(arr: Array(A) cmp: Fun(a: A b: A): Int): Array(A) sortedVector: All(A :: TYPE) Fun(v: vector.T(A) cmp: Fun(a: A b: A): Int): vector.T(A) end)))
+        :args (
+          (TypedVar 'original' :type Array(Int))
+          (TypedSelect 'intCompare' :type Fun(a: Int b: Int): Int
+            :target (TypedVar 'sort' :type Record intCompare: Fun(a: Int b: Int): Int stringCompare: Fun(a: String b: String): Int realCompare: Fun(a: Real b: Real): Int reverse: All(A :: TYPE) Fun(cmp: Fun(a: A b: A): Int): Fun(a: A b: A): Int bisectRight: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): Int bisectRightVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): Int bisectRightRange: All(A :: TYPE) Fun(arr: Array(A) key: A lo: Int hi: Int cmp: Fun(a: A b: A): Int): Int bisectLeft: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): Int bisectLeftVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): Int bisectLeftRange: All(A :: TYPE) Fun(arr: Array(A) key: A lo: Int hi: Int cmp: Fun(a: A b: A): Int): Int binarySearch: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): maybe.T(Int) binarySearchVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): maybe.T(Int) sort: All(A :: TYPE) Fun(arr: Array(A) cmp: Fun(a: A b: A): Int): Ok sortVector: All(A :: TYPE) Fun(v: vector.T(A) cmp: Fun(a: A b: A): Int): Ok sorted: All(A :: TYPE) Fun(arr: Array(A) cmp: Fun(a: A b: A): Int): Array(A) sortedVector: All(A :: TYPE) Fun(v: vector.T(A) cmp: Fun(a: A b: A): Int): vector.T(A) end))
+        )))
+    (TypedExprStmt
+      :expr (TypedFor 'i' :upto
+        :start (TypedInt 0 :type Int)
+        :stop (TypedInt 3 :type Int)
+        :body (TypedApp :type Ok
+          :func (TypedVar 'printInt' :type Fun(n: Int): Ok)
+          :args (
+            (TypedIndex :type Int
+              :target (TypedVar 'original' :type Array(Int))
+              :index (TypedVar 'i' :type Int))
+          ))))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printString' :type Fun(s: String): Ok)
+        :args (
+          (TypedString '|' :type String)
+        )))
+    (TypedExprStmt
+      :expr (TypedFor 'i' :upto
+        :start (TypedInt 0 :type Int)
+        :stop (TypedInt 3 :type Int)
+        :body (TypedApp :type Ok
+          :func (TypedVar 'printInt' :type Fun(n: Int): Ok)
+          :args (
+            (TypedIndex :type Int
+              :target (TypedVar 'sortedArr' :type Array(Int))
+              :index (TypedVar 'i' :type Int))
+          ))))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printNewline' :type Fun(dummy: Int): Ok)
+        :args (
+          (TypedInt 0 :type Int)
+        )))
+    (TypedLetValue 'vec2' :type vector.T(String)
+      :value (TypedTypeApp [String] :type vector.T(String)
+        :func (TypedSelect 'new' :type All(A :: TYPE) vector.T(A)
+          :target (TypedVar 'vector' :type Record error: Exception new: All(A :: TYPE) vector.T(A) newWithCapacity: All(A :: TYPE) Fun(capacity: Int): vector.T(A) length: All(A :: TYPE) Fun(v: vector.T(A)): Int empty: All(A :: TYPE) Fun(v: vector.T(A)): Bool get: All(A :: TYPE) Fun(v: vector.T(A) index: Int): A set: All(A :: TYPE) Fun(v: vector.T(A) index: Int value: A): Ok first: All(A :: TYPE) Fun(v: vector.T(A)): A last: All(A :: TYPE) Fun(v: vector.T(A)): A append: All(A :: TYPE) Fun(v: vector.T(A) value: A): Ok pop: All(A :: TYPE) Fun(v: vector.T(A)): A delete: All(A :: TYPE) Fun(v: vector.T(A) index: Int): Ok clear: All(A :: TYPE) Fun(v: vector.T(A)): Ok copy: All(A :: TYPE) Fun(v: vector.T(A)): vector.T(A) concat: All(A :: TYPE) Fun(v1: vector.T(A) v2: vector.T(A)): vector.T(A) fromArray: All(A :: TYPE) Fun(arr: Array(A)): vector.T(A) toArray: All(A :: TYPE) Fun(v: vector.T(A)): Array(A) forEach: All(A :: TYPE) Fun(v: vector.T(A) action: Fun(elem: A): Ok): Ok map: All(A :: TYPE B :: TYPE) Fun(v: vector.T(A) f: Fun(elem: A): B): vector.T(B) filter: All(A :: TYPE) Fun(v: vector.T(A) pred: Fun(elem: A): Bool): vector.T(A) fold: All(A :: TYPE Acc :: TYPE) Fun(v: vector.T(A) init: Acc f: Fun(acc: Acc elem: A): Acc): Acc filterMap: All(A :: TYPE B :: TYPE) Fun(v: vector.T(A) f: Fun(elem: A): maybe.T(B)): vector.T(B) end))))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedTypeApp [String] :type Fun(v: vector.T(String) value: String): Ok
+          :func (TypedSelect 'append' :type All(A :: TYPE) Fun(v: vector.T(A) value: A): Ok
+            :target (TypedVar 'vector' :type Record error: Exception new: All(A :: TYPE) vector.T(A) newWithCapacity: All(A :: TYPE) Fun(capacity: Int): vector.T(A) length: All(A :: TYPE) Fun(v: vector.T(A)): Int empty: All(A :: TYPE) Fun(v: vector.T(A)): Bool get: All(A :: TYPE) Fun(v: vector.T(A) index: Int): A set: All(A :: TYPE) Fun(v: vector.T(A) index: Int value: A): Ok first: All(A :: TYPE) Fun(v: vector.T(A)): A last: All(A :: TYPE) Fun(v: vector.T(A)): A append: All(A :: TYPE) Fun(v: vector.T(A) value: A): Ok pop: All(A :: TYPE) Fun(v: vector.T(A)): A delete: All(A :: TYPE) Fun(v: vector.T(A) index: Int): Ok clear: All(A :: TYPE) Fun(v: vector.T(A)): Ok copy: All(A :: TYPE) Fun(v: vector.T(A)): vector.T(A) concat: All(A :: TYPE) Fun(v1: vector.T(A) v2: vector.T(A)): vector.T(A) fromArray: All(A :: TYPE) Fun(arr: Array(A)): vector.T(A) toArray: All(A :: TYPE) Fun(v: vector.T(A)): Array(A) forEach: All(A :: TYPE) Fun(v: vector.T(A) action: Fun(elem: A): Ok): Ok map: All(A :: TYPE B :: TYPE) Fun(v: vector.T(A) f: Fun(elem: A): B): vector.T(B) filter: All(A :: TYPE) Fun(v: vector.T(A) pred: Fun(elem: A): Bool): vector.T(A) fold: All(A :: TYPE Acc :: TYPE) Fun(v: vector.T(A) init: Acc f: Fun(acc: Acc elem: A): Acc): Acc filterMap: All(A :: TYPE B :: TYPE) Fun(v: vector.T(A) f: Fun(elem: A): maybe.T(B)): vector.T(B) end)))
+        :args (
+          (TypedVar 'vec2' :type vector.T(String))
+          (TypedString 'banana' :type String)
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedTypeApp [String] :type Fun(v: vector.T(String) value: String): Ok
+          :func (TypedSelect 'append' :type All(A :: TYPE) Fun(v: vector.T(A) value: A): Ok
+            :target (TypedVar 'vector' :type Record error: Exception new: All(A :: TYPE) vector.T(A) newWithCapacity: All(A :: TYPE) Fun(capacity: Int): vector.T(A) length: All(A :: TYPE) Fun(v: vector.T(A)): Int empty: All(A :: TYPE) Fun(v: vector.T(A)): Bool get: All(A :: TYPE) Fun(v: vector.T(A) index: Int): A set: All(A :: TYPE) Fun(v: vector.T(A) index: Int value: A): Ok first: All(A :: TYPE) Fun(v: vector.T(A)): A last: All(A :: TYPE) Fun(v: vector.T(A)): A append: All(A :: TYPE) Fun(v: vector.T(A) value: A): Ok pop: All(A :: TYPE) Fun(v: vector.T(A)): A delete: All(A :: TYPE) Fun(v: vector.T(A) index: Int): Ok clear: All(A :: TYPE) Fun(v: vector.T(A)): Ok copy: All(A :: TYPE) Fun(v: vector.T(A)): vector.T(A) concat: All(A :: TYPE) Fun(v1: vector.T(A) v2: vector.T(A)): vector.T(A) fromArray: All(A :: TYPE) Fun(arr: Array(A)): vector.T(A) toArray: All(A :: TYPE) Fun(v: vector.T(A)): Array(A) forEach: All(A :: TYPE) Fun(v: vector.T(A) action: Fun(elem: A): Ok): Ok map: All(A :: TYPE B :: TYPE) Fun(v: vector.T(A) f: Fun(elem: A): B): vector.T(B) filter: All(A :: TYPE) Fun(v: vector.T(A) pred: Fun(elem: A): Bool): vector.T(A) fold: All(A :: TYPE Acc :: TYPE) Fun(v: vector.T(A) init: Acc f: Fun(acc: Acc elem: A): Acc): Acc filterMap: All(A :: TYPE B :: TYPE) Fun(v: vector.T(A) f: Fun(elem: A): maybe.T(B)): vector.T(B) end)))
+        :args (
+          (TypedVar 'vec2' :type vector.T(String))
+          (TypedString 'apple' :type String)
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedTypeApp [String] :type Fun(v: vector.T(String) value: String): Ok
+          :func (TypedSelect 'append' :type All(A :: TYPE) Fun(v: vector.T(A) value: A): Ok
+            :target (TypedVar 'vector' :type Record error: Exception new: All(A :: TYPE) vector.T(A) newWithCapacity: All(A :: TYPE) Fun(capacity: Int): vector.T(A) length: All(A :: TYPE) Fun(v: vector.T(A)): Int empty: All(A :: TYPE) Fun(v: vector.T(A)): Bool get: All(A :: TYPE) Fun(v: vector.T(A) index: Int): A set: All(A :: TYPE) Fun(v: vector.T(A) index: Int value: A): Ok first: All(A :: TYPE) Fun(v: vector.T(A)): A last: All(A :: TYPE) Fun(v: vector.T(A)): A append: All(A :: TYPE) Fun(v: vector.T(A) value: A): Ok pop: All(A :: TYPE) Fun(v: vector.T(A)): A delete: All(A :: TYPE) Fun(v: vector.T(A) index: Int): Ok clear: All(A :: TYPE) Fun(v: vector.T(A)): Ok copy: All(A :: TYPE) Fun(v: vector.T(A)): vector.T(A) concat: All(A :: TYPE) Fun(v1: vector.T(A) v2: vector.T(A)): vector.T(A) fromArray: All(A :: TYPE) Fun(arr: Array(A)): vector.T(A) toArray: All(A :: TYPE) Fun(v: vector.T(A)): Array(A) forEach: All(A :: TYPE) Fun(v: vector.T(A) action: Fun(elem: A): Ok): Ok map: All(A :: TYPE B :: TYPE) Fun(v: vector.T(A) f: Fun(elem: A): B): vector.T(B) filter: All(A :: TYPE) Fun(v: vector.T(A) pred: Fun(elem: A): Bool): vector.T(A) fold: All(A :: TYPE Acc :: TYPE) Fun(v: vector.T(A) init: Acc f: Fun(acc: Acc elem: A): Acc): Acc filterMap: All(A :: TYPE B :: TYPE) Fun(v: vector.T(A) f: Fun(elem: A): maybe.T(B)): vector.T(B) end)))
+        :args (
+          (TypedVar 'vec2' :type vector.T(String))
+          (TypedString 'cherry' :type String)
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedTypeApp [String] :type Fun(v: vector.T(String) value: String): Ok
+          :func (TypedSelect 'append' :type All(A :: TYPE) Fun(v: vector.T(A) value: A): Ok
+            :target (TypedVar 'vector' :type Record error: Exception new: All(A :: TYPE) vector.T(A) newWithCapacity: All(A :: TYPE) Fun(capacity: Int): vector.T(A) length: All(A :: TYPE) Fun(v: vector.T(A)): Int empty: All(A :: TYPE) Fun(v: vector.T(A)): Bool get: All(A :: TYPE) Fun(v: vector.T(A) index: Int): A set: All(A :: TYPE) Fun(v: vector.T(A) index: Int value: A): Ok first: All(A :: TYPE) Fun(v: vector.T(A)): A last: All(A :: TYPE) Fun(v: vector.T(A)): A append: All(A :: TYPE) Fun(v: vector.T(A) value: A): Ok pop: All(A :: TYPE) Fun(v: vector.T(A)): A delete: All(A :: TYPE) Fun(v: vector.T(A) index: Int): Ok clear: All(A :: TYPE) Fun(v: vector.T(A)): Ok copy: All(A :: TYPE) Fun(v: vector.T(A)): vector.T(A) concat: All(A :: TYPE) Fun(v1: vector.T(A) v2: vector.T(A)): vector.T(A) fromArray: All(A :: TYPE) Fun(arr: Array(A)): vector.T(A) toArray: All(A :: TYPE) Fun(v: vector.T(A)): Array(A) forEach: All(A :: TYPE) Fun(v: vector.T(A) action: Fun(elem: A): Ok): Ok map: All(A :: TYPE B :: TYPE) Fun(v: vector.T(A) f: Fun(elem: A): B): vector.T(B) filter: All(A :: TYPE) Fun(v: vector.T(A) pred: Fun(elem: A): Bool): vector.T(A) fold: All(A :: TYPE Acc :: TYPE) Fun(v: vector.T(A) init: Acc f: Fun(acc: Acc elem: A): Acc): Acc filterMap: All(A :: TYPE B :: TYPE) Fun(v: vector.T(A) f: Fun(elem: A): maybe.T(B)): vector.T(B) end)))
+        :args (
+          (TypedVar 'vec2' :type vector.T(String))
+          (TypedString 'date' :type String)
+        )))
+    (TypedLetValue 'vecSorted' :type vector.T(String)
+      :value (TypedApp :type vector.T(String)
+        :func (TypedTypeApp [String] :type Fun(v: vector.T(String) cmp: Fun(a: String b: String): Int): vector.T(String)
+          :func (TypedSelect 'sortedVector' :type All(A :: TYPE) Fun(v: vector.T(A) cmp: Fun(a: A b: A): Int): vector.T(A)
+            :target (TypedVar 'sort' :type Record intCompare: Fun(a: Int b: Int): Int stringCompare: Fun(a: String b: String): Int realCompare: Fun(a: Real b: Real): Int reverse: All(A :: TYPE) Fun(cmp: Fun(a: A b: A): Int): Fun(a: A b: A): Int bisectRight: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): Int bisectRightVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): Int bisectRightRange: All(A :: TYPE) Fun(arr: Array(A) key: A lo: Int hi: Int cmp: Fun(a: A b: A): Int): Int bisectLeft: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): Int bisectLeftVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): Int bisectLeftRange: All(A :: TYPE) Fun(arr: Array(A) key: A lo: Int hi: Int cmp: Fun(a: A b: A): Int): Int binarySearch: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): maybe.T(Int) binarySearchVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): maybe.T(Int) sort: All(A :: TYPE) Fun(arr: Array(A) cmp: Fun(a: A b: A): Int): Ok sortVector: All(A :: TYPE) Fun(v: vector.T(A) cmp: Fun(a: A b: A): Int): Ok sorted: All(A :: TYPE) Fun(arr: Array(A) cmp: Fun(a: A b: A): Int): Array(A) sortedVector: All(A :: TYPE) Fun(v: vector.T(A) cmp: Fun(a: A b: A): Int): vector.T(A) end)))
+        :args (
+          (TypedVar 'vec2' :type vector.T(String))
+          (TypedSelect 'stringCompare' :type Fun(a: String b: String): Int
+            :target (TypedVar 'sort' :type Record intCompare: Fun(a: Int b: Int): Int stringCompare: Fun(a: String b: String): Int realCompare: Fun(a: Real b: Real): Int reverse: All(A :: TYPE) Fun(cmp: Fun(a: A b: A): Int): Fun(a: A b: A): Int bisectRight: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): Int bisectRightVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): Int bisectRightRange: All(A :: TYPE) Fun(arr: Array(A) key: A lo: Int hi: Int cmp: Fun(a: A b: A): Int): Int bisectLeft: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): Int bisectLeftVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): Int bisectLeftRange: All(A :: TYPE) Fun(arr: Array(A) key: A lo: Int hi: Int cmp: Fun(a: A b: A): Int): Int binarySearch: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): maybe.T(Int) binarySearchVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): maybe.T(Int) sort: All(A :: TYPE) Fun(arr: Array(A) cmp: Fun(a: A b: A): Int): Ok sortVector: All(A :: TYPE) Fun(v: vector.T(A) cmp: Fun(a: A b: A): Int): Ok sorted: All(A :: TYPE) Fun(arr: Array(A) cmp: Fun(a: A b: A): Int): Array(A) sortedVector: All(A :: TYPE) Fun(v: vector.T(A) cmp: Fun(a: A b: A): Int): vector.T(A) end))
+        )))
+    (TypedExprStmt
+      :expr (TypedFor 'i' :upto
+        :start (TypedInt 0 :type Int)
+        :stop (TypedInfix '-' :type Int
+          :left (TypedApp :type Int
+            :func (TypedTypeApp [String] :type Fun(v: vector.T(String)): Int
+              :func (TypedSelect 'length' :type All(A :: TYPE) Fun(v: vector.T(A)): Int
+                :target (TypedVar 'vector' :type Record error: Exception new: All(A :: TYPE) vector.T(A) newWithCapacity: All(A :: TYPE) Fun(capacity: Int): vector.T(A) length: All(A :: TYPE) Fun(v: vector.T(A)): Int empty: All(A :: TYPE) Fun(v: vector.T(A)): Bool get: All(A :: TYPE) Fun(v: vector.T(A) index: Int): A set: All(A :: TYPE) Fun(v: vector.T(A) index: Int value: A): Ok first: All(A :: TYPE) Fun(v: vector.T(A)): A last: All(A :: TYPE) Fun(v: vector.T(A)): A append: All(A :: TYPE) Fun(v: vector.T(A) value: A): Ok pop: All(A :: TYPE) Fun(v: vector.T(A)): A delete: All(A :: TYPE) Fun(v: vector.T(A) index: Int): Ok clear: All(A :: TYPE) Fun(v: vector.T(A)): Ok copy: All(A :: TYPE) Fun(v: vector.T(A)): vector.T(A) concat: All(A :: TYPE) Fun(v1: vector.T(A) v2: vector.T(A)): vector.T(A) fromArray: All(A :: TYPE) Fun(arr: Array(A)): vector.T(A) toArray: All(A :: TYPE) Fun(v: vector.T(A)): Array(A) forEach: All(A :: TYPE) Fun(v: vector.T(A) action: Fun(elem: A): Ok): Ok map: All(A :: TYPE B :: TYPE) Fun(v: vector.T(A) f: Fun(elem: A): B): vector.T(B) filter: All(A :: TYPE) Fun(v: vector.T(A) pred: Fun(elem: A): Bool): vector.T(A) fold: All(A :: TYPE Acc :: TYPE) Fun(v: vector.T(A) init: Acc f: Fun(acc: Acc elem: A): Acc): Acc filterMap: All(A :: TYPE B :: TYPE) Fun(v: vector.T(A) f: Fun(elem: A): maybe.T(B)): vector.T(B) end)))
+            :args (
+              (TypedVar 'vecSorted' :type vector.T(String))
+            ))
+          :right (TypedInt 1 :type Int))
+        :body (TypedApp :type Ok
+          :func (TypedVar 'printString' :type Fun(s: String): Ok)
+          :args (
+            (TypedApp :type String
+              :func (TypedTypeApp [String] :type Fun(v: vector.T(String) index: Int): String
+                :func (TypedSelect 'get' :type All(A :: TYPE) Fun(v: vector.T(A) index: Int): A
+                  :target (TypedVar 'vector' :type Record error: Exception new: All(A :: TYPE) vector.T(A) newWithCapacity: All(A :: TYPE) Fun(capacity: Int): vector.T(A) length: All(A :: TYPE) Fun(v: vector.T(A)): Int empty: All(A :: TYPE) Fun(v: vector.T(A)): Bool get: All(A :: TYPE) Fun(v: vector.T(A) index: Int): A set: All(A :: TYPE) Fun(v: vector.T(A) index: Int value: A): Ok first: All(A :: TYPE) Fun(v: vector.T(A)): A last: All(A :: TYPE) Fun(v: vector.T(A)): A append: All(A :: TYPE) Fun(v: vector.T(A) value: A): Ok pop: All(A :: TYPE) Fun(v: vector.T(A)): A delete: All(A :: TYPE) Fun(v: vector.T(A) index: Int): Ok clear: All(A :: TYPE) Fun(v: vector.T(A)): Ok copy: All(A :: TYPE) Fun(v: vector.T(A)): vector.T(A) concat: All(A :: TYPE) Fun(v1: vector.T(A) v2: vector.T(A)): vector.T(A) fromArray: All(A :: TYPE) Fun(arr: Array(A)): vector.T(A) toArray: All(A :: TYPE) Fun(v: vector.T(A)): Array(A) forEach: All(A :: TYPE) Fun(v: vector.T(A) action: Fun(elem: A): Ok): Ok map: All(A :: TYPE B :: TYPE) Fun(v: vector.T(A) f: Fun(elem: A): B): vector.T(B) filter: All(A :: TYPE) Fun(v: vector.T(A) pred: Fun(elem: A): Bool): vector.T(A) fold: All(A :: TYPE Acc :: TYPE) Fun(v: vector.T(A) init: Acc f: Fun(acc: Acc elem: A): Acc): Acc filterMap: All(A :: TYPE B :: TYPE) Fun(v: vector.T(A) f: Fun(elem: A): maybe.T(B)): vector.T(B) end)))
+              :args (
+                (TypedVar 'vecSorted' :type vector.T(String))
+                (TypedVar 'i' :type Int)
+              ))
+          ))))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printNewline' :type Fun(dummy: Int): Ok)
+        :args (
+          (TypedInt 0 :type Int)
+        )))
+    (TypedLetValue 'revStr' :type Fun(a: String b: String): Int
+      :value (TypedApp :type Fun(a: String b: String): Int
+        :func (TypedTypeApp [String] :type Fun(cmp: Fun(a: String b: String): Int): Fun(a: String b: String): Int
+          :func (TypedSelect 'reverse' :type All(A :: TYPE) Fun(cmp: Fun(a: A b: A): Int): Fun(a: A b: A): Int
+            :target (TypedVar 'sort' :type Record intCompare: Fun(a: Int b: Int): Int stringCompare: Fun(a: String b: String): Int realCompare: Fun(a: Real b: Real): Int reverse: All(A :: TYPE) Fun(cmp: Fun(a: A b: A): Int): Fun(a: A b: A): Int bisectRight: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): Int bisectRightVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): Int bisectRightRange: All(A :: TYPE) Fun(arr: Array(A) key: A lo: Int hi: Int cmp: Fun(a: A b: A): Int): Int bisectLeft: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): Int bisectLeftVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): Int bisectLeftRange: All(A :: TYPE) Fun(arr: Array(A) key: A lo: Int hi: Int cmp: Fun(a: A b: A): Int): Int binarySearch: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): maybe.T(Int) binarySearchVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): maybe.T(Int) sort: All(A :: TYPE) Fun(arr: Array(A) cmp: Fun(a: A b: A): Int): Ok sortVector: All(A :: TYPE) Fun(v: vector.T(A) cmp: Fun(a: A b: A): Int): Ok sorted: All(A :: TYPE) Fun(arr: Array(A) cmp: Fun(a: A b: A): Int): Array(A) sortedVector: All(A :: TYPE) Fun(v: vector.T(A) cmp: Fun(a: A b: A): Int): vector.T(A) end)))
+        :args (
+          (TypedSelect 'stringCompare' :type Fun(a: String b: String): Int
+            :target (TypedVar 'sort' :type Record intCompare: Fun(a: Int b: Int): Int stringCompare: Fun(a: String b: String): Int realCompare: Fun(a: Real b: Real): Int reverse: All(A :: TYPE) Fun(cmp: Fun(a: A b: A): Int): Fun(a: A b: A): Int bisectRight: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): Int bisectRightVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): Int bisectRightRange: All(A :: TYPE) Fun(arr: Array(A) key: A lo: Int hi: Int cmp: Fun(a: A b: A): Int): Int bisectLeft: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): Int bisectLeftVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): Int bisectLeftRange: All(A :: TYPE) Fun(arr: Array(A) key: A lo: Int hi: Int cmp: Fun(a: A b: A): Int): Int binarySearch: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): maybe.T(Int) binarySearchVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): maybe.T(Int) sort: All(A :: TYPE) Fun(arr: Array(A) cmp: Fun(a: A b: A): Int): Ok sortVector: All(A :: TYPE) Fun(v: vector.T(A) cmp: Fun(a: A b: A): Int): Ok sorted: All(A :: TYPE) Fun(arr: Array(A) cmp: Fun(a: A b: A): Int): Array(A) sortedVector: All(A :: TYPE) Fun(v: vector.T(A) cmp: Fun(a: A b: A): Int): vector.T(A) end))
+        )))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedTypeApp [String] :type Fun(v: vector.T(String) cmp: Fun(a: String b: String): Int): Ok
+          :func (TypedSelect 'sortVector' :type All(A :: TYPE) Fun(v: vector.T(A) cmp: Fun(a: A b: A): Int): Ok
+            :target (TypedVar 'sort' :type Record intCompare: Fun(a: Int b: Int): Int stringCompare: Fun(a: String b: String): Int realCompare: Fun(a: Real b: Real): Int reverse: All(A :: TYPE) Fun(cmp: Fun(a: A b: A): Int): Fun(a: A b: A): Int bisectRight: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): Int bisectRightVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): Int bisectRightRange: All(A :: TYPE) Fun(arr: Array(A) key: A lo: Int hi: Int cmp: Fun(a: A b: A): Int): Int bisectLeft: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): Int bisectLeftVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): Int bisectLeftRange: All(A :: TYPE) Fun(arr: Array(A) key: A lo: Int hi: Int cmp: Fun(a: A b: A): Int): Int binarySearch: All(A :: TYPE) Fun(arr: Array(A) key: A cmp: Fun(a: A b: A): Int): maybe.T(Int) binarySearchVector: All(A :: TYPE) Fun(v: vector.T(A) key: A cmp: Fun(a: A b: A): Int): maybe.T(Int) sort: All(A :: TYPE) Fun(arr: Array(A) cmp: Fun(a: A b: A): Int): Ok sortVector: All(A :: TYPE) Fun(v: vector.T(A) cmp: Fun(a: A b: A): Int): Ok sorted: All(A :: TYPE) Fun(arr: Array(A) cmp: Fun(a: A b: A): Int): Array(A) sortedVector: All(A :: TYPE) Fun(v: vector.T(A) cmp: Fun(a: A b: A): Int): vector.T(A) end)))
+        :args (
+          (TypedVar 'vec2' :type vector.T(String))
+          (TypedVar 'revStr' :type Fun(a: String b: String): Int)
+        )))
+    (TypedExprStmt
+      :expr (TypedFor 'i' :upto
+        :start (TypedInt 0 :type Int)
+        :stop (TypedInfix '-' :type Int
+          :left (TypedApp :type Int
+            :func (TypedTypeApp [String] :type Fun(v: vector.T(String)): Int
+              :func (TypedSelect 'length' :type All(A :: TYPE) Fun(v: vector.T(A)): Int
+                :target (TypedVar 'vector' :type Record error: Exception new: All(A :: TYPE) vector.T(A) newWithCapacity: All(A :: TYPE) Fun(capacity: Int): vector.T(A) length: All(A :: TYPE) Fun(v: vector.T(A)): Int empty: All(A :: TYPE) Fun(v: vector.T(A)): Bool get: All(A :: TYPE) Fun(v: vector.T(A) index: Int): A set: All(A :: TYPE) Fun(v: vector.T(A) index: Int value: A): Ok first: All(A :: TYPE) Fun(v: vector.T(A)): A last: All(A :: TYPE) Fun(v: vector.T(A)): A append: All(A :: TYPE) Fun(v: vector.T(A) value: A): Ok pop: All(A :: TYPE) Fun(v: vector.T(A)): A delete: All(A :: TYPE) Fun(v: vector.T(A) index: Int): Ok clear: All(A :: TYPE) Fun(v: vector.T(A)): Ok copy: All(A :: TYPE) Fun(v: vector.T(A)): vector.T(A) concat: All(A :: TYPE) Fun(v1: vector.T(A) v2: vector.T(A)): vector.T(A) fromArray: All(A :: TYPE) Fun(arr: Array(A)): vector.T(A) toArray: All(A :: TYPE) Fun(v: vector.T(A)): Array(A) forEach: All(A :: TYPE) Fun(v: vector.T(A) action: Fun(elem: A): Ok): Ok map: All(A :: TYPE B :: TYPE) Fun(v: vector.T(A) f: Fun(elem: A): B): vector.T(B) filter: All(A :: TYPE) Fun(v: vector.T(A) pred: Fun(elem: A): Bool): vector.T(A) fold: All(A :: TYPE Acc :: TYPE) Fun(v: vector.T(A) init: Acc f: Fun(acc: Acc elem: A): Acc): Acc filterMap: All(A :: TYPE B :: TYPE) Fun(v: vector.T(A) f: Fun(elem: A): maybe.T(B)): vector.T(B) end)))
+            :args (
+              (TypedVar 'vec2' :type vector.T(String))
+            ))
+          :right (TypedInt 1 :type Int))
+        :body (TypedApp :type Ok
+          :func (TypedVar 'printString' :type Fun(s: String): Ok)
+          :args (
+            (TypedApp :type String
+              :func (TypedTypeApp [String] :type Fun(v: vector.T(String) index: Int): String
+                :func (TypedSelect 'get' :type All(A :: TYPE) Fun(v: vector.T(A) index: Int): A
+                  :target (TypedVar 'vector' :type Record error: Exception new: All(A :: TYPE) vector.T(A) newWithCapacity: All(A :: TYPE) Fun(capacity: Int): vector.T(A) length: All(A :: TYPE) Fun(v: vector.T(A)): Int empty: All(A :: TYPE) Fun(v: vector.T(A)): Bool get: All(A :: TYPE) Fun(v: vector.T(A) index: Int): A set: All(A :: TYPE) Fun(v: vector.T(A) index: Int value: A): Ok first: All(A :: TYPE) Fun(v: vector.T(A)): A last: All(A :: TYPE) Fun(v: vector.T(A)): A append: All(A :: TYPE) Fun(v: vector.T(A) value: A): Ok pop: All(A :: TYPE) Fun(v: vector.T(A)): A delete: All(A :: TYPE) Fun(v: vector.T(A) index: Int): Ok clear: All(A :: TYPE) Fun(v: vector.T(A)): Ok copy: All(A :: TYPE) Fun(v: vector.T(A)): vector.T(A) concat: All(A :: TYPE) Fun(v1: vector.T(A) v2: vector.T(A)): vector.T(A) fromArray: All(A :: TYPE) Fun(arr: Array(A)): vector.T(A) toArray: All(A :: TYPE) Fun(v: vector.T(A)): Array(A) forEach: All(A :: TYPE) Fun(v: vector.T(A) action: Fun(elem: A): Ok): Ok map: All(A :: TYPE B :: TYPE) Fun(v: vector.T(A) f: Fun(elem: A): B): vector.T(B) filter: All(A :: TYPE) Fun(v: vector.T(A) pred: Fun(elem: A): Bool): vector.T(A) fold: All(A :: TYPE Acc :: TYPE) Fun(v: vector.T(A) init: Acc f: Fun(acc: Acc elem: A): Acc): Acc filterMap: All(A :: TYPE B :: TYPE) Fun(v: vector.T(A) f: Fun(elem: A): maybe.T(B)): vector.T(B) end)))
+              :args (
+                (TypedVar 'vec2' :type vector.T(String))
+                (TypedVar 'i' :type Int)
+              ))
+          ))))
+    (TypedExprStmt
+      :expr (TypedApp :type Ok
+        :func (TypedVar 'printNewline' :type Fun(dummy: Int): Ok)
+        :args (
+          (TypedInt 0 :type Int)
+        )))
+  ))

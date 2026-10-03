@@ -1,0 +1,261 @@
+(* Standard Library: Pure Quest Searching and Sorting Utilities *)
+
+module sort : Sort
+import
+    arrayOp : ArrayOp
+    collections/vector : collections/Vector
+    util/maybe : util/Maybe
+    stringOp = string : StringOp
+    real: RealOp
+export
+    (* =========================================================================
+     * Comparators
+     * ========================================================================= *)
+
+    let intCompare(a: Int b: Int): Int =
+        if a < b then ~1 else if a > b then 1 else 0 end end;
+
+    let stringCompare(a: String b: String): Int =
+        if stringOp.equal(a b) then
+            0
+        elsif stringOp.precedes(a b) then
+            ~1
+        else
+            1
+        end;
+
+    let realCompare(a: Real b: Real): Int =
+        if real.smaller(a b) then
+            ~1
+        elsif real.greater(a b) then
+            1
+        else
+            0
+        end;
+
+    let reverse(A::TYPE)(cmp: All(a: A b: A) Int): All(a: A b: A) Int =
+        fun(a: A b: A): Int 0 - cmp(a b);
+
+    (* =========================================================================
+     * Bisection (Right / Upper Bound)
+     * ========================================================================= *)
+
+    let bisectRightRange(A::TYPE)(arr: Array(A) key: A lo: Int hi: Int cmp: All(a: A b: A) Int): Int =
+        begin
+            let var low = lo;
+            let var high = hi;
+            loop
+                if low >= high then exit end;
+                let mid = low + {high - low} / 2;
+                if cmp(arr[mid] key) > 0 then
+                    high := mid;
+                else
+                    low := mid + 1;
+                end;
+            end;
+            low
+        end;
+
+    let bisectRight(A::TYPE)(arr: Array(A) key: A cmp: All(a: A b: A) Int): Int =
+        bisectRightRange(:A arr key 0 arrayOp.size(:A arr) cmp);
+
+    let bisectRightVector(A::TYPE)(v: vector.T(A) key: A cmp: All(a: A b: A) Int): Int =
+        begin
+            let var low = 0;
+            let var high = vector.length(:A v);
+            loop
+                if low >= high then exit end;
+                let mid = low + {high - low} / 2;
+                if cmp(vector.get(:A v mid) key) > 0 then
+                    high := mid;
+                else
+                    low := mid + 1;
+                end;
+            end;
+            low
+        end;
+
+    (* =========================================================================
+     * Bisection (Left / Lower Bound)
+     * ========================================================================= *)
+
+    let bisectLeftRange(A::TYPE)(arr: Array(A) key: A lo: Int hi: Int cmp: All(a: A b: A) Int): Int =
+        begin
+            let var low = lo;
+            let var high = hi;
+            loop
+                if low >= high then exit end;
+                let mid = low + {high - low} / 2;
+                if cmp(arr[mid] key) < 0 then
+                    low := mid + 1;
+                else
+                    high := mid;
+                end;
+            end;
+            low
+        end;
+
+    let bisectLeft(A::TYPE)(arr: Array(A) key: A cmp: All(a: A b: A) Int): Int =
+        bisectLeftRange(:A arr key 0 arrayOp.size(:A arr) cmp);
+
+    let bisectLeftVector(A::TYPE)(v: vector.T(A) key: A cmp: All(a: A b: A) Int): Int =
+        begin
+            let var low = 0;
+            let var high = vector.length(:A v);
+            loop
+                if low >= high then exit end;
+                let mid = low + {high - low} / 2;
+                if cmp(vector.get(:A v mid) key) < 0 then
+                    low := mid + 1;
+                else
+                    high := mid;
+                end;
+            end;
+            low
+        end;
+
+    (* =========================================================================
+     * Exact Match Binary Search
+     * ========================================================================= *)
+
+    let binarySearch(A::TYPE)(arr: Array(A) key: A cmp: All(a: A b: A) Int): maybe.T(Int) =
+        begin
+            let n: Int = arrayOp.size(:A arr);
+            let idx: Int = bisectLeft(:A arr key cmp);
+            if idx < n then
+                if cmp(arr[idx] key) is 0 then
+                    maybe.some(:Int idx)
+                else
+                    maybe.none(:Int)
+                end
+            else
+                maybe.none(:Int)
+            end
+        end;
+
+    let binarySearchVector(A::TYPE)(v: vector.T(A) key: A cmp: All(a: A b: A) Int): maybe.T(Int) =
+        begin
+            let n: Int = vector.length(:A v);
+            let idx: Int = bisectLeftVector(:A v key cmp);
+            if idx < n then
+                if cmp(vector.get(:A v idx) key) is 0 then
+                    maybe.some(:Int idx)
+                else
+                    maybe.none(:Int)
+                end
+            else
+                maybe.none(:Int)
+            end
+        end;
+
+    (* =========================================================================
+     * Sorting Helpers & 3-Way Quicksort
+     * ========================================================================= *)
+
+    let swap(A::TYPE)(arr: Array(A) i: Int j: Int): Ok =
+        begin
+            let tmp = arr[i];
+            arr[i] := arr[j];
+            arr[j] := tmp;
+        end;
+
+    let insertionSort(A::TYPE)(arr: Array(A) lo: Int hi: Int cmp: All(a: A b: A) Int): Ok =
+        begin
+            for i = {lo + 1} upto hi do
+                let val = arr[i];
+                let var j = i - 1;
+                loop
+                    if j < lo then exit end;
+                    if cmp(arr[j] val) <= 0 then exit end;
+                    arr[j + 1] := arr[j];
+                    j := j - 1;
+                end;
+                arr[j + 1] := val;
+            end;
+            ok
+        end;
+
+    let rec quickSort(A::TYPE)(arr: Array(A) lo: Int hi: Int cmp: All(a: A b: A) Int): Ok =
+        begin
+            if lo < hi then
+                if {hi - lo} < 12 then
+                    insertionSort(:A arr lo hi cmp);
+                else
+                    let mid = lo + {hi - lo} / 2;
+                    let pivot = arr[mid];
+                    let var lt = lo;
+                    let var gt = hi;
+                    let var i = lo;
+                    loop
+                        if i > gt then exit end;
+                        let c = cmp(arr[i] pivot);
+                        if c < 0 then
+                            swap(:A arr lt i);
+                            lt := lt + 1;
+                            i := i + 1;
+                        elsif c > 0 then
+                            swap(:A arr i gt);
+                            gt := gt - 1;
+                        else
+                            i := i + 1;
+                        end;
+                    end;
+                    if lo < {lt - 1} then
+                        quickSort(:A arr lo {lt - 1} cmp);
+                    end;
+                    if {gt + 1} < hi then
+                        quickSort(:A arr {gt + 1} hi cmp);
+                    end;
+                end;
+            end;
+            ok
+        end;
+
+    (* =========================================================================
+     * Sorting API
+     * ========================================================================= *)
+
+    let sort(A::TYPE)(arr: Array(A) cmp: All(a: A b: A) Int): Ok =
+        begin
+            let n: Int = arrayOp.size(:A arr);
+            if n > 1 then
+                quickSort(:A arr 0 {n - 1} cmp);
+            end;
+            ok
+        end;
+
+    let sorted(A::TYPE)(arr: Array(A) cmp: All(a: A b: A) Int): Array(A) =
+        begin
+            let n: Int = arrayOp.size(:A arr);
+            if n is 0 then
+                array of :A end
+            else
+                let res: Array(A) = array of(n arr[0]);
+                for i = 1 upto {n - 1} do
+                    res[i] := arr[i];
+                end;
+                sort(:A res cmp);
+                res
+            end
+        end;
+
+    let sortVector(A::TYPE)(v: vector.T(A) cmp: All(a: A b: A) Int): Ok =
+        begin
+            let n: Int = vector.length(:A v);
+            if n > 1 then
+                let arr = vector.toArray(:A v);
+                sort(:A arr cmp);
+                for i = 0 upto {n - 1} do
+                    vector.set(:A v i arr[i]);
+                end;
+            end;
+            ok
+        end;
+
+    let sortedVector(A::TYPE)(v: vector.T(A) cmp: All(a: A b: A) Int): vector.T(A) =
+        begin
+            let copy = vector.copy(:A v);
+            sortVector(:A copy cmp);
+            copy
+        end;
+end;

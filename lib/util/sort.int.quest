@@ -1,0 +1,123 @@
+(* Standard Library: Pure Quest Searching and Sorting Utilities *)
+
+interface Sort
+import
+    collections/vector : collections/Vector
+    util/maybe : util/Maybe
+export
+    (* =========================================================================
+     * Comparators
+     * ========================================================================= *)
+
+    (* Standard integer comparator: returns ~1 if a < b, 0 if a == b, 1 if a > b *)
+    intCompare(a: Int b: Int): Int
+
+    (* Lexicographical string comparator: returns ~1 if a < b, 0 if a == b, 1 if a > b *)
+    stringCompare(a: String b: String): Int
+
+    (* Standard floating-point comparator: returns ~1 if a < b, 0 if a == b, 1 if a > b *)
+    realCompare(a: Real b: Real): Int
+
+    (* Inverts any comparator to sort or search in descending order *)
+    reverse: All(A::TYPE) All(cmp: All(a: A b: A) Int) All(a: A b: A) Int
+
+    (* =========================================================================
+     * Bisection & Binary Search (Right / Upper Bound)
+     * ========================================================================= *)
+
+    (* Returns insertion index i in [0, size] such that arr[0..i-1] <= key and arr[i..] > key *)
+    bisectRight: All(A::TYPE) All(
+        arr: Array(A)
+        key: A
+        cmp: All(a: A b: A) Int
+    ) Int
+
+    (* Vector variant of bisectRight *)
+    bisectRightVector: All(A::TYPE) All(
+        v: vector.T(A)
+        key: A
+        cmp: All(a: A b: A) Int
+    ) Int
+
+    (* Sliced range variant [lo, hi) of bisectRight *)
+    bisectRightRange: All(A::TYPE) All(
+        arr: Array(A)
+        key: A
+        lo: Int
+        hi: Int
+        cmp: All(a: A b: A) Int
+    ) Int
+
+    (* =========================================================================
+     * Bisection & Binary Search (Left / Lower Bound)
+     * ========================================================================= *)
+
+    (* Returns insertion index i in [0, size] such that arr[0..i-1] < key and arr[i..] >= key *)
+    bisectLeft: All(A::TYPE) All(
+        arr: Array(A)
+        key: A
+        cmp: All(a: A b: A) Int
+    ) Int
+
+    (* Vector variant of bisectLeft *)
+    bisectLeftVector: All(A::TYPE) All(
+        v: vector.T(A)
+        key: A
+        cmp: All(a: A b: A) Int
+    ) Int
+
+    (* Sliced range variant [lo, hi) of bisectLeft *)
+    bisectLeftRange: All(A::TYPE) All(
+        arr: Array(A)
+        key: A
+        lo: Int
+        hi: Int
+        cmp: All(a: A b: A) Int
+    ) Int
+
+    (* =========================================================================
+     * Exact Match Binary Search
+     * ========================================================================= *)
+
+    (* Exact match search: returns maybe.some(index) if found, else maybe.none *)
+    binarySearch: All(A::TYPE) All(
+        arr: Array(A)
+        key: A
+        cmp: All(a: A b: A) Int
+    ) maybe.T(Int)
+
+    (* Vector variant of binarySearch *)
+    binarySearchVector: All(A::TYPE) All(
+        v: vector.T(A)
+        key: A
+        cmp: All(a: A b: A) Int
+    ) maybe.T(Int)
+
+    (* =========================================================================
+     * Sorting Algorithms
+     * ========================================================================= *)
+
+    (* In-place 3-way quicksort on Array(A) *)
+    sort: All(A::TYPE) All(
+        arr: Array(A)
+        cmp: All(a: A b: A) Int
+    ) Ok
+
+    (* In-place sort on vector.T(A) *)
+    sortVector: All(A::TYPE) All(
+        v: vector.T(A)
+        cmp: All(a: A b: A) Int
+    ) Ok
+
+    (* Non-destructive sort returning a newly allocated sorted Array *)
+    sorted: All(A::TYPE) All(
+        arr: Array(A)
+        cmp: All(a: A b: A) Int
+    ) Array(A)
+
+    (* Non-destructive sort returning a newly allocated sorted Vector *)
+    sortedVector: All(A::TYPE) All(
+        v: vector.T(A)
+        cmp: All(a: A b: A) Int
+    ) vector.T(A)
+end;

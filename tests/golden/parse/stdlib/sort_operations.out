@@ -1,0 +1,1524 @@
+(Program
+  :phrases (
+    (ImportPhrase
+      :items (
+        (ImportItem ('sort') 'Sort' ('util/sort') 'util/Sort')
+      )
+    )
+    (ImportPhrase
+      :items (
+        (ImportItem ('vector') 'Vector' ('collections/vector') 'collections/Vector')
+      )
+    )
+    (ImportPhrase
+      :items (
+        (ImportItem ('maybe') 'Maybe' ('util/maybe') 'util/Maybe')
+      )
+    )
+    (ImportPhrase
+      :items (
+        (ImportItem ('writer') 'Writer')
+      )
+    )
+    (ImportPhrase
+      :items (
+        (ImportItem ('conv') 'Conv')
+      )
+    )
+    (LetValueBinding
+      :name 'wOut'
+      :value (ExprSelect
+        :target (ExprId 'writer')
+        :field 'output'
+      )
+    )
+    (LetValueBinding
+      :name 'printInt'
+      :value (ExprBlock
+        :bindings (
+          (ExprStmt
+            :expr (ExprApp
+              :func (ExprSelect
+                :target (ExprId 'writer')
+                :field 'putString'
+              )
+              :args (
+                (ExprId 'wOut')
+                (ExprApp
+                  :func (ExprSelect
+                    :target (ExprId 'conv')
+                    :field 'int'
+                  )
+                  :args (
+                    (ExprId 'n')
+                  )
+                )
+              )
+            )
+          )
+          (ExprStmt
+            :expr (ExprApp
+              :func (ExprSelect
+                :target (ExprId 'writer')
+                :field 'putString'
+              )
+              :args (
+                (ExprId 'wOut')
+                (ExprString ' ' '" "')
+              )
+            )
+          )
+        )
+      )
+      :params (
+        (FormalParam
+          :name 'n'
+          :type_annot (TypePath ('Int'))
+          :mode VALUE
+        )
+      )
+      :type_annot (TypePath ('Ok'))
+    )
+    (LetValueBinding
+      :name 'printBool'
+      :value (ExprBlock
+        :bindings (
+          (ExprStmt
+            :expr (ExprApp
+              :func (ExprSelect
+                :target (ExprId 'writer')
+                :field 'putString'
+              )
+              :args (
+                (ExprId 'wOut')
+                (ExprApp
+                  :func (ExprSelect
+                    :target (ExprId 'conv')
+                    :field 'bool'
+                  )
+                  :args (
+                    (ExprId 'b')
+                  )
+                )
+              )
+            )
+          )
+          (ExprStmt
+            :expr (ExprApp
+              :func (ExprSelect
+                :target (ExprId 'writer')
+                :field 'putString'
+              )
+              :args (
+                (ExprId 'wOut')
+                (ExprString ' ' '" "')
+              )
+            )
+          )
+        )
+      )
+      :params (
+        (FormalParam
+          :name 'b'
+          :type_annot (TypePath ('Bool'))
+          :mode VALUE
+        )
+      )
+      :type_annot (TypePath ('Ok'))
+    )
+    (LetValueBinding
+      :name 'printString'
+      :value (ExprBlock
+        :bindings (
+          (ExprStmt
+            :expr (ExprApp
+              :func (ExprSelect
+                :target (ExprId 'writer')
+                :field 'putString'
+              )
+              :args (
+                (ExprId 'wOut')
+                (ExprId 's')
+              )
+            )
+          )
+          (ExprStmt
+            :expr (ExprApp
+              :func (ExprSelect
+                :target (ExprId 'writer')
+                :field 'putString'
+              )
+              :args (
+                (ExprId 'wOut')
+                (ExprString ' ' '" "')
+              )
+            )
+          )
+        )
+      )
+      :params (
+        (FormalParam
+          :name 's'
+          :type_annot (TypePath ('String'))
+          :mode VALUE
+        )
+      )
+      :type_annot (TypePath ('Ok'))
+    )
+    (LetValueBinding
+      :name 'printNewline'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'writer')
+          :field 'putString'
+        )
+        :args (
+          (ExprId 'wOut')
+          (ExprString '\n' '"\\n"')
+        )
+      )
+      :params (
+        (FormalParam
+          :name 'dummy'
+          :type_annot (TypePath ('Int'))
+          :mode VALUE
+        )
+      )
+      :type_annot (TypePath ('Ok'))
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printInt')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'sort')
+              :field 'intCompare'
+            )
+            :args (
+              (ExprInt 10 '10')
+              (ExprInt 20 '20')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printInt')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'sort')
+              :field 'intCompare'
+            )
+            :args (
+              (ExprInt 20 '20')
+              (ExprInt 20 '20')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printInt')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'sort')
+              :field 'intCompare'
+            )
+            :args (
+              (ExprInt 30 '30')
+              (ExprInt 20 '20')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printInt')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'sort')
+              :field 'stringCompare'
+            )
+            :args (
+              (ExprString 'apple' '"apple"')
+              (ExprString 'banana' '"banana"')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printInt')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'sort')
+              :field 'stringCompare'
+            )
+            :args (
+              (ExprString 'apple' '"apple"')
+              (ExprString 'apple' '"apple"')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printInt')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'sort')
+              :field 'stringCompare'
+            )
+            :args (
+              (ExprString 'banana' '"banana"')
+              (ExprString 'apple' '"apple"')
+            )
+          )
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'revInt'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'sort')
+          :field 'reverse'
+        )
+        :args (
+          (TypeArgument
+            :type_val (TypePath ('Int'))
+          )
+          (ExprSelect
+            :target (ExprId 'sort')
+            :field 'intCompare'
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printInt')
+        :args (
+          (ExprApp
+            :func (ExprId 'revInt')
+            :args (
+              (ExprInt 10 '10')
+              (ExprInt 20 '20')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printInt')
+        :args (
+          (ExprApp
+            :func (ExprId 'revInt')
+            :args (
+              (ExprInt 20 '20')
+              (ExprInt 10 '10')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printNewline')
+        :args (
+          (ExprInt 0 '0')
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'arr1'
+      :value (ExprArrayRep
+        :count (ExprInt 6 '6')
+        :init_val (ExprInt 0 '0')
+      )
+    )
+    (ExprStmt
+      :expr (ExprInfix
+        :left (ExprIndex
+          :target (ExprId 'arr1')
+          :index (ExprInt 0 '0')
+        )
+        :op ':='
+        :right (ExprInt 10 '10')
+      )
+    )
+    (ExprStmt
+      :expr (ExprInfix
+        :left (ExprIndex
+          :target (ExprId 'arr1')
+          :index (ExprInt 1 '1')
+        )
+        :op ':='
+        :right (ExprInt 20 '20')
+      )
+    )
+    (ExprStmt
+      :expr (ExprInfix
+        :left (ExprIndex
+          :target (ExprId 'arr1')
+          :index (ExprInt 2 '2')
+        )
+        :op ':='
+        :right (ExprInt 20 '20')
+      )
+    )
+    (ExprStmt
+      :expr (ExprInfix
+        :left (ExprIndex
+          :target (ExprId 'arr1')
+          :index (ExprInt 3 '3')
+        )
+        :op ':='
+        :right (ExprInt 20 '20')
+      )
+    )
+    (ExprStmt
+      :expr (ExprInfix
+        :left (ExprIndex
+          :target (ExprId 'arr1')
+          :index (ExprInt 4 '4')
+        )
+        :op ':='
+        :right (ExprInt 30 '30')
+      )
+    )
+    (ExprStmt
+      :expr (ExprInfix
+        :left (ExprIndex
+          :target (ExprId 'arr1')
+          :index (ExprInt 5 '5')
+        )
+        :op ':='
+        :right (ExprInt 40 '40')
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printInt')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'sort')
+              :field 'bisectRight'
+            )
+            :args (
+              (TypeArgument
+                :type_val (TypePath ('Int'))
+              )
+              (ExprId 'arr1')
+              (ExprInt 5 '5')
+              (ExprSelect
+                :target (ExprId 'sort')
+                :field 'intCompare'
+              )
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printInt')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'sort')
+              :field 'bisectRight'
+            )
+            :args (
+              (TypeArgument
+                :type_val (TypePath ('Int'))
+              )
+              (ExprId 'arr1')
+              (ExprInt 10 '10')
+              (ExprSelect
+                :target (ExprId 'sort')
+                :field 'intCompare'
+              )
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printInt')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'sort')
+              :field 'bisectRight'
+            )
+            :args (
+              (TypeArgument
+                :type_val (TypePath ('Int'))
+              )
+              (ExprId 'arr1')
+              (ExprInt 20 '20')
+              (ExprSelect
+                :target (ExprId 'sort')
+                :field 'intCompare'
+              )
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printInt')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'sort')
+              :field 'bisectRight'
+            )
+            :args (
+              (TypeArgument
+                :type_val (TypePath ('Int'))
+              )
+              (ExprId 'arr1')
+              (ExprInt 25 '25')
+              (ExprSelect
+                :target (ExprId 'sort')
+                :field 'intCompare'
+              )
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printInt')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'sort')
+              :field 'bisectRight'
+            )
+            :args (
+              (TypeArgument
+                :type_val (TypePath ('Int'))
+              )
+              (ExprId 'arr1')
+              (ExprInt 40 '40')
+              (ExprSelect
+                :target (ExprId 'sort')
+                :field 'intCompare'
+              )
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printInt')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'sort')
+              :field 'bisectRight'
+            )
+            :args (
+              (TypeArgument
+                :type_val (TypePath ('Int'))
+              )
+              (ExprId 'arr1')
+              (ExprInt 50 '50')
+              (ExprSelect
+                :target (ExprId 'sort')
+                :field 'intCompare'
+              )
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printNewline')
+        :args (
+          (ExprInt 0 '0')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printInt')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'sort')
+              :field 'bisectLeft'
+            )
+            :args (
+              (TypeArgument
+                :type_val (TypePath ('Int'))
+              )
+              (ExprId 'arr1')
+              (ExprInt 5 '5')
+              (ExprSelect
+                :target (ExprId 'sort')
+                :field 'intCompare'
+              )
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printInt')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'sort')
+              :field 'bisectLeft'
+            )
+            :args (
+              (TypeArgument
+                :type_val (TypePath ('Int'))
+              )
+              (ExprId 'arr1')
+              (ExprInt 10 '10')
+              (ExprSelect
+                :target (ExprId 'sort')
+                :field 'intCompare'
+              )
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printInt')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'sort')
+              :field 'bisectLeft'
+            )
+            :args (
+              (TypeArgument
+                :type_val (TypePath ('Int'))
+              )
+              (ExprId 'arr1')
+              (ExprInt 20 '20')
+              (ExprSelect
+                :target (ExprId 'sort')
+                :field 'intCompare'
+              )
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printInt')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'sort')
+              :field 'bisectLeft'
+            )
+            :args (
+              (TypeArgument
+                :type_val (TypePath ('Int'))
+              )
+              (ExprId 'arr1')
+              (ExprInt 25 '25')
+              (ExprSelect
+                :target (ExprId 'sort')
+                :field 'intCompare'
+              )
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printInt')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'sort')
+              :field 'bisectLeft'
+            )
+            :args (
+              (TypeArgument
+                :type_val (TypePath ('Int'))
+              )
+              (ExprId 'arr1')
+              (ExprInt 40 '40')
+              (ExprSelect
+                :target (ExprId 'sort')
+                :field 'intCompare'
+              )
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printInt')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'sort')
+              :field 'bisectLeft'
+            )
+            :args (
+              (TypeArgument
+                :type_val (TypePath ('Int'))
+              )
+              (ExprId 'arr1')
+              (ExprInt 50 '50')
+              (ExprSelect
+                :target (ExprId 'sort')
+                :field 'intCompare'
+              )
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printNewline')
+        :args (
+          (ExprInt 0 '0')
+        )
+      )
+    )
+    (LetValueBinding
+      :name 's1'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'sort')
+          :field 'binarySearch'
+        )
+        :args (
+          (TypeArgument
+            :type_val (TypePath ('Int'))
+          )
+          (ExprId 'arr1')
+          (ExprInt 20 '20')
+          (ExprSelect
+            :target (ExprId 'sort')
+            :field 'intCompare'
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printBool')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'maybe')
+              :field 'isSome'
+            )
+            :args (
+              (TypeArgument
+                :type_val (TypePath ('Int'))
+              )
+              (ExprId 's1')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printInt')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'maybe')
+              :field 'unwrap'
+            )
+            :args (
+              (TypeArgument
+                :type_val (TypePath ('Int'))
+              )
+              (ExprId 's1')
+            )
+          )
+        )
+      )
+    )
+    (LetValueBinding
+      :name 's2'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'sort')
+          :field 'binarySearch'
+        )
+        :args (
+          (TypeArgument
+            :type_val (TypePath ('Int'))
+          )
+          (ExprId 'arr1')
+          (ExprInt 25 '25')
+          (ExprSelect
+            :target (ExprId 'sort')
+            :field 'intCompare'
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printBool')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'maybe')
+              :field 'isNone'
+            )
+            :args (
+              (TypeArgument
+                :type_val (TypePath ('Int'))
+              )
+              (ExprId 's2')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printNewline')
+        :args (
+          (ExprInt 0 '0')
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'vec1'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'vector')
+          :field 'new'
+        )
+        :args (
+          (TypeArgument
+            :type_val (TypePath ('Int'))
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'vector')
+          :field 'append'
+        )
+        :args (
+          (TypeArgument
+            :type_val (TypePath ('Int'))
+          )
+          (ExprId 'vec1')
+          (ExprInt 10 '10')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'vector')
+          :field 'append'
+        )
+        :args (
+          (TypeArgument
+            :type_val (TypePath ('Int'))
+          )
+          (ExprId 'vec1')
+          (ExprInt 20 '20')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'vector')
+          :field 'append'
+        )
+        :args (
+          (TypeArgument
+            :type_val (TypePath ('Int'))
+          )
+          (ExprId 'vec1')
+          (ExprInt 20 '20')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'vector')
+          :field 'append'
+        )
+        :args (
+          (TypeArgument
+            :type_val (TypePath ('Int'))
+          )
+          (ExprId 'vec1')
+          (ExprInt 30 '30')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printInt')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'sort')
+              :field 'bisectRightVector'
+            )
+            :args (
+              (TypeArgument
+                :type_val (TypePath ('Int'))
+              )
+              (ExprId 'vec1')
+              (ExprInt 20 '20')
+              (ExprSelect
+                :target (ExprId 'sort')
+                :field 'intCompare'
+              )
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printInt')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'sort')
+              :field 'bisectLeftVector'
+            )
+            :args (
+              (TypeArgument
+                :type_val (TypePath ('Int'))
+              )
+              (ExprId 'vec1')
+              (ExprInt 20 '20')
+              (ExprSelect
+                :target (ExprId 'sort')
+                :field 'intCompare'
+              )
+            )
+          )
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'sv1'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'sort')
+          :field 'binarySearchVector'
+        )
+        :args (
+          (TypeArgument
+            :type_val (TypePath ('Int'))
+          )
+          (ExprId 'vec1')
+          (ExprInt 30 '30')
+          (ExprSelect
+            :target (ExprId 'sort')
+            :field 'intCompare'
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printBool')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'maybe')
+              :field 'isSome'
+            )
+            :args (
+              (TypeArgument
+                :type_val (TypePath ('Int'))
+              )
+              (ExprId 'sv1')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printInt')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'maybe')
+              :field 'unwrap'
+            )
+            :args (
+              (TypeArgument
+                :type_val (TypePath ('Int'))
+              )
+              (ExprId 'sv1')
+            )
+          )
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'sv2'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'sort')
+          :field 'binarySearchVector'
+        )
+        :args (
+          (TypeArgument
+            :type_val (TypePath ('Int'))
+          )
+          (ExprId 'vec1')
+          (ExprInt 99 '99')
+          (ExprSelect
+            :target (ExprId 'sort')
+            :field 'intCompare'
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printBool')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'maybe')
+              :field 'isNone'
+            )
+            :args (
+              (TypeArgument
+                :type_val (TypePath ('Int'))
+              )
+              (ExprId 'sv2')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printNewline')
+        :args (
+          (ExprInt 0 '0')
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'toSort'
+      :value (ExprArrayRep
+        :count (ExprInt 8 '8')
+        :init_val (ExprInt 0 '0')
+      )
+    )
+    (ExprStmt
+      :expr (ExprInfix
+        :left (ExprIndex
+          :target (ExprId 'toSort')
+          :index (ExprInt 0 '0')
+        )
+        :op ':='
+        :right (ExprInt 50 '50')
+      )
+    )
+    (ExprStmt
+      :expr (ExprInfix
+        :left (ExprIndex
+          :target (ExprId 'toSort')
+          :index (ExprInt 1 '1')
+        )
+        :op ':='
+        :right (ExprInt 10 '10')
+      )
+    )
+    (ExprStmt
+      :expr (ExprInfix
+        :left (ExprIndex
+          :target (ExprId 'toSort')
+          :index (ExprInt 2 '2')
+        )
+        :op ':='
+        :right (ExprInt 40 '40')
+      )
+    )
+    (ExprStmt
+      :expr (ExprInfix
+        :left (ExprIndex
+          :target (ExprId 'toSort')
+          :index (ExprInt 3 '3')
+        )
+        :op ':='
+        :right (ExprInt 20 '20')
+      )
+    )
+    (ExprStmt
+      :expr (ExprInfix
+        :left (ExprIndex
+          :target (ExprId 'toSort')
+          :index (ExprInt 4 '4')
+        )
+        :op ':='
+        :right (ExprInt 10 '10')
+      )
+    )
+    (ExprStmt
+      :expr (ExprInfix
+        :left (ExprIndex
+          :target (ExprId 'toSort')
+          :index (ExprInt 5 '5')
+        )
+        :op ':='
+        :right (ExprInt 30 '30')
+      )
+    )
+    (ExprStmt
+      :expr (ExprInfix
+        :left (ExprIndex
+          :target (ExprId 'toSort')
+          :index (ExprInt 6 '6')
+        )
+        :op ':='
+        :right (ExprInt 20 '20')
+      )
+    )
+    (ExprStmt
+      :expr (ExprInfix
+        :left (ExprIndex
+          :target (ExprId 'toSort')
+          :index (ExprInt 7 '7')
+        )
+        :op ':='
+        :right (ExprInt 50 '50')
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'sort')
+          :field 'sort'
+        )
+        :args (
+          (TypeArgument
+            :type_val (TypePath ('Int'))
+          )
+          (ExprId 'toSort')
+          (ExprSelect
+            :target (ExprId 'sort')
+            :field 'intCompare'
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprFor
+        :var_name 'i'
+        :start (ExprInt 0 '0')
+        :stop (ExprInt 7 '7')
+        :body (ExprStmt
+          :expr (ExprApp
+            :func (ExprId 'printInt')
+            :args (
+              (ExprIndex
+                :target (ExprId 'toSort')
+                :index (ExprId 'i')
+              )
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printNewline')
+        :args (
+          (ExprInt 0 '0')
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'original'
+      :value (ExprArrayRep
+        :count (ExprInt 4 '4')
+        :init_val (ExprInt 0 '0')
+      )
+    )
+    (ExprStmt
+      :expr (ExprInfix
+        :left (ExprIndex
+          :target (ExprId 'original')
+          :index (ExprInt 0 '0')
+        )
+        :op ':='
+        :right (ExprInt 9 '9')
+      )
+    )
+    (ExprStmt
+      :expr (ExprInfix
+        :left (ExprIndex
+          :target (ExprId 'original')
+          :index (ExprInt 1 '1')
+        )
+        :op ':='
+        :right (ExprInt 3 '3')
+      )
+    )
+    (ExprStmt
+      :expr (ExprInfix
+        :left (ExprIndex
+          :target (ExprId 'original')
+          :index (ExprInt 2 '2')
+        )
+        :op ':='
+        :right (ExprInt 7 '7')
+      )
+    )
+    (ExprStmt
+      :expr (ExprInfix
+        :left (ExprIndex
+          :target (ExprId 'original')
+          :index (ExprInt 3 '3')
+        )
+        :op ':='
+        :right (ExprInt 1 '1')
+      )
+    )
+    (LetValueBinding
+      :name 'sortedArr'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'sort')
+          :field 'sorted'
+        )
+        :args (
+          (TypeArgument
+            :type_val (TypePath ('Int'))
+          )
+          (ExprId 'original')
+          (ExprSelect
+            :target (ExprId 'sort')
+            :field 'intCompare'
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprFor
+        :var_name 'i'
+        :start (ExprInt 0 '0')
+        :stop (ExprInt 3 '3')
+        :body (ExprStmt
+          :expr (ExprApp
+            :func (ExprId 'printInt')
+            :args (
+              (ExprIndex
+                :target (ExprId 'original')
+                :index (ExprId 'i')
+              )
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printString')
+        :args (
+          (ExprString '|' '"|"')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprFor
+        :var_name 'i'
+        :start (ExprInt 0 '0')
+        :stop (ExprInt 3 '3')
+        :body (ExprStmt
+          :expr (ExprApp
+            :func (ExprId 'printInt')
+            :args (
+              (ExprIndex
+                :target (ExprId 'sortedArr')
+                :index (ExprId 'i')
+              )
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printNewline')
+        :args (
+          (ExprInt 0 '0')
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'vec2'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'vector')
+          :field 'new'
+        )
+        :args (
+          (TypeArgument
+            :type_val (TypePath ('String'))
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'vector')
+          :field 'append'
+        )
+        :args (
+          (TypeArgument
+            :type_val (TypePath ('String'))
+          )
+          (ExprId 'vec2')
+          (ExprString 'banana' '"banana"')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'vector')
+          :field 'append'
+        )
+        :args (
+          (TypeArgument
+            :type_val (TypePath ('String'))
+          )
+          (ExprId 'vec2')
+          (ExprString 'apple' '"apple"')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'vector')
+          :field 'append'
+        )
+        :args (
+          (TypeArgument
+            :type_val (TypePath ('String'))
+          )
+          (ExprId 'vec2')
+          (ExprString 'cherry' '"cherry"')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'vector')
+          :field 'append'
+        )
+        :args (
+          (TypeArgument
+            :type_val (TypePath ('String'))
+          )
+          (ExprId 'vec2')
+          (ExprString 'date' '"date"')
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'vecSorted'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'sort')
+          :field 'sortedVector'
+        )
+        :args (
+          (TypeArgument
+            :type_val (TypePath ('String'))
+          )
+          (ExprId 'vec2')
+          (ExprSelect
+            :target (ExprId 'sort')
+            :field 'stringCompare'
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprFor
+        :var_name 'i'
+        :start (ExprInt 0 '0')
+        :stop (ExprInfix
+          :left (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'vector')
+              :field 'length'
+            )
+            :args (
+              (TypeArgument
+                :type_val (TypePath ('String'))
+              )
+              (ExprId 'vecSorted')
+            )
+          )
+          :op '-'
+          :right (ExprInt 1 '1')
+        )
+        :body (ExprStmt
+          :expr (ExprApp
+            :func (ExprId 'printString')
+            :args (
+              (ExprApp
+                :func (ExprSelect
+                  :target (ExprId 'vector')
+                  :field 'get'
+                )
+                :args (
+                  (TypeArgument
+                    :type_val (TypePath ('String'))
+                  )
+                  (ExprId 'vecSorted')
+                  (ExprId 'i')
+                )
+              )
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printNewline')
+        :args (
+          (ExprInt 0 '0')
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'revStr'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'sort')
+          :field 'reverse'
+        )
+        :args (
+          (TypeArgument
+            :type_val (TypePath ('String'))
+          )
+          (ExprSelect
+            :target (ExprId 'sort')
+            :field 'stringCompare'
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'sort')
+          :field 'sortVector'
+        )
+        :args (
+          (TypeArgument
+            :type_val (TypePath ('String'))
+          )
+          (ExprId 'vec2')
+          (ExprId 'revStr')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprFor
+        :var_name 'i'
+        :start (ExprInt 0 '0')
+        :stop (ExprInfix
+          :left (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'vector')
+              :field 'length'
+            )
+            :args (
+              (TypeArgument
+                :type_val (TypePath ('String'))
+              )
+              (ExprId 'vec2')
+            )
+          )
+          :op '-'
+          :right (ExprInt 1 '1')
+        )
+        :body (ExprStmt
+          :expr (ExprApp
+            :func (ExprId 'printString')
+            :args (
+              (ExprApp
+                :func (ExprSelect
+                  :target (ExprId 'vector')
+                  :field 'get'
+                )
+                :args (
+                  (TypeArgument
+                    :type_val (TypePath ('String'))
+                  )
+                  (ExprId 'vec2')
+                  (ExprId 'i')
+                )
+              )
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printNewline')
+        :args (
+          (ExprInt 0 '0')
+        )
+      )
+    )
+  )
+)
