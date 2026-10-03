@@ -1008,6 +1008,7 @@ When an interface `x.int.quest` is compiled (`quest -c x.int.quest`), the compil
 ---
 
 ## See Also
+- [name-mangling.md](name-mangling.md): Comprehensive specification of compiler-generated C identifiers.
 - [codegen-c.md](codegen-c.md): C Code Generator architecture, AST lowering, and compiler runner.
 - [pipeline.md](pipeline.md): Compiler pipeline passes and dual-pipeline CLI driver.
 - [runtime-design.md](runtime-design.md): Evidence Passing vs. Fat Pointers and AAPCS64 register ABI.

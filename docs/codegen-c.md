@@ -52,21 +52,20 @@ Quest scalar types map to native C99 types defined in `runtime/quest_runtime.h`:
 | `Ok` | `void` / `QVal` | Statement completion indicator (`Q_OK_VAL`) |
 | Polymorphic / Generic | `QVal` | Uniform 64-bit value word union |
 
-### 2.2. Identifier Namespacing
-To prevent collisions with C99 keywords (`int`, `return`, `default`, `static`, etc.) and libc symbols:
-- **Value and variable names** are prefixed with `qv_`:
-  - `let x = 10` $ightarrow$ `QInt qv_x = 10LL;`
-  - `let x = 10` $\rightarrow$ `QInt qv_x = 10LL;`
-  - `let default = true` $\rightarrow$ `QBool qv_default = true;`
-- **Temporary variable names** are generated uniquely with fresh counters:
-  - `_res_1`, `_if_res_2`, `_div_r_3`
+### 2.2. Identifier Namespacing and Name Mangling
+To prevent collisions with C99 keywords (`int`, `return`, `default`, `static`, etc.), standard library symbols,
+and C struct member keywords, Quest applies a comprehensive, deterministic name mangling scheme:
+- **Value and variable names** are prefixed with `qv_` (e.g. `qv_x`, `qv_default`).
+- **Record field names** inside C structs are prefixed with `qf_` (e.g. `qf_default`, `qf_x`).
+- **Hierarchical module paths** are flattened using `__` (e.g. `util/path` $\rightarrow$ `util__path`).
+- **Symbolic operators** are mapped via `SYMBOL_MANGLE_MAP` with prefix `qv_sym_`
+  (e.g. `:=` $\rightarrow$ `qv_sym_colon_equals`).
+- **Temporary variable names** are generated uniquely with fresh counters (e.g. `_res_1`, `_tuple_2`).
 
-### 2.3. Operator Mangling
-When operators appear as first-class functions or bindings, they are mangled with the prefix `qv_sym_`:
-- `+` $\rightarrow$ `qv_sym_plus`
-- `++` $\rightarrow$ `qv_sym_plus_plus`
-- `<>` $\rightarrow$ `qv_sym_lt_gt`
-- `:=` $\rightarrow$ `qv_sym_colon_equals`
+> [!NOTE]
+> For the complete, definitive specification of all generated C identifiers—including external ABI symbols,
+> static module initializers, lifted lambdas, closure environments, struct tags, evidence dictionaries,
+> runtime type descriptors, and local temporaries—see [docs/name-mangling.md](name-mangling.md).
 
 ---
 
