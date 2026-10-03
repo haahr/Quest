@@ -11,10 +11,13 @@ Tests ModuleManifest serialization, deserialization, and staleness evaluations:
 from __future__ import annotations
 
 import os
+import sys
 import tempfile
 import time
 import unittest
 from pathlib import Path
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "bootstrap", "python"))
 
 from quest.build.manifest import (
     ImportedInterfaceRef,

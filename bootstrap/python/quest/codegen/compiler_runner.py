@@ -180,3 +180,49 @@ def compile_c_to_object(
         )
     return target_obj
 
+
+def link_objects(
+    objects: list[Path | str],
+    output_binary: Path | str,
+    nogc: bool = False,
+    compiler_path: Optional[str] = None,
+    extra_flags: Optional[list[str]] = None,
+) -> Path:
+    """Links object files and runtime C sources into an executable binary."""
+    target_bin = Path(output_binary)
+    target_bin.parent.mkdir(parents=True, exist_ok=True)
+    compiler = compiler_path or find_c_compiler()
+    runtime_dir = get_runtime_dir()
+    runtime_c = runtime_dir / "quest_runtime.c"
+    serialization_c = runtime_dir / "quest_serialization.c"
+
+    cmd = [
+        compiler,
+        "-std=c99",
+        "-pedantic-errors",
+        "-Wall",
+        "-Wextra",
+        "-O2",
+        f"-I{runtime_dir}",
+        str(runtime_c),
+        str(serialization_c),
+    ]
+    cmd.extend(str(obj) for obj in objects)
+    cmd.extend([
+        "-o",
+        str(target_bin),
+    ])
+    cmd.extend(detect_gc_flags(nogc=nogc))
+    if extra_flags:
+        cmd.extend(extra_flags)
+
+    proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    if proc.returncode != 0:
+        raise RuntimeError(
+            f"Linker failed with exit code {proc.returncode}:\n"
+            f"Command: {' '.join(cmd)}\n"
+            f"{proc.stderr}"
+        )
+    return target_bin
+
+

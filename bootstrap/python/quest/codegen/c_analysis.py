@@ -525,11 +525,6 @@ def analyze_program_for_c(
                         if key:
                             all_module_map[key] = stub_mod
 
-    has_precompiled = any(getattr(m, "is_precompiled", False) for m in all_module_map.values())
-    if has_precompiled:
-        for bmod in known_builtins:
-            if bmod not in needed_builtin_modules:
-                needed_builtin_modules.append(bmod)
 
     linked_stems = {
         obj.stem
@@ -539,11 +534,19 @@ def analyze_program_for_c(
         )
     } if env is not None else set()
 
+    current_unit_modules = {phrase.name for phrase in prog.phrases if isinstance(phrase, TypedModule)}
+    from quest.module_loader import is_c_compilation_mode
+    is_c_mode = env is not None and is_c_compilation_mode(env)
+
     for bmod in needed_builtin_modules:
         if bmod not in all_module_map:
             bast = BuiltinModuleRegistry.get_module_ast(bmod)
             if bast is not None:
-                if bmod in linked_stems or (env and bmod in env.precompiled_modules):
+                if bmod != "dynamic" and (
+                    bmod in linked_stems
+                    or (env and bmod in env.precompiled_modules)
+                    or (is_c_mode and bmod not in current_unit_modules)
+                ):
                     from dataclasses import replace
                     bast = replace(bast, is_precompiled=True)
                 all_module_map[bmod] = bast
@@ -559,7 +562,11 @@ def analyze_program_for_c(
                             if iname in known_builtins and iname not in all_module_map:
                                 bast = BuiltinModuleRegistry.get_module_ast(iname)
                                 if bast is not None:
-                                    if iname in linked_stems or (env and iname in env.precompiled_modules):
+                                    if iname != "dynamic" and (
+                                        iname in linked_stems
+                                        or (env and iname in env.precompiled_modules)
+                                        or (is_c_mode and iname not in current_unit_modules)
+                                    ):
                                         from dataclasses import replace
                                         bast = replace(bast, is_precompiled=True)
                                     all_module_map[iname] = bast
@@ -568,14 +575,29 @@ def analyze_program_for_c(
                                     changed = True
 
     for k, mod in list(all_module_map.items()):
-        if not getattr(mod, "is_precompiled", False):
+        if not getattr(mod, "is_precompiled", False) and mod.name != "dynamic":
             if (
                 mod.name.lower() in linked_stems
                 or mangle_module_name(mod.name) in linked_stems
                 or (env and (mod.name in env.precompiled_modules or mod.name.lower() in env.precompiled_modules))
+                or (is_c_mode and mod.name not in current_unit_modules)
             ):
                 from dataclasses import replace
                 all_module_map[k] = replace(mod, is_precompiled=True)
+
+    if env is not None:
+        from quest.module_loader import (
+            _load_precompiled_transitive_deps,
+            resolve_object_file,
+        )
+        for mod in all_module_map.values():
+            if getattr(mod, "is_precompiled", False):
+                obj = resolve_object_file(mod.name, env.current_dir, env.include_paths)
+                if obj is not None and obj.is_file():
+                    if obj not in env.linked_objects:
+                        env.linked_objects.append(obj)
+                    env.precompiled_modules.add(mod.name)
+                    _load_precompiled_transitive_deps(obj, None, env, None)
 
     sorted_modules = topological_sort_modules(list(all_module_map.values()))
 

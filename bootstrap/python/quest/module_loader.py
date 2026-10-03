@@ -421,38 +421,47 @@ def _load_precompiled_transitive_deps(
     file_path: Optional[Path],
     env: Environment,
     out_root: Optional[Path] = None,
+    visited: Optional[set[Path]] = None,
 ) -> None:
     """Discovers and loads transitive module dependencies from a .d file or fallback source."""
+    if obj_file is None or not obj_file.is_file():
+        return
+    if visited is None:
+        visited = set()
+    obj_resolved = obj_file.resolve()
+    if obj_resolved in visited:
+        return
+    visited.add(obj_resolved)
+
     # 1. Try reading from .qm manifest first
-    if obj_file is not None and obj_file.is_file():
-        qm_cand = obj_file.with_suffix(".qm")
-        if qm_cand.is_file():
-            from quest.build.manifest import read_qm
-            manifest = read_qm(qm_cand)
-            if manifest:
-                for imp_m in manifest.imported_modules:
-                    mod_name = imp_m.name
-                    dep_obj: Optional[Path] = None
-                    if out_root is not None:
-                        cand = out_root / f"{mod_name.lower()}.o"
+    qm_cand = obj_file.with_suffix(".qm")
+    if qm_cand.is_file():
+        from quest.build.manifest import read_qm
+        manifest = read_qm(qm_cand)
+        if manifest:
+            for imp_m in manifest.imported_modules:
+                mod_name = imp_m.name
+                dep_obj: Optional[Path] = None
+                if out_root is not None:
+                    cand = out_root / f"{mod_name.lower()}.o"
+                    if cand.is_file():
+                        dep_obj = cand.resolve()
+                if dep_obj is None and env.current_dir is not None:
+                    cand = env.current_dir / f"{mod_name.lower()}.o"
+                    if cand.is_file():
+                        dep_obj = cand.resolve()
+                if dep_obj is None:
+                    for inc in env.include_paths:
+                        cand = Path(inc) / f"{mod_name.lower()}.o"
                         if cand.is_file():
                             dep_obj = cand.resolve()
-                    if dep_obj is None and env.current_dir is not None:
-                        cand = env.current_dir / f"{mod_name.lower()}.o"
-                        if cand.is_file():
-                            dep_obj = cand.resolve()
-                    if dep_obj is None:
-                        for inc in env.include_paths:
-                            cand = Path(inc) / f"{mod_name.lower()}.o"
-                            if cand.is_file():
-                                dep_obj = cand.resolve()
-                                break
-                    if dep_obj is not None and dep_obj.is_file():
-                        if dep_obj not in env.linked_objects:
-                            env.linked_objects.append(dep_obj)
-                        env.precompiled_modules.add(mod_name)
-                        _load_precompiled_transitive_deps(dep_obj, None, env, out_root)
-                return
+                            break
+                if dep_obj is not None and dep_obj.is_file():
+                    if dep_obj not in env.linked_objects:
+                        env.linked_objects.append(dep_obj)
+                    env.precompiled_modules.add(mod_name)
+                    _load_precompiled_transitive_deps(dep_obj, None, env, out_root, visited=visited)
+            return
 
     # 2. Fallback: try reading from .deps/<stem>.d (or alongside .o)
     if obj_file is not None and obj_file.is_file():
