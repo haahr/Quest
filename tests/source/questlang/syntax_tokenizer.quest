@@ -1,0 +1,114 @@
+(* Self-Hosted Quest Compiler: Test Tokenizer Module *)
+
+import
+    questlang/common/location : questlang/common/Location
+    questlang/common/diagbag : questlang/common/DiagBag
+    questlang/syntax/tokens : questlang/syntax/Tokens
+    questlang/syntax/tokenizer : questlang/syntax/Tokenizer
+    writer : Writer
+    conv : Conv
+;
+
+let wOut = writer.output;
+
+let printStr(s: String): Ok =
+    begin
+        writer.putString(wOut s);
+        writer.putString(wOut "\n");
+    end;
+
+let printInt(n: Int): Ok =
+    printStr(conv.int(n));
+
+let printBool(b: Bool): Ok =
+    printStr(conv.bool(b));
+
+(* =========================================================================
+ * 1. Tokenize Clean Program and Format Dump
+ * ========================================================================= *)
+
+let code1 =
+    "(* Sample Quest program *)\n" <>
+    "let rec fact(n: Int): Int =\n" <>
+    "    if n <= 1 then\n" <>
+    "        1\n" <>
+    "    else\n" <>
+    "        { n * fact(n - 1) };\n";
+
+let sm1 = location.newSourceMap("fact.quest" code1);
+let bag1 = diagbag.new();
+let tk1 = tokenizer.new(sm1 bag1);
+
+let allTokens = tokenizer.tokenizeAll(tk1);
+let dump1 = tokenizer.formatDump(allTokens sm1 false);
+printStr(dump1);
+printBool(diagbag.hasErrors(bag1));
+printInt(diagbag.errorCount(bag1));
+
+(* =========================================================================
+ * 2. NextToken and PeekToken
+ * ========================================================================= *)
+
+let code2 = "let x = 42;";
+let sm2 = location.newSourceMap("peek.quest" code2);
+let bag2 = diagbag.new();
+let tk2 = tokenizer.new(sm2 bag2);
+
+let p1 = tokenizer.peekToken(tk2);
+printStr(tokens.tokenKindName(p1.kind));
+printStr(p1.lexeme);
+
+let t1 = tokenizer.nextToken(tk2);
+printStr(tokens.tokenKindName(t1.kind));
+printStr(t1.lexeme);
+
+let p2 = tokenizer.peekToken(tk2);
+printStr(tokens.tokenKindName(p2.kind));
+printStr(p2.lexeme);
+
+let t2 = tokenizer.nextToken(tk2);
+printStr(tokens.tokenKindName(t2.kind));
+printStr(t2.lexeme);
+
+(* =========================================================================
+ * 3. Literals: Integers, Reals, Characters, Strings, Nested Comments
+ * ========================================================================= *)
+
+let code3 =
+    "0 42 ~100 3.14 1.5e-3 ~2.0E+2\n" <>
+    "'a' '\\n' '\\t' '\\'' '\\\\' '\\x41' '\\065'\n" <>
+    "\"hello\" \"with \\\"quotes\\\" and \\n newline\"\n" <>
+    "(* outer (* nested level 2 (* nested 3 *) *) back *)\n" <>
+    "ident_1 _validIdent == !=\n";
+
+let sm3 = location.newSourceMap("literals.quest" code3);
+let bag3 = diagbag.new();
+let tk3 = tokenizer.new(sm3 bag3);
+
+let tokens3 = tokenizer.tokenizeAll(tk3);
+printStr(tokenizer.formatDump(tokens3 sm3 false));
+printBool(diagbag.hasErrors(bag3));
+
+(* =========================================================================
+ * 4. Lexical Error Recovery (Option A: Accumulate and Continue)
+ * ========================================================================= *)
+
+let codeErr =
+    "let valid = 1;\n" <>
+    "\"unclosed string literal\n" <>
+    "let alsoValid = 2;\n" <>
+    "'\\z' (* invalid char escape *)\n" <>
+    "'too long'\n" <>
+    "let final = 3;\n";
+
+let smErr = location.newSourceMap("error_recovery.quest" codeErr);
+let bagErr = diagbag.new();
+let tkErr = tokenizer.new(smErr bagErr);
+
+let tokensErr = tokenizer.tokenizeAll(tkErr);
+printStr(tokenizer.formatDump(tokensErr smErr false));
+printBool(diagbag.hasErrors(bagErr));
+printInt(diagbag.errorCount(bagErr));
+
+printStr("--- Diagnostics Rendered ---");
+diagbag.renderAll(bagErr smErr wOut);

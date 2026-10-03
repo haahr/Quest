@@ -1,0 +1,1167 @@
+(Program
+  :phrases (
+    (ImportPhrase
+      :items (
+        (ImportItem ('location') 'Location' ('questlang/common/location') 'questlang/common/Location')
+        (ImportItem ('tokens') 'Tokens' ('questlang/syntax/tokens') 'questlang/syntax/Tokens')
+        (ImportItem ('writer') 'Writer')
+        (ImportItem ('conv') 'Conv')
+      )
+    )
+    (LetValueBinding
+      :name 'wOut'
+      :value (ExprSelect
+        :target (ExprId 'writer')
+        :field 'output'
+      )
+    )
+    (LetValueBinding
+      :name 'printStr'
+      :value (ExprBlock
+        :bindings (
+          (ExprStmt
+            :expr (ExprApp
+              :func (ExprSelect
+                :target (ExprId 'writer')
+                :field 'putString'
+              )
+              :args (
+                (ExprId 'wOut')
+                (ExprId 's')
+              )
+            )
+          )
+          (ExprStmt
+            :expr (ExprApp
+              :func (ExprSelect
+                :target (ExprId 'writer')
+                :field 'putString'
+              )
+              :args (
+                (ExprId 'wOut')
+                (ExprString '\n' '"\\n"')
+              )
+            )
+          )
+        )
+      )
+      :params (
+        (FormalParam
+          :name 's'
+          :type_annot (TypePath ('String'))
+          :mode VALUE
+        )
+      )
+      :type_annot (TypePath ('Ok'))
+    )
+    (LetValueBinding
+      :name 'printInt'
+      :value (ExprApp
+        :func (ExprId 'printStr')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'conv')
+              :field 'int'
+            )
+            :args (
+              (ExprId 'n')
+            )
+          )
+        )
+      )
+      :params (
+        (FormalParam
+          :name 'n'
+          :type_annot (TypePath ('Int'))
+          :mode VALUE
+        )
+      )
+      :type_annot (TypePath ('Ok'))
+    )
+    (LetValueBinding
+      :name 'printReal'
+      :value (ExprApp
+        :func (ExprId 'printStr')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'conv')
+              :field 'real'
+            )
+            :args (
+              (ExprId 'r')
+            )
+          )
+        )
+      )
+      :params (
+        (FormalParam
+          :name 'r'
+          :type_annot (TypePath ('Real'))
+          :mode VALUE
+        )
+      )
+      :type_annot (TypePath ('Ok'))
+    )
+    (LetValueBinding
+      :name 'printChar'
+      :value (ExprApp
+        :func (ExprId 'printStr')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'conv')
+              :field 'char'
+            )
+            :args (
+              (ExprId 'c')
+            )
+          )
+        )
+      )
+      :params (
+        (FormalParam
+          :name 'c'
+          :type_annot (TypePath ('Char'))
+          :mode VALUE
+        )
+      )
+      :type_annot (TypePath ('Ok'))
+    )
+    (LetValueBinding
+      :name 'printBool'
+      :value (ExprApp
+        :func (ExprId 'printStr')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'conv')
+              :field 'bool'
+            )
+            :args (
+              (ExprId 'b')
+            )
+          )
+        )
+      )
+      :params (
+        (FormalParam
+          :name 'b'
+          :type_annot (TypePath ('Bool'))
+          :mode VALUE
+        )
+      )
+      :type_annot (TypePath ('Ok'))
+    )
+    (LetValueBinding
+      :name 'sp1'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'location')
+          :field 'span'
+        )
+        :args (
+          (ExprString 'test.quest' '"test.quest"')
+          (ExprInt 0 '0')
+          (ExprInt 3 '3')
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'tokLet'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'tokens')
+          :field 'make'
+        )
+        :args (
+          (ExprOption
+            :tag 'kwLet'
+            :option_type (TypePath ('tokens' 'TokenKind'))
+          )
+          (ExprString 'let' '"let"')
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'tokens')
+              :field 'valNone'
+            )
+          )
+          (ExprId 'sp1')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printStr')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'tokens')
+              :field 'tokenKindName'
+            )
+            :args (
+              (ExprSelect
+                :target (ExprId 'tokLet')
+                :field 'kind'
+              )
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printStr')
+        :args (
+          (ExprSelect
+            :target (ExprId 'tokLet')
+            :field 'lexeme'
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printInt')
+        :args (
+          (ExprSelect
+            :target (ExprSelect
+              :target (ExprId 'tokLet')
+              :field 'span'
+            )
+            :field 'startOffset'
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printInt')
+        :args (
+          (ExprSelect
+            :target (ExprSelect
+              :target (ExprId 'tokLet')
+              :field 'span'
+            )
+            :field 'endOffset'
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printBool')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'tokens')
+              :field 'isKeyword'
+            )
+            :args (
+              (ExprSelect
+                :target (ExprId 'tokLet')
+                :field 'kind'
+              )
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printBool')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'tokens')
+              :field 'isLiteral'
+            )
+            :args (
+              (ExprSelect
+                :target (ExprId 'tokLet')
+                :field 'kind'
+              )
+            )
+          )
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'sp2'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'location')
+          :field 'span'
+        )
+        :args (
+          (ExprString 'test.quest' '"test.quest"')
+          (ExprInt 4 '4')
+          (ExprInt 7 '7')
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'tokIdent'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'tokens')
+          :field 'make'
+        )
+        :args (
+          (ExprOption
+            :tag 'ident'
+            :option_type (TypePath ('tokens' 'TokenKind'))
+          )
+          (ExprString 'foo' '"foo"')
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'tokens')
+              :field 'valNone'
+            )
+          )
+          (ExprId 'sp2')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printStr')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'tokens')
+              :field 'tokenKindName'
+            )
+            :args (
+              (ExprSelect
+                :target (ExprId 'tokIdent')
+                :field 'kind'
+              )
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printStr')
+        :args (
+          (ExprSelect
+            :target (ExprId 'tokIdent')
+            :field 'lexeme'
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printBool')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'tokens')
+              :field 'isKeyword'
+            )
+            :args (
+              (ExprSelect
+                :target (ExprId 'tokIdent')
+                :field 'kind'
+              )
+            )
+          )
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'sp3'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'location')
+          :field 'span'
+        )
+        :args (
+          (ExprString 'test.quest' '"test.quest"')
+          (ExprInt 8 '8')
+          (ExprInt 10 '10')
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'tokInt'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'tokens')
+          :field 'make'
+        )
+        :args (
+          (ExprOption
+            :tag 'intLit'
+            :option_type (TypePath ('tokens' 'TokenKind'))
+          )
+          (ExprString '42' '"42"')
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'tokens')
+              :field 'valInt'
+            )
+            :args (
+              (ExprInt 42 '42')
+            )
+          )
+          (ExprId 'sp3')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printStr')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'tokens')
+              :field 'tokenKindName'
+            )
+            :args (
+              (ExprSelect
+                :target (ExprId 'tokInt')
+                :field 'kind'
+              )
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printStr')
+        :args (
+          (ExprSelect
+            :target (ExprId 'tokInt')
+            :field 'lexeme'
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printBool')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'tokens')
+              :field 'isLiteral'
+            )
+            :args (
+              (ExprSelect
+                :target (ExprId 'tokInt')
+                :field 'kind'
+              )
+            )
+          )
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'vInt'
+      :value (ExprSelect
+        :target (ExprId 'tokInt')
+        :field 'value'
+      )
+    )
+    (ExprStmt
+      :expr (ExprIf
+        :cond (ExprVariantCheck
+          :target (ExprId 'vInt')
+          :tag 'intVal'
+        )
+        :then_branch (ExprStmt
+          :expr (ExprApp
+            :func (ExprId 'printInt')
+            :args (
+              (ExprSelect
+                :target (ExprVariantAssert
+                  :target (ExprId 'vInt')
+                  :tag 'intVal'
+                )
+                :field 'val'
+              )
+            )
+          )
+        )
+        :else_branch (ExprStmt
+          :expr (ExprApp
+            :func (ExprId 'printStr')
+            :args (
+              (ExprString 'not int' '"not int"')
+            )
+          )
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'sp4'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'location')
+          :field 'span'
+        )
+        :args (
+          (ExprString 'test.quest' '"test.quest"')
+          (ExprInt 11 '11')
+          (ExprInt 15 '15')
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'tokReal'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'tokens')
+          :field 'make'
+        )
+        :args (
+          (ExprOption
+            :tag 'realLit'
+            :option_type (TypePath ('tokens' 'TokenKind'))
+          )
+          (ExprString '3.14' '"3.14"')
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'tokens')
+              :field 'valReal'
+            )
+            :args (
+              (ExprReal 3.14 '3.14')
+            )
+          )
+          (ExprId 'sp4')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printStr')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'tokens')
+              :field 'tokenKindName'
+            )
+            :args (
+              (ExprSelect
+                :target (ExprId 'tokReal')
+                :field 'kind'
+              )
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printStr')
+        :args (
+          (ExprSelect
+            :target (ExprId 'tokReal')
+            :field 'lexeme'
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printBool')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'tokens')
+              :field 'isLiteral'
+            )
+            :args (
+              (ExprSelect
+                :target (ExprId 'tokReal')
+                :field 'kind'
+              )
+            )
+          )
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'vReal'
+      :value (ExprSelect
+        :target (ExprId 'tokReal')
+        :field 'value'
+      )
+    )
+    (ExprStmt
+      :expr (ExprIf
+        :cond (ExprVariantCheck
+          :target (ExprId 'vReal')
+          :tag 'realVal'
+        )
+        :then_branch (ExprStmt
+          :expr (ExprApp
+            :func (ExprId 'printReal')
+            :args (
+              (ExprSelect
+                :target (ExprVariantAssert
+                  :target (ExprId 'vReal')
+                  :tag 'realVal'
+                )
+                :field 'val'
+              )
+            )
+          )
+        )
+        :else_branch (ExprStmt
+          :expr (ExprApp
+            :func (ExprId 'printStr')
+            :args (
+              (ExprString 'not real' '"not real"')
+            )
+          )
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'sp5'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'location')
+          :field 'span'
+        )
+        :args (
+          (ExprString 'test.quest' '"test.quest"')
+          (ExprInt 16 '16')
+          (ExprInt 19 '19')
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'tokChar'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'tokens')
+          :field 'make'
+        )
+        :args (
+          (ExprOption
+            :tag 'charLit'
+            :option_type (TypePath ('tokens' 'TokenKind'))
+          )
+          (ExprString "'Z'" '"\'Z\'"')
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'tokens')
+              :field 'valChar'
+            )
+            :args (
+              (ExprChar 'Z' "'Z'")
+            )
+          )
+          (ExprId 'sp5')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printStr')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'tokens')
+              :field 'tokenKindName'
+            )
+            :args (
+              (ExprSelect
+                :target (ExprId 'tokChar')
+                :field 'kind'
+              )
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printStr')
+        :args (
+          (ExprSelect
+            :target (ExprId 'tokChar')
+            :field 'lexeme'
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printBool')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'tokens')
+              :field 'isLiteral'
+            )
+            :args (
+              (ExprSelect
+                :target (ExprId 'tokChar')
+                :field 'kind'
+              )
+            )
+          )
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'vChar'
+      :value (ExprSelect
+        :target (ExprId 'tokChar')
+        :field 'value'
+      )
+    )
+    (ExprStmt
+      :expr (ExprIf
+        :cond (ExprVariantCheck
+          :target (ExprId 'vChar')
+          :tag 'charVal'
+        )
+        :then_branch (ExprStmt
+          :expr (ExprApp
+            :func (ExprId 'printChar')
+            :args (
+              (ExprSelect
+                :target (ExprVariantAssert
+                  :target (ExprId 'vChar')
+                  :tag 'charVal'
+                )
+                :field 'val'
+              )
+            )
+          )
+        )
+        :else_branch (ExprStmt
+          :expr (ExprApp
+            :func (ExprId 'printStr')
+            :args (
+              (ExprString 'not char' '"not char"')
+            )
+          )
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'sp6'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'location')
+          :field 'span'
+        )
+        :args (
+          (ExprString 'test.quest' '"test.quest"')
+          (ExprInt 20 '20')
+          (ExprInt 27 '27')
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'tokStr'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'tokens')
+          :field 'make'
+        )
+        :args (
+          (ExprOption
+            :tag 'stringLit'
+            :option_type (TypePath ('tokens' 'TokenKind'))
+          )
+          (ExprString '"hello"' '"\\"hello\\""')
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'tokens')
+              :field 'valString'
+            )
+            :args (
+              (ExprString 'hello' '"hello"')
+            )
+          )
+          (ExprId 'sp6')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printStr')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'tokens')
+              :field 'tokenKindName'
+            )
+            :args (
+              (ExprSelect
+                :target (ExprId 'tokStr')
+                :field 'kind'
+              )
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printStr')
+        :args (
+          (ExprSelect
+            :target (ExprId 'tokStr')
+            :field 'lexeme'
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printBool')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'tokens')
+              :field 'isLiteral'
+            )
+            :args (
+              (ExprSelect
+                :target (ExprId 'tokStr')
+                :field 'kind'
+              )
+            )
+          )
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'vStr'
+      :value (ExprSelect
+        :target (ExprId 'tokStr')
+        :field 'value'
+      )
+    )
+    (ExprStmt
+      :expr (ExprIf
+        :cond (ExprVariantCheck
+          :target (ExprId 'vStr')
+          :tag 'stringVal'
+        )
+        :then_branch (ExprStmt
+          :expr (ExprApp
+            :func (ExprId 'printStr')
+            :args (
+              (ExprSelect
+                :target (ExprVariantAssert
+                  :target (ExprId 'vStr')
+                  :tag 'stringVal'
+                )
+                :field 'val'
+              )
+            )
+          )
+        )
+        :else_branch (ExprStmt
+          :expr (ExprApp
+            :func (ExprId 'printStr')
+            :args (
+              (ExprString 'not str' '"not str"')
+            )
+          )
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'sp7'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'location')
+          :field 'span'
+        )
+        :args (
+          (ExprString 'test.quest' '"test.quest"')
+          (ExprInt 28 '28')
+          (ExprInt 30 '30')
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'tokOp'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'tokens')
+          :field 'make'
+        )
+        :args (
+          (ExprOption
+            :tag 'symbolicInfix'
+            :option_type (TypePath ('tokens' 'TokenKind'))
+          )
+          (ExprString ':=' '":="')
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'tokens')
+              :field 'valNone'
+            )
+          )
+          (ExprId 'sp7')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printStr')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'tokens')
+              :field 'tokenKindName'
+            )
+            :args (
+              (ExprSelect
+                :target (ExprId 'tokOp')
+                :field 'kind'
+              )
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printStr')
+        :args (
+          (ExprSelect
+            :target (ExprId 'tokOp')
+            :field 'lexeme'
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printBool')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'tokens')
+              :field 'isDelimiter'
+            )
+            :args (
+              (ExprSelect
+                :target (ExprId 'tokOp')
+                :field 'kind'
+              )
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printBool')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'tokens')
+              :field 'isPunctuation'
+            )
+            :args (
+              (ExprSelect
+                :target (ExprId 'tokOp')
+                :field 'kind'
+              )
+            )
+          )
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'tokEof'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'tokens')
+          :field 'eofToken'
+        )
+        :args (
+          (ExprString 'test.quest' '"test.quest"')
+          (ExprInt 31 '31')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printStr')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'tokens')
+              :field 'tokenKindName'
+            )
+            :args (
+              (ExprSelect
+                :target (ExprId 'tokEof')
+                :field 'kind'
+              )
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printStr')
+        :args (
+          (ExprSelect
+            :target (ExprId 'tokEof')
+            :field 'lexeme'
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printInt')
+        :args (
+          (ExprSelect
+            :target (ExprSelect
+              :target (ExprId 'tokEof')
+              :field 'span'
+            )
+            :field 'startOffset'
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printInt')
+        :args (
+          (ExprSelect
+            :target (ExprSelect
+              :target (ExprId 'tokEof')
+              :field 'span'
+            )
+            :field 'endOffset'
+          )
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'kLparen'
+      :value (ExprOption
+        :tag 'lparen'
+        :option_type (TypePath ('tokens' 'TokenKind'))
+      )
+    )
+    (LetValueBinding
+      :name 'kColon'
+      :value (ExprOption
+        :tag 'colon'
+        :option_type (TypePath ('tokens' 'TokenKind'))
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printStr')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'tokens')
+              :field 'tokenKindName'
+            )
+            :args (
+              (ExprId 'kLparen')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printBool')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'tokens')
+              :field 'isDelimiter'
+            )
+            :args (
+              (ExprId 'kLparen')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printBool')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'tokens')
+              :field 'isPunctuation'
+            )
+            :args (
+              (ExprId 'kLparen')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printStr')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'tokens')
+              :field 'tokenKindName'
+            )
+            :args (
+              (ExprId 'kColon')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printBool')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'tokens')
+              :field 'isDelimiter'
+            )
+            :args (
+              (ExprId 'kColon')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printBool')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'tokens')
+              :field 'isPunctuation'
+            )
+            :args (
+              (ExprId 'kColon')
+            )
+          )
+        )
+      )
+    )
+  )
+)

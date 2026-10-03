@@ -1,0 +1,124 @@
+(* Self-Hosted Quest Compiler: Test Tokens Module *)
+
+import
+    questlang/common/location : questlang/common/Location
+    questlang/syntax/tokens : questlang/syntax/Tokens
+    writer : Writer
+    conv : Conv
+;
+
+let wOut = writer.output;
+
+let printStr(s: String): Ok =
+    begin
+        writer.putString(wOut s);
+        writer.putString(wOut "\n");
+    end;
+
+let printInt(n: Int): Ok =
+    printStr(conv.int(n));
+
+let printReal(r: Real): Ok =
+    printStr(conv.real(r));
+
+let printChar(c: Char): Ok =
+    printStr(conv.char(c));
+
+let printBool(b: Bool): Ok =
+    printStr(conv.bool(b));
+
+(* =========================================================================
+ * 1. Token Construction and Accessors
+ * ========================================================================= *)
+
+let sp1 = location.span("test.quest" 0 3);
+let tokLet = tokens.make(option kwLet of tokens.TokenKind end "let" tokens.valNone() sp1);
+
+printStr(tokens.tokenKindName(tokLet.kind));
+printStr(tokLet.lexeme);
+printInt(tokLet.span.startOffset);
+printInt(tokLet.span.endOffset);
+printBool(tokens.isKeyword(tokLet.kind));
+printBool(tokens.isLiteral(tokLet.kind));
+
+let sp2 = location.span("test.quest" 4 7);
+let tokIdent = tokens.make(option ident of tokens.TokenKind end "foo" tokens.valNone() sp2);
+printStr(tokens.tokenKindName(tokIdent.kind));
+printStr(tokIdent.lexeme);
+printBool(tokens.isKeyword(tokIdent.kind));
+
+let sp3 = location.span("test.quest" 8 10);
+let tokInt = tokens.make(option intLit of tokens.TokenKind end "42" tokens.valInt(42) sp3);
+printStr(tokens.tokenKindName(tokInt.kind));
+printStr(tokInt.lexeme);
+printBool(tokens.isLiteral(tokInt.kind));
+let vInt = tokInt.value;
+if vInt?intVal then
+    printInt(vInt!intVal.val)
+else
+    printStr("not int")
+end;
+
+let sp4 = location.span("test.quest" 11 15);
+let tokReal = tokens.make(option realLit of tokens.TokenKind end "3.14" tokens.valReal(3.14) sp4);
+printStr(tokens.tokenKindName(tokReal.kind));
+printStr(tokReal.lexeme);
+printBool(tokens.isLiteral(tokReal.kind));
+let vReal = tokReal.value;
+if vReal?realVal then
+    printReal(vReal!realVal.val)
+else
+    printStr("not real")
+end;
+
+let sp5 = location.span("test.quest" 16 19);
+let tokChar = tokens.make(option charLit of tokens.TokenKind end "'Z'" tokens.valChar('Z') sp5);
+printStr(tokens.tokenKindName(tokChar.kind));
+printStr(tokChar.lexeme);
+printBool(tokens.isLiteral(tokChar.kind));
+let vChar = tokChar.value;
+if vChar?charVal then
+    printChar(vChar!charVal.val)
+else
+    printStr("not char")
+end;
+
+let sp6 = location.span("test.quest" 20 27);
+let tokStr = tokens.make(option stringLit of tokens.TokenKind end "\"hello\"" tokens.valString("hello") sp6);
+printStr(tokens.tokenKindName(tokStr.kind));
+printStr(tokStr.lexeme);
+printBool(tokens.isLiteral(tokStr.kind));
+let vStr = tokStr.value;
+if vStr?stringVal then
+    printStr(vStr!stringVal.val)
+else
+    printStr("not str")
+end;
+
+let sp7 = location.span("test.quest" 28 30);
+let tokOp = tokens.make(option symbolicInfix of tokens.TokenKind end ":=" tokens.valNone() sp7);
+printStr(tokens.tokenKindName(tokOp.kind));
+printStr(tokOp.lexeme);
+printBool(tokens.isDelimiter(tokOp.kind));
+printBool(tokens.isPunctuation(tokOp.kind));
+
+let tokEof = tokens.eofToken("test.quest" 31);
+printStr(tokens.tokenKindName(tokEof.kind));
+printStr(tokEof.lexeme);
+printInt(tokEof.span.startOffset);
+printInt(tokEof.span.endOffset);
+
+(* =========================================================================
+ * 2. Delimiters, Punctuation, and Kind Names
+ * ========================================================================= *)
+
+let kLparen = option lparen of tokens.TokenKind end;
+let kColon = option colon of tokens.TokenKind end;
+
+printStr(tokens.tokenKindName(kLparen));
+printBool(tokens.isDelimiter(kLparen));
+printBool(tokens.isPunctuation(kLparen));
+
+printStr(tokens.tokenKindName(kColon));
+printBool(tokens.isDelimiter(kColon));
+printBool(tokens.isPunctuation(kColon));

@@ -194,7 +194,7 @@ def run_driver(args: list[str]) -> int:
             try:
                 include_paths = [Path(p) for p in parsed_args.include_paths]
                 build_dir = Path(parsed_args.build_dir) if parsed_args.build_dir else None
-                out_dir = build_dir or (Path(parsed_args.output).parent if parsed_args.output else None)
+                out_dir = Path(parsed_args.output).parent if parsed_args.output else None
                 if out_dir:
                     out_dir.mkdir(parents=True, exist_ok=True)
                 compile_interface_file(
@@ -212,7 +212,7 @@ def run_driver(args: list[str]) -> int:
             try:
                 include_paths = [Path(p) for p in parsed_args.include_paths]
                 build_dir = Path(parsed_args.build_dir) if parsed_args.build_dir else None
-                out_dir = Path(parsed_args.output).parent if parsed_args.output else build_dir
+                out_dir = Path(parsed_args.output).parent if parsed_args.output else None
                 if out_dir:
                     out_dir.mkdir(parents=True, exist_ok=True)
                 compile_module_file(
@@ -527,7 +527,7 @@ def run_compile(args: list[str]) -> int:
             try:
                 include_paths = [Path(p) for p in parsed_args.include_paths]
                 build_dir = Path(parsed_args.build_dir) if parsed_args.build_dir else None
-                out_dir = build_dir or (Path(parsed_args.output).parent if parsed_args.output else None)
+                out_dir = Path(parsed_args.output).parent if parsed_args.output else None
                 if out_dir:
                     out_dir.mkdir(parents=True, exist_ok=True)
                 compile_interface_file(
@@ -545,7 +545,7 @@ def run_compile(args: list[str]) -> int:
             try:
                 include_paths = [Path(p) for p in parsed_args.include_paths]
                 build_dir = Path(parsed_args.build_dir) if parsed_args.build_dir else None
-                out_dir = Path(parsed_args.output).parent if parsed_args.output else build_dir
+                out_dir = Path(parsed_args.output).parent if parsed_args.output else None
                 if out_dir:
                     out_dir.mkdir(parents=True, exist_ok=True)
                 compile_module_file(

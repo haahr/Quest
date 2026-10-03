@@ -54,7 +54,10 @@ from quest.types import (
     QTupleField,
     QTupleType,
     QType,
+    QTypeApp,
     QTypeVar,
+    QVarType,
+    QOutType,
     QVariantField,
     QVariantType,
 )
@@ -139,11 +142,21 @@ def format_type_for_qi(t: QType) -> str:
         return f"Variant {variants} end" if variants else "Variant end"
 
     if isinstance(t, QOptionType):
-        opts = " ".join(
-            f"{o.name} with {format_type_for_qi(o.payload_type)}" if o.payload_type is not None else o.name
-            for o in t.options
-        )
-        return f"Option {opts} end" if opts else "Option end"
+        opts: list[str] = []
+        for o in t.options:
+            if o.payload_type is not None:
+                if isinstance(o.payload_type, QTupleType):
+                    parts = [
+                        f"{f.name}: {format_type_for_qi(f.type_val)}" if f.name else format_type_for_qi(f.type_val)
+                        for f in o.payload_type.fields
+                    ]
+                    opts.append(f"{o.name} with {' '.join(parts)} end")
+                else:
+                    opts.append(f"{o.name} with {format_type_for_qi(o.payload_type)} end")
+            else:
+                opts.append(o.name)
+        opts_str = " ".join(opts)
+        return f"Option {opts_str} end" if opts_str else "Option end"
 
     if isinstance(t, QFunType):
         params_str = " ".join(
@@ -161,6 +174,19 @@ def format_type_for_qi(t: QType) -> str:
             )
             return f"All({quants_str} {params_str}) {format_type_for_qi(t.body.result_type)}"
         return f"All({quants_str}) {format_type_for_qi(t.body)}"
+
+    if isinstance(t, QTypeApp):
+        args_str = " ".join(format_type_for_qi(a) for a in t.arguments)
+        return f"{format_type_for_qi(t.constructor)}({args_str})"
+
+    if isinstance(t, QArrayType):
+        return f"Array({format_type_for_qi(t.element_type)})"
+
+    if isinstance(t, QVarType):
+        return f"Var({format_type_for_qi(t.value_type)})"
+
+    if isinstance(t, QOutType):
+        return f"Out({format_type_for_qi(t.value_type)})"
 
     return str(t)
 

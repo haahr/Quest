@@ -1,0 +1,29 @@
+(* Quest Self-Hosted Compiler: Lexical Analyzer Interface *)
+
+interface Tokenizer
+import
+    questlang/common/location : questlang/common/Location
+    questlang/common/diagbag : questlang/common/DiagBag
+    questlang/syntax/tokens : questlang/syntax/Tokens
+    collections/vector : collections/Vector
+export
+    (* Abstract tokenizer state type *)
+    T::TYPE
+
+    (* Create a new tokenizer for a given source map and diagnostic bag *)
+    new(sm: location.SourceMap bag: diagbag.T): T
+
+    (* Return the next token, advancing the stream *)
+    nextToken(tok: T): tokens.Token
+
+    (* Peek at the next token without advancing *)
+    peekToken(tok: T): tokens.Token
+
+    (* Tokenize the entire input stream into a vector of tokens ending with EOF *)
+    tokenizeAll(tok: T): vector.T(tokens.Token)
+
+    (* Format a list of tokens matching the canonical golden test output:
+     * <line>:<col>\t<KIND_NAME>\t<lexeme>
+     *)
+    formatDump(tokensList: vector.T(tokens.Token) sm: location.SourceMap showValues: Bool): String
+end;

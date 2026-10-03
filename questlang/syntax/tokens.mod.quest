@@ -1,0 +1,351 @@
+(* Quest Self-Hosted Compiler: Lexical Tokens Implementation *)
+
+module tokens : Tokens
+import
+    questlang/common/location : Location
+    util/maybe : Maybe
+export
+    Let TokenKind = Option
+        eof
+        intLit
+        realLit
+        charLit
+        stringLit
+        ident
+        symbolicInfix
+        lparen
+        rparen
+        lbracket
+        rbracket
+        lbrace
+        rbrace
+        comma
+        semicolon
+        dot
+        colon
+        colonColon
+        subtype
+        assign
+        equal
+        question
+        bang
+        at
+        underscore
+        kwType
+        kwPower
+        kwAllKind
+        kwDefKind
+        kwAll
+        kwArrayType
+        kwAutoType
+        kwDef
+        kwExceptionType
+        kwFunType
+        kwLetType
+        kwOptionType
+        kwOutType
+        kwRecType
+        kwRecordType
+        kwTupleType
+        kwVarType
+        kwVariantType
+        kwAnd
+        kwAndif
+        kwArray
+        kwAs
+        kwAuto
+        kwBegin
+        kwCase
+        kwDo
+        kwDownto
+        kwElse
+        kwElsif
+        kwEnd
+        kwException
+        kwExit
+        kwExport
+        kwExtent
+        kwExternal
+        kwFalse
+        kwFor
+        kwFun
+        kwIf
+        kwImport
+        kwInspect
+        kwInterface
+        kwIs
+        kwIsnot
+        kwLet
+        kwLoop
+        kwModule
+        kwNot
+        kwOf
+        kwOk
+        kwOption
+        kwOrdinal
+        kwOrif
+        kwOut
+        kwRaise
+        kwRec
+        kwRecord
+        kwThen
+        kwTrue
+        kwTry
+        kwTuple
+        kwUnsound
+        kwUpto
+        kwVar
+        kwVariant
+        kwWhen
+        kwWhile
+        kwWith
+    end;
+
+    Let TokenValue = Option
+        none
+        intVal with val: Int end
+        realVal with val: Real end
+        charVal with val: Char end
+        stringVal with val: String end
+    end;
+
+    Let Token = Tuple
+        kind: TokenKind
+        lexeme: String
+        value: TokenValue
+        span: location.Span
+    end;
+
+    let make(kind: TokenKind lexeme: String value: TokenValue span: location.Span): Token =
+        tuple
+            let kind = kind
+            let lexeme = lexeme
+            let value = value
+            let span = span
+        end;
+
+    let valNone(): TokenValue =
+        option none of TokenValue end;
+
+    let valInt(n: Int): TokenValue =
+        option intVal of TokenValue with let val = n end;
+
+    let valReal(r: Real): TokenValue =
+        option realVal of TokenValue with let val = r end;
+
+    let valChar(c: Char): TokenValue =
+        option charVal of TokenValue with let val = c end;
+
+    let valString(s: String): TokenValue =
+        option stringVal of TokenValue with let val = s end;
+
+    let eofToken(file: String offset: Int): Token =
+        make(option eof of TokenKind end "" valNone() location.pointSpan(file offset));
+
+    let tokenKindName(kind: TokenKind): String =
+        case kind
+            when eof then "EOF"
+            when intLit then "INT_LIT"
+            when realLit then "REAL_LIT"
+            when charLit then "CHAR_LIT"
+            when stringLit then "STRING_LIT"
+            when ident then "IDENT"
+            when symbolicInfix then "SYMBOLIC_INFIX"
+            when lparen then "LPAREN"
+            when rparen then "RPAREN"
+            when lbracket then "LBRACKET"
+            when rbracket then "RBRACKET"
+            when lbrace then "LBRACE"
+            when rbrace then "RBRACE"
+            when comma then "COMMA"
+            when semicolon then "SEMICOLON"
+            when dot then "DOT"
+            when colon then "COLON"
+            when colonColon then "COLON_COLON"
+            when subtype then "SUBTYPE"
+            when assign then "ASSIGN"
+            when equal then "EQUAL"
+            when question then "QUESTION"
+            when bang then "BANG"
+            when at then "AT"
+            when underscore then "UNDERSCORE"
+            when kwType then "KW_TYPE"
+            when kwPower then "KW_POWER"
+            when kwAllKind then "KW_ALL_KIND"
+            when kwDefKind then "KW_DEF_KIND"
+            when kwAll then "KW_ALL"
+            when kwArrayType then "KW_ARRAY_TYPE"
+            when kwAutoType then "KW_AUTO_TYPE"
+            when kwDef then "KW_DEF"
+            when kwExceptionType then "KW_EXCEPTION_TYPE"
+            when kwFunType then "KW_FUN_TYPE"
+            when kwLetType then "KW_LET_TYPE"
+            when kwOptionType then "KW_OPTION_TYPE"
+            when kwOutType then "KW_OUT_TYPE"
+            when kwRecType then "KW_REC_TYPE"
+            when kwRecordType then "KW_RECORD_TYPE"
+            when kwTupleType then "KW_TUPLE_TYPE"
+            when kwVarType then "KW_VAR_TYPE"
+            when kwVariantType then "KW_VARIANT_TYPE"
+            when kwAnd then "KW_AND"
+            when kwAndif then "KW_ANDIF"
+            when kwArray then "KW_ARRAY"
+            when kwAs then "KW_AS"
+            when kwAuto then "KW_AUTO"
+            when kwBegin then "KW_BEGIN"
+            when kwCase then "KW_CASE"
+            when kwDo then "KW_DO"
+            when kwDownto then "KW_DOWNTO"
+            when kwElse then "KW_ELSE"
+            when kwElsif then "KW_ELSIF"
+            when kwEnd then "KW_END"
+            when kwException then "KW_EXCEPTION"
+            when kwExit then "KW_EXIT"
+            when kwExport then "KW_EXPORT"
+            when kwExtent then "KW_EXTENT"
+            when kwExternal then "KW_EXTERNAL"
+            when kwFalse then "KW_FALSE"
+            when kwFor then "KW_FOR"
+            when kwFun then "KW_FUN"
+            when kwIf then "KW_IF"
+            when kwImport then "KW_IMPORT"
+            when kwInspect then "KW_INSPECT"
+            when kwInterface then "KW_INTERFACE"
+            when kwIs then "KW_IS"
+            when kwIsnot then "KW_ISNOT"
+            when kwLet then "KW_LET"
+            when kwLoop then "KW_LOOP"
+            when kwModule then "KW_MODULE"
+            when kwNot then "KW_NOT"
+            when kwOf then "KW_OF"
+            when kwOk then "KW_OK"
+            when kwOption then "KW_OPTION"
+            when kwOrdinal then "KW_ORDINAL"
+            when kwOrif then "KW_ORIF"
+            when kwOut then "KW_OUT"
+            when kwRaise then "KW_RAISE"
+            when kwRec then "KW_REC"
+            when kwRecord then "KW_RECORD"
+            when kwThen then "KW_THEN"
+            when kwTrue then "KW_TRUE"
+            when kwTry then "KW_TRY"
+            when kwTuple then "KW_TUPLE"
+            when kwUnsound then "KW_UNSOUND"
+            when kwUpto then "KW_UPTO"
+            when kwVar then "KW_VAR"
+            when kwVariant then "KW_VARIANT"
+            when kwWhen then "KW_WHEN"
+            when kwWhile then "KW_WHILE"
+            when kwWith then "KW_WITH"
+        end;
+
+    let isLiteral(kind: TokenKind): Bool =
+        case kind
+            when intLit then true
+            when realLit then true
+            when charLit then true
+            when stringLit then true
+            else false
+        end;
+
+    let isDelimiter(kind: TokenKind): Bool =
+        case kind
+            when lparen then true
+            when rparen then true
+            when lbracket then true
+            when rbracket then true
+            when lbrace then true
+            when rbrace then true
+            when comma then true
+            when semicolon then true
+            else false
+        end;
+
+    let isPunctuation(kind: TokenKind): Bool =
+        case kind
+            when dot then true
+            when colon then true
+            when colonColon then true
+            when subtype then true
+            when assign then true
+            when equal then true
+            when question then true
+            when bang then true
+            when at then true
+            when underscore then true
+            else false
+        end;
+
+    let isKeyword(kind: TokenKind): Bool =
+        case kind
+            when kwType then true
+            when kwPower then true
+            when kwAllKind then true
+            when kwDefKind then true
+            when kwAll then true
+            when kwArrayType then true
+            when kwAutoType then true
+            when kwDef then true
+            when kwExceptionType then true
+            when kwFunType then true
+            when kwLetType then true
+            when kwOptionType then true
+            when kwOutType then true
+            when kwRecType then true
+            when kwRecordType then true
+            when kwTupleType then true
+            when kwVarType then true
+            when kwVariantType then true
+            when kwAnd then true
+            when kwAndif then true
+            when kwArray then true
+            when kwAs then true
+            when kwAuto then true
+            when kwBegin then true
+            when kwCase then true
+            when kwDo then true
+            when kwDownto then true
+            when kwElse then true
+            when kwElsif then true
+            when kwEnd then true
+            when kwException then true
+            when kwExit then true
+            when kwExport then true
+            when kwExtent then true
+            when kwExternal then true
+            when kwFalse then true
+            when kwFor then true
+            when kwFun then true
+            when kwIf then true
+            when kwImport then true
+            when kwInspect then true
+            when kwInterface then true
+            when kwIs then true
+            when kwIsnot then true
+            when kwLet then true
+            when kwLoop then true
+            when kwModule then true
+            when kwNot then true
+            when kwOf then true
+            when kwOk then true
+            when kwOption then true
+            when kwOrdinal then true
+            when kwOrif then true
+            when kwOut then true
+            when kwRaise then true
+            when kwRec then true
+            when kwRecord then true
+            when kwThen then true
+            when kwTrue then true
+            when kwTry then true
+            when kwTuple then true
+            when kwUnsound then true
+            when kwUpto then true
+            when kwVar then true
+            when kwVariant then true
+            when kwWhen then true
+            when kwWhile then true
+            when kwWith then true
+            else false
+        end;
+end;

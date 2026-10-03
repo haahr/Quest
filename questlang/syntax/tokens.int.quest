@@ -1,0 +1,158 @@
+(* Quest Self-Hosted Compiler: Lexical Tokens Interface *)
+
+interface Tokens
+import
+    questlang/common/location : questlang/common/Location
+    util/maybe : util/Maybe
+export
+    (* Exhaustive enumeration of all lexical token kinds in Quest *)
+    Def TokenKind = Option
+        (* End of Stream *)
+        eof
+
+        (* Literals *)
+        intLit
+        realLit
+        charLit
+        stringLit
+
+        (* Identifiers & Symbolic Infix Operators *)
+        ident
+        symbolicInfix
+
+        (* Delimiters *)
+        lparen
+        rparen
+        lbracket
+        rbracket
+        lbrace
+        rbrace
+        comma
+        semicolon
+
+        (* Punctuation *)
+        dot
+        colon
+        colonColon
+        subtype
+        assign
+        equal
+        question
+        bang
+        at
+        underscore
+
+        (* Kind-Level Keywords (ALL CAPS) *)
+        kwType
+        kwPower
+        kwAllKind
+        kwDefKind
+
+        (* Type-Level Keywords (Initial Capital) *)
+        kwAll
+        kwArrayType
+        kwAutoType
+        kwDef
+        kwExceptionType
+        kwFunType
+        kwLetType
+        kwOptionType
+        kwOutType
+        kwRecType
+        kwRecordType
+        kwTupleType
+        kwVarType
+        kwVariantType
+
+        (* Value-Level Keywords (Lowercase) *)
+        kwAnd
+        kwAndif
+        kwArray
+        kwAs
+        kwAuto
+        kwBegin
+        kwCase
+        kwDo
+        kwDownto
+        kwElse
+        kwElsif
+        kwEnd
+        kwException
+        kwExit
+        kwExport
+        kwExtent
+        kwExternal
+        kwFalse
+        kwFor
+        kwFun
+        kwIf
+        kwImport
+        kwInspect
+        kwInterface
+        kwIs
+        kwIsnot
+        kwLet
+        kwLoop
+        kwModule
+        kwNot
+        kwOf
+        kwOk
+        kwOption
+        kwOrdinal
+        kwOrif
+        kwOut
+        kwRaise
+        kwRec
+        kwRecord
+        kwThen
+        kwTrue
+        kwTry
+        kwTuple
+        kwUnsound
+        kwUpto
+        kwVar
+        kwVariant
+        kwWhen
+        kwWhile
+        kwWith
+    end
+
+    (* Typed value payload for literal tokens *)
+    Def TokenValue = Option
+        none
+        intVal with val: Int end
+        realVal with val: Real end
+        charVal with val: Char end
+        stringVal with val: String end
+    end
+
+    (* Lexical token structure *)
+    Def Token = Tuple
+        kind: TokenKind
+        lexeme: String
+        value: TokenValue
+        span: location.Span
+    end
+
+    (* Construct a token *)
+    make(kind: TokenKind lexeme: String value: TokenValue span: location.Span): Token
+
+    (* TokenValue constructors *)
+    valNone(): TokenValue
+    valInt(n: Int): TokenValue
+    valReal(r: Real): TokenValue
+    valChar(c: Char): TokenValue
+    valString(s: String): TokenValue
+
+    (* Construct an EOF token at given file and offset *)
+    eofToken(file: String offset: Int): Token
+
+    (* Canonical uppercase name matching Python's TokenKind.name *)
+    tokenKindName(kind: TokenKind): String
+
+    (* Predicates *)
+    isKeyword(kind: TokenKind): Bool
+    isLiteral(kind: TokenKind): Bool
+    isDelimiter(kind: TokenKind): Bool
+    isPunctuation(kind: TokenKind): Bool
+end;

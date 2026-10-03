@@ -1,0 +1,717 @@
+(* Quest Self-Hosted Compiler: Lexical Analyzer Implementation *)
+
+module tokenizer : Tokenizer
+import
+    location = questlang/common/location : questlang/common/Location
+    diagbag = questlang/common/diagbag : questlang/common/DiagBag
+    tokens = questlang/syntax/tokens : questlang/syntax/Tokens
+    vector = collections/vector : collections/Vector
+    hashmap = collections/hashmap : collections/HashMap
+    hash = util/hash : util/Hash
+    maybe = util/maybe : util/Maybe
+    strutil = util/strutil : util/Strutil
+    stringBuilder = util/stringbuilder : util/StringBuilder
+    stringOp = string : StringOp
+    ascii : Ascii
+    conv : Conv
+export
+    Let T = Tuple
+        sm: location.SourceMap
+        bag: diagbag.T
+        file: String
+        text: String
+        textLen: Int
+        var cursor: Int
+        var peeked: maybe.T(tokens.Token)
+        keywords: hashmap.T(String tokens.TokenKind)
+        reservedPunc: hashmap.T(String tokens.TokenKind)
+    end;
+
+    (* Character classification helpers *)
+    let isSymbolicChar(c: Char): Bool =
+        strutil.contains("!#$%&*+-/:<=>?@\\^_`|~" stringOp.new(1 c));
+
+    let isHexDigit(c: Char): Bool =
+        begin
+            let code = ascii.val(c);
+            { { code >= 48 } andif { code <= 57 } } orif
+            { { code >= 65 } andif { code <= 70 } } orif
+            { { code >= 97 } andif { code <= 102 } }
+        end;
+
+    let hexVal(c: Char): Int =
+        begin
+            let code = ascii.val(c);
+            if { code >= 48 } andif { code <= 57 } then code - 48
+            elsif { code >= 65 } andif { code <= 70 } then code - 55
+            elsif { code >= 97 } andif { code <= 102 } then code - 87
+            else 0 end
+        end;
+
+    (* Build keyword map *)
+    let initKeywords(): hashmap.T(String tokens.TokenKind) =
+        begin
+            let m = hashmap.new(:String :tokens.TokenKind stringOp.equal hash.string);
+            (* Kind-level *)
+            hashmap.insert(:String :tokens.TokenKind m "TYPE" option kwType of tokens.TokenKind end);
+            hashmap.insert(:String :tokens.TokenKind m "POWER" option kwPower of tokens.TokenKind end);
+            hashmap.insert(:String :tokens.TokenKind m "ALL" option kwAllKind of tokens.TokenKind end);
+            hashmap.insert(:String :tokens.TokenKind m "DEF" option kwDefKind of tokens.TokenKind end);
+            (* Type-level *)
+            hashmap.insert(:String :tokens.TokenKind m "All" option kwAll of tokens.TokenKind end);
+            hashmap.insert(:String :tokens.TokenKind m "Array" option kwArrayType of tokens.TokenKind end);
+            hashmap.insert(:String :tokens.TokenKind m "Auto" option kwAutoType of tokens.TokenKind end);
+            hashmap.insert(:String :tokens.TokenKind m "Def" option kwDef of tokens.TokenKind end);
+            hashmap.insert(:String :tokens.TokenKind m "Exception" option kwExceptionType of tokens.TokenKind end);
+            hashmap.insert(:String :tokens.TokenKind m "Fun" option kwFunType of tokens.TokenKind end);
+            hashmap.insert(:String :tokens.TokenKind m "Let" option kwLetType of tokens.TokenKind end);
+            hashmap.insert(:String :tokens.TokenKind m "Option" option kwOptionType of tokens.TokenKind end);
+            hashmap.insert(:String :tokens.TokenKind m "Out" option kwOutType of tokens.TokenKind end);
+            hashmap.insert(:String :tokens.TokenKind m "Rec" option kwRecType of tokens.TokenKind end);
+            hashmap.insert(:String :tokens.TokenKind m "Record" option kwRecordType of tokens.TokenKind end);
+            hashmap.insert(:String :tokens.TokenKind m "Tuple" option kwTupleType of tokens.TokenKind end);
+            hashmap.insert(:String :tokens.TokenKind m "Var" option kwVarType of tokens.TokenKind end);
+            hashmap.insert(:String :tokens.TokenKind m "Variant" option kwVariantType of tokens.TokenKind end);
+            (* Value-level *)
+            hashmap.insert(:String :tokens.TokenKind m "and" option kwAnd of tokens.TokenKind end);
+            hashmap.insert(:String :tokens.TokenKind m "andif" option kwAndif of tokens.TokenKind end);
+            hashmap.insert(:String :tokens.TokenKind m "array" option kwArray of tokens.TokenKind end);
+            hashmap.insert(:String :tokens.TokenKind m "as" option kwAs of tokens.TokenKind end);
+            hashmap.insert(:String :tokens.TokenKind m "auto" option kwAuto of tokens.TokenKind end);
+            hashmap.insert(:String :tokens.TokenKind m "begin" option kwBegin of tokens.TokenKind end);
+            hashmap.insert(:String :tokens.TokenKind m "case" option kwCase of tokens.TokenKind end);
+            hashmap.insert(:String :tokens.TokenKind m "do" option kwDo of tokens.TokenKind end);
+            hashmap.insert(:String :tokens.TokenKind m "downto" option kwDownto of tokens.TokenKind end);
+            hashmap.insert(:String :tokens.TokenKind m "else" option kwElse of tokens.TokenKind end);
+            hashmap.insert(:String :tokens.TokenKind m "elsif" option kwElsif of tokens.TokenKind end);
+            hashmap.insert(:String :tokens.TokenKind m "end" option kwEnd of tokens.TokenKind end);
+            hashmap.insert(:String :tokens.TokenKind m "exception" option kwException of tokens.TokenKind end);
+            hashmap.insert(:String :tokens.TokenKind m "exit" option kwExit of tokens.TokenKind end);
+            hashmap.insert(:String :tokens.TokenKind m "export" option kwExport of tokens.TokenKind end);
+            hashmap.insert(:String :tokens.TokenKind m "extent" option kwExtent of tokens.TokenKind end);
+            hashmap.insert(:String :tokens.TokenKind m "external" option kwExternal of tokens.TokenKind end);
+            hashmap.insert(:String :tokens.TokenKind m "false" option kwFalse of tokens.TokenKind end);
+            hashmap.insert(:String :tokens.TokenKind m "for" option kwFor of tokens.TokenKind end);
+            hashmap.insert(:String :tokens.TokenKind m "fun" option kwFun of tokens.TokenKind end);
+            hashmap.insert(:String :tokens.TokenKind m "if" option kwIf of tokens.TokenKind end);
+            hashmap.insert(:String :tokens.TokenKind m "import" option kwImport of tokens.TokenKind end);
+            hashmap.insert(:String :tokens.TokenKind m "inspect" option kwInspect of tokens.TokenKind end);
+            hashmap.insert(:String :tokens.TokenKind m "interface" option kwInterface of tokens.TokenKind end);
+            hashmap.insert(:String :tokens.TokenKind m "is" option kwIs of tokens.TokenKind end);
+            hashmap.insert(:String :tokens.TokenKind m "isnot" option kwIsnot of tokens.TokenKind end);
+            hashmap.insert(:String :tokens.TokenKind m "let" option kwLet of tokens.TokenKind end);
+            hashmap.insert(:String :tokens.TokenKind m "loop" option kwLoop of tokens.TokenKind end);
+            hashmap.insert(:String :tokens.TokenKind m "module" option kwModule of tokens.TokenKind end);
+            hashmap.insert(:String :tokens.TokenKind m "not" option kwNot of tokens.TokenKind end);
+            hashmap.insert(:String :tokens.TokenKind m "of" option kwOf of tokens.TokenKind end);
+            hashmap.insert(:String :tokens.TokenKind m "ok" option kwOk of tokens.TokenKind end);
+            hashmap.insert(:String :tokens.TokenKind m "option" option kwOption of tokens.TokenKind end);
+            hashmap.insert(:String :tokens.TokenKind m "ordinal" option kwOrdinal of tokens.TokenKind end);
+            hashmap.insert(:String :tokens.TokenKind m "orif" option kwOrif of tokens.TokenKind end);
+            hashmap.insert(:String :tokens.TokenKind m "out" option kwOut of tokens.TokenKind end);
+            hashmap.insert(:String :tokens.TokenKind m "raise" option kwRaise of tokens.TokenKind end);
+            hashmap.insert(:String :tokens.TokenKind m "rec" option kwRec of tokens.TokenKind end);
+            hashmap.insert(:String :tokens.TokenKind m "record" option kwRecord of tokens.TokenKind end);
+            hashmap.insert(:String :tokens.TokenKind m "then" option kwThen of tokens.TokenKind end);
+            hashmap.insert(:String :tokens.TokenKind m "true" option kwTrue of tokens.TokenKind end);
+            hashmap.insert(:String :tokens.TokenKind m "try" option kwTry of tokens.TokenKind end);
+            hashmap.insert(:String :tokens.TokenKind m "tuple" option kwTuple of tokens.TokenKind end);
+            hashmap.insert(:String :tokens.TokenKind m "unsound" option kwUnsound of tokens.TokenKind end);
+            hashmap.insert(:String :tokens.TokenKind m "upto" option kwUpto of tokens.TokenKind end);
+            hashmap.insert(:String :tokens.TokenKind m "var" option kwVar of tokens.TokenKind end);
+            hashmap.insert(:String :tokens.TokenKind m "variant" option kwVariant of tokens.TokenKind end);
+            hashmap.insert(:String :tokens.TokenKind m "when" option kwWhen of tokens.TokenKind end);
+            hashmap.insert(:String :tokens.TokenKind m "while" option kwWhile of tokens.TokenKind end);
+            hashmap.insert(:String :tokens.TokenKind m "with" option kwWith of tokens.TokenKind end);
+            m
+        end;
+
+    (* Build reserved punctuation map *)
+    let initReservedPunctuation(): hashmap.T(String tokens.TokenKind) =
+        begin
+            let m = hashmap.new(:String :tokens.TokenKind stringOp.equal hash.string);
+            hashmap.insert(:String :tokens.TokenKind m ":=" option assign of tokens.TokenKind end);
+            hashmap.insert(:String :tokens.TokenKind m "::" option colonColon of tokens.TokenKind end);
+            hashmap.insert(:String :tokens.TokenKind m "<:" option subtype of tokens.TokenKind end);
+            hashmap.insert(:String :tokens.TokenKind m "=" option equal of tokens.TokenKind end);
+            hashmap.insert(:String :tokens.TokenKind m ":" option colon of tokens.TokenKind end);
+            hashmap.insert(:String :tokens.TokenKind m "?" option question of tokens.TokenKind end);
+            hashmap.insert(:String :tokens.TokenKind m "!" option bang of tokens.TokenKind end);
+            hashmap.insert(:String :tokens.TokenKind m "@" option at of tokens.TokenKind end);
+            hashmap.insert(:String :tokens.TokenKind m "_" option underscore of tokens.TokenKind end);
+            m
+        end;
+
+    let new(sm: location.SourceMap bag: diagbag.T): T =
+        begin
+            let txt = location.text(sm);
+            tuple
+                let sm = sm
+                let bag = bag
+                let file = location.file(sm)
+                let text = txt
+                let textLen = stringOp.length(txt)
+                var cursor = 0
+                var peeked = maybe.none(:tokens.Token)
+                let keywords = initKeywords()
+                let reservedPunc = initReservedPunctuation()
+            end
+        end;
+
+    let peekChar(tok: T offset: Int): Char =
+        begin
+            let idx = tok.cursor + offset;
+            if idx < tok.textLen then
+                stringOp.getChar(tok.text idx)
+            else
+                ascii.char(0)
+            end
+        end;
+
+    let currentChar(tok: T): Char =
+        if tok.cursor < tok.textLen then
+            stringOp.getChar(tok.text tok.cursor)
+        else
+            ascii.char(0)
+        end;
+
+    let advanceChar(tok: T): Char =
+        if tok.cursor < tok.textLen then
+            begin
+                let c = stringOp.getChar(tok.text tok.cursor);
+                tok.cursor := tok.cursor + 1;
+                c
+            end
+        else
+            ascii.char(0)
+        end;
+
+    let skipWhitespaceAndComments(tok: T): Ok =
+        begin
+            let var loopVar = true;
+            while loopVar andif { tok.cursor < tok.textLen } do
+                let c = currentChar(tok);
+                if strutil.isSpace(c) orif { c is ascii.char(11) } orif { c is ascii.char(12) } then
+                    tok.cursor := tok.cursor + 1
+                elsif { c is '(' } andif { peekChar(tok 1) is '*' } then
+                    begin
+                        let startOff = tok.cursor;
+                        tok.cursor := tok.cursor + 2;
+                        let var depth = 1;
+                        while { tok.cursor < tok.textLen } andif { depth > 0 } do
+                            let cur = currentChar(tok);
+                            if { cur is '(' } andif { peekChar(tok 1) is '*' } then
+                                begin
+                                    tok.cursor := tok.cursor + 2;
+                                    depth := depth + 1
+                                end
+                            elsif { cur is '*' } andif { peekChar(tok 1) is ')' } then
+                                begin
+                                    tok.cursor := tok.cursor + 2;
+                                    depth := depth - 1
+                                end
+                            else
+                                tok.cursor := tok.cursor + 1
+                            end
+                        end;
+                        if depth > 0 then
+                            begin
+                                diagbag.addError(
+                                    tok.bag
+                                    location.span(tok.file startOff tok.cursor)
+                                    "Unclosed comment"
+                                );
+                                loopVar := false
+                            end
+                        end
+                    end
+                else
+                    loopVar := false
+                end
+            end;
+            ok
+        end;
+
+    let lexEscapeSequence(tok: T litStart: Int): Char =
+        begin
+            let escStart = tok.cursor - 1;
+            if tok.cursor >= tok.textLen then
+                begin
+                    diagbag.addError(
+                        tok.bag
+                        location.span(tok.file escStart tok.cursor)
+                        "Unterminated escape sequence"
+                    );
+                    ascii.char(0)
+                end
+            else
+                let c = advanceChar(tok);
+                if c is 'n' then ascii.char(10)
+                elsif c is 't' then ascii.char(9)
+                elsif c is 'r' then ascii.char(13)
+                elsif c is 'b' then ascii.char(8)
+                elsif c is 'f' then ascii.char(12)
+                elsif c is '\\' then ascii.char(92)
+                elsif c is '\'' then ascii.char(39)
+                elsif c is '"' then ascii.char(34)
+                elsif c is 'x' then
+                    begin
+                        let var digits = 0;
+                        let var hexValAcc = 0;
+                        while { digits < 2 } andif { tok.cursor < tok.textLen } andif isHexDigit(currentChar(tok)) do
+                            let h = advanceChar(tok);
+                            hexValAcc := { hexValAcc * 16 } + hexVal(h);
+                            digits := digits + 1
+                        end;
+                        if digits is 0 then
+                            begin
+                                diagbag.addError(
+                                    tok.bag
+                                    location.span(tok.file escStart tok.cursor)
+                                    "Invalid hexadecimal escape sequence"
+                                );
+                                ascii.char(0)
+                            end
+                        else
+                            ascii.char(hexValAcc)
+                        end
+                    end
+                elsif strutil.isDigit(c) then
+                    begin
+                        let var digits = 1;
+                        let var decValAcc = ascii.val(c) - 48;
+                        while { digits < 3 } andif { tok.cursor < tok.textLen } andif
+                            strutil.isDigit(currentChar(tok)) do
+                            let d = advanceChar(tok);
+                            decValAcc := { decValAcc * 10 } + { ascii.val(d) - 48 };
+                            digits := digits + 1
+                        end;
+                        if decValAcc > 255 then
+                            begin
+                                diagbag.addError(
+                                    tok.bag
+                                    location.span(tok.file escStart tok.cursor)
+                                    stringOp.cat(
+                                        "Character code "
+                                        stringOp.cat(conv.int(decValAcc) " out of byte range")
+                                    )
+                                );
+                                ascii.char(0)
+                            end
+                        else
+                            ascii.char(decValAcc)
+                        end
+                    end
+                else
+                    begin
+                        let lex = stringOp.getSub(tok.text escStart { tok.cursor - escStart });
+                        diagbag.addError(
+                            tok.bag
+                            location.span(tok.file escStart tok.cursor)
+                            stringOp.cat("Unknown escape sequence '" stringOp.cat(lex "'"))
+                        );
+                        c
+                    end
+                end
+            end
+        end;
+
+    let lexNumber(tok: T): tokens.Token =
+        begin
+            let start = tok.cursor;
+            if currentChar(tok) is '~' then
+                tok.cursor := tok.cursor + 1
+            end;
+
+            while { tok.cursor < tok.textLen } andif strutil.isDigit(currentChar(tok)) do
+                tok.cursor := tok.cursor + 1
+            end;
+
+            (* Fractional check *)
+            if { tok.cursor < tok.textLen } andif { currentChar(tok) is '.' } andif
+                strutil.isDigit(peekChar(tok 1)) then
+                begin
+                    tok.cursor := tok.cursor + 1; (* Consume '.' *)
+                    while { tok.cursor < tok.textLen } andif strutil.isDigit(currentChar(tok)) do
+                        tok.cursor := tok.cursor + 1
+                    end;
+
+                    (* Optional exponent *)
+                    if { tok.cursor < tok.textLen } andif
+                        { { currentChar(tok) is 'e' } orif { currentChar(tok) is 'E' } } then
+                        begin
+                            let expStart = tok.cursor;
+                            tok.cursor := tok.cursor + 1;
+                            if { tok.cursor < tok.textLen } andif
+                                { { currentChar(tok) is '+' } orif { currentChar(tok) is '-' } orif
+                                  { currentChar(tok) is '~' } } then
+                                tok.cursor := tok.cursor + 1
+                            end;
+                            if not { { tok.cursor < tok.textLen } andif strutil.isDigit(currentChar(tok)) } then
+                                diagbag.addError(
+                                    tok.bag
+                                    location.span(tok.file expStart tok.cursor)
+                                    "Malformed real exponent"
+                                )
+                            end;
+                            while { tok.cursor < tok.textLen } andif strutil.isDigit(currentChar(tok)) do
+                                tok.cursor := tok.cursor + 1
+                            end
+                        end
+                    end;
+
+                    let lexeme = stringOp.getSub(tok.text start { tok.cursor - start });
+                    let norm = strutil.replace(lexeme "~" "-");
+                    let rOpt = strutil.tryToReal(norm);
+                    let rVal = if maybe.isSome(:Real rOpt) then maybe.unwrap(:Real rOpt) else 0.0 end;
+                    tokens.make(
+                        option realLit of tokens.TokenKind end
+                        lexeme
+                        tokens.valReal(rVal)
+                        location.span(tok.file start tok.cursor)
+                    )
+                end
+            else
+                let lexeme = stringOp.getSub(tok.text start { tok.cursor - start });
+                let norm = strutil.replace(lexeme "~" "-");
+                let iOpt = strutil.tryToInt(norm);
+                let iVal = if maybe.isSome(:Int iOpt) then maybe.unwrap(:Int iOpt) else 0 end;
+                tokens.make(
+                    option intLit of tokens.TokenKind end
+                    lexeme
+                    tokens.valInt(iVal)
+                    location.span(tok.file start tok.cursor)
+                )
+            end
+        end;
+
+    let lexChar(tok: T): tokens.Token =
+        begin
+            let start = tok.cursor;
+            tok.cursor := tok.cursor + 1; (* Consume opening quote *)
+            if { tok.cursor >= tok.textLen } orif { currentChar(tok) is '\'' } then
+                begin
+                    diagbag.addError(
+                        tok.bag
+                        location.span(tok.file start tok.cursor)
+                        "Empty character literal"
+                    );
+                    if { tok.cursor < tok.textLen } andif { currentChar(tok) is '\'' } then
+                        tok.cursor := tok.cursor + 1
+                    end;
+                    tokens.make(
+                        option charLit of tokens.TokenKind end
+                        stringOp.getSub(tok.text start { tok.cursor - start })
+                        tokens.valChar(ascii.char(0))
+                        location.span(tok.file start tok.cursor)
+                    )
+                end
+            else
+                let charVal = if currentChar(tok) is '\\' then
+                    begin
+                        tok.cursor := tok.cursor + 1;
+                        lexEscapeSequence(tok start)
+                    end
+                else
+                    advanceChar(tok)
+                end;
+
+                if { tok.cursor >= tok.textLen } orif { currentChar(tok) isnot '\'' } then
+                    diagbag.addError(
+                        tok.bag
+                        location.span(tok.file start tok.cursor)
+                        "Unterminated character literal"
+                    )
+                else
+                    tok.cursor := tok.cursor + 1; (* Consume closing quote *)
+                end;
+
+                tokens.make(
+                    option charLit of tokens.TokenKind end
+                    stringOp.getSub(tok.text start { tok.cursor - start })
+                    tokens.valChar(charVal)
+                    location.span(tok.file start tok.cursor)
+                )
+            end
+        end;
+
+    let lexString(tok: T): tokens.Token =
+        begin
+            let start = tok.cursor;
+            tok.cursor := tok.cursor + 1; (* Consume opening quote *)
+            let sb = stringBuilder.new();
+            while { tok.cursor < tok.textLen } andif { currentChar(tok) isnot '"' } do
+                if currentChar(tok) is '\\' then
+                    begin
+                        tok.cursor := tok.cursor + 1;
+                        let escChar = lexEscapeSequence(tok start);
+                        stringBuilder.appendChar(sb escChar)
+                    end
+                else
+                    stringBuilder.appendChar(sb advanceChar(tok))
+                end
+            end;
+
+            if tok.cursor >= tok.textLen then
+                diagbag.addError(
+                    tok.bag
+                    location.span(tok.file start tok.cursor)
+                    "Unterminated string literal"
+                )
+            else
+                tok.cursor := tok.cursor + 1; (* Consume closing quote *)
+            end;
+
+            tokens.make(
+                option stringLit of tokens.TokenKind end
+                stringOp.getSub(tok.text start { tok.cursor - start })
+                tokens.valString(stringBuilder.toString(sb))
+                location.span(tok.file start tok.cursor)
+            )
+        end;
+
+    let lexIdentOrKeyword(tok: T): tokens.Token =
+        begin
+            let start = tok.cursor;
+            while { tok.cursor < tok.textLen } andif strutil.isAlnum(currentChar(tok)) do
+                tok.cursor := tok.cursor + 1
+            end;
+
+            let lexeme = stringOp.getSub(tok.text start { tok.cursor - start });
+            let kwOpt = hashmap.get(:String :tokens.TokenKind tok.keywords lexeme);
+            let kind = if maybe.isSome(:tokens.TokenKind kwOpt) then
+                maybe.unwrap(:tokens.TokenKind kwOpt)
+            else
+                option ident of tokens.TokenKind end
+            end;
+            tokens.make(kind lexeme tokens.valNone() location.span(tok.file start tok.cursor))
+        end;
+
+    let lexSymbolicOrPunctuation(tok: T): tokens.Token =
+        begin
+            let start = tok.cursor;
+            let var loopVar = true;
+            while loopVar andif { tok.cursor < tok.textLen } andif isSymbolicChar(currentChar(tok)) do
+                if { currentChar(tok) is '(' } andif { peekChar(tok 1) is '*' } then
+                    loopVar := false
+                elsif { currentChar(tok) is '~' } andif strutil.isDigit(peekChar(tok 1)) then
+                    loopVar := false
+                else
+                    tok.cursor := tok.cursor + 1
+                end
+            end;
+
+            let lexeme = stringOp.getSub(tok.text start { tok.cursor - start });
+            let puncOpt = hashmap.get(:String :tokens.TokenKind tok.reservedPunc lexeme);
+            let kind = if maybe.isSome(:tokens.TokenKind puncOpt) then
+                maybe.unwrap(:tokens.TokenKind puncOpt)
+            else
+                option symbolicInfix of tokens.TokenKind end
+            end;
+            tokens.make(kind lexeme tokens.valNone() location.span(tok.file start tok.cursor))
+        end;
+
+    let rec readNextToken(tok: T): tokens.Token =
+        begin
+            skipWhitespaceAndComments(tok);
+            if tok.cursor >= tok.textLen then
+                tokens.eofToken(tok.file tok.cursor)
+            else
+                let start = tok.cursor;
+                let c = currentChar(tok);
+
+                (* 1. Delimiters *)
+                if c is '(' then
+                    begin
+                        tok.cursor := tok.cursor + 1;
+                        tokens.make(
+                            option lparen of tokens.TokenKind end
+                            "("
+                            tokens.valNone()
+                            location.span(tok.file start tok.cursor)
+                        )
+                    end
+                elsif c is ')' then
+                    begin
+                        tok.cursor := tok.cursor + 1;
+                        tokens.make(
+                            option rparen of tokens.TokenKind end
+                            ")"
+                            tokens.valNone()
+                            location.span(tok.file start tok.cursor)
+                        )
+                    end
+                elsif c is '[' then
+                    begin
+                        tok.cursor := tok.cursor + 1;
+                        tokens.make(
+                            option lbracket of tokens.TokenKind end
+                            "["
+                            tokens.valNone()
+                            location.span(tok.file start tok.cursor)
+                        )
+                    end
+                elsif c is ']' then
+                    begin
+                        tok.cursor := tok.cursor + 1;
+                        tokens.make(
+                            option rbracket of tokens.TokenKind end
+                            "]"
+                            tokens.valNone()
+                            location.span(tok.file start tok.cursor)
+                        )
+                    end
+                elsif c is '{' then
+                    begin
+                        tok.cursor := tok.cursor + 1;
+                        tokens.make(
+                            option lbrace of tokens.TokenKind end
+                            "{"
+                            tokens.valNone()
+                            location.span(tok.file start tok.cursor)
+                        )
+                    end
+                elsif c is '}' then
+                    begin
+                        tok.cursor := tok.cursor + 1;
+                        tokens.make(
+                            option rbrace of tokens.TokenKind end
+                            "}"
+                            tokens.valNone()
+                            location.span(tok.file start tok.cursor)
+                        )
+                    end
+                elsif c is ',' then
+                    begin
+                        tok.cursor := tok.cursor + 1;
+                        tokens.make(
+                            option comma of tokens.TokenKind end
+                            ","
+                            tokens.valNone()
+                            location.span(tok.file start tok.cursor)
+                        )
+                    end
+                elsif c is ';' then
+                    begin
+                        tok.cursor := tok.cursor + 1;
+                        tokens.make(
+                            option semicolon of tokens.TokenKind end
+                            ";"
+                            tokens.valNone()
+                            location.span(tok.file start tok.cursor)
+                        )
+                    end
+                (* 2. Dot *)
+                elsif c is '.' then
+                    begin
+                        tok.cursor := tok.cursor + 1;
+                        tokens.make(
+                            option dot of tokens.TokenKind end
+                            "."
+                            tokens.valNone()
+                            location.span(tok.file start tok.cursor)
+                        )
+                    end
+                (* 3. Numbers *)
+                elsif strutil.isDigit(c) orif { { c is '~' } andif strutil.isDigit(peekChar(tok 1)) } then
+                    lexNumber(tok)
+                (* 4. Character literal *)
+                elsif c is '\'' then
+                    lexChar(tok)
+                (* 5. String literal *)
+                elsif c is '"' then
+                    lexString(tok)
+                (* 6. Identifiers and Keywords *)
+                elsif strutil.isAlpha(c) then
+                    lexIdentOrKeyword(tok)
+                (* 7. Symbolic operators and punctuation *)
+                elsif isSymbolicChar(c) then
+                    lexSymbolicOrPunctuation(tok)
+                (* 8. Unexpected character *)
+                else
+                    begin
+                        tok.cursor := tok.cursor + 1;
+                        diagbag.addError(
+                            tok.bag
+                            location.span(tok.file start tok.cursor)
+                            stringOp.cat("Unexpected character '" stringOp.cat(stringOp.new(1 c) "'"))
+                        );
+                        readNextToken(tok)
+                    end
+                end
+            end
+        end;
+
+    let nextToken(tok: T): tokens.Token =
+        if maybe.isSome(:tokens.Token tok.peeked) then
+            begin
+                let t = maybe.unwrap(:tokens.Token tok.peeked);
+                tok.peeked := maybe.none(:tokens.Token);
+                t
+            end
+        else
+            readNextToken(tok)
+        end;
+
+    let peekToken(tok: T): tokens.Token =
+        if maybe.isNone(:tokens.Token tok.peeked) then
+            begin
+                let t = readNextToken(tok);
+                tok.peeked := maybe.some(:tokens.Token t);
+                t
+            end
+        else
+            maybe.unwrap(:tokens.Token tok.peeked)
+        end;
+
+    let tokenizeAll(tok: T): vector.T(tokens.Token) =
+        begin
+            let v = vector.new(:tokens.Token);
+            let var loopVar = true;
+            while loopVar do
+                let t = nextToken(tok);
+                vector.append(:tokens.Token v t);
+                case t.kind
+                    when eof then loopVar := false
+                    else ok
+                end
+            end;
+            v
+        end;
+
+    let formatDump(tokensList: vector.T(tokens.Token) sm: location.SourceMap showValues: Bool): String =
+        begin
+            let sb = stringBuilder.new();
+            let count = vector.length(:tokens.Token tokensList);
+            let var i = 0;
+            while i < count do
+                let tok = vector.get(:tokens.Token tokensList i);
+                let loc = location.locate(sm tok.span.startOffset);
+                let posStr = stringOp.cat(conv.int(loc.line) stringOp.cat(":" conv.int(loc.col)));
+
+                case tok.kind
+                    when eof then
+                        begin
+                            stringBuilder.append(sb posStr);
+                            stringBuilder.append(sb "\tEOF");
+                            i := count (* Terminate *)
+                        end
+                    else
+                        begin
+                            stringBuilder.append(sb posStr);
+                            stringBuilder.append(sb "\t");
+                            stringBuilder.append(sb tokens.tokenKindName(tok.kind));
+                            stringBuilder.append(sb "\t");
+                            stringBuilder.append(sb tok.lexeme);
+                            if { i + 1 } < count then
+                                stringBuilder.append(sb "\n")
+                            else
+                                ok
+                            end;
+                            i := i + 1
+                        end
+                end
+            end;
+            stringBuilder.toString(sb)
+        end;
+end;

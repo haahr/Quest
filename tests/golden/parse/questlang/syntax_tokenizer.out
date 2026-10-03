@@ -1,0 +1,685 @@
+(Program
+  :phrases (
+    (ImportPhrase
+      :items (
+        (ImportItem ('location') 'Location' ('questlang/common/location') 'questlang/common/Location')
+        (ImportItem ('diagbag') 'DiagBag' ('questlang/common/diagbag') 'questlang/common/DiagBag')
+        (ImportItem ('tokens') 'Tokens' ('questlang/syntax/tokens') 'questlang/syntax/Tokens')
+        (ImportItem ('tokenizer') 'Tokenizer' ('questlang/syntax/tokenizer') 'questlang/syntax/Tokenizer')
+        (ImportItem ('writer') 'Writer')
+        (ImportItem ('conv') 'Conv')
+      )
+    )
+    (LetValueBinding
+      :name 'wOut'
+      :value (ExprSelect
+        :target (ExprId 'writer')
+        :field 'output'
+      )
+    )
+    (LetValueBinding
+      :name 'printStr'
+      :value (ExprBlock
+        :bindings (
+          (ExprStmt
+            :expr (ExprApp
+              :func (ExprSelect
+                :target (ExprId 'writer')
+                :field 'putString'
+              )
+              :args (
+                (ExprId 'wOut')
+                (ExprId 's')
+              )
+            )
+          )
+          (ExprStmt
+            :expr (ExprApp
+              :func (ExprSelect
+                :target (ExprId 'writer')
+                :field 'putString'
+              )
+              :args (
+                (ExprId 'wOut')
+                (ExprString '\n' '"\\n"')
+              )
+            )
+          )
+        )
+      )
+      :params (
+        (FormalParam
+          :name 's'
+          :type_annot (TypePath ('String'))
+          :mode VALUE
+        )
+      )
+      :type_annot (TypePath ('Ok'))
+    )
+    (LetValueBinding
+      :name 'printInt'
+      :value (ExprApp
+        :func (ExprId 'printStr')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'conv')
+              :field 'int'
+            )
+            :args (
+              (ExprId 'n')
+            )
+          )
+        )
+      )
+      :params (
+        (FormalParam
+          :name 'n'
+          :type_annot (TypePath ('Int'))
+          :mode VALUE
+        )
+      )
+      :type_annot (TypePath ('Ok'))
+    )
+    (LetValueBinding
+      :name 'printBool'
+      :value (ExprApp
+        :func (ExprId 'printStr')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'conv')
+              :field 'bool'
+            )
+            :args (
+              (ExprId 'b')
+            )
+          )
+        )
+      )
+      :params (
+        (FormalParam
+          :name 'b'
+          :type_annot (TypePath ('Bool'))
+          :mode VALUE
+        )
+      )
+      :type_annot (TypePath ('Ok'))
+    )
+    (LetValueBinding
+      :name 'code1'
+      :value (ExprInfix
+        :left (ExprString '(* Sample Quest program *)\n' '"(* Sample Quest program *)\\n"')
+        :op '<>'
+        :right (ExprInfix
+          :left (ExprString 'let rec fact(n: Int): Int =\n' '"let rec fact(n: Int): Int =\\n"')
+          :op '<>'
+          :right (ExprInfix
+            :left (ExprString '    if n <= 1 then\n' '"    if n <= 1 then\\n"')
+            :op '<>'
+            :right (ExprInfix
+              :left (ExprString '        1\n' '"        1\\n"')
+              :op '<>'
+              :right (ExprInfix
+                :left (ExprString '    else\n' '"    else\\n"')
+                :op '<>'
+                :right (ExprString '        { n * fact(n - 1) };\n' '"        { n * fact(n - 1) };\\n"')
+              )
+            )
+          )
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'sm1'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'location')
+          :field 'newSourceMap'
+        )
+        :args (
+          (ExprString 'fact.quest' '"fact.quest"')
+          (ExprId 'code1')
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'bag1'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'diagbag')
+          :field 'new'
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'tk1'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'tokenizer')
+          :field 'new'
+        )
+        :args (
+          (ExprId 'sm1')
+          (ExprId 'bag1')
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'allTokens'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'tokenizer')
+          :field 'tokenizeAll'
+        )
+        :args (
+          (ExprId 'tk1')
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'dump1'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'tokenizer')
+          :field 'formatDump'
+        )
+        :args (
+          (ExprId 'allTokens')
+          (ExprId 'sm1')
+          (ExprBool False)
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printStr')
+        :args (
+          (ExprId 'dump1')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printBool')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'diagbag')
+              :field 'hasErrors'
+            )
+            :args (
+              (ExprId 'bag1')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printInt')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'diagbag')
+              :field 'errorCount'
+            )
+            :args (
+              (ExprId 'bag1')
+            )
+          )
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'code2'
+      :value (ExprString 'let x = 42;' '"let x = 42;"')
+    )
+    (LetValueBinding
+      :name 'sm2'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'location')
+          :field 'newSourceMap'
+        )
+        :args (
+          (ExprString 'peek.quest' '"peek.quest"')
+          (ExprId 'code2')
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'bag2'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'diagbag')
+          :field 'new'
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'tk2'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'tokenizer')
+          :field 'new'
+        )
+        :args (
+          (ExprId 'sm2')
+          (ExprId 'bag2')
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'p1'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'tokenizer')
+          :field 'peekToken'
+        )
+        :args (
+          (ExprId 'tk2')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printStr')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'tokens')
+              :field 'tokenKindName'
+            )
+            :args (
+              (ExprSelect
+                :target (ExprId 'p1')
+                :field 'kind'
+              )
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printStr')
+        :args (
+          (ExprSelect
+            :target (ExprId 'p1')
+            :field 'lexeme'
+          )
+        )
+      )
+    )
+    (LetValueBinding
+      :name 't1'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'tokenizer')
+          :field 'nextToken'
+        )
+        :args (
+          (ExprId 'tk2')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printStr')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'tokens')
+              :field 'tokenKindName'
+            )
+            :args (
+              (ExprSelect
+                :target (ExprId 't1')
+                :field 'kind'
+              )
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printStr')
+        :args (
+          (ExprSelect
+            :target (ExprId 't1')
+            :field 'lexeme'
+          )
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'p2'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'tokenizer')
+          :field 'peekToken'
+        )
+        :args (
+          (ExprId 'tk2')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printStr')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'tokens')
+              :field 'tokenKindName'
+            )
+            :args (
+              (ExprSelect
+                :target (ExprId 'p2')
+                :field 'kind'
+              )
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printStr')
+        :args (
+          (ExprSelect
+            :target (ExprId 'p2')
+            :field 'lexeme'
+          )
+        )
+      )
+    )
+    (LetValueBinding
+      :name 't2'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'tokenizer')
+          :field 'nextToken'
+        )
+        :args (
+          (ExprId 'tk2')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printStr')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'tokens')
+              :field 'tokenKindName'
+            )
+            :args (
+              (ExprSelect
+                :target (ExprId 't2')
+                :field 'kind'
+              )
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printStr')
+        :args (
+          (ExprSelect
+            :target (ExprId 't2')
+            :field 'lexeme'
+          )
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'code3'
+      :value (ExprInfix
+        :left (ExprString '0 42 ~100 3.14 1.5e-3 ~2.0E+2\n' '"0 42 ~100 3.14 1.5e-3 ~2.0E+2\\n"')
+        :op '<>'
+        :right (ExprInfix
+          :left (ExprString "'a' '\\n' '\\t' '\\'' '\\\\' '\\x41' '\\065'\n" '"\'a\' \'\\\\n\' \'\\\\t\' \'\\\\\'\' \'\\\\\\\\\' \'\\\\x41\' \'\\\\065\'\\n"')
+          :op '<>'
+          :right (ExprInfix
+            :left (ExprString '"hello" "with \\"quotes\\" and \\n newline"\n' '"\\"hello\\" \\"with \\\\\\"quotes\\\\\\" and \\\\n newline\\"\\n"')
+            :op '<>'
+            :right (ExprInfix
+              :left (ExprString '(* outer (* nested level 2 (* nested 3 *) *) back *)\n' '"(* outer (* nested level 2 (* nested 3 *) *) back *)\\n"')
+              :op '<>'
+              :right (ExprString 'ident_1 _validIdent == !=\n' '"ident_1 _validIdent == !=\\n"')
+            )
+          )
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'sm3'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'location')
+          :field 'newSourceMap'
+        )
+        :args (
+          (ExprString 'literals.quest' '"literals.quest"')
+          (ExprId 'code3')
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'bag3'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'diagbag')
+          :field 'new'
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'tk3'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'tokenizer')
+          :field 'new'
+        )
+        :args (
+          (ExprId 'sm3')
+          (ExprId 'bag3')
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'tokens3'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'tokenizer')
+          :field 'tokenizeAll'
+        )
+        :args (
+          (ExprId 'tk3')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printStr')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'tokenizer')
+              :field 'formatDump'
+            )
+            :args (
+              (ExprId 'tokens3')
+              (ExprId 'sm3')
+              (ExprBool False)
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printBool')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'diagbag')
+              :field 'hasErrors'
+            )
+            :args (
+              (ExprId 'bag3')
+            )
+          )
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'codeErr'
+      :value (ExprInfix
+        :left (ExprString 'let valid = 1;\n' '"let valid = 1;\\n"')
+        :op '<>'
+        :right (ExprInfix
+          :left (ExprString '"unclosed string literal\n' '"\\"unclosed string literal\\n"')
+          :op '<>'
+          :right (ExprInfix
+            :left (ExprString 'let alsoValid = 2;\n' '"let alsoValid = 2;\\n"')
+            :op '<>'
+            :right (ExprInfix
+              :left (ExprString "'\\z' (* invalid char escape *)\n" '"\'\\\\z\' (* invalid char escape *)\\n"')
+              :op '<>'
+              :right (ExprInfix
+                :left (ExprString "'too long'\n" '"\'too long\'\\n"')
+                :op '<>'
+                :right (ExprString 'let final = 3;\n' '"let final = 3;\\n"')
+              )
+            )
+          )
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'smErr'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'location')
+          :field 'newSourceMap'
+        )
+        :args (
+          (ExprString 'error_recovery.quest' '"error_recovery.quest"')
+          (ExprId 'codeErr')
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'bagErr'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'diagbag')
+          :field 'new'
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'tkErr'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'tokenizer')
+          :field 'new'
+        )
+        :args (
+          (ExprId 'smErr')
+          (ExprId 'bagErr')
+        )
+      )
+    )
+    (LetValueBinding
+      :name 'tokensErr'
+      :value (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'tokenizer')
+          :field 'tokenizeAll'
+        )
+        :args (
+          (ExprId 'tkErr')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printStr')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'tokenizer')
+              :field 'formatDump'
+            )
+            :args (
+              (ExprId 'tokensErr')
+              (ExprId 'smErr')
+              (ExprBool False)
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printBool')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'diagbag')
+              :field 'hasErrors'
+            )
+            :args (
+              (ExprId 'bagErr')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printInt')
+        :args (
+          (ExprApp
+            :func (ExprSelect
+              :target (ExprId 'diagbag')
+              :field 'errorCount'
+            )
+            :args (
+              (ExprId 'bagErr')
+            )
+          )
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprId 'printStr')
+        :args (
+          (ExprString '--- Diagnostics Rendered ---' '"--- Diagnostics Rendered ---"')
+        )
+      )
+    )
+    (ExprStmt
+      :expr (ExprApp
+        :func (ExprSelect
+          :target (ExprId 'diagbag')
+          :field 'renderAll'
+        )
+        :args (
+          (ExprId 'bagErr')
+          (ExprId 'smErr')
+          (ExprId 'wOut')
+        )
+      )
+    )
+  )
+)
