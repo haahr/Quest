@@ -71,6 +71,10 @@ def compile_module(
         output_dir = Path.cwd()
     output_dir.mkdir(parents=True, exist_ok=True)
 
+    if getattr(env, "options", None) is None:
+        from quest.pipeline import CompilerOptions
+        env.options = CompilerOptions(stop_after="codegen_c", build_dir=build_dir)
+
     imported_modules: list[ImportedModuleRef] = []
     imported_interfaces: list[ImportedInterfaceRef] = []
 
@@ -110,9 +114,6 @@ def compile_module(
         for iname, mpath in zip(imp.names, imp.effective_module_paths):
             mod_ref = mpath if mpath else iname
             imported_modules.append(ImportedModuleRef(name=mod_ref, interface=iface_path))
-            if mpath not in env.loaded_modules_ast and iname not in env.loaded_modules_ast:
-                from quest.module_loader import load_module
-                load_module(mpath, iface_path, env)
 
     # 3. Elaborate module
     typed_mod = elaborate_module(module_decl, env)

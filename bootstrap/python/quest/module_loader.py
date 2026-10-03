@@ -241,43 +241,69 @@ def load_interface(name: str, env: Environment) -> Scope:
 
     file_path = resolve_interface_file(name, env.current_dir, env.include_paths)
 
-    # Hierarchical interface compilation on-demand in C compilation mode
-    if is_c_compilation_mode(env) and "/" in name:
+    # 3-way staleness check and on-demand interface compilation in C compilation mode
+    if is_c_compilation_mode(env):
         opts = getattr(env, "options", None)
         build_dir = getattr(opts, "build_dir", None)
         if build_dir is not None:
             out_root = Path(build_dir).resolve()
-        elif file_path is not None:
+        elif Path(".build").is_dir():
+            out_root = Path(".build").resolve()
+        elif file_path is not None and "/" in name:
             rel_parts = len(Path(name.lower()).parts)
             out_root = file_path.parents[rel_parts - 1].resolve()
         else:
             out_root = (env.current_dir or Path.cwd()).resolve()
 
-        qi_file = out_root / f"{name.lower()}.qi"
-        sources: list[Path] = []
         int_src = resolve_interface_source_file(name, env.current_dir, env.include_paths)
-        if int_src and int_src.is_file():
-            sources.append(int_src)
-        elif file_path and file_path.is_file():
-            sources.append(file_path)
-        mod_src = resolve_module_file(name, env.current_dir, env.include_paths)
-        if mod_src and mod_src.is_file():
-            sources.append(mod_src)
+        if int_src is None and file_path and file_path.name.endswith(".int.quest"):
+            int_src = file_path
 
-        obj_file = out_root / f"{name.lower()}.o"
-        is_c_mode = is_c_compilation_mode(env)
-        stale = _is_artifact_stale(qi_file, sources) or (is_c_mode and _is_artifact_stale(obj_file, sources))
-        if stale and file_path is not None and mod_src is not None:
-            from quest.module_compiler import compile_hierarchical_module
-            compile_hierarchical_module(
-                name.lower(),
-                output_dir=out_root,
-                current_dir=env.current_dir,
-                include_paths=env.include_paths,
-                emit_deps=True,
+        canon_name = canonicalize_module_path(int_src, env.include_paths) if int_src else name.lower()
+        if "/" in canon_name:
+            target_sub = out_root / Path(canon_name).parent
+        else:
+            target_sub = out_root
+
+        stem = Path(canon_name).name.lower()
+        qi_file = target_sub / f"{stem}.qi"
+        h_file = target_sub / f"{stem}.h"
+
+        if not qi_file.is_file() and file_path and file_path.suffix == ".qi":
+            cand_h = file_path.with_suffix(".h")
+            if cand_h.is_file():
+                qi_file = file_path
+                h_file = cand_h
+
+        # 3-way staleness check (§5 of docs/build-process.md)
+        stale = False
+        if int_src and int_src.is_file():
+            if not qi_file.is_file() or not h_file.is_file():
+                # Rule 2: source exists, artifacts incomplete -> OUT OF DATE
+                stale = True
+            else:
+                # Rule 1: source and artifacts exist -> compare timestamps
+                src_mtime = int_src.stat().st_mtime
+                if src_mtime > qi_file.stat().st_mtime or src_mtime > h_file.stat().st_mtime:
+                    stale = True
+        elif qi_file and qi_file.is_file() and h_file and h_file.is_file():
+            # Rule 3: binary distribution mode (artifacts exist, no source) -> UP TO DATE
+            stale = False
+
+        if stale and int_src and int_src.is_file():
+            from quest.interface_compiler import compile_interface_file
+            target_sub.mkdir(parents=True, exist_ok=True)
+            search_paths = list(env.include_paths)
+            if out_root not in search_paths:
+                search_paths.insert(0, out_root)
+            h_file, qi_file = compile_interface_file(
+                int_src,
+                output_dir=target_sub,
+                include_paths=search_paths,
+                build_dir=out_root,
             )
 
-        if qi_file.is_file():
+        if qi_file and qi_file.is_file():
             from quest.interface_compiler import load_interface_from_qi_file
             if out_root not in env.include_paths:
                 env.include_paths.insert(0, out_root)
@@ -286,6 +312,8 @@ def load_interface(name: str, env: Environment) -> Scope:
             decl_name = name.split("/")[-1]
             if decl_name != name:
                 env.register_interface(decl_name, scope)
+            if canon_name != name:
+                env.register_interface(canon_name, scope)
             return scope
 
     if file_path is None:
@@ -395,7 +423,38 @@ def _load_precompiled_transitive_deps(
     out_root: Optional[Path] = None,
 ) -> None:
     """Discovers and loads transitive module dependencies from a .d file or fallback source."""
-    # 1. Try reading from .deps/<stem>.d (or alongside .o)
+    # 1. Try reading from .qm manifest first
+    if obj_file is not None and obj_file.is_file():
+        qm_cand = obj_file.with_suffix(".qm")
+        if qm_cand.is_file():
+            from quest.build.manifest import read_qm
+            manifest = read_qm(qm_cand)
+            if manifest:
+                for imp_m in manifest.imported_modules:
+                    mod_name = imp_m.name
+                    dep_obj: Optional[Path] = None
+                    if out_root is not None:
+                        cand = out_root / f"{mod_name.lower()}.o"
+                        if cand.is_file():
+                            dep_obj = cand.resolve()
+                    if dep_obj is None and env.current_dir is not None:
+                        cand = env.current_dir / f"{mod_name.lower()}.o"
+                        if cand.is_file():
+                            dep_obj = cand.resolve()
+                    if dep_obj is None:
+                        for inc in env.include_paths:
+                            cand = Path(inc) / f"{mod_name.lower()}.o"
+                            if cand.is_file():
+                                dep_obj = cand.resolve()
+                                break
+                    if dep_obj is not None and dep_obj.is_file():
+                        if dep_obj not in env.linked_objects:
+                            env.linked_objects.append(dep_obj)
+                        env.precompiled_modules.add(mod_name)
+                        _load_precompiled_transitive_deps(dep_obj, None, env, out_root)
+                return
+
+    # 2. Fallback: try reading from .deps/<stem>.d (or alongside .o)
     if obj_file is not None and obj_file.is_file():
         dep_candidates = [
             obj_file.parent / ".deps" / f"{obj_file.stem}.d",

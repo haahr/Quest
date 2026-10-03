@@ -269,27 +269,31 @@ def elaborate_module(
                         module_internal_scope.declare_kind(kind_symbol)
                         continue
                 from quest.module_loader import (
+                    is_c_compilation_mode,
                     load_module,
                     resolve_module_file,
                     resolve_object_file,
                 )
-                on_disk = (
-                    resolve_module_file(mod_path, env.current_dir, env.include_paths) is not None
-                    or resolve_object_file(mod_path, env.current_dir, env.include_paths) is not None
-                    or mod_path in env.precompiled_modules
-                )
-                if on_disk or mod_path in env.loaded_modules_ast:
-                    if mod_path not in env.loaded_modules_ast:
-                        load_module(mod_path, iface_path, env)
+                if is_c_compilation_mode(env):
                     mod_scope = env.lookup_module(mod_path)
                     if mod_scope is not None:
                         mod_type = BuiltinModuleRegistry._build_record_type_from_scope(mod_scope)
                     else:
                         mod_type = BuiltinModuleRegistry._build_record_type_from_scope(source_interface_scope)
+                    registered_scope = mod_scope if mod_scope is not None else source_interface_scope
+                    obj_file = resolve_object_file(mod_path, env.current_dir, env.include_paths)
+                    if obj_file is not None and obj_file.is_file():
+                        if obj_file not in env.linked_objects:
+                            env.linked_objects.append(obj_file)
+                        from quest.module_loader import _load_precompiled_transitive_deps
+                        _load_precompiled_transitive_deps(obj_file, None, env, None)
                 else:
-                    mod_type = BuiltinModuleRegistry.get_module_type(mod_path, env)
-                    mod_scope = env.lookup_module(mod_path)
-                    if mod_type is None:
+                    on_disk = (
+                        resolve_module_file(mod_path, env.current_dir, env.include_paths) is not None
+                        or resolve_object_file(mod_path, env.current_dir, env.include_paths) is not None
+                        or mod_path in env.precompiled_modules
+                    )
+                    if on_disk or mod_path in env.loaded_modules_ast:
                         if mod_path not in env.loaded_modules_ast:
                             load_module(mod_path, iface_path, env)
                         mod_scope = env.lookup_module(mod_path)
@@ -297,7 +301,18 @@ def elaborate_module(
                             mod_type = BuiltinModuleRegistry._build_record_type_from_scope(mod_scope)
                         else:
                             mod_type = BuiltinModuleRegistry._build_record_type_from_scope(source_interface_scope)
-                registered_scope = mod_scope if mod_scope is not None else source_interface_scope
+                    else:
+                        mod_type = BuiltinModuleRegistry.get_module_type(mod_path, env)
+                        mod_scope = env.lookup_module(mod_path)
+                        if mod_type is None:
+                            if mod_path not in env.loaded_modules_ast:
+                                load_module(mod_path, iface_path, env)
+                            mod_scope = env.lookup_module(mod_path)
+                            if mod_scope is not None:
+                                mod_type = BuiltinModuleRegistry._build_record_type_from_scope(mod_scope)
+                            else:
+                                mod_type = BuiltinModuleRegistry._build_record_type_from_scope(source_interface_scope)
+                    registered_scope = mod_scope if mod_scope is not None else source_interface_scope
                 env.register_module(mod_path, registered_scope)
                 if local_name != mod_path:
                     env.register_module(local_name, registered_scope)
@@ -446,27 +461,32 @@ def elaborate_import(phrase: ast.ImportPhrase, env: Environment) -> TypedImport:
             # import mod1, mod2: Interface
             for local_mod_name, mod_path in zip(item.names, item.effective_module_paths):
                 from quest.module_loader import (
+                    is_c_compilation_mode,
                     load_module,
                     resolve_module_file,
                     resolve_object_file,
                 )
-                on_disk = (
-                    resolve_module_file(mod_path, env.current_dir, env.include_paths) is not None
-                    or resolve_object_file(mod_path, env.current_dir, env.include_paths) is not None
-                    or mod_path in env.precompiled_modules
-                )
-                if on_disk or mod_path in env.loaded_modules_ast:
-                    if mod_path not in env.loaded_modules_ast:
-                        load_module(mod_path, iface_path, env)
+                if is_c_compilation_mode(env):
+                    # In separate compilation mode, type the module via its interface without loading source
                     mod_scope = env.lookup_module(mod_path)
                     if mod_scope is not None:
                         mod_type = BuiltinModuleRegistry._build_record_type_from_scope(mod_scope)
                     else:
                         mod_type = BuiltinModuleRegistry._build_record_type_from_scope(iface_scope)
+                    registered_scope = mod_scope if mod_scope is not None else iface_scope
+                    obj_file = resolve_object_file(mod_path, env.current_dir, env.include_paths)
+                    if obj_file is not None and obj_file.is_file():
+                        if obj_file not in env.linked_objects:
+                            env.linked_objects.append(obj_file)
+                        from quest.module_loader import _load_precompiled_transitive_deps
+                        _load_precompiled_transitive_deps(obj_file, None, env, None)
                 else:
-                    mod_type = BuiltinModuleRegistry.get_module_type(mod_path, env)
-                    mod_scope = env.lookup_module(mod_path)
-                    if mod_type is None:
+                    on_disk = (
+                        resolve_module_file(mod_path, env.current_dir, env.include_paths) is not None
+                        or resolve_object_file(mod_path, env.current_dir, env.include_paths) is not None
+                        or mod_path in env.precompiled_modules
+                    )
+                    if on_disk or mod_path in env.loaded_modules_ast:
                         if mod_path not in env.loaded_modules_ast:
                             load_module(mod_path, iface_path, env)
                         mod_scope = env.lookup_module(mod_path)
@@ -474,7 +494,18 @@ def elaborate_import(phrase: ast.ImportPhrase, env: Environment) -> TypedImport:
                             mod_type = BuiltinModuleRegistry._build_record_type_from_scope(mod_scope)
                         else:
                             mod_type = BuiltinModuleRegistry._build_record_type_from_scope(iface_scope)
-                registered_scope = mod_scope if mod_scope is not None else iface_scope
+                    else:
+                        mod_type = BuiltinModuleRegistry.get_module_type(mod_path, env)
+                        mod_scope = env.lookup_module(mod_path)
+                        if mod_type is None:
+                            if mod_path not in env.loaded_modules_ast:
+                                load_module(mod_path, iface_path, env)
+                            mod_scope = env.lookup_module(mod_path)
+                            if mod_scope is not None:
+                                mod_type = BuiltinModuleRegistry._build_record_type_from_scope(mod_scope)
+                            else:
+                                mod_type = BuiltinModuleRegistry._build_record_type_from_scope(iface_scope)
+                    registered_scope = mod_scope if mod_scope is not None else iface_scope
                 env.register_module(mod_path, registered_scope)
                 if local_mod_name != mod_path:
                     env.register_module(local_mod_name, registered_scope)

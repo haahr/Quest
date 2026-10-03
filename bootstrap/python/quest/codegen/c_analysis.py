@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from typing import Any, Optional
 
 from quest.analysis.closure import LambdaAnalysis, analyze_closures
-from quest.env import ValueSymbol
+from quest.env import Scope, ValueSymbol
 from quest.typed_ast import (
     TypedApp,
     TypedException,
@@ -484,18 +484,46 @@ def analyze_program_for_c(
             for item in n:
                 _scan_for_builtin_vars(item)
 
+    all_imports: list[TypedImport] = []
     for phrase in prog.phrases:
         if isinstance(phrase, TypedImport):
-            for it in phrase.items:
-                for iname, mpath in zip(it.names, it.effective_module_paths):
-                    _check_import_item(mpath)
-                    if iname != mpath:
-                        _check_import_item(iname)
-                    target = mpath if mpath in all_module_map else (iname if iname in all_module_map else None)
-                    if target is not None:
-                        all_module_map[iname] = all_module_map[target]
-                        all_module_map[mpath] = all_module_map[target]
+            all_imports.append(phrase)
+        elif isinstance(phrase, TypedModule):
+            for b in phrase.bindings:
+                if isinstance(b, TypedImport):
+                    all_imports.append(b)
         _scan_for_builtin_vars(phrase)
+
+    for imp in all_imports:
+        for it in imp.items:
+            for iname, mpath in zip(it.names, it.effective_module_paths):
+                _check_import_item(mpath)
+                if iname != mpath:
+                    _check_import_item(iname)
+                target = mpath if mpath in all_module_map else (iname if iname in all_module_map else None)
+                if target is not None:
+                    all_module_map[iname] = all_module_map[target]
+                    all_module_map[mpath] = all_module_map[target]
+                elif iname not in known_builtins and mpath not in known_builtins:
+                    clean_name = mpath if mpath else iname
+                    scope = None
+                    if env is not None:
+                        scope = env.lookup_module(clean_name) or env.lookup_module(iname)
+                        if scope is None and it.interface_name:
+                            scope = env.lookup_interface(it.interface_name)
+                    if scope is None:
+                        scope = Scope()
+                    stub_mod = TypedModule(
+                        name=clean_name,
+                        interface_name=it.interface_name or "",
+                        bindings=(),
+                        scope=scope,
+                        is_precompiled=True,
+                    )
+                    clean_mod = mangle_module_name(clean_name)
+                    for key in (clean_name, clean_name.lower(), iname, iname.lower(), clean_mod, clean_mod.lower()):
+                        if key:
+                            all_module_map[key] = stub_mod
 
     has_precompiled = any(getattr(m, "is_precompiled", False) for m in all_module_map.values())
     if has_precompiled:
