@@ -90,9 +90,11 @@ class BuildEngine:
         nogc: bool = False,
         compiler_path: Optional[str] = None,
         extra_c_flags: Optional[list[str]] = None,
+        extra_objects: Optional[list[Path]] = None,
     ) -> None:
         self.build_dir = (build_dir or Path(".build")).resolve()
         self.include_paths = [Path(p).resolve() for p in (include_paths or [])]
+        self.extra_objects = [Path(p).resolve() for p in (extra_objects or [])]
         self.verbose = verbose
         actual_log = log_file if log_file is not None else (self.build_dir / "build.log")
         self.logger = BuildLogger(log_file=actual_log, verbose=verbose)
@@ -107,6 +109,10 @@ class BuildEngine:
             c_res = current_dir.resolve()
             if c_res not in paths:
                 paths.append(c_res)
+        for obj in self.extra_objects:
+            p_parent = obj.parent.resolve()
+            if p_parent not in paths:
+                paths.append(p_parent)
         for p in self.include_paths:
             if p not in paths:
                 paths.append(p)
@@ -249,7 +255,10 @@ class BuildEngine:
         self.logger.log("QUEUE INIT", f"enqueued main routine '{main_file.stem}'")
 
         discovered_modules: set[str] = set()
-        linked_objects: list[Path] = []
+        linked_objects: list[Path] = list(self.extra_objects)
+        for obj in self.extra_objects:
+            discovered_modules.add(obj.stem)
+            discovered_modules.add(obj.stem.lower())
         compiled_units: list[str] = []
         module_graph: dict[str, list[str]] = {}
 
@@ -337,8 +346,21 @@ class BuildEngine:
                 stale = False
                 reason = ""
                 if mod_src is None:
-                    # Binary mode: if qm and o exist without source, it is up to date
-                    if qm_path.is_file() and o_path.is_file():
+                    found_obj: Optional[Path] = None
+                    for obj in self.extra_objects:
+                        if obj.stem.lower() in (stem, item_name.lower()):
+                            found_obj = obj
+                            break
+                    if found_obj is None:
+                        from quest.module_loader import resolve_object_file
+                        found_obj = resolve_object_file(item_name, main_file.parent, search_paths)
+                    if found_obj is not None and found_obj.is_file():
+                        o_path = found_obj
+                        qm_cand = found_obj.with_suffix(".qm")
+                        if qm_cand.is_file():
+                            qm_path = qm_cand
+                        stale = False
+                    elif qm_path.is_file() and o_path.is_file():
                         stale = False
                     else:
                         raise BuildError(
@@ -382,17 +404,16 @@ class BuildEngine:
                     manifest = read_qm(qm_path)
                 else:
                     self.logger.log("EVAL STALENESS", f"'{item_name}' -> UP TO DATE")
-                    manifest = read_qm(qm_path)
+                    manifest = read_qm(qm_path) if qm_path.is_file() else None
 
-                if manifest is None:
-                    raise BuildError(f"Failed to load module manifest: {qm_path}")
+                imported_mods: list[ImportedModuleRef] = manifest.imported_modules if manifest else []
 
                 if o_path not in linked_objects:
                     linked_objects.append(o_path)
 
-                module_graph[item_name] = [dep.name for dep in manifest.imported_modules]
+                module_graph[item_name] = [dep.name for dep in imported_mods]
 
-                for dep in manifest.imported_modules:
+                for dep in imported_mods:
                     norm_dep = dep.name.lower()
                     if norm_dep in RUNTIME_BUILTINS:
                         continue

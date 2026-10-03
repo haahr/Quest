@@ -138,7 +138,7 @@ def run_driver(args: list[str]) -> int:
     arg_parser.add_argument(
         "--build-dir", "--build_dir",
         dest="build_dir",
-        default=".build",
+        default=None,
         help="Directory path for transient build artifacts (default: .build).",
     )
     arg_parser.add_argument(
@@ -193,11 +193,13 @@ def run_driver(args: list[str]) -> int:
             from quest.interface_compiler import compile_interface_file
             try:
                 include_paths = [Path(p) for p in parsed_args.include_paths]
-                build_dir = Path(parsed_args.build_dir) if parsed_args.build_dir else Path(".build")
-                build_dir.mkdir(parents=True, exist_ok=True)
+                build_dir = Path(parsed_args.build_dir) if parsed_args.build_dir else None
+                out_dir = build_dir or (Path(parsed_args.output).parent if parsed_args.output else None)
+                if out_dir:
+                    out_dir.mkdir(parents=True, exist_ok=True)
                 compile_interface_file(
                     file_path,
-                    output_dir=build_dir,
+                    output_dir=out_dir,
                     include_paths=include_paths,
                     build_dir=build_dir,
                 )
@@ -209,13 +211,15 @@ def run_driver(args: list[str]) -> int:
             from quest.module_compiler import compile_module_file
             try:
                 include_paths = [Path(p) for p in parsed_args.include_paths]
-                build_dir = Path(parsed_args.build_dir) if parsed_args.build_dir else Path(".build")
-                build_dir.mkdir(parents=True, exist_ok=True)
-                output_dir = Path(parsed_args.output).parent if parsed_args.output else build_dir
+                build_dir = Path(parsed_args.build_dir) if parsed_args.build_dir else None
+                out_dir = Path(parsed_args.output).parent if parsed_args.output else build_dir
+                if out_dir:
+                    out_dir.mkdir(parents=True, exist_ok=True)
                 compile_module_file(
                     file_path,
-                    output_dir=output_dir,
+                    output_dir=out_dir,
                     include_paths=include_paths,
+                    emit_deps=parsed_args.emit_deps,
                     build_dir=build_dir,
                 )
                 return 0
@@ -249,6 +253,7 @@ def run_driver(args: list[str]) -> int:
             include_paths=include_paths,
             verbose=parsed_args.verbose,
             nogc=False,
+            extra_objects=extra_objects,
         )
         try:
             engine.build_main(file_path, output_binary=Path(parsed_args.output))
@@ -463,7 +468,7 @@ def run_compile(args: list[str]) -> int:
     arg_parser.add_argument(
         "--build-dir", "--build_dir",
         dest="build_dir",
-        default=".build",
+        default=None,
         help="Directory path for transient build artifacts (default: .build).",
     )
     arg_parser.add_argument(
@@ -521,11 +526,13 @@ def run_compile(args: list[str]) -> int:
             from quest.interface_compiler import compile_interface_file
             try:
                 include_paths = [Path(p) for p in parsed_args.include_paths]
-                build_dir = Path(parsed_args.build_dir) if parsed_args.build_dir else Path(".build")
-                build_dir.mkdir(parents=True, exist_ok=True)
+                build_dir = Path(parsed_args.build_dir) if parsed_args.build_dir else None
+                out_dir = build_dir or (Path(parsed_args.output).parent if parsed_args.output else None)
+                if out_dir:
+                    out_dir.mkdir(parents=True, exist_ok=True)
                 compile_interface_file(
                     file_path,
-                    output_dir=build_dir,
+                    output_dir=out_dir,
                     include_paths=include_paths,
                     build_dir=build_dir,
                 )
@@ -537,13 +544,15 @@ def run_compile(args: list[str]) -> int:
             from quest.module_compiler import compile_module_file
             try:
                 include_paths = [Path(p) for p in parsed_args.include_paths]
-                build_dir = Path(parsed_args.build_dir) if parsed_args.build_dir else Path(".build")
-                build_dir.mkdir(parents=True, exist_ok=True)
-                output_dir = Path(parsed_args.output).parent if parsed_args.output else build_dir
+                build_dir = Path(parsed_args.build_dir) if parsed_args.build_dir else None
+                out_dir = Path(parsed_args.output).parent if parsed_args.output else build_dir
+                if out_dir:
+                    out_dir.mkdir(parents=True, exist_ok=True)
                 compile_module_file(
                     file_path,
-                    output_dir=output_dir,
+                    output_dir=out_dir,
                     include_paths=include_paths,
+                    emit_deps=parsed_args.emit_deps,
                     build_dir=build_dir,
                 )
                 return 0
@@ -582,6 +591,7 @@ def run_compile(args: list[str]) -> int:
             include_paths=include_paths,
             verbose=parsed_args.verbose,
             nogc=parsed_args.nogc,
+            extra_objects=extra_objects,
         )
         try:
             if parsed_args.compile_only:
